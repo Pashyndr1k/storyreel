@@ -1,0 +1,150 @@
+const LANG_NAMES = { en: 'English', ru: 'Russian' };
+
+function system(lang) {
+  const langName = LANG_NAMES[lang] || 'English';
+  return `You are an award-winning screenwriter and director who specializes in short-form video: commercials, branded content and short films up to 5 minutes long. You think in concrete visual images, understand pacing, and write economically.
+
+Rules:
+- Respond with VALID JSON ONLY. No markdown, no code fences, no commentary outside the JSON.
+- Follow the exact JSON schema given in the task.
+- Write ALL creative content (titles, pitches, synopsis, character descriptions, dialogue, action descriptions, notes) in ${langName}, regardless of the language of the user's input.
+- The only exception: "image_prompt" and "video_prompt" fields must ALWAYS be written in English — never in any other language.`;
+}
+
+function characterBlock(project) {
+  const chars = project.storyline?.characters || [];
+  return chars
+    .map((c) => `- ${c.name} (${c.role}): ${c.description}`)
+    .join('\n');
+}
+
+export function stage1Prompt(project, lang) {
+  return {
+    system: system(lang),
+    maxTokens: 2500,
+    user: `Brief plot description for a short video (target length: up to 5 minutes):
+
+"""
+${project.logline}
+"""
+
+Generate exactly 4 distinct directions for improving and developing this plot. Make them genuinely different from each other (different angle, tone, structure or twist) — not four variations of one idea. Each must stay faithful to the core of the original but make it stronger: clearer conflict, a more distinctive hook, a more satisfying ending.
+
+JSON schema:
+{"ideas":[{"title":"catchy working title","pitch":"the improved plot in 3-6 sentences","why_it_works":"1-2 sentences on why this version is stronger than the original"}]}`,
+  };
+}
+
+export function stage2Prompt(project, lang) {
+  return {
+    system: system(lang),
+    maxTokens: 3500,
+    user: `Original plot description:
+"""
+${project.logline}
+"""
+
+Approved plot direction:
+"""
+${project.approvedPlot}
+"""
+
+Create the final storyline for this short video (up to 5 minutes).
+
+JSON schema:
+{"title":"a strong final title","genres":["2-3 short genre tags, e.g. drama, comedy, thriller"],"synopsis":"a complete story summary of 150-300 words with a clear beginning, middle and end","characters":[{"name":"character name","role":"protagonist / antagonist / supporting","description":"2-4 sentences: age, physical appearance (specific enough to keep the character visually consistent across AI image generation), personality, motivation"}]}`,
+  };
+}
+
+export function stage3Prompt(project, lang) {
+  return {
+    system: system(lang),
+    maxTokens: 3000,
+    user: `Title: ${project.title}
+Genres: ${project.genres.join(', ')}
+
+Synopsis:
+"""
+${project.storyline?.synopsis || ''}
+"""
+
+Characters:
+${characterBlock(project)}
+
+Create a scene-by-scene outline for this short video. The full video must run at most 300 seconds (5 minutes) in total; commercials are typically much shorter — infer the right total length from the material. Use between 3 and 10 scenes. Each scene must be a single continuous location and moment.
+
+JSON schema:
+{"scenes":[{"number":1,"title":"short scene title","summary":"2-3 sentences describing exactly what happens in the scene","duration_sec":20}]}`,
+  };
+}
+
+export function stage4Prompt(project, scene, lang) {
+  const outlineList = project.outline
+    .map((s, i) => `${i + 1}. ${s.title} — ${s.summary} (~${s.duration}s)`)
+    .join('\n');
+  return {
+    system: system(lang),
+    maxTokens: 5000,
+    user: `Title: ${project.title}
+
+Synopsis:
+"""
+${project.storyline?.synopsis || ''}
+"""
+
+Characters:
+${characterBlock(project)}
+
+Full scene outline:
+${outlineList}
+
+Now break down SCENE ${scene.number}: "${scene.title}" (${scene.summary}) into individual camera shots.
+
+Requirements:
+- Each shot lasts between 2 and 10 seconds.
+- Shot durations must add up to roughly the scene's target duration (${scene.duration} seconds).
+- "action" must describe precisely what the characters do and what the camera sees — concrete and filmable, no abstractions.
+- "dialogue" contains the spoken lines prefixed by the speaker's name, or an empty string if the shot has no dialogue.
+- "location" is the specific place plus time of day / lighting condition.
+
+JSON schema:
+{"shots":[{"duration_sec":4,"shot_type":"wide / medium / close-up / POV / tracking / etc.","location":"specific location, time of day","action":"what happens and what the camera sees","dialogue":"NAME: line — or empty string","notes":"mood, lighting, sound or continuity note — may be empty"}]}`,
+  };
+}
+
+export function stage5Prompt(project, scene, shots, lang) {
+  const shotList = shots.map((s, i) => ({
+    shot: i + 1,
+    duration_sec: s.duration,
+    shot_type: s.shotType,
+    location: s.location,
+    action: s.action,
+    dialogue: s.dialogue,
+    notes: s.notes,
+  }));
+  return {
+    system: system(lang),
+    maxTokens: 8000,
+    user: `Title: ${project.title}
+Genres: ${project.genres.join(', ')}
+
+Characters (repeat their key physical details in EVERY prompt where they appear, so the generated images stay visually consistent):
+${characterBlock(project)}
+
+Scene ${scene.number}: "${scene.title}" — ${scene.summary}
+
+Shots of this scene:
+${JSON.stringify(shotList, null, 2)}
+
+For EVERY shot above, write two prompts:
+
+1) "image_prompt" — a detailed English prompt for the Nano Banana image generation model to create the FIRST FRAME of the shot. Describe: the subject and action frozen at the shot's opening moment, each visible character with their consistent physical details, the environment, lighting, camera angle and lens (e.g. 35mm, shallow depth of field), composition, and an overall cinematic style. Write it as one dense paragraph, no lists.
+
+2) "video_prompt" — a detailed English prompt for an image-to-video model that animates that image for the shot's duration. Describe: what moves and how, character actions and expressions, camera movement (static / pan / dolly / handheld...), pacing, and atmosphere or sound cues. Assume the generated image is the starting frame.
+
+JSON schema:
+{"prompts":[{"shot":1,"image_prompt":"...","video_prompt":"..."}]}
+
+Return exactly one entry per shot, in order.`,
+  };
+}
