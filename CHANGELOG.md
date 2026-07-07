@@ -2,7 +2,13 @@
 
 ## 1.0.3 — in development
 
-- (changes will be listed here)
+- Per-project settings menu (🎛 in the project header) with:
+  - editable project title;
+  - a custom "System prompt" — extra instructions added to every generation in
+    that project (tone, style rules, things to avoid), on top of the built-in rules;
+  - optional image/video prompt templates — when set, Stage 5 fits each generated
+    prompt to the template; left blank, prompts stay free-form as before.
+- These settings travel with the project through .md export/import.
 
 ## 1.0.2 — 2026-07-06
 

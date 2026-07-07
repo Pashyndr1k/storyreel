@@ -445,6 +445,8 @@ label { display: block; margin: 14px 0 6px; font-size: 13px; font-weight: 600; c
   max-height: 90vh;
   overflow-y: auto;
 }
+.modal.wide { max-width: 640px; }
+.modal .sub-label { font-weight: 400; color: var(--text); margin-top: 10px; font-size: 12.5px; }
 .modal h2 { margin-bottom: 10px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
 .settings-io { margin-top: 6px; }

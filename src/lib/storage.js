@@ -47,6 +47,9 @@ export function newProject({ title, logline }) {
     createdAt: Date.now(),
     archived: false,
     lang: '', // '' = follow the app language; 'en'/'ru'/'uk' = per-project override
+    systemPrompt: '', // extra project-specific instructions for the prompt builder
+    imageTemplate: '', // optional template for Nano Banana image prompts
+    videoTemplate: '', // optional template for image-to-video prompts
     stage: 1,
     logline: logline || '',
     ideas: [],

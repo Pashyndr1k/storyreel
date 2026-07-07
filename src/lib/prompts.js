@@ -8,15 +8,19 @@ function withPhotos(photos, text) {
     : text;
 }
 
-function system(lang) {
+function system(lang, custom) {
   const langName = LANG_NAMES[lang] || 'English';
-  return `You are an award-winning screenwriter and director who specializes in short-form video: commercials, branded content and short films up to 5 minutes long. You think in concrete visual images, understand pacing, and write economically.
+  const base = `You are an award-winning screenwriter and director who specializes in short-form video: commercials, branded content and short films up to 5 minutes long. You think in concrete visual images, understand pacing, and write economically.
 
 Rules:
 - Respond with VALID JSON ONLY. No markdown, no code fences, no commentary outside the JSON.
 - Follow the exact JSON schema given in the task.
 - Write ALL creative content (titles, pitches, synopsis, character descriptions, dialogue, action descriptions, notes) in ${langName}, regardless of the language of the user's input.
 - The only exception: "image_prompt" and "video_prompt" fields must ALWAYS be written in English — never in any other language.`;
+  const extra = (custom || '').trim();
+  return extra
+    ? `${base}\n\nAdditional project-specific instructions (follow these, but never break the rules above):\n${extra}`
+    : base;
 }
 
 function characterBlock(project) {
@@ -28,7 +32,7 @@ function characterBlock(project) {
 
 export function stage1Prompt(project, lang) {
   return {
-    system: system(lang),
+    system: system(lang, project.systemPrompt),
     maxTokens: 2500,
     user: `Brief plot description for a short video (target length: up to 5 minutes):
 
@@ -45,7 +49,7 @@ JSON schema:
 
 export function stage2Prompt(project, lang) {
   return {
-    system: system(lang),
+    system: system(lang, project.systemPrompt),
     maxTokens: 3500,
     user: `Original plot description:
 """
@@ -66,7 +70,7 @@ JSON schema:
 
 export function stage3Prompt(project, lang) {
   return {
-    system: system(lang),
+    system: system(lang, project.systemPrompt),
     maxTokens: 3000,
     user: `Title: ${project.title}
 Genres: ${project.genres.join(', ')}
@@ -94,7 +98,7 @@ export function stage4Prompt(project, scene, lang) {
     ? `\n\nAttached are reference photos of this scene's environment. Match the locations, lighting and mood in your shot descriptions to these photos.`
     : '';
   return {
-    system: system(lang),
+    system: system(lang, project.systemPrompt),
     maxTokens: 5000,
     user: withPhotos(scene.photos, `Title: ${project.title}
 
@@ -136,8 +140,16 @@ export function stage5Prompt(project, scene, shots, lang) {
   const envNote = scene.photos?.length
     ? `\n\nAttached are reference photos of this scene's environment. Ground the image prompts in what these photos show: architecture, interior details, colors, lighting and atmosphere.`
     : '';
+  const imgTpl = (project.imageTemplate || '').trim();
+  const vidTpl = (project.videoTemplate || '').trim();
+  const tplNote =
+    imgTpl || vidTpl
+      ? '\n\nFollow these prompt templates for this project. Adapt each shot to the template while keeping the required content; the template defines style, structure and any fixed wording, but every prompt must still be in English.' +
+        (imgTpl ? `\n\nIMAGE PROMPT TEMPLATE:\n${imgTpl}` : '') +
+        (vidTpl ? `\n\nVIDEO PROMPT TEMPLATE:\n${vidTpl}` : '')
+      : '';
   return {
-    system: system(lang),
+    system: system(lang, project.systemPrompt),
     maxTokens: 8000,
     user: withPhotos(scene.photos, `Title: ${project.title}
 Genres: ${project.genres.join(', ')}
@@ -159,7 +171,7 @@ For EVERY shot above, write two prompts:
 JSON schema:
 {"prompts":[{"shot":1,"image_prompt":"...","video_prompt":"..."}]}
 
-Return exactly one entry per shot, in order.` + envNote),
+Return exactly one entry per shot, in order.` + tplNote + envNote),
   };
 }
 

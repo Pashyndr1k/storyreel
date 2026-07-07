@@ -6,10 +6,12 @@ import Stage4 from '../stages/Stage4.jsx';
 import Stage5 from '../stages/Stage5.jsx';
 import { buildProjectExport, downloadText } from '../lib/exportScript.js';
 import { LANGS, useI18n } from '../lib/i18n.js';
+import ProjectSettingsModal from '../components/ProjectSettingsModal.jsx';
 
 export default function Project({ project, updateProject, settings, onBack, onSettings }) {
   const { t, lang } = useI18n();
   const [view, setView] = useState(Math.min(project.stage, 5));
+  const [showProjectSettings, setShowProjectSettings] = useState(false);
 
   const STAGES = [1, 2, 3, 4, 5].map((n) => ({ n, label: t(`stages.${n}`) }));
 
@@ -66,9 +68,20 @@ export default function Project({ project, updateProject, settings, onBack, onSe
             ))}
           </select>
           <button className="btn" onClick={exportScript}>{t('proj.export')}</button>
-          <button className="btn" onClick={onSettings}>⚙</button>
+          <button className="btn" title={t('proj.settings')} onClick={() => setShowProjectSettings(true)}>
+            🎛 {t('proj.settings')}
+          </button>
+          <button className="btn" title={t('set.title')} onClick={onSettings}>⚙</button>
         </div>
       </header>
+
+      {showProjectSettings && (
+        <ProjectSettingsModal
+          project={project}
+          update={update}
+          onClose={() => setShowProjectSettings(false)}
+        />
+      )}
 
       <nav className="stage-nav">
         {STAGES.map((s) => (
