@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.3 — in development
+## 1.0.3 — 2026-07-06
 
 - Per-project settings menu (🎛 in the project header) with:
   - editable project title;
