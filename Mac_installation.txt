@@ -1,0 +1,42 @@
+There are two ways to get StoryReel onto a Mac. Apple doesn't allow building Mac apps from Windows, so pick whichever fits:
+
+## Option A — Build the .dmg with GitHub Actions (no Mac needed for the build)
+
+The project already includes a workflow that builds the Mac installer in the cloud.
+
+1. **Create a GitHub repository.** Go to github.com → New repository (e.g. `storyreel`, can be private).
+2. **Push the project from your PC.** In a terminal in `D:\Claude work\storyreel`:
+   ```
+   git init
+   git add .
+   git commit -m "StoryReel v1.0.1"
+   git branch -M main
+   git remote add origin https://github.com/YOUR_USERNAME/storyreel.git
+   git push -u origin main
+   ```
+   (`node_modules`, `dist`, and `release` are already excluded by `.gitignore`.)
+3. **Run the build.** On GitHub, open your repo → **Actions** tab → select **"Build installers"** → click **"Run workflow"**.
+4. **Download the result.** When the run finishes (~5 min), open it and scroll to **Artifacts** — download `storyreel-macos-latest`. Inside the zip is **`StoryReel-1.0.1.dmg`** (you also get a fresh Windows exe from the same run).
+5. **Install on the Mac.** Copy the `.dmg` to the Mac, double-click it, and drag **StoryReel** into the **Applications** folder.
+6. **First launch (important).** The app is unsigned, so don't double-click it the first time. Instead: open **Applications**, **right-click (or Ctrl-click) StoryReel → Open → Open**. If macOS still refuses with a "damaged" message, run this once in Terminal and try again:
+   ```
+   xattr -cr /Applications/StoryReel.app
+   ```
+7. **Add the API key.** In the app, open ⚙ Settings and paste the Mac user's Anthropic API key.
+
+## Option B — Build directly on the Mac
+
+If you have access to the Mac itself:
+
+1. Install Node.js from nodejs.org (LTS version).
+2. Copy the `storyreel` folder to the Mac (zip it first; `node_modules` and `release` aren't needed).
+3. In Terminal, inside the folder:
+   ```
+   npm install
+   npm run dist:mac
+   ```
+4. Open `release/StoryReel-1.0.1.dmg` and drag the app to Applications. Same right-click → Open trick on first launch.
+
+**Quick alternative without any installer:** on a Mac with Node.js, just run `npm install` then `npm run app` inside the project folder — it launches the desktop app directly from source.
+
+I'd recommend Option A: you only do the GitHub setup once, and every future version is one "Run workflow" click away for both Windows and Mac. If you'd like, I can prepare the git repository locally (init + commit) so you only have to create the GitHub repo and push.
