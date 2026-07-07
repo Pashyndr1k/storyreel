@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
 import { stage4Prompt } from '../lib/prompts.js';
 import { uid } from '../lib/storage.js';
+import { fileToResizedDataURL } from '../lib/images.js';
 import { useI18n } from '../lib/i18n.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 
@@ -24,37 +25,59 @@ export function sceneStartTime(project, sceneId) {
 
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, Number(n) || lo));
 
-export default function Stage4({ project, update, settings, goNext, onSettings }) {
-  const { t, lang } = useI18n();
+const mapShots = (rawShots) =>
+  (rawShots || []).map((s) => ({
+    id: uid(),
+    duration: clamp(s.duration_sec, 2, 10),
+    shotType: s.shot_type || '',
+    location: s.location || '',
+    action: s.action || '',
+    dialogue: s.dialogue || '',
+    notes: s.notes || '',
+  }));
+
+export default function Stage4({ project, update, settings, goNext, onSettings, genLang }) {
+  const { t } = useI18n();
   const [sceneId, setSceneId] = useState(project.outline[0]?.id || null);
-  const { busy, error, run } = useGenerate(settings);
+  const [prog, setProg] = useState(null);
+  const { busy, error, run, runBatch } = useGenerate(settings);
 
   const scene = project.outline.find((s) => s.id === sceneId) || project.outline[0];
   const shots = (scene && project.sceneDetails[scene.id]?.shots) || [];
   const doneCount = project.outline.filter((s) => project.sceneDetails[s.id]?.shots?.length).length;
   const allDone = doneCount === project.outline.length && project.outline.length > 0;
 
-  const setShots = (nextShots) =>
+  const applyShots = (targetSceneId, rawShots) =>
     update((p) => ({
-      sceneDetails: { ...p.sceneDetails, [scene.id]: { shots: nextShots } },
+      sceneDetails: { ...p.sceneDetails, [targetSceneId]: { shots: mapShots(rawShots) } },
     }));
 
   const generate = () => {
     if (shots.length && !window.confirm(t('s4.replaceConfirm'))) return;
-    run(stage4Prompt(project, { ...scene, number: project.outline.indexOf(scene) + 1 }, lang), (data) =>
-      setShots(
-        (data.shots || []).map((s) => ({
-          id: uid(),
-          duration: clamp(s.duration_sec, 2, 10),
-          shotType: s.shot_type || '',
-          location: s.location || '',
-          action: s.action || '',
-          dialogue: s.dialogue || '',
-          notes: s.notes || '',
-        }))
-      )
+    run(
+      stage4Prompt(project, { ...scene, number: project.outline.indexOf(scene) + 1 }, genLang),
+      (data) => applyShots(scene.id, data.shots)
     );
   };
+
+  const processAll = () => {
+    let targets = project.outline.filter((s) => !project.sceneDetails[s.id]?.shots?.length);
+    if (!targets.length) {
+      if (!window.confirm(t('batch.confirmAll4'))) return;
+      targets = project.outline;
+    }
+    runBatch(
+      targets,
+      (s) => stage4Prompt(project, { ...s, number: project.outline.indexOf(s) + 1 }, genLang),
+      (s, data) => applyShots(s.id, data.shots),
+      (a, b) => setProg(b ? { a, b } : null)
+    );
+  };
+
+  const setShots = (nextShots) =>
+    update((p) => ({
+      sceneDetails: { ...p.sceneDetails, [scene.id]: { shots: nextShots } },
+    }));
 
   const updateShot = (id, patch) => setShots(shots.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   const removeShot = (id) => setShots(shots.filter((s) => s.id !== id));
@@ -70,6 +93,20 @@ export default function Stage4({ project, update, settings, goNext, onSettings }
       ...shots,
       { id: uid(), duration: 4, shotType: '', location: '', action: '', dialogue: '', notes: '' },
     ]);
+
+  const updateScenePhotos = (photos) =>
+    update((p) => ({
+      outline: p.outline.map((s) => (s.id === scene.id ? { ...s, photos } : s)),
+    }));
+
+  const addScenePhoto = async (file) => {
+    try {
+      const dataURL = await fileToResizedDataURL(file);
+      updateScenePhotos([...(scene.photos || []), dataURL].slice(0, 3));
+    } catch (e) {
+      window.alert(e.message);
+    }
+  };
 
   if (!project.outline.length) {
     return (
@@ -109,12 +146,47 @@ export default function Stage4({ project, update, settings, goNext, onSettings }
         {t('s4.startsAt', { t: fmt(sceneStart) })} · {t('s4.target', { d: scene.duration })}
         {shots.length > 0 && <> · {t('s4.current', { d: sceneTotal })}</>}
         <p>{scene.summary}</p>
+        <label className="photos-label">{t('scene.photos')}</label>
+        <div className="photo-row">
+          {(scene.photos || []).map((ph, i) => (
+            <div key={i} className="photo-thumb">
+              <img src={ph} alt="" />
+              <button
+                className="photo-x"
+                onClick={() => updateScenePhotos((scene.photos || []).filter((_, j) => j !== i))}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+          {(scene.photos || []).length < 3 && (
+            <label className="btn small file-btn">
+              {t('char.addPhoto')}
+              <input
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (f) addScenePhoto(f);
+                }}
+              />
+            </label>
+          )}
+        </div>
       </div>
 
       <div className="row">
         <button className="btn primary" disabled={busy} onClick={generate}>
-          {busy ? t('gen.generating') : shots.length ? t('s4.regenerate') : t('s4.generate')}
+          {busy && !prog ? t('gen.generating') : shots.length ? t('s4.regenerate') : t('s4.generate')}
         </button>
+        <button className="btn" disabled={busy} onClick={processAll}>
+          {t('batch.run4')}
+        </button>
+        {prog && (
+          <span className="total-badge">{t('batch.progress', { a: prog.a, b: prog.b })}</span>
+        )}
       </div>
       <ErrorNote error={error} onSettings={onSettings} />
 

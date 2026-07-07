@@ -1,8 +1,8 @@
-import { useI18n } from '../lib/i18n.js';
+import { useI18n, localeOf } from '../lib/i18n.js';
 
-export default function ProjectCard({ project, onOpen, onArchive, onRestore, onDelete }) {
+export default function ProjectCard({ project, onOpen, onArchive, onRestore, onDuplicate, onDelete }) {
   const { t, lang } = useI18n();
-  const date = new Date(project.createdAt).toLocaleDateString(lang === 'ru' ? 'ru-RU' : 'en-US', {
+  const date = new Date(project.createdAt).toLocaleDateString(localeOf(lang), {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -25,6 +25,9 @@ export default function ProjectCard({ project, onOpen, onArchive, onRestore, onD
       </div>
       <div className="card-actions">
         <button className="btn primary small" onClick={onOpen}>{t('card.open')}</button>
+        {onDuplicate && (
+          <button className="btn small" title={t('card.duplicate')} onClick={onDuplicate}>⧉</button>
+        )}
         {onArchive && <button className="btn small" onClick={onArchive}>{t('card.archive')}</button>}
         {onRestore && <button className="btn small" onClick={onRestore}>{t('card.restore')}</button>}
         <button className="btn danger small" onClick={onDelete}>{t('card.delete')}</button>

@@ -1,4 +1,12 @@
-const LANG_NAMES = { en: 'English', ru: 'Russian' };
+import { dataURLToImageBlock } from './images.js';
+
+const LANG_NAMES = { en: 'English', ru: 'Russian', uk: 'Ukrainian' };
+
+function withPhotos(photos, text) {
+  return photos?.length
+    ? [...photos.map(dataURLToImageBlock), { type: 'text', text }]
+    : text;
+}
 
 function system(lang) {
   const langName = LANG_NAMES[lang] || 'English';
@@ -82,10 +90,13 @@ export function stage4Prompt(project, scene, lang) {
   const outlineList = project.outline
     .map((s, i) => `${i + 1}. ${s.title} — ${s.summary} (~${s.duration}s)`)
     .join('\n');
+  const envNote = scene.photos?.length
+    ? `\n\nAttached are reference photos of this scene's environment. Match the locations, lighting and mood in your shot descriptions to these photos.`
+    : '';
   return {
     system: system(lang),
     maxTokens: 5000,
-    user: `Title: ${project.title}
+    user: withPhotos(scene.photos, `Title: ${project.title}
 
 Synopsis:
 """
@@ -108,7 +119,7 @@ Requirements:
 - "location" is the specific place plus time of day / lighting condition.
 
 JSON schema:
-{"shots":[{"duration_sec":4,"shot_type":"wide / medium / close-up / POV / tracking / etc.","location":"specific location, time of day","action":"what happens and what the camera sees","dialogue":"NAME: line — or empty string","notes":"mood, lighting, sound or continuity note — may be empty"}]}`,
+{"shots":[{"duration_sec":4,"shot_type":"wide / medium / close-up / POV / tracking / etc.","location":"specific location, time of day","action":"what happens and what the camera sees","dialogue":"NAME: line — or empty string","notes":"mood, lighting, sound or continuity note — may be empty"}]}` + envNote),
   };
 }
 
@@ -122,10 +133,13 @@ export function stage5Prompt(project, scene, shots, lang) {
     dialogue: s.dialogue,
     notes: s.notes,
   }));
+  const envNote = scene.photos?.length
+    ? `\n\nAttached are reference photos of this scene's environment. Ground the image prompts in what these photos show: architecture, interior details, colors, lighting and atmosphere.`
+    : '';
   return {
     system: system(lang),
     maxTokens: 8000,
-    user: `Title: ${project.title}
+    user: withPhotos(scene.photos, `Title: ${project.title}
 Genres: ${project.genres.join(', ')}
 
 Characters (repeat their key physical details in EVERY prompt where they appear, so the generated images stay visually consistent):
@@ -145,6 +159,20 @@ For EVERY shot above, write two prompts:
 JSON schema:
 {"prompts":[{"shot":1,"image_prompt":"...","video_prompt":"..."}]}
 
-Return exactly one entry per shot, in order.`,
+Return exactly one entry per shot, in order.` + envNote),
+  };
+}
+
+export function extractCharacterPrompt(character, lang) {
+  const text = `Look carefully at the attached reference photo(s) of the character "${character.name || 'the character'}".
+
+Write a detailed visual description (3–5 sentences) that can be used to generate consistent AI images of this character: apparent age, face shape and features, hair (color, length, style), eyes, build, skin tone, clothing style, and any distinctive features. Be specific and concrete — no vague words like "attractive" or "ordinary".
+
+JSON schema:
+{"description":"..."}`;
+  return {
+    system: system(lang),
+    maxTokens: 1500,
+    user: withPhotos(character.photos || [], text),
   };
 }

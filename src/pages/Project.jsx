@@ -4,14 +4,17 @@ import Stage2 from '../stages/Stage2.jsx';
 import Stage3 from '../stages/Stage3.jsx';
 import Stage4 from '../stages/Stage4.jsx';
 import Stage5 from '../stages/Stage5.jsx';
-import { buildScriptMarkdown, downloadText } from '../lib/exportScript.js';
-import { useI18n } from '../lib/i18n.js';
+import { buildProjectExport, downloadText } from '../lib/exportScript.js';
+import { LANGS, useI18n } from '../lib/i18n.js';
 
 export default function Project({ project, updateProject, settings, onBack, onSettings }) {
   const { t, lang } = useI18n();
   const [view, setView] = useState(Math.min(project.stage, 5));
 
   const STAGES = [1, 2, 3, 4, 5].map((n) => ({ n, label: t(`stages.${n}`) }));
+
+  // Language of the generated script content: per-project override, else app language.
+  const genLang = project.lang || lang;
 
   const update = (patch) => updateProject(project.id, patch);
 
@@ -23,10 +26,10 @@ export default function Project({ project, updateProject, settings, onBack, onSe
 
   const exportScript = () => {
     const safe = project.title.replace(/[^\w\d\- ]+/g, '').trim().replace(/\s+/g, '-') || 'script';
-    downloadText(`${safe}.md`, buildScriptMarkdown(project, lang));
+    downloadText(`${safe}.md`, buildProjectExport(project, genLang));
   };
 
-  const stageProps = { project, update, settings, goNext, onSettings };
+  const stageProps = { project, update, settings, goNext, onSettings, genLang };
 
   return (
     <div className="page project-page">
@@ -51,6 +54,17 @@ export default function Project({ project, updateProject, settings, onBack, onSe
           />
         </div>
         <div className="header-actions">
+          <select
+            className="lang-select"
+            title={t('proj.langLabel')}
+            value={project.lang || ''}
+            onChange={(e) => update({ lang: e.target.value })}
+          >
+            <option value="">{t('proj.langDefault')}</option>
+            {LANGS.map((l) => (
+              <option key={l.id} value={l.id}>{l.label}</option>
+            ))}
+          </select>
           <button className="btn" onClick={exportScript}>{t('proj.export')}</button>
           <button className="btn" onClick={onSettings}>⚙</button>
         </div>

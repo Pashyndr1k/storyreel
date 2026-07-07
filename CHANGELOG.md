@@ -1,8 +1,24 @@
 # Changelog
 
-## 1.0.2 — in development
+## 1.0.2 — 2026-07-06
 
-- (changes will be listed here)
+- Ukrainian (UA) interface language, alongside English and Russian.
+- Per-project script language override: each project can generate its content in
+  EN, RU or UK independently of the app language (selector in the project header).
+- "⚡ Break down all scenes" button on Stage 4 — batch-processes every scene with
+  one click (skips scenes that already have breakdowns; offers full regeneration
+  when everything is done).
+- "⚡ Prompts for all scenes" button on Stage 5 — same one-click batch processing
+  for image/video prompts.
+- Duplicate button (⧉) on project cards for making variants of a project.
+- Character cards accept up to 3 reference photos; a "Describe appearance from
+  photos" button uses Claude vision to write the character description from them.
+- Scenes accept up to 3 environment reference photos (Stage 4); they are sent to
+  Claude during shot breakdown and prompt generation so locations, lighting and
+  mood match the references.
+- Export/import projects as .md: the exported script now embeds the full project
+  data, and a new "Import project" button on the main page restores a complete
+  project (including photos) from such a file.
 
 ## 1.0.1 — 2026-07-06
 

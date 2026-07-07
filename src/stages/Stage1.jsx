@@ -4,12 +4,12 @@ import { uid } from '../lib/storage.js';
 import { useI18n } from '../lib/i18n.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 
-export default function Stage1({ project, update, settings, goNext, onSettings }) {
-  const { t, lang } = useI18n();
+export default function Stage1({ project, update, settings, goNext, onSettings, genLang }) {
+  const { t } = useI18n();
   const { busy, error, run } = useGenerate(settings);
 
   const generate = () =>
-    run(stage1Prompt(project, lang), (data) =>
+    run(stage1Prompt(project, genLang), (data) =>
       update({
         ideas: (data.ideas || []).map((i) => ({ id: uid(), ...i })),
         selectedIdeaId: null,

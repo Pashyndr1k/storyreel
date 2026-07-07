@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import ProjectCard from '../components/ProjectCard.jsx';
 import NewProjectModal from '../components/NewProjectModal.jsx';
-import { newProject } from '../lib/storage.js';
+import { newProject, uid } from '../lib/storage.js';
+import { parseProjectFile } from '../lib/exportScript.js';
 import { useI18n } from '../lib/i18n.js';
 
 export default function Home({
@@ -48,6 +49,34 @@ export default function Home({
     }
   };
 
+  const duplicate = (p) => {
+    const copy = structuredClone(p);
+    copy.id = uid();
+    copy.createdAt = Date.now();
+    copy.archived = false;
+    copy.title = `${p.title} ${t('card.copySuffix')}`;
+    setProjects((ps) => [copy, ...ps]);
+  };
+
+  const importProject = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const p = parseProjectFile(String(reader.result));
+      if (!p) {
+        window.alert(t('imp.invalid'));
+        return;
+      }
+      p.id = uid();
+      p.createdAt = Date.now();
+      p.archived = false;
+      setProjects((ps) => [p, ...ps]);
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div className="page">
       <header className="page-header">
@@ -64,11 +93,16 @@ export default function Home({
           >
             <option value="en">EN</option>
             <option value="ru">RU</option>
+            <option value="uk">UA</option>
           </select>
           <button className="btn" onClick={onArchivePage}>
             {t('home.archive')}{archivedCount ? ` (${archivedCount})` : ''}
           </button>
           <button className="btn" onClick={onSettings}>{t('home.settings')}</button>
+          <label className="btn file-btn">
+            {t('home.importProject')}
+            <input type="file" accept=".md,.json,text/markdown,application/json" hidden onChange={importProject} />
+          </label>
           <button className="btn primary" onClick={() => setShowNew(true)}>{t('home.new')}</button>
         </div>
       </header>
@@ -107,6 +141,7 @@ export default function Home({
               project={p}
               onOpen={() => onOpen(p.id)}
               onArchive={() => updateProject(p.id, { archived: true })}
+              onDuplicate={() => duplicate(p)}
               onDelete={() => del(p)}
             />
           ))}

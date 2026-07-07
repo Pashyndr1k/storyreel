@@ -379,6 +379,36 @@ label { display: block; margin: 14px 0 6px; font-size: 13px; font-weight: 600; c
 .prompt-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; }
 .prompt-head label { margin-bottom: 4px; }
 
+/* photo references */
+.photos-label { margin: 10px 0 4px; font-size: 12px; }
+.photo-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0 2px; }
+.photo-thumb {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-x {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+}
+.card-actions { flex-wrap: wrap; }
+
 /* modal */
 .overlay {
   position: fixed;

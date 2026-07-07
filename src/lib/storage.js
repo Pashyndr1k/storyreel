@@ -14,7 +14,12 @@ export function loadProjects() {
 }
 
 export function saveProjects(projects) {
-  localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+  try {
+    localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+  } catch (e) {
+    console.error('saveProjects failed', e);
+    window.alert('Storage is full — the latest change could not be saved. Remove some reference photos or delete old projects.');
+  }
 }
 
 export function loadSettings() {
@@ -41,6 +46,7 @@ export function newProject({ title, logline }) {
     genres: [],
     createdAt: Date.now(),
     archived: false,
+    lang: '', // '' = follow the app language; 'en'/'ru'/'uk' = per-project override
     stage: 1,
     logline: logline || '',
     ideas: [],

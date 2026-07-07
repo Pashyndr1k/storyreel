@@ -1,17 +1,18 @@
 import { useGenerate } from '../lib/useGenerate.js';
-import { stage2Prompt } from '../lib/prompts.js';
+import { stage2Prompt, extractCharacterPrompt } from '../lib/prompts.js';
 import { uid } from '../lib/storage.js';
+import { fileToResizedDataURL } from '../lib/images.js';
 import { useI18n } from '../lib/i18n.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 
-export default function Stage2({ project, update, settings, goNext, onSettings }) {
-  const { t, lang } = useI18n();
+export default function Stage2({ project, update, settings, goNext, onSettings, genLang }) {
+  const { t } = useI18n();
   const { busy, error, run } = useGenerate(settings);
   const storyline = project.storyline;
 
   const generate = () => {
     if (storyline && !window.confirm(t('s2.replaceConfirm'))) return;
-    run(stage2Prompt(project, lang), (data) =>
+    run(stage2Prompt(project, genLang), (data) =>
       update((p) => ({
         storyline: {
           synopsis: data.synopsis || '',
@@ -20,6 +21,7 @@ export default function Stage2({ project, update, settings, goNext, onSettings }
             name: c.name || '',
             role: c.role || '',
             description: c.description || '',
+            photos: [],
           })),
         },
         title: data.title || p.title,
@@ -34,7 +36,9 @@ export default function Stage2({ project, update, settings, goNext, onSettings }
     update((p) => ({
       storyline: {
         ...p.storyline,
-        characters: p.storyline.characters.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+        characters: p.storyline.characters.map((c) =>
+          c.id === id ? { ...c, ...(typeof patch === 'function' ? patch(c) : patch) } : c
+        ),
       },
     }));
 
@@ -42,7 +46,10 @@ export default function Stage2({ project, update, settings, goNext, onSettings }
     update((p) => ({
       storyline: {
         ...p.storyline,
-        characters: [...p.storyline.characters, { id: uid(), name: '', role: '', description: '' }],
+        characters: [
+          ...p.storyline.characters,
+          { id: uid(), name: '', role: '', description: '', photos: [] },
+        ],
       },
     }));
 
@@ -53,6 +60,25 @@ export default function Stage2({ project, update, settings, goNext, onSettings }
         characters: p.storyline.characters.filter((c) => c.id !== id),
       },
     }));
+
+  const addPhoto = async (id, file) => {
+    try {
+      const dataURL = await fileToResizedDataURL(file);
+      updateChar(id, (c) => ({ photos: [...(c.photos || []), dataURL].slice(0, 3) }));
+    } catch (e) {
+      window.alert(e.message);
+    }
+  };
+
+  const removePhoto = (id, idx) =>
+    updateChar(id, (c) => ({ photos: (c.photos || []).filter((_, i) => i !== idx) }));
+
+  const extract = (c) => {
+    if (c.description?.trim() && !window.confirm(t('char.extractConfirm'))) return;
+    run(extractCharacterPrompt(c, genLang), (data) => {
+      if (data.description) updateChar(c.id, { description: data.description });
+    });
+  };
 
   return (
     <section className="stage">
@@ -103,6 +129,35 @@ export default function Stage2({ project, update, settings, goNext, onSettings }
                 placeholder={t('s2.charDesc')}
                 onChange={(e) => updateChar(c.id, { description: e.target.value })}
               />
+              <label className="photos-label">{t('char.photos')}</label>
+              <div className="photo-row">
+                {(c.photos || []).map((ph, i) => (
+                  <div key={i} className="photo-thumb">
+                    <img src={ph} alt="" />
+                    <button className="photo-x" onClick={() => removePhoto(c.id, i)}>✕</button>
+                  </div>
+                ))}
+                {(c.photos || []).length < 3 && (
+                  <label className="btn small file-btn">
+                    {t('char.addPhoto')}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        e.target.value = '';
+                        if (f) addPhoto(c.id, f);
+                      }}
+                    />
+                  </label>
+                )}
+                {(c.photos || []).length > 0 && (
+                  <button className="btn small" disabled={busy} onClick={() => extract(c)}>
+                    {busy ? t('gen.generating') : t('char.extract')}
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </>
