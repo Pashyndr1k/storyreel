@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.3 — in development
+
+- (changes will be listed here)
+
 ## 1.0.2 — 2026-07-06
 
 - Ukrainian (UA) interface language, alongside English and Russian.
