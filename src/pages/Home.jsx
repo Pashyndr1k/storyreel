@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import ProjectCard from '../components/ProjectCard.jsx';
 import NewProjectModal from '../components/NewProjectModal.jsx';
+import AppShell from '../components/AppShell.jsx';
+import Dropdown from '../components/Dropdown.jsx';
+import { Upload, Plus, Clapperboard } from '../components/icons.jsx';
 import { newProject, uid } from '../lib/storage.js';
 import { parseProjectFile } from '../lib/exportScript.js';
 import { useI18n } from '../lib/i18n.js';
@@ -22,7 +25,6 @@ export default function Home({
   const [showNew, setShowNew] = useState(false);
 
   const active = projects.filter((p) => !p.archived);
-  const archivedCount = projects.length - active.length;
 
   const q = query.trim().toLowerCase();
   const filtered = active.filter(
@@ -32,9 +34,13 @@ export default function Home({
       p.genres.some((g) => g.toLowerCase().includes(q)) ||
       (p.logline || '').toLowerCase().includes(q)
   );
-  const sorted = [...filtered].sort((a, b) =>
-    sort === 'newest' ? b.createdAt - a.createdAt : a.createdAt - b.createdAt
-  );
+  const sorted = [...filtered].sort((a, b) => {
+    if (sort === 'newest') return b.createdAt - a.createdAt;
+    if (sort === 'oldest') return a.createdAt - b.createdAt;
+    if (sort === 'az') return a.title.localeCompare(b.title);
+    if (sort === 'stage') return b.stage - a.stage;
+    return 0;
+  });
 
   const create = (title, logline) => {
     const p = newProject({ title, logline });
@@ -44,9 +50,7 @@ export default function Home({
   };
 
   const del = (p) => {
-    if (window.confirm(t('confirm.delete', { title: p.title }))) {
-      removeProject(p.id);
-    }
+    if (window.confirm(t('confirm.delete', { title: p.title }))) removeProject(p.id);
   };
 
   const duplicate = (p) => {
@@ -77,55 +81,49 @@ export default function Home({
     reader.readAsText(file);
   };
 
+  const sortOptions = [
+    { value: 'newest', label: t('home.newest') },
+    { value: 'oldest', label: t('home.oldest') },
+    { value: 'az', label: t('home.sortAZ') },
+    { value: 'stage', label: t('home.sortStage') },
+  ];
+
   return (
-    <div className="page">
-      <header className="page-header">
-        <div>
-          <h1>🎬 StoryReel <span className="app-version">v{__APP_VERSION__}</span></h1>
-          <p className="subtitle">{t('home.subtitle')}</p>
+    <AppShell
+      route="home"
+      onNavigate={(r) => r === 'archive' && onArchivePage()}
+      onSettings={onSettings}
+      lang={settings.lang || 'en'}
+      setLang={(l) => setSettings({ ...settings, lang: l })}
+      search={{ value: query, onChange: setQuery, placeholder: t('home.search') }}
+    >
+      <div className="title-row">
+        <div className="title-left">
+          <h1 className="page-title">{t('home.yourProjects')}</h1>
+          <span className="count-chip">{active.length}</span>
         </div>
-        <div className="header-actions">
-          <select
-            className="lang-select"
-            value={settings.lang || 'en'}
-            onChange={(e) => setSettings({ ...settings, lang: e.target.value })}
-            title={t('set.language')}
-          >
-            <option value="en">EN</option>
-            <option value="ru">RU</option>
-            <option value="uk">UA</option>
-          </select>
-          <button className="btn" onClick={onArchivePage}>
-            {t('home.archive')}{archivedCount ? ` (${archivedCount})` : ''}
-          </button>
-          <button className="btn" onClick={onSettings}>{t('home.settings')}</button>
-          <label className="btn file-btn">
-            {t('home.importProject')}
+        <div className="title-actions">
+          <Dropdown value={sort} options={sortOptions} onChange={setSort} title={t('home.newest')} />
+          <label className="glass-btn file-btn">
+            <Upload size={15} />
+            {t('home.import')}
             <input type="file" accept=".md,.json,text/markdown,application/json" hidden onChange={importProject} />
           </label>
-          <button className="btn primary" onClick={() => setShowNew(true)}>{t('home.new')}</button>
+          <button className="btn primary" onClick={() => setShowNew(true)}>
+            <Plus size={16} />
+            {t('home.newProject')}
+          </button>
         </div>
-      </header>
-
-      <div className="toolbar">
-        <input
-          className="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={t('home.search')}
-        />
-        <select value={sort} onChange={(e) => setSort(e.target.value)}>
-          <option value="newest">{t('home.newest')}</option>
-          <option value="oldest">{t('home.oldest')}</option>
-        </select>
       </div>
 
       {sorted.length === 0 ? (
         <div className="empty">
+          <div className="empty-tile"><Clapperboard size={30} /></div>
           {active.length === 0 ? (
             <>
               <p>{t('home.noProjects')}</p>
               <button className="btn primary" onClick={() => setShowNew(true)}>
+                <Plus size={16} />
                 {t('home.createFirst')}
               </button>
             </>
@@ -149,6 +147,6 @@ export default function Home({
       )}
 
       {showNew && <NewProjectModal onCreate={create} onClose={() => setShowNew(false)} />}
-    </div>
+    </AppShell>
   );
 }

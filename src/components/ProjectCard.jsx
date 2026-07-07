@@ -1,36 +1,88 @@
 import { useI18n, localeOf } from '../lib/i18n.js';
+import StageRing from './StageRing.jsx';
+import { Copy, Archive as ArchiveIcon, Trash, RestoreIcon } from './icons.jsx';
+
+const TINTS = ['#f4805e', '#60a5fa', '#ec6ead', '#8b5cf6'];
+
+function tintOf(id) {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return TINTS[h % TINTS.length];
+}
+
+// Use the first reference photo in the project as the poster, if any.
+function posterOf(project) {
+  const scenePhoto = project.outline?.find((s) => s.photos?.length)?.photos?.[0];
+  if (scenePhoto) return scenePhoto;
+  const charPhoto = project.storyline?.characters?.find((c) => c.photos?.length)?.photos?.[0];
+  return charPhoto || null;
+}
+
+function hexToRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+}
 
 export default function ProjectCard({ project, onOpen, onArchive, onRestore, onDuplicate, onDelete }) {
   const { t, lang } = useI18n();
   const date = new Date(project.createdAt).toLocaleDateString(localeOf(lang), {
-    year: 'numeric',
     month: 'short',
     day: 'numeric',
   });
+  const poster = posterOf(project);
+  const tint = tintOf(project.id);
+  const rgb = hexToRgb(tint);
+
+  const posterStyle = poster
+    ? { backgroundImage: `url(${poster})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+    : {
+        background: `repeating-linear-gradient(45deg, rgba(${rgb},0.12) 0 12px, rgba(${rgb},0.05) 12px 24px)`,
+      };
 
   return (
-    <div className="card">
-      <div className="card-body" onClick={onOpen}>
-        <h3>{project.title}</h3>
-        <div className="tags">
-          {project.genres.slice(0, 3).map((g) => (
-            <span key={g} className="tag">{g}</span>
-          ))}
-          {!project.genres.length && <span className="tag muted">{t('card.noGenre')}</span>}
-        </div>
-        <div className="card-meta">
-          <span>{date}</span>
-          <span className="stage-badge">{t('card.stage', { n: Math.min(project.stage, 5) })}</span>
-        </div>
-      </div>
-      <div className="card-actions">
-        <button className="btn primary small" onClick={onOpen}>{t('card.open')}</button>
-        {onDuplicate && (
-          <button className="btn small" title={t('card.duplicate')} onClick={onDuplicate}>⧉</button>
+    <div className="sr-card">
+      <div className="sr-poster" style={posterStyle} onClick={onOpen}>
+        {!poster && (
+          <span className="sr-poster-label" style={{ color: `rgba(${rgb},0.8)` }}>
+            poster · 9:16
+          </span>
         )}
-        {onArchive && <button className="btn small" onClick={onArchive}>{t('card.archive')}</button>}
-        {onRestore && <button className="btn small" onClick={onRestore}>{t('card.restore')}</button>}
-        <button className="btn danger small" onClick={onDelete}>{t('card.delete')}</button>
+        <span className="sr-date">{date}</span>
+      </div>
+
+      <div className="sr-body">
+        <div className="sr-body-main">
+          <h3 className="sr-title" onClick={onOpen}>{project.title}</h3>
+          <div className="sr-tags">
+            {project.genres.slice(0, 3).map((g) => (
+              <span key={g} className="sr-tag">{g}</span>
+            ))}
+            {!project.genres.length && <span className="sr-tag muted">{t('card.noGenre')}</span>}
+          </div>
+        </div>
+        <StageRing stage={Math.min(project.stage, 5)} total={5} />
+      </div>
+
+      <div className="sr-actions">
+        <button className="btn primary sr-open" onClick={onOpen}>{t('card.open')}</button>
+        {onDuplicate && (
+          <button className="icon-btn" title={t('card.duplicate')} aria-label={t('card.duplicate')} onClick={onDuplicate}>
+            <Copy size={15} />
+          </button>
+        )}
+        {onArchive && (
+          <button className="icon-btn" title={t('card.archive')} aria-label={t('card.archive')} onClick={onArchive}>
+            <ArchiveIcon size={15} />
+          </button>
+        )}
+        {onRestore && (
+          <button className="icon-btn" title={t('card.restore')} aria-label={t('card.restore')} onClick={onRestore}>
+            <RestoreIcon size={15} />
+          </button>
+        )}
+        <button className="icon-btn danger" title={t('card.delete')} aria-label={t('card.delete')} onClick={onDelete}>
+          <Trash size={15} />
+        </button>
       </div>
     </div>
   );

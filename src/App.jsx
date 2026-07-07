@@ -53,8 +53,11 @@ export default function App() {
           projects={projects}
           updateProject={updateProject}
           removeProject={removeProject}
+          settings={settings}
+          setSettings={setSettings}
           onOpen={(id) => setRoute({ name: 'project', id })}
           onBack={() => setRoute({ name: 'home' })}
+          onSettings={() => setShowSettings(true)}
         />
       )}
       {route.name === 'project' && current && (

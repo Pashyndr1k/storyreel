@@ -7,6 +7,7 @@ import Stage5 from '../stages/Stage5.jsx';
 import { buildProjectExport, downloadText } from '../lib/exportScript.js';
 import { LANGS, useI18n } from '../lib/i18n.js';
 import ProjectSettingsModal from '../components/ProjectSettingsModal.jsx';
+import { ArrowLeft, Download, Sliders, Cog } from '../components/icons.jsx';
 
 export default function Project({ project, updateProject, settings, onBack, onSettings }) {
   const { t, lang } = useI18n();
@@ -36,7 +37,7 @@ export default function Project({ project, updateProject, settings, onBack, onSe
   return (
     <div className="page project-page">
       <header className="project-header">
-        <button className="btn back" onClick={onBack}>{t('proj.back')}</button>
+        <button className="btn back" onClick={onBack}><ArrowLeft size={16} />{t('proj.back')}</button>
         <div className="project-title-block">
           <input
             className="title-input"
@@ -67,11 +68,11 @@ export default function Project({ project, updateProject, settings, onBack, onSe
               <option key={l.id} value={l.id}>{l.label}</option>
             ))}
           </select>
-          <button className="btn" onClick={exportScript}>{t('proj.export')}</button>
+          <button className="btn" onClick={exportScript}><Download size={16} />{t('proj.export')}</button>
           <button className="btn" title={t('proj.settings')} onClick={() => setShowProjectSettings(true)}>
-            🎛 {t('proj.settings')}
+            <Sliders size={16} /> {t('proj.settings')}
           </button>
-          <button className="btn" title={t('set.title')} onClick={onSettings}>⚙</button>
+          <button className="btn" title={t('set.title')} aria-label={t('set.title')} onClick={onSettings}><Cog size={16} /></button>
         </div>
       </header>
 

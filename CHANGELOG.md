@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.1.0 — 2026-07-07
+
+- Full visual redesign: dark-violet glassmorphic theme across the whole app.
+- New Projects/home screen: persistent left icon rail, top bar with brand,
+  centered search and language pill, and poster cards with a per-project stage
+  progress ring, date badge, genre tags and an icon action row.
+- Project cards use the first character/scene reference photo as the poster,
+  falling back to a tinted placeholder.
+- New sort options: Newest, Oldest, A–Z, and By stage.
+- Archive screen restyled to match, sharing the rail navigation.
+- Restyled project editor, stages, modals and inputs to the violet theme;
+  replaced emoji controls with Lucide-style line icons.
+- Added Plus Jakarta Sans (with system-ui fallback).
+
 ## 1.0.3 — 2026-07-06
 
 - Per-project settings menu (🎛 in the project header) with:

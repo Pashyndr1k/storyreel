@@ -1,30 +1,39 @@
 import ProjectCard from '../components/ProjectCard.jsx';
+import AppShell from '../components/AppShell.jsx';
+import { Clapperboard } from '../components/icons.jsx';
 import { useI18n } from '../lib/i18n.js';
 
-export default function Archive({ projects, updateProject, removeProject, onOpen, onBack }) {
+export default function Archive({ projects, updateProject, removeProject, settings, setSettings, onOpen, onBack, onSettings }) {
   const { t } = useI18n();
   const archived = projects
     .filter((p) => p.archived)
     .sort((a, b) => b.createdAt - a.createdAt);
 
   const del = (p) => {
-    if (window.confirm(t('confirm.delete', { title: p.title }))) {
-      removeProject(p.id);
-    }
+    if (window.confirm(t('confirm.delete', { title: p.title }))) removeProject(p.id);
   };
 
   return (
-    <div className="page">
-      <header className="page-header">
-        <div>
-          <button className="btn back" onClick={onBack}>{t('archive.back')}</button>
-          <h1>{t('archive.title')}</h1>
-          <p className="subtitle">{t('archive.subtitle')}</p>
+    <AppShell
+      route="archive"
+      onNavigate={(r) => r === 'home' && onBack()}
+      onSettings={onSettings}
+      lang={settings.lang || 'en'}
+      setLang={(l) => setSettings({ ...settings, lang: l })}
+    >
+      <div className="title-row">
+        <div className="title-left">
+          <h1 className="page-title">{t('archive.title')}</h1>
+          <span className="count-chip">{archived.length}</span>
         </div>
-      </header>
+      </div>
+      <p className="section-sub">{t('archive.subtitle')}</p>
 
       {archived.length === 0 ? (
-        <div className="empty"><p>{t('archive.empty')}</p></div>
+        <div className="empty">
+          <div className="empty-tile"><Clapperboard size={30} /></div>
+          <p>{t('archive.empty')}</p>
+        </div>
       ) : (
         <div className="grid">
           {archived.map((p) => (
@@ -38,6 +47,6 @@ export default function Archive({ projects, updateProject, removeProject, onOpen
           ))}
         </div>
       )}
-    </div>
+    </AppShell>
   );
 }
