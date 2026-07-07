@@ -81,7 +81,7 @@ export default function Home({
     <div className="page">
       <header className="page-header">
         <div>
-          <h1>🎬 StoryReel</h1>
+          <h1>🎬 StoryReel <span className="app-version">v{__APP_VERSION__}</span></h1>
           <p className="subtitle">{t('home.subtitle')}</p>
         </div>
         <div className="header-actions">

@@ -43,10 +43,25 @@ h3 { margin: 0 0 8px; font-size: 16px; }
   align-items: flex-start;
   gap: 16px;
   margin-bottom: 22px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
-.header-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.page-header > div:first-child { min-width: 0; }
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+.header-actions .btn { white-space: nowrap; }
 .lang-select { width: auto; padding: 7px 8px; font-weight: 600; }
+.app-version {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  vertical-align: middle;
+}
 
 /* ---------- buttons ---------- */
 .btn {
