@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.1 — 2026-07-07
+
+- macOS build is now a **universal** binary (x64 + arm64): a single `.dmg` runs
+  on both Intel Macs (e.g. 2018 models) and Apple Silicon. Requires macOS 11+.
+
 ## 1.1.0 — 2026-07-07
 
 - Full visual redesign: dark-violet glassmorphic theme across the whole app.
