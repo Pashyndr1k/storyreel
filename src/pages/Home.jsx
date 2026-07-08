@@ -4,7 +4,7 @@ import NewProjectModal from '../components/NewProjectModal.jsx';
 import AppShell from '../components/AppShell.jsx';
 import Dropdown from '../components/Dropdown.jsx';
 import { Upload, Plus, Clapperboard } from '../components/icons.jsx';
-import { newProject, uid } from '../lib/storage.js';
+import { newProject, uid, migrateProject } from '../lib/storage.js';
 import { parseProjectFile } from '../lib/exportScript.js';
 import { useI18n } from '../lib/i18n.js';
 
@@ -68,11 +68,12 @@ export default function Home({
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      const p = parseProjectFile(String(reader.result));
-      if (!p) {
+      const parsed = parseProjectFile(String(reader.result));
+      if (!parsed) {
         window.alert(t('imp.invalid'));
         return;
       }
+      const p = migrateProject(parsed);
       p.id = uid();
       p.createdAt = Date.now();
       p.archived = false;

@@ -3,6 +3,7 @@ import Home from './pages/Home.jsx';
 import Archive from './pages/Archive.jsx';
 import Project from './pages/Project.jsx';
 import SettingsModal from './components/SettingsModal.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { loadProjects, saveProjects, loadSettings, saveSettings } from './lib/storage.js';
 import { I18nContext, createT } from './lib/i18n.js';
 
@@ -35,6 +36,7 @@ export default function App() {
   return (
     <I18nContext.Provider value={i18n}>
     <div className="app">
+      <ErrorBoundary key={`${route.name}:${route.id || ''}`} onHome={() => setRoute({ name: 'home' })}>
       {route.name === 'home' && (
         <Home
           projects={projects}
@@ -69,6 +71,7 @@ export default function App() {
           onSettings={() => setShowSettings(true)}
         />
       )}
+      </ErrorBoundary>
       {showSettings && (
         <SettingsModal settings={settings} setSettings={setSettings} onClose={() => setShowSettings(false)} />
       )}

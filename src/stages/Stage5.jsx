@@ -179,7 +179,7 @@ export default function Stage5({ project, update, settings, onSettings, genLang 
         shots.map((shot, i) => {
           const p = project.shotPrompts[shot.id] || { imagePrompt: '', videoPrompt: '' };
           const pref = prefFor(shot.id);
-          const genImg = project.shotImages[shot.id];
+          const genImg = (project.shotImages || {})[shot.id];
           return (
             <div key={shot.id} className="shot-card">
               <div className="shot-head">

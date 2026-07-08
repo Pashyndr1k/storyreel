@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.3 — 2026-07-07
+
+- Fixed a crash (black screen) when importing a project exported from an older
+  version: projects are now normalized to the current schema on import and on
+  load, so any older export opens correctly. No data is dropped.
+- Standardized the export/import format (embedded project JSON tagged with a
+  schema version); older files remain importable.
+- Added an error boundary so an unexpected view error shows a recoverable
+  message instead of blanking the whole app.
+
 ## 1.1.2 — 2026-07-07
 
 - Google Gemini image generation (Nano Banana 2 / `gemini-3-pro-image-preview`,

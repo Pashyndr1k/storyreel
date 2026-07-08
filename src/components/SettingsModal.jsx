@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { MODELS } from '../lib/claude.js';
 import { LANGS, useI18n } from '../lib/i18n.js';
-import { loadProjects, saveProjects } from '../lib/storage.js';
+import { loadProjects, saveProjects, migrateProject } from '../lib/storage.js';
 import { downloadText } from '../lib/exportScript.js';
 
 export default function SettingsModal({ settings, setSettings, onClose }) {
@@ -25,7 +25,7 @@ export default function SettingsModal({ settings, setSettings, onClose }) {
         const data = JSON.parse(reader.result);
         if (!Array.isArray(data)) throw new Error('bad format');
         if (window.confirm(t('set.importConfirm', { n: data.length }))) {
-          saveProjects(data);
+          saveProjects(data.map(migrateProject));
           window.location.reload();
         }
       } catch {
