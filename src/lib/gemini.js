@@ -21,7 +21,7 @@ function extractImage(data) {
 }
 
 // Generate an image from a text prompt plus optional reference images (data URLs).
-export async function generateImage(settings, { prompt, images = [] }) {
+export async function generateImage(settings, { prompt, images = [], aspectRatio }) {
   const key = settings.geminiKey;
   if (!key) throw new Error('NO_GEMINI_KEY');
   const model = settings.geminiModel || DEFAULT_IMAGE_MODEL;
@@ -29,12 +29,15 @@ export async function generateImage(settings, { prompt, images = [] }) {
   const parts = [{ text: prompt }];
   for (const img of images) parts.push({ inline_data: dataURLToInline(img) });
 
+  const generationConfig = { responseModalities: ['IMAGE'] };
+  if (aspectRatio) generationConfig.imageConfig = { aspectRatio };
+
   const res = await fetch(`${ENDPOINT}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       contents: [{ role: 'user', parts }],
-      generationConfig: { responseModalities: ['IMAGE'] },
+      generationConfig,
     }),
   });
 

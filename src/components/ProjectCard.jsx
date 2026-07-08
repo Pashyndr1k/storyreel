@@ -45,7 +45,7 @@ export default function ProjectCard({ project, onOpen, onArchive, onRestore, onD
       <div className="sr-poster" style={posterStyle} onClick={onOpen}>
         {!poster && (
           <span className="sr-poster-label" style={{ color: `rgba(${rgb},0.8)` }}>
-            poster · 9:16
+            poster · 16:9
           </span>
         )}
         <span className="sr-date">{date}</span>

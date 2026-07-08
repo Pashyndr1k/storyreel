@@ -46,7 +46,10 @@ export default function Stage2({ project, update, settings, goNext, onSettings, 
     setCoverErr('');
     try {
       const promptData = await generateJSON(settings, coverPromptSpec(project, genLang));
-      const cover = await generateImage(settings, { prompt: promptData.image_prompt });
+      const cover = await generateImage(settings, {
+        prompt: `${promptData.image_prompt}\n\nRender in 16:9 widescreen aspect ratio.`,
+        aspectRatio: '16:9',
+      });
       update({ cover });
     } catch (e) {
       setCoverErr(e.message || String(e));
@@ -152,7 +155,7 @@ export default function Stage2({ project, update, settings, goNext, onSettings, 
                 {project.cover ? (
                   <img className="cover-preview" src={project.cover} alt={t('cover.label')} />
                 ) : (
-                  <div className="cover-placeholder">{coverBusy ? '…' : '9:16'}</div>
+                  <div className="cover-placeholder">{coverBusy ? '…' : '16:9'}</div>
                 )}
                 {coverBusy && <div className="cover-loading">{t('cover.generating')}</div>}
               </div>

@@ -196,7 +196,7 @@ Identify the SINGLE most striking key event or key visual moment in this synopsi
 
 Requirements:
 - The prompt MUST be in English only.
-- Compose it as a vertical 9:16 cinematic movie poster / cover, no text or lettering in the image.
+- Compose it as a 16:9 widescreen cinematic key frame / cover image, no text or lettering in the image.
 - Describe the subject and action, setting, lighting, mood, color palette and cinematic style; include the key characters' consistent physical details if they appear.
 - One dense paragraph, no lists.
 

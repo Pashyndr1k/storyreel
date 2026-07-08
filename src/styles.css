@@ -173,17 +173,19 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  height: 42px;
   background: var(--glass);
   color: var(--text-2);
   border: 1px solid var(--glass-border);
   border-radius: var(--r-btn);
-  padding: 10px 16px;
+  padding: 0 16px;
   font-size: 13px;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
   transition: 0.15s;
   white-space: nowrap;
+  vertical-align: middle;
 }
 .btn:hover:not(:disabled), .glass-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.09); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -201,10 +203,11 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
   color: var(--danger);
 }
 .btn.danger:hover:not(:disabled) { background: rgba(255, 107, 138, 0.12); border-color: rgba(255, 107, 138, 0.4); }
-.btn.small { padding: 6px 12px; font-size: 12.5px; }
-.btn.tiny { padding: 4px 9px; font-size: 12px; border-radius: 8px; }
-.btn.big { padding: 12px 22px; font-size: 14px; }
+.btn.small { height: 36px; padding: 0 12px; font-size: 12.5px; }
+.btn.tiny { height: 28px; padding: 0 9px; font-size: 12px; border-radius: 8px; }
+.btn.big { height: 50px; padding: 0 22px; font-size: 14px; }
 .btn.back {
+  height: auto;
   background: transparent;
   border: none;
   color: var(--muted);
@@ -231,12 +234,12 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 .icon-btn.danger { background: transparent; border-color: transparent; color: var(--danger); }
 .icon-btn.danger:hover { background: rgba(255, 107, 138, 0.12); }
 
-.file-btn { cursor: pointer; }
+.file-btn { cursor: pointer; margin: 0; }
 
 /* ============ DROPDOWN ============ */
 .dd { position: relative; }
+.dd-trigger { height: 42px; }
 .dd-trigger.pill { border-radius: 999px; padding: 0 14px; height: 44px; }
-.dd-trigger { height: 44px; }
 .dd-chevron { opacity: 0.6; }
 .dd-menu {
   position: absolute;
@@ -411,7 +414,7 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 }
 .genres-input:hover, .genres-input:focus { background: var(--glass-input); border-color: var(--glass-border); padding-left: 12px; }
 .project-header .header-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.lang-select { width: auto; padding: 9px 10px; font-weight: 600; }
+.lang-select { width: auto; height: 42px; padding: 0 10px; font-weight: 600; }
 
 /* stage nav */
 .stage-nav { display: flex; gap: 6px; margin-bottom: 26px; flex-wrap: wrap; }
@@ -551,8 +554,8 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 .cover-row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
 .cover-frame {
   position: relative;
-  width: 120px;
-  height: 213px;
+  width: 240px;
+  height: 135px;
   flex: none;
   border-radius: 12px;
   overflow: hidden;
@@ -592,7 +595,7 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 .check input { width: auto; margin: 0; cursor: pointer; accent-color: var(--accent); }
 .check input:disabled { cursor: not-allowed; }
 .gen-image { margin-top: 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
-.gen-image img { max-width: 320px; width: 100%; border-radius: 12px; border: 1px solid var(--glass-border); display: block; }
+.gen-image img { max-width: 360px; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 12px; border: 1px solid var(--glass-border); display: block; }
 
 /* ============ MODALS ============ */
 .overlay {
