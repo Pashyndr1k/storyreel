@@ -175,6 +175,36 @@ Return exactly one entry per shot, in order.` + tplNote + envNote),
   };
 }
 
+// Asks Claude to pick the key visual from the synopsis and write an English
+// image prompt for the project cover (poster). Returns { image_prompt }.
+export function coverPromptSpec(project, lang) {
+  return {
+    system: system(lang, project.systemPrompt),
+    maxTokens: 900,
+    user: `Title: ${project.title}
+Genres: ${project.genres.join(', ')}
+
+Synopsis:
+"""
+${project.storyline?.synopsis || ''}
+"""
+
+Characters:
+${characterBlock(project)}
+
+Identify the SINGLE most striking key event or key visual moment in this synopsis — the one image that best captures the whole film as a poster. Then write ONE detailed image-generation prompt for that image.
+
+Requirements:
+- The prompt MUST be in English only.
+- Compose it as a vertical 9:16 cinematic movie poster / cover, no text or lettering in the image.
+- Describe the subject and action, setting, lighting, mood, color palette and cinematic style; include the key characters' consistent physical details if they appear.
+- One dense paragraph, no lists.
+
+JSON schema:
+{"image_prompt":"..."}`,
+  };
+}
+
 export function extractCharacterPrompt(character, lang) {
   const text = `Look carefully at the attached reference photo(s) of the character "${character.name || 'the character'}".
 

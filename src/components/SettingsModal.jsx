@@ -9,6 +9,8 @@ export default function SettingsModal({ settings, setSettings, onClose }) {
   const [apiKey, setApiKey] = useState(settings.apiKey);
   const [model, setModel] = useState(settings.model);
   const [lang, setLang] = useState(settings.lang || 'en');
+  const [geminiKey, setGeminiKey] = useState(settings.geminiKey || '');
+  const [geminiModel, setGeminiModel] = useState(settings.geminiModel || 'gemini-3-pro-image-preview');
 
   const exportAll = () => {
     downloadText('storyreel-backup.json', JSON.stringify(loadProjects(), null, 2));
@@ -60,6 +62,25 @@ export default function SettingsModal({ settings, setSettings, onClose }) {
             <option key={m.id} value={m.id}>{m.label}</option>
           ))}
         </select>
+
+        <label>{t('set.geminiKey')}</label>
+        <input
+          type="password"
+          value={geminiKey}
+          onChange={(e) => setGeminiKey(e.target.value)}
+          placeholder="AIza…"
+        />
+        <p className="hint">
+          {t('set.geminiKeyHint')}{' '}
+          <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">aistudio.google.com</a>.
+        </p>
+        <label>{t('set.geminiModel')}</label>
+        <input
+          value={geminiModel}
+          onChange={(e) => setGeminiModel(e.target.value)}
+          placeholder="gemini-3-pro-image-preview"
+        />
+
         <div className="settings-io">
           <label>{t('set.backup')}</label>
           <div className="row">
@@ -75,7 +96,14 @@ export default function SettingsModal({ settings, setSettings, onClose }) {
           <button
             className="btn primary"
             onClick={() => {
-              setSettings({ ...settings, apiKey: apiKey.trim(), model, lang });
+              setSettings({
+                ...settings,
+                apiKey: apiKey.trim(),
+                model,
+                lang,
+                geminiKey: geminiKey.trim(),
+                geminiModel: geminiModel.trim() || 'gemini-3-pro-image-preview',
+              });
               onClose();
             }}
           >

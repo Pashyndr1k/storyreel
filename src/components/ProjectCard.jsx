@@ -10,8 +10,9 @@ function tintOf(id) {
   return TINTS[h % TINTS.length];
 }
 
-// Use the first reference photo in the project as the poster, if any.
+// Prefer the generated cover; fall back to the first reference photo.
 function posterOf(project) {
+  if (project.cover) return project.cover;
   const scenePhoto = project.outline?.find((s) => s.photos?.length)?.photos?.[0];
   if (scenePhoto) return scenePhoto;
   const charPhoto = project.storyline?.characters?.find((c) => c.photos?.length)?.photos?.[0];

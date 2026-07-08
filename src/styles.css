@@ -546,6 +546,54 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 .photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .photo-x { position: absolute; top: 2px; right: 2px; background: rgba(0, 0, 0, 0.65); color: #fff; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; cursor: pointer; line-height: 1; padding: 0; }
 
+/* cover generation (Stage 2) */
+.cover-block { margin: 14px 0 6px; }
+.cover-row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.cover-frame {
+  position: relative;
+  width: 120px;
+  height: 213px;
+  flex: none;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+}
+.cover-preview { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cover-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-3);
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+}
+.cover-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(12, 11, 24, 0.55);
+  backdrop-filter: blur(2px);
+  color: #fff;
+  font-size: 12px;
+  text-align: center;
+  padding: 8px;
+}
+.cover-side { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.cover-side .hint { margin: 0; }
+
+/* image generation (Stage 5) */
+.img-gen { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
+.check { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-size: 12.5px; font-weight: 500; color: var(--text-2); cursor: pointer; }
+.check input { width: auto; margin: 0; cursor: pointer; accent-color: var(--accent); }
+.check input:disabled { cursor: not-allowed; }
+.gen-image { margin-top: 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.gen-image img { max-width: 320px; width: 100%; border-radius: 12px; border: 1px solid var(--glass-border); display: block; }
+
 /* ============ MODALS ============ */
 .overlay {
   position: fixed;

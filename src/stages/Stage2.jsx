@@ -1,5 +1,8 @@
+import { useEffect, useRef, useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
-import { stage2Prompt, extractCharacterPrompt } from '../lib/prompts.js';
+import { generateJSON } from '../lib/claude.js';
+import { generateImage } from '../lib/gemini.js';
+import { stage2Prompt, extractCharacterPrompt, coverPromptSpec } from '../lib/prompts.js';
 import { uid } from '../lib/storage.js';
 import { fileToResizedDataURL } from '../lib/images.js';
 import { useI18n } from '../lib/i18n.js';
@@ -9,6 +12,10 @@ export default function Stage2({ project, update, settings, goNext, onSettings, 
   const { t } = useI18n();
   const { busy, error, run } = useGenerate(settings);
   const storyline = project.storyline;
+
+  const [coverBusy, setCoverBusy] = useState(false);
+  const [coverErr, setCoverErr] = useState('');
+  const coverTried = useRef(false);
 
   const generate = () => {
     if (storyline && !window.confirm(t('s2.replaceConfirm'))) return;
@@ -30,6 +37,34 @@ export default function Stage2({ project, update, settings, goNext, onSettings, 
     );
   };
 
+  // Cover = Claude picks the key visual from the synopsis, Gemini renders it.
+  const genCover = async () => {
+    if (!settings.apiKey) return setCoverErr('NO_KEY');
+    if (!settings.geminiKey) return setCoverErr('NO_GEMINI_KEY');
+    if (!project.storyline?.synopsis?.trim()) return;
+    setCoverBusy(true);
+    setCoverErr('');
+    try {
+      const promptData = await generateJSON(settings, coverPromptSpec(project, genLang));
+      const cover = await generateImage(settings, { prompt: promptData.image_prompt });
+      update({ cover });
+    } catch (e) {
+      setCoverErr(e.message || String(e));
+    } finally {
+      setCoverBusy(false);
+    }
+  };
+
+  // Auto-generate a cover once when the synopsis exists and there's no cover yet.
+  useEffect(() => {
+    if (coverTried.current || coverBusy) return;
+    if (project.storyline?.synopsis?.trim() && !project.cover && settings.apiKey && settings.geminiKey) {
+      coverTried.current = true;
+      genCover();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.storyline?.synopsis, project.cover, settings.apiKey, settings.geminiKey]);
+
   const setSynopsis = (synopsis) => update((p) => ({ storyline: { ...p.storyline, synopsis } }));
 
   const updateChar = (id, patch) =>
@@ -46,19 +81,13 @@ export default function Stage2({ project, update, settings, goNext, onSettings, 
     update((p) => ({
       storyline: {
         ...p.storyline,
-        characters: [
-          ...p.storyline.characters,
-          { id: uid(), name: '', role: '', description: '', photos: [] },
-        ],
+        characters: [...p.storyline.characters, { id: uid(), name: '', role: '', description: '', photos: [] }],
       },
     }));
 
   const removeChar = (id) =>
     update((p) => ({
-      storyline: {
-        ...p.storyline,
-        characters: p.storyline.characters.filter((c) => c.id !== id),
-      },
+      storyline: { ...p.storyline, characters: p.storyline.characters.filter((c) => c.id !== id) },
     }));
 
   const addPhoto = async (id, file) => {
@@ -80,6 +109,23 @@ export default function Stage2({ project, update, settings, goNext, onSettings, 
     });
   };
 
+  const coverErrNode = () => {
+    if (!coverErr) return null;
+    if (coverErr === 'NO_GEMINI_KEY')
+      return (
+        <div className="note warn">
+          {t('err.noGeminiKey')} <button className="btn small" onClick={onSettings}>{t('err.openSettings')}</button>
+        </div>
+      );
+    if (coverErr === 'NO_KEY')
+      return (
+        <div className="note warn">
+          {t('err.noKey')} <button className="btn small" onClick={onSettings}>{t('err.openSettings')}</button>
+        </div>
+      );
+    return <div className="note error">{t('err.failed')} {coverErr}</div>;
+  };
+
   return (
     <section className="stage">
       <h2>{t('s2.title')}</h2>
@@ -99,6 +145,27 @@ export default function Stage2({ project, update, settings, goNext, onSettings, 
 
       {storyline && (
         <>
+          <div className="cover-block">
+            <label>{t('cover.label')}</label>
+            <div className="cover-row">
+              <div className="cover-frame">
+                {project.cover ? (
+                  <img className="cover-preview" src={project.cover} alt={t('cover.label')} />
+                ) : (
+                  <div className="cover-placeholder">{coverBusy ? '…' : '9:16'}</div>
+                )}
+                {coverBusy && <div className="cover-loading">{t('cover.generating')}</div>}
+              </div>
+              <div className="cover-side">
+                <p className="hint">{t('cover.auto')}</p>
+                <button className="btn small" disabled={coverBusy} onClick={genCover}>
+                  {coverBusy ? t('cover.generating') : project.cover ? t('cover.regenerate') : t('cover.generate')}
+                </button>
+                {coverErrNode()}
+              </div>
+            </div>
+          </div>
+
           <label>{t('s2.synopsis')}</label>
           <textarea rows={9} value={storyline.synopsis} onChange={(e) => setSynopsis(e.target.value)} />
 
@@ -164,11 +231,7 @@ export default function Stage2({ project, update, settings, goNext, onSettings, 
       )}
 
       <footer className="stage-footer">
-        <button
-          className="btn primary big"
-          disabled={!storyline || !storyline.synopsis.trim()}
-          onClick={goNext}
-        >
+        <button className="btn primary big" disabled={!storyline || !storyline.synopsis.trim()} onClick={goNext}>
           {t('s2.continue')}
         </button>
       </footer>

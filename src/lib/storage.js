@@ -28,10 +28,12 @@ export function loadSettings() {
       apiKey: '',
       model: 'claude-sonnet-5',
       lang: 'en',
+      geminiKey: '',
+      geminiModel: 'gemini-3-pro-image-preview',
       ...(JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}),
     };
   } catch {
-    return { apiKey: '', model: 'claude-sonnet-5', lang: 'en' };
+    return { apiKey: '', model: 'claude-sonnet-5', lang: 'en', geminiKey: '', geminiModel: 'gemini-3-pro-image-preview' };
   }
 }
 
@@ -51,6 +53,8 @@ export function newProject({ title, logline }) {
     imageTemplate: '', // optional template for Nano Banana image prompts
     videoTemplate: '', // optional template for image-to-video prompts
     stage: 1,
+    cover: '', // generated project cover image (data URL)
+    shotImages: {}, // shotId -> generated image (data URL)
     logline: logline || '',
     ideas: [],
     selectedIdeaId: null,

@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.1.2 — 2026-07-07
+
+- Google Gemini image generation (Nano Banana 2 / `gemini-3-pro-image-preview`,
+  configurable in Settings alongside a new Gemini API key field).
+- Stage 2: a project cover image is generated automatically from the synopsis —
+  Claude picks the key visual, writes an English prompt, and Gemini renders it.
+  The cover becomes the project card poster. Manual regenerate button included.
+- Stage 5: each shot has a "Generate image" button that renders the image prompt
+  with Gemini. Two checkboxes (both on by default) attach character reference
+  photos and location reference photos so appearances and settings stay
+  consistent; the attached references are described in the request. Generated
+  images can be downloaded.
+- Generated images are downscaled/compressed before being stored locally.
+
 ## 1.1.1 — 2026-07-07
 
 - macOS build is now a **universal** binary (x64 + arm64): a single `.dmg` runs
