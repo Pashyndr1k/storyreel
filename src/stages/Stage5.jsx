@@ -112,7 +112,7 @@ export default function Stage5({ project, update, settings, onSettings, genLang 
     setImgBusy(shot.id);
     setImgErr(null);
     try {
-      const img = await generateImage(settings, { prompt: text, images, aspectRatio: '16:9' });
+      const img = await generateImage(settings, { prompt: text, images, aspectRatio: '16:9', imageSize: '2K' });
       update((p) => ({ shotImages: { ...p.shotImages, [shot.id]: img } }));
     } catch (e) {
       setImgErr({ id: shot.id, msg: e.message || String(e) });

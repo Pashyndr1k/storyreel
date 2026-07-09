@@ -50,6 +50,7 @@ export default function Stage2({ project, update, settings, goNext, onSettings, 
       const cover = await generateImage(settings, {
         prompt: `${promptData.image_prompt}\n\nRender in 16:9 widescreen aspect ratio.`,
         aspectRatio: '16:9',
+        imageSize: '2K',
       });
       update({ cover });
     } catch (e) {

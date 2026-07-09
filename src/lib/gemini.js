@@ -21,7 +21,8 @@ function extractImage(data) {
 }
 
 // Generate an image from a text prompt plus optional reference images (data URLs).
-export async function generateImage(settings, { prompt, images = [], aspectRatio }) {
+// imageSize: '1K' | '2K' | '4K' — resolution hint for Gemini 3 Pro Image (Nano Banana 2).
+export async function generateImage(settings, { prompt, images = [], aspectRatio, imageSize }) {
   const key = settings.geminiKey;
   if (!key) throw new Error('NO_GEMINI_KEY');
   const model = settings.geminiModel || DEFAULT_IMAGE_MODEL;
@@ -30,7 +31,10 @@ export async function generateImage(settings, { prompt, images = [], aspectRatio
   for (const img of images) parts.push({ inline_data: dataURLToInline(img) });
 
   const generationConfig = { responseModalities: ['IMAGE'] };
-  if (aspectRatio) generationConfig.imageConfig = { aspectRatio };
+  const imageConfig = {};
+  if (aspectRatio) imageConfig.aspectRatio = aspectRatio;
+  if (imageSize) imageConfig.imageSize = imageSize;
+  if (Object.keys(imageConfig).length) generationConfig.imageConfig = imageConfig;
 
   const res = await fetch(`${ENDPOINT}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
     method: 'POST',
