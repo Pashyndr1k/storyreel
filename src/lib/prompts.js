@@ -16,7 +16,8 @@ Rules:
 - Respond with VALID JSON ONLY. No markdown, no code fences, no commentary outside the JSON.
 - Follow the exact JSON schema given in the task.
 - Write ALL creative content (titles, pitches, synopsis, character descriptions, dialogue, action descriptions, notes) in ${langName}, regardless of the language of the user's input.
-- The only exception: "image_prompt" and "video_prompt" fields must ALWAYS be written in English — never in any other language.`;
+- Character names must ALWAYS be written in English using Latin letters (transliterate if needed) — never in Cyrillic or any non-Latin script — so they stay consistent inside the English image and video prompts.
+- The "image_prompt" and "video_prompt" fields must ALWAYS be written entirely in English — never in any other language.`;
   const extra = (custom || '').trim();
   return extra
     ? `${base}\n\nAdditional project-specific instructions (follow these, but never break the rules above):\n${extra}`

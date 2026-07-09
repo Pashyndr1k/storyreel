@@ -58,7 +58,8 @@ export async function generateImage(settings, { prompt, images = [], aspectRatio
 
   const data = await res.json();
   const raw = extractImage(data);
-  return resizeDataURL(raw, 2_000_000, 0.85); // ~2 megapixels
+  // Keep the model's native resolution; only re-encode to JPEG to keep storage sane.
+  return resizeDataURL(raw, Number.POSITIVE_INFINITY, 0.92);
 }
 
 // Fetch the models available to this key, preferring image-capable ones.

@@ -47,7 +47,7 @@ export default function Stage5({ project, update, settings, onSettings, genLang 
 
   const prefFor = (shotId) => refPrefs[shotId] || { char: true, loc: true };
   const setPref = (shotId, patch) =>
-    setRefPrefs((prev) => ({ ...prev, [shotId]: { ...prefFor(shotId), ...patch } }));
+    setRefPrefs((prev) => ({ ...prev, [shotId]: { char: true, loc: true, ...prev[shotId], ...patch } }));
 
   const applyPrompts = (targetScene, data) =>
     update((p) => {
@@ -99,7 +99,9 @@ export default function Stage5({ project, update, settings, onSettings, genLang 
     const useLoc = pref.loc ? locRefs : [];
     const images = [...useChar, ...useLoc];
 
-    let text = prompt;
+    let text = '';
+    if (project.systemPrompt?.trim()) text += `Project style direction: ${project.systemPrompt.trim()}\n\n`;
+    text += prompt;
     if (useChar.length || useLoc.length) {
       text += `\n\nReference images are attached.`;
       if (useChar.length)
@@ -209,24 +211,26 @@ export default function Stage5({ project, update, settings, onSettings, genLang 
                   >
                     {imgBusy === shot.id ? t('img.generating') : genImg ? t('img.regenerate') : t('img.generate')}
                   </button>
-                  <label className="check">
-                    <input
-                      type="checkbox"
-                      checked={pref.char}
-                      disabled={!charRefs.length}
-                      onChange={(e) => setPref(shot.id, { char: e.target.checked })}
-                    />
+                  <button
+                    type="button"
+                    className={`check-toggle ${pref.char ? 'on' : ''}`}
+                    disabled={!charRefs.length}
+                    aria-pressed={pref.char}
+                    onClick={() => setPref(shot.id, { char: !pref.char })}
+                  >
+                    <span className="box" />
                     {t('img.useChar')}
-                  </label>
-                  <label className="check">
-                    <input
-                      type="checkbox"
-                      checked={pref.loc}
-                      disabled={!locRefs.length}
-                      onChange={(e) => setPref(shot.id, { loc: e.target.checked })}
-                    />
+                  </button>
+                  <button
+                    type="button"
+                    className={`check-toggle ${pref.loc ? 'on' : ''}`}
+                    disabled={!locRefs.length}
+                    aria-pressed={pref.loc}
+                    onClick={() => setPref(shot.id, { loc: !pref.loc })}
+                  >
+                    <span className="box" />
                     {t('img.useLoc')}
-                  </label>
+                  </button>
                 </div>
 
                 {imgErr?.id === shot.id &&

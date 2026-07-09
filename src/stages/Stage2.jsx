@@ -47,8 +47,11 @@ export default function Stage2({ project, update, settings, goNext, onSettings, 
     setCoverErr('');
     try {
       const promptData = await generateJSON(settings, coverPromptSpec(project, genLang));
+      let coverPrompt = '';
+      if (project.systemPrompt?.trim()) coverPrompt += `Project style direction: ${project.systemPrompt.trim()}\n\n`;
+      coverPrompt += `${promptData.image_prompt}\n\nRender in 16:9 widescreen aspect ratio.`;
       const cover = await generateImage(settings, {
-        prompt: `${promptData.image_prompt}\n\nRender in 16:9 widescreen aspect ratio.`,
+        prompt: coverPrompt,
         aspectRatio: '16:9',
         imageSize: '2K',
       });
