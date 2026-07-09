@@ -1,4 +1,5 @@
 import { useI18n } from '../lib/i18n.js';
+import AutoTextarea from './AutoTextarea.jsx';
 
 export default function ProjectSettingsModal({ project, update, onClose }) {
   const { t } = useI18n();
@@ -17,8 +18,8 @@ export default function ProjectSettingsModal({ project, update, onClose }) {
 
         <label>{t('pset.systemPrompt')}</label>
         <p className="hint">{t('pset.systemPromptHint')}</p>
-        <textarea
-          rows={5}
+        <AutoTextarea
+          minRows={4}
           value={project.systemPrompt || ''}
           onChange={(e) => update({ systemPrompt: e.target.value })}
           placeholder={t('pset.systemPromptPh')}
@@ -27,15 +28,15 @@ export default function ProjectSettingsModal({ project, update, onClose }) {
         <label>{t('pset.templates')}</label>
         <p className="hint">{t('pset.templatesHint')}</p>
         <label className="sub-label">{t('pset.imageTpl')}</label>
-        <textarea
-          rows={3}
+        <AutoTextarea
+          minRows={3}
           value={project.imageTemplate || ''}
           onChange={(e) => update({ imageTemplate: e.target.value })}
           placeholder={t('pset.imageTplPh')}
         />
         <label className="sub-label">{t('pset.videoTpl')}</label>
-        <textarea
-          rows={3}
+        <AutoTextarea
+          minRows={3}
           value={project.videoTemplate || ''}
           onChange={(e) => update({ videoTemplate: e.target.value })}
           placeholder={t('pset.videoTplPh')}

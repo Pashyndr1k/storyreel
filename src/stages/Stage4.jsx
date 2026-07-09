@@ -5,6 +5,7 @@ import { uid } from '../lib/storage.js';
 import { fileToResizedDataURL } from '../lib/images.js';
 import { useI18n } from '../lib/i18n.js';
 import ErrorNote from '../components/ErrorNote.jsx';
+import AutoTextarea from '../components/AutoTextarea.jsx';
 
 export function fmt(sec) {
   const m = Math.floor(sec / 60);
@@ -234,12 +235,12 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
             </div>
             <div className="field">
               <label>{t('s4.action')}</label>
-              <textarea rows={2} value={shot.action} onChange={(e) => updateShot(shot.id, { action: e.target.value })} />
+              <AutoTextarea minRows={2} value={shot.action} onChange={(e) => updateShot(shot.id, { action: e.target.value })} />
             </div>
             <div className="field">
               <label>{t('s4.dialogue')}</label>
-              <textarea
-                rows={2}
+              <AutoTextarea
+                minRows={2}
                 value={shot.dialogue}
                 placeholder={t('s4.dialoguePh')}
                 onChange={(e) => updateShot(shot.id, { dialogue: e.target.value })}

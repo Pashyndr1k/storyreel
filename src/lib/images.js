@@ -34,12 +34,13 @@ export function dataURLToInline(dataURL) {
   return { mime_type: mimeType, data };
 }
 
-// Downscale + re-encode a data URL (used to keep generated images small in storage).
-export function resizeDataURL(dataURL, maxDim = 896, quality = 0.82) {
+// Downscale + re-encode a data URL, capping total pixels (default ~2 megapixels).
+export function resizeDataURL(dataURL, maxPixels = 2_000_000, quality = 0.85) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
-      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      const pixels = img.width * img.height;
+      const scale = pixels > maxPixels ? Math.sqrt(maxPixels / pixels) : 1;
       const width = Math.max(1, Math.round(img.width * scale));
       const height = Math.max(1, Math.round(img.height * scale));
       const canvas = document.createElement('canvas');

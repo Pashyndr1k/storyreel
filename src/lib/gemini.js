@@ -54,5 +54,29 @@ export async function generateImage(settings, { prompt, images = [], aspectRatio
 
   const data = await res.json();
   const raw = extractImage(data);
-  return resizeDataURL(raw, 896, 0.82);
+  return resizeDataURL(raw, 2_000_000, 0.85); // ~2 megapixels
+}
+
+// Fetch the models available to this key, preferring image-capable ones.
+export async function listImageModels(settings) {
+  const key = settings.geminiKey;
+  if (!key) throw new Error('NO_GEMINI_KEY');
+  const res = await fetch(`${ENDPOINT}?key=${encodeURIComponent(key)}&pageSize=1000`);
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const err = await res.json();
+      detail = err?.error?.message || detail;
+    } catch {
+      /* keep status */
+    }
+    throw new Error(detail);
+  }
+  const data = await res.json();
+  const models = (data.models || []).filter((m) =>
+    (m.supportedGenerationMethods || []).includes('generateContent')
+  );
+  const imageOnes = models.filter((m) => /image/i.test(m.name || ''));
+  const chosen = imageOnes.length ? imageOnes : models;
+  return chosen.map((m) => (m.name || '').replace(/^models\//, '')).filter(Boolean);
 }

@@ -119,7 +119,7 @@ h1, h2, h3 { margin: 0; }
 
 /* topbar */
 .topbar { display: flex; align-items: center; gap: 18px; }
-.brand-name { font-size: 22px; font-weight: 800; color: var(--text); letter-spacing: -0.01em; }
+.brand-name { font-size: 22px; font-weight: 800; color: #b06bff; letter-spacing: -0.01em; }
 .brand-tagline { font-size: 12.5px; color: var(--muted-2); margin-top: 2px; }
 .topbar-search { position: relative; flex: 1; max-width: 480px; margin: 0 auto; }
 .topbar-search-spacer { flex: 1; }
@@ -164,7 +164,9 @@ input, textarea, select {
 }
 input:focus, textarea:focus, select:focus { outline: none; border-color: rgba(139, 92, 246, 0.6); }
 textarea { resize: vertical; }
-select { cursor: pointer; }
+.auto-ta { resize: none; overflow: hidden; }
+select { cursor: pointer; color-scheme: dark; }
+select option { background-color: #2c2352; color: var(--text); }
 label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
 
 /* ============ BUTTONS ============ */
@@ -196,7 +198,11 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
   font-weight: 700;
   box-shadow: 0 8px 22px rgba(124, 92, 255, 0.35);
 }
-.btn.primary:hover:not(:disabled) { filter: brightness(1.08); box-shadow: 0 10px 30px rgba(124, 92, 255, 0.45); }
+.btn.primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #4a2ea8, #6a2fa6);
+  box-shadow: 0 0 0 1.5px #a855f7, 0 8px 22px rgba(124, 92, 255, 0.3);
+  filter: none;
+}
 .btn.danger {
   background: transparent;
   border-color: rgba(255, 107, 138, 0.25);
@@ -526,7 +532,7 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 
 .scene-chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
 .chip { background: var(--glass); border: 1px solid var(--glass-border); color: var(--muted); border-radius: 999px; padding: 6px 14px; font-size: 13px; font-family: inherit; cursor: pointer; }
-.chip.active { border-color: rgba(139, 92, 246, 0.5); color: var(--text); background: rgba(139, 92, 246, 0.14); }
+.chip.active { border-color: rgba(179, 153, 255, 0.65); color: #ece5ff; background: rgba(179, 153, 255, 0.26); }
 .chip.done:not(.active) { color: var(--violet-text); }
 
 .shot-card { background: var(--card-grad); border: 1px solid var(--glass-border-soft); border-radius: 16px; padding: 14px 16px; margin: 12px 0; }

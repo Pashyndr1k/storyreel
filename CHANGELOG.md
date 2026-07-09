@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.1.4 — 2026-07-08
+
+- Settings: "Fetch available models" button lists the image-capable models your
+  Gemini key can use and lets you pick one, instead of typing the id.
+- Generated cover and shot images are now rendered at ~2 megapixels.
+- Text areas grow to fit their content — no more inner scrollbars on long prompts.
+- Lighter-purple highlight for the active scene chips in Stages 4 and 5.
+- Language / model dropdowns now use a dark purple menu (readable text).
+- Primary (purple gradient) buttons now darken with a purple outline on hover
+  instead of turning grey.
+- Removed the duplicate back-arrow next to "Projects" in the project header.
+- The app version is shown next to the app name again (name in bright purple).
+
 ## 1.1.3 — 2026-07-07
 
 - Fixed a crash (black screen) when importing a project exported from an older

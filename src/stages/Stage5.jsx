@@ -4,6 +4,7 @@ import { generateImage } from '../lib/gemini.js';
 import { stage5Prompt } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
 import ErrorNote from '../components/ErrorNote.jsx';
+import AutoTextarea from '../components/AutoTextarea.jsx';
 
 function CopyButton({ text }) {
   const { t } = useI18n();
@@ -193,8 +194,8 @@ export default function Stage5({ project, update, settings, onSettings, genLang 
                   <label>{t('s5.img')}</label>
                   <CopyButton text={p.imagePrompt} />
                 </div>
-                <textarea
-                  rows={4}
+                <AutoTextarea
+                  minRows={4}
                   value={p.imagePrompt}
                   placeholder={t('s5.ph')}
                   onChange={(e) => setPrompt(shot.id, { imagePrompt: e.target.value })}
@@ -250,8 +251,8 @@ export default function Stage5({ project, update, settings, onSettings, genLang 
                   <label>{t('s5.vid', { d: shot.duration })}</label>
                   <CopyButton text={p.videoPrompt} />
                 </div>
-                <textarea
-                  rows={4}
+                <AutoTextarea
+                  minRows={4}
                   value={p.videoPrompt}
                   placeholder={t('s5.ph')}
                   onChange={(e) => setPrompt(shot.id, { videoPrompt: e.target.value })}

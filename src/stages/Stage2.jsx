@@ -7,6 +7,7 @@ import { uid } from '../lib/storage.js';
 import { fileToResizedDataURL } from '../lib/images.js';
 import { useI18n } from '../lib/i18n.js';
 import ErrorNote from '../components/ErrorNote.jsx';
+import AutoTextarea from '../components/AutoTextarea.jsx';
 
 export default function Stage2({ project, update, settings, goNext, onSettings, genLang }) {
   const { t } = useI18n();
@@ -170,7 +171,7 @@ export default function Stage2({ project, update, settings, goNext, onSettings, 
           </div>
 
           <label>{t('s2.synopsis')}</label>
-          <textarea rows={9} value={storyline.synopsis} onChange={(e) => setSynopsis(e.target.value)} />
+          <AutoTextarea minRows={7} value={storyline.synopsis} onChange={(e) => setSynopsis(e.target.value)} />
 
           <div className="section-head">
             <label>{t('s2.characters')}</label>
@@ -193,8 +194,8 @@ export default function Stage2({ project, update, settings, goNext, onSettings, 
                 />
                 <button className="btn danger small" onClick={() => removeChar(c.id)}>✕</button>
               </div>
-              <textarea
-                rows={3}
+              <AutoTextarea
+                minRows={3}
                 value={c.description}
                 placeholder={t('s2.charDesc')}
                 onChange={(e) => updateChar(c.id, { description: e.target.value })}

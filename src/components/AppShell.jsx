@@ -51,7 +51,7 @@ export default function AppShell({
           <div className="topbar">
             <div className="brand">
               <div className="brand-name">StoryReel</div>
-              <div className="brand-tagline">{t('home.tagline')}</div>
+              <div className="brand-tagline">v{__APP_VERSION__}</div>
             </div>
 
             {search ? (

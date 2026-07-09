@@ -3,6 +3,7 @@ import { stage3Prompt } from '../lib/prompts.js';
 import { uid } from '../lib/storage.js';
 import { useI18n } from '../lib/i18n.js';
 import ErrorNote from '../components/ErrorNote.jsx';
+import AutoTextarea from '../components/AutoTextarea.jsx';
 
 function fmt(sec) {
   const m = Math.floor(sec / 60);
@@ -95,8 +96,8 @@ export default function Stage3({ project, update, settings, goNext, onSettings, 
               />
               <span className="unit">{t('s3.sec')}</span>
             </div>
-            <textarea
-              rows={2}
+            <AutoTextarea
+              minRows={2}
               value={s.summary}
               placeholder={t('s3.summaryPlaceholder')}
               onChange={(e) => updateScene(s.id, { summary: e.target.value })}

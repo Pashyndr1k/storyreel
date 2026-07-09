@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { MODELS } from '../lib/claude.js';
+import { listImageModels } from '../lib/gemini.js';
 import { LANGS, useI18n } from '../lib/i18n.js';
 import { loadProjects, saveProjects, migrateProject } from '../lib/storage.js';
 import { downloadText } from '../lib/exportScript.js';
@@ -11,6 +12,22 @@ export default function SettingsModal({ settings, setSettings, onClose }) {
   const [lang, setLang] = useState(settings.lang || 'en');
   const [geminiKey, setGeminiKey] = useState(settings.geminiKey || '');
   const [geminiModel, setGeminiModel] = useState(settings.geminiModel || 'gemini-3-pro-image-preview');
+  const [modelList, setModelList] = useState(null);
+  const [fetching, setFetching] = useState(false);
+  const [fetchErr, setFetchErr] = useState('');
+
+  const fetchModels = async () => {
+    setFetching(true);
+    setFetchErr('');
+    try {
+      const list = await listImageModels({ geminiKey: geminiKey.trim() });
+      setModelList(list);
+    } catch (e) {
+      setFetchErr(e.message === 'NO_GEMINI_KEY' ? t('err.noGeminiKey') : e.message || String(e));
+    } finally {
+      setFetching(false);
+    }
+  };
 
   const exportAll = () => {
     downloadText('storyreel-backup.json', JSON.stringify(loadProjects(), null, 2));
@@ -80,6 +97,27 @@ export default function SettingsModal({ settings, setSettings, onClose }) {
           onChange={(e) => setGeminiModel(e.target.value)}
           placeholder="gemini-3-pro-image-preview"
         />
+        <div className="row" style={{ marginTop: 8 }}>
+          <button className="btn small" disabled={fetching} onClick={fetchModels}>
+            {fetching ? t('set.fetching') : t('set.fetchModels')}
+          </button>
+        </div>
+        {fetchErr && <div className="note error">{fetchErr}</div>}
+        {modelList && (
+          modelList.length ? (
+            <>
+              <label className="sub-label">{t('set.modelsFound')}</label>
+              <select value={geminiModel} onChange={(e) => setGeminiModel(e.target.value)}>
+                {!modelList.includes(geminiModel) && <option value={geminiModel}>{geminiModel}</option>}
+                {modelList.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </>
+          ) : (
+            <div className="note warn">—</div>
+          )
+        )}
 
         <div className="settings-io">
           <label>{t('set.backup')}</label>

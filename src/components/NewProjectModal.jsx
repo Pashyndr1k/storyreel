@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useI18n } from '../lib/i18n.js';
+import AutoTextarea from './AutoTextarea.jsx';
 
 export default function NewProjectModal({ onCreate, onClose }) {
   const { t } = useI18n();
@@ -18,8 +19,8 @@ export default function NewProjectModal({ onCreate, onClose }) {
           autoFocus
         />
         <label>{t('new.plotLabel')}</label>
-        <textarea
-          rows={6}
+        <AutoTextarea
+          minRows={5}
           value={logline}
           onChange={(e) => setLogline(e.target.value)}
           placeholder={t('new.plotPlaceholder')}
