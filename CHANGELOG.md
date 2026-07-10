@@ -14,7 +14,9 @@
 - New projects choose a script length: 10–30 seconds, 1–4 minutes or 5–10
   minutes. All generation targets that duration; shots stay 2–10 seconds.
 - Voice-to-text input (microphone buttons on the plot, synopsis and smart-edit
-  fields), transcribed via Gemini in the input language.
+  fields), transcribed via Gemini in the input language. The transcription
+  model is auto-discovered from the models available to your API key (newest
+  flash model preferred), so it keeps working as Google retires model versions.
 
 ## 1.1.4 — 2026-07-08
 

@@ -63,11 +63,55 @@ export async function generateImage(settings, { prompt, images = [], aspectRatio
 }
 
 // Voice-to-text via Gemini audio understanding (works in the browser and Electron).
-export const TRANSCRIBE_MODEL = 'gemini-2.5-flash';
+// Model availability varies per key/generation, so discover a usable text model
+// from the key's own model list instead of hardcoding one.
+const TRANSCRIBE_PREFERENCES = [
+  /^gemini-3.*flash/,
+  /^gemini-flash-latest$/,
+  /^gemini-3(?!.*image)/,
+  /^gemini-2\.5-flash/,
+  /^gemini-2\.0-flash/,
+  /flash/,
+];
+let transcribeModelCache = null;
 
-export async function transcribeAudio(settings, blob) {
+async function pickTranscribeModel(key) {
+  if (transcribeModelCache) return transcribeModelCache;
+  const res = await fetch(`${ENDPOINT}?key=${encodeURIComponent(key)}&pageSize=1000`);
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const err = await res.json();
+      detail = err?.error?.message || detail;
+    } catch {
+      /* keep status */
+    }
+    throw new Error(detail);
+  }
+  const data = await res.json();
+  const names = (data.models || [])
+    .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
+    .map((m) => (m.name || '').replace(/^models\//, ''))
+    // exclude models that can't do plain text-out audio understanding
+    .filter((n) => n && !/image|imagen|embed|tts|veo|aqa|live|audio-dialog/i.test(n));
+  for (const re of TRANSCRIBE_PREFERENCES) {
+    const hit = names.find((n) => re.test(n));
+    if (hit) {
+      transcribeModelCache = hit;
+      return hit;
+    }
+  }
+  if (names.length) {
+    transcribeModelCache = names[0];
+    return names[0];
+  }
+  throw new Error('No Gemini text model available on this API key for transcription.');
+}
+
+export async function transcribeAudio(settings, blob, _retried) {
   const key = settings.geminiKey;
   if (!key) throw new Error('NO_GEMINI_KEY');
+  const model = await pickTranscribeModel(key);
 
   const dataURL = await new Promise((resolve, reject) => {
     const r = new FileReader();
@@ -78,7 +122,7 @@ export async function transcribeAudio(settings, blob) {
   const [head, data] = dataURL.split(',');
   const mime = head.match(/data:(.*?);base64/)?.[1] || 'audio/webm';
 
-  const res = await fetch(`${ENDPOINT}/${TRANSCRIBE_MODEL}:generateContent?key=${encodeURIComponent(key)}`, {
+  const res = await fetch(`${ENDPOINT}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
@@ -100,6 +144,12 @@ export async function transcribeAudio(settings, blob) {
       detail = err?.error?.message || detail;
     } catch {
       /* keep status */
+    }
+    // The picked model may have been retired between listing and calling —
+    // drop the cache and rediscover once.
+    if (!_retried && (res.status === 404 || /not found|not supported/i.test(detail))) {
+      transcribeModelCache = null;
+      return transcribeAudio(settings, blob, true);
     }
     throw new Error(detail);
   }
