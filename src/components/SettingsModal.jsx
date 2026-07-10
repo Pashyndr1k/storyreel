@@ -10,6 +10,7 @@ export default function SettingsModal({ settings, setSettings, onClose }) {
   const [apiKey, setApiKey] = useState(settings.apiKey);
   const [model, setModel] = useState(settings.model);
   const [lang, setLang] = useState(settings.lang || 'en');
+  const [theme, setTheme] = useState(settings.theme || 'dark');
   const [geminiKey, setGeminiKey] = useState(settings.geminiKey || '');
   const [geminiModel, setGeminiModel] = useState(settings.geminiModel || 'gemini-3-pro-image-preview');
   const [modelList, setModelList] = useState(null);
@@ -72,6 +73,12 @@ export default function SettingsModal({ settings, setSettings, onClose }) {
           {LANGS.map((l) => (
             <option key={l.id} value={l.id}>{l.label}</option>
           ))}
+        </select>
+        <label>{t('set.theme')}</label>
+        <select value={theme} onChange={(e) => setTheme(e.target.value)}>
+          <option value="dark">{t('theme.dark')}</option>
+          <option value="medium">{t('theme.medium')}</option>
+          <option value="light">{t('theme.light')}</option>
         </select>
         <label>{t('set.model')}</label>
         <select value={model} onChange={(e) => setModel(e.target.value)}>
@@ -139,6 +146,7 @@ export default function SettingsModal({ settings, setSettings, onClose }) {
                 apiKey: apiKey.trim(),
                 model,
                 lang,
+                theme,
                 geminiKey: geminiKey.trim(),
                 geminiModel: geminiModel.trim() || 'gemini-3-pro-image-preview',
               });

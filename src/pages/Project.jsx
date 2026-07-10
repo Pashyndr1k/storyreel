@@ -7,12 +7,15 @@ import Stage5 from '../stages/Stage5.jsx';
 import { buildProjectExport, downloadText } from '../lib/exportScript.js';
 import { LANGS, useI18n } from '../lib/i18n.js';
 import ProjectSettingsModal from '../components/ProjectSettingsModal.jsx';
-import { ArrowLeft, Download, Sliders, Cog } from '../components/icons.jsx';
+import SmartEditModal from '../components/SmartEditModal.jsx';
+import { ArrowLeft, Download, Sliders, Cog, Wand } from '../components/icons.jsx';
 
 export default function Project({ project, updateProject, settings, onBack, onSettings }) {
   const { t, lang } = useI18n();
   const [view, setView] = useState(Math.min(project.stage, 5));
   const [showProjectSettings, setShowProjectSettings] = useState(false);
+  const [showSmartEdit, setShowSmartEdit] = useState(false);
+  const [staleFrom, setStaleFrom] = useState(null);
 
   const STAGES = [1, 2, 3, 4, 5].map((n) => ({ n, label: t(`stages.${n}`) }));
 
@@ -20,6 +23,14 @@ export default function Project({ project, updateProject, settings, onBack, onSe
   const genLang = project.lang || lang;
 
   const update = (patch) => updateProject(project.id, patch);
+
+  // Edits made on an earlier stage make the later, already-generated stages stale.
+  const stageUpdate = (patch) => {
+    update(patch);
+    if (view < project.stage) {
+      setStaleFrom((prev) => (prev === null ? view : Math.min(prev, view)));
+    }
+  };
 
   const goNext = () => {
     const next = Math.min(view + 1, 5);
@@ -32,7 +43,7 @@ export default function Project({ project, updateProject, settings, onBack, onSe
     downloadText(`${safe}.md`, buildProjectExport(project, genLang));
   };
 
-  const stageProps = { project, update, settings, goNext, onSettings, genLang };
+  const stageProps = { project, update: stageUpdate, settings, goNext, onSettings, genLang };
 
   return (
     <div className="page project-page">
@@ -68,6 +79,9 @@ export default function Project({ project, updateProject, settings, onBack, onSe
               <option key={l.id} value={l.id}>{l.label}</option>
             ))}
           </select>
+          <button className="btn" onClick={() => setShowSmartEdit(true)}>
+            <Wand size={16} /> {t('edit.button')}
+          </button>
           <button className="btn" onClick={exportScript}><Download size={16} />{t('proj.export')}</button>
           <button className="btn" title={t('proj.settings')} onClick={() => setShowProjectSettings(true)}>
             <Sliders size={16} /> {t('proj.settings')}
@@ -83,17 +97,27 @@ export default function Project({ project, updateProject, settings, onBack, onSe
           onClose={() => setShowProjectSettings(false)}
         />
       )}
+      {showSmartEdit && (
+        <SmartEditModal
+          project={project}
+          update={update}
+          settings={settings}
+          genLang={genLang}
+          onClose={() => setShowSmartEdit(false)}
+          onSettings={onSettings}
+        />
+      )}
 
-      <nav className="stage-nav">
+      <nav className="stage-timeline">
         {STAGES.map((s) => (
           <button
             key={s.n}
-            className={`stage-tab ${view === s.n ? 'active' : ''} ${s.n < project.stage ? 'done' : ''}`}
+            className={`tl-seg ${view === s.n ? 'current' : ''} ${s.n < project.stage && view !== s.n ? 'done' : ''}`}
             disabled={s.n > project.stage}
             onClick={() => setView(s.n)}
           >
-            <span className="stage-num">{s.n < project.stage && view !== s.n ? '✓' : s.n}</span>
-            {s.label}
+            <span className="tl-num">{s.n < project.stage && view !== s.n ? '✓' : s.n}</span>
+            <span className="tl-label">{s.label}</span>
           </button>
         ))}
       </nav>
@@ -103,6 +127,26 @@ export default function Project({ project, updateProject, settings, onBack, onSe
       {view === 3 && <Stage3 {...stageProps} />}
       {view === 4 && <Stage4 {...stageProps} />}
       {view === 5 && <Stage5 {...stageProps} />}
+
+      {staleFrom !== null && staleFrom < project.stage && (
+        <div className="stale-toast">
+          <p>{t('stale.msg', { n: staleFrom })}</p>
+          <div className="row">
+            <button
+              className="btn small primary"
+              onClick={() => {
+                setView(Math.min(staleFrom + 1, 5));
+                setStaleFrom(null);
+              }}
+            >
+              {t('stale.go', { n: Math.min(staleFrom + 1, 5) })}
+            </button>
+            <button className="btn small" onClick={() => setStaleFrom(null)}>
+              {t('stale.dismiss')}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

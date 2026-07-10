@@ -4,6 +4,7 @@ import { uid } from '../lib/storage.js';
 import { useI18n } from '../lib/i18n.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import VoiceButton from '../components/VoiceButton.jsx';
 
 export default function Stage1({ project, update, settings, goNext, onSettings, genLang }) {
   const { t } = useI18n();
@@ -30,12 +31,18 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
       <p className="stage-desc">{t('s1.desc')}</p>
 
       <label>{t('s1.loglineLabel')}</label>
-      <AutoTextarea
-        minRows={4}
-        value={project.logline}
-        onChange={(e) => update({ logline: e.target.value })}
-        placeholder={t('s1.loglinePlaceholder')}
-      />
+      <div className="voice-row">
+        <AutoTextarea
+          minRows={4}
+          value={project.logline}
+          onChange={(e) => update({ logline: e.target.value })}
+          placeholder={t('s1.loglinePlaceholder')}
+        />
+        <VoiceButton
+          settings={settings}
+          onText={(text) => update({ logline: project.logline ? `${project.logline} ${text}` : text })}
+        />
+      </div>
       <div className="row">
         <button className="btn primary" disabled={busy || !project.logline.trim()} onClick={generate}>
           {busy ? t('gen.generating') : project.ideas.length ? t('s1.regenerate') : t('s1.generate')}
@@ -59,12 +66,20 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
       )}
 
       <label>{t('s1.approvedLabel')}</label>
-      <AutoTextarea
-        minRows={5}
-        value={project.approvedPlot}
-        onChange={(e) => update({ approvedPlot: e.target.value, selectedIdeaId: null })}
-        placeholder={t('s1.approvedPlaceholder')}
-      />
+      <div className="voice-row">
+        <AutoTextarea
+          minRows={5}
+          value={project.approvedPlot}
+          onChange={(e) => update({ approvedPlot: e.target.value, selectedIdeaId: null })}
+          placeholder={t('s1.approvedPlaceholder')}
+        />
+        <VoiceButton
+          settings={settings}
+          onText={(text) =>
+            update({ approvedPlot: project.approvedPlot ? `${project.approvedPlot} ${text}` : text, selectedIdeaId: null })
+          }
+        />
+      </div>
       <div className="row">
         <button
           className="btn small"

@@ -2,6 +2,14 @@ import { dataURLToImageBlock } from './images.js';
 
 const LANG_NAMES = { en: 'English', ru: 'Russian', uk: 'Ukrainian' };
 
+// Target duration per script type. Shots stay 2–10 seconds regardless of type.
+const DURATIONS = {
+  short: { min: 10, max: 30 },
+  medium: { min: 60, max: 240 },
+  long: { min: 300, max: 600 },
+};
+export const durationOf = (project) => DURATIONS[project?.scriptType] || DURATIONS.medium;
+
 function withPhotos(photos, text) {
   return photos?.length
     ? [...photos.map(dataURLToImageBlock), { type: 'text', text }]
@@ -10,7 +18,7 @@ function withPhotos(photos, text) {
 
 function system(lang, custom) {
   const langName = LANG_NAMES[lang] || 'English';
-  const base = `You are an award-winning screenwriter and director who specializes in short-form video: commercials, branded content and short films up to 5 minutes long. You think in concrete visual images, understand pacing, and write economically.
+  const base = `You are an award-winning screenwriter and director who specializes in short-form video: commercials, branded content and short films up to 10 minutes long. You think in concrete visual images, understand pacing, and write economically.
 
 Rules:
 - Respond with VALID JSON ONLY. No markdown, no code fences, no commentary outside the JSON.
@@ -32,10 +40,11 @@ function characterBlock(project) {
 }
 
 export function stage1Prompt(project, lang) {
+  const d = durationOf(project);
   return {
     system: system(lang, project.systemPrompt),
     maxTokens: 2500,
-    user: `Brief plot description for a short video (target length: up to 5 minutes):
+    user: `Brief plot description for a short video (target length: ${d.min}–${d.max} seconds):
 
 """
 ${project.logline}
@@ -62,7 +71,7 @@ Approved plot direction:
 ${project.approvedPlot}
 """
 
-Create the final storyline for this short video (up to 5 minutes).
+Create the final storyline for this short video (target length: ${durationOf(project).min}–${durationOf(project).max} seconds).
 
 JSON schema:
 {"title":"a strong final title","genres":["2-3 short genre tags, e.g. drama, comedy, thriller"],"synopsis":"a complete story summary of 150-300 words with a clear beginning, middle and end","characters":[{"name":"character name","role":"protagonist / antagonist / supporting","description":"2-4 sentences: age, physical appearance (specific enough to keep the character visually consistent across AI image generation), personality, motivation"}]}`,
@@ -84,7 +93,7 @@ ${project.storyline?.synopsis || ''}
 Characters:
 ${characterBlock(project)}
 
-Create a scene-by-scene outline for this short video. The full video must run at most 300 seconds (5 minutes) in total; commercials are typically much shorter — infer the right total length from the material. Use between 3 and 10 scenes. Each scene must be a single continuous location and moment.
+Create a scene-by-scene outline for this short video. The full video must run between ${durationOf(project).min} and ${durationOf(project).max} seconds in total — choose a number of scenes appropriate for that length (a 10–30 second ad may need only 2–4 scenes; a 5–10 minute film may need 6–14). Each scene must be a single continuous location and moment.
 
 JSON schema:
 {"scenes":[{"number":1,"title":"short scene title","summary":"2-3 sentences describing exactly what happens in the scene","duration_sec":20}]}`,
@@ -203,6 +212,66 @@ Requirements:
 
 JSON schema:
 {"image_prompt":"..."}`,
+  };
+}
+
+// Targeted-edit agent: applies one specific change (rename, time of day, location…)
+// consistently across every stage without regenerating anything else.
+export function smartEditPrompt(project, instruction, lang) {
+  const content = {
+    title: project.title,
+    logline: project.logline,
+    approvedPlot: project.approvedPlot,
+    synopsis: project.storyline?.synopsis || '',
+    characters: (project.storyline?.characters || []).map((c) => ({
+      id: c.id,
+      name: c.name,
+      role: c.role,
+      description: c.description,
+    })),
+    scenes: project.outline.map((s) => ({ id: s.id, title: s.title, summary: s.summary })),
+    shots: project.outline.flatMap((s) =>
+      (project.sceneDetails[s.id]?.shots || []).map((sh) => ({
+        id: sh.id,
+        scene: s.title,
+        shotType: sh.shotType,
+        location: sh.location,
+        action: sh.action,
+        dialogue: sh.dialogue,
+        notes: sh.notes,
+      }))
+    ),
+    prompts: Object.entries(project.shotPrompts || {}).map(([id, p]) => ({
+      id,
+      imagePrompt: p.imagePrompt,
+      videoPrompt: p.videoPrompt,
+    })),
+  };
+
+  return {
+    system: system(lang, project.systemPrompt),
+    maxTokens: 8000,
+    user: `You are performing a TARGETED find-and-adapt edit on an existing short-video script. Do NOT rewrite, improve or regenerate anything beyond what the requested change strictly requires.
+
+Current script content (JSON):
+${JSON.stringify(content)}
+
+Requested change:
+"""
+${instruction}
+"""
+
+Apply ONLY this change, but apply it CONSISTENTLY everywhere it logically appears: title, logline, approved plot, synopsis, character entries, scene titles/summaries, shot fields (location, action, dialogue, notes) and image/video prompts. Examples: renaming a character must update every mention including dialogue speaker names and prompts; changing time of day must update locations, lighting descriptions and prompts; changing a location must update settings and environment descriptions.
+
+Rules:
+- Preserve each field's existing language and style; change only what the request requires.
+- "imagePrompt" and "videoPrompt" must remain entirely in English; character names always in Latin letters.
+- Return ONLY the fields and entries that actually change. Omit everything unchanged. For array entries include the entry "id" and only the changed fields.
+
+JSON schema:
+{"title":"...","logline":"...","approvedPlot":"...","synopsis":"...","characters":[{"id":"...","name":"...","role":"...","description":"..."}],"scenes":[{"id":"...","title":"...","summary":"..."}],"shots":[{"id":"...","shotType":"...","location":"...","action":"...","dialogue":"...","notes":"..."}],"prompts":[{"id":"...","imagePrompt":"...","videoPrompt":"..."}]}
+
+Every top-level key is optional — include a key only if something under it changed.`,
   };
 }
 

@@ -42,8 +42,8 @@ export default function Home({
     return 0;
   });
 
-  const create = (title, logline) => {
-    const p = newProject({ title, logline });
+  const create = (title, logline, scriptType) => {
+    const p = newProject({ title, logline, scriptType });
     setProjects((ps) => [p, ...ps]);
     setShowNew(false);
     onOpen(p.id);
@@ -147,7 +147,7 @@ export default function Home({
         </div>
       )}
 
-      {showNew && <NewProjectModal onCreate={create} onClose={() => setShowNew(false)} />}
+      {showNew && <NewProjectModal onCreate={create} onClose={() => setShowNew(false)} settings={settings} />}
     </AppShell>
   );
 }

@@ -139,6 +139,23 @@ export const Sliders = (p) => (
   </S>
 );
 
+export const Mic = (p) => (
+  <S {...p} sw={1.7}>
+    <rect x="9" y="2" width="6" height="12" rx="3" />
+    <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+    <line x1="12" y1="18" x2="12" y2="22" />
+  </S>
+);
+
+export const Wand = (p) => (
+  <S {...p} sw={1.7}>
+    <path d="m15 4 1 2 2 1-2 1-1 2-1-2-2-1 2-1z" />
+    <path d="M6 12l.8 1.6L8.4 14l-1.6.8L6 16.4l-.8-1.6L3.6 14l1.6-.4z" />
+    <path d="M13 11 20 18" />
+    <path d="m11 13 2-2" />
+  </S>
+);
+
 export const Cog = (p) => (
   <S {...p} sw={1.6}>
     <circle cx="12" cy="12" r="3" />

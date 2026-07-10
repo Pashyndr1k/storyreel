@@ -1,5 +1,5 @@
 import { useGenerate } from '../lib/useGenerate.js';
-import { stage3Prompt } from '../lib/prompts.js';
+import { stage3Prompt, durationOf } from '../lib/prompts.js';
 import { uid } from '../lib/storage.js';
 import { useI18n } from '../lib/i18n.js';
 import ErrorNote from '../components/ErrorNote.jsx';
@@ -16,6 +16,7 @@ export default function Stage3({ project, update, settings, goNext, onSettings, 
   const { busy, error, run } = useGenerate(settings);
   const outline = project.outline;
   const total = outline.reduce((a, s) => a + (s.duration || 0), 0);
+  const maxDuration = durationOf(project).max;
 
   const generate = () => {
     if (outline.length && !window.confirm(t('s3.replaceConfirm'))) return;
@@ -68,8 +69,8 @@ export default function Stage3({ project, update, settings, goNext, onSettings, 
           {busy ? t('gen.generating') : outline.length ? t('s3.regenerate') : t('s3.generate')}
         </button>
         {outline.length > 0 && (
-          <span className={`total-badge ${total > 300 ? 'over' : ''}`}>
-            {t('s3.total', { t: fmt(total) })} {total > 300 && t('s3.over')}
+          <span className={`total-badge ${total > maxDuration ? 'over' : ''}`}>
+            {t('s3.total', { t: fmt(total) })} / ≤{fmt(maxDuration)}
           </span>
         )}
       </div>

@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.2.0 — 2026-07-08
+
+- Smart-edit agent: describe one specific change (rename a character, move the
+  story to night, swap a location…) and it is applied consistently across every
+  stage — plot, synopsis, characters, scenes, shots and prompts — without
+  regenerating anything.
+- After editing an earlier stage, a pop-up suggests regenerating the later
+  stages that may now be out of date.
+- Three interface themes: Dark, Medium and Light (Settings → Theme).
+- Stage navigation replaced with a single timeline of large segments; the
+  current stage is highlighted with the violet gradient.
+- New projects choose a script length: 10–30 seconds, 1–4 minutes or 5–10
+  minutes. All generation targets that duration; shots stay 2–10 seconds.
+- Voice-to-text input (microphone buttons on the plot, synopsis and smart-edit
+  fields), transcribed via Gemini in the input language.
+
 ## 1.1.4 — 2026-07-08
 
 - Settings: "Fetch available models" button lists the image-capable models your

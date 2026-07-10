@@ -1,11 +1,15 @@
 import { useState } from 'react';
 import { useI18n } from '../lib/i18n.js';
 import AutoTextarea from './AutoTextarea.jsx';
+import VoiceButton from './VoiceButton.jsx';
 
-export default function NewProjectModal({ onCreate, onClose }) {
+const TYPES = ['short', 'medium', 'long'];
+
+export default function NewProjectModal({ onCreate, onClose, settings }) {
   const { t } = useI18n();
   const [title, setTitle] = useState('');
   const [logline, setLogline] = useState('');
+  const [type, setType] = useState('medium');
 
   return (
     <div className="overlay" onClick={onClose}>
@@ -18,19 +22,39 @@ export default function NewProjectModal({ onCreate, onClose }) {
           placeholder={t('new.titlePlaceholder')}
           autoFocus
         />
+        <label>{t('new.type')}</label>
+        <div className="type-cards">
+          {TYPES.map((k) => (
+            <button
+              key={k}
+              type="button"
+              className={`type-card ${type === k ? 'selected' : ''}`}
+              onClick={() => setType(k)}
+            >
+              <strong>{t(`new.type_${k}`)}</strong>
+              <span>{t(`new.typeHint_${k}`)}</span>
+            </button>
+          ))}
+        </div>
         <label>{t('new.plotLabel')}</label>
-        <AutoTextarea
-          minRows={5}
-          value={logline}
-          onChange={(e) => setLogline(e.target.value)}
-          placeholder={t('new.plotPlaceholder')}
-        />
+        <div className="voice-row">
+          <AutoTextarea
+            minRows={5}
+            value={logline}
+            onChange={(e) => setLogline(e.target.value)}
+            placeholder={t('new.plotPlaceholder')}
+          />
+          <VoiceButton
+            settings={settings}
+            onText={(text) => setLogline((v) => (v ? `${v} ${text}` : text))}
+          />
+        </div>
         <div className="modal-actions">
           <button className="btn" onClick={onClose}>{t('new.cancel')}</button>
           <button
             className="btn primary"
             disabled={!logline.trim()}
-            onClick={() => onCreate(title, logline.trim())}
+            onClick={() => onCreate(title, logline.trim(), type)}
           >
             {t('new.create')}
           </button>

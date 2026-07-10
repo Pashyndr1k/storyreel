@@ -62,6 +62,56 @@ export async function generateImage(settings, { prompt, images = [], aspectRatio
   return resizeDataURL(raw, Number.POSITIVE_INFINITY, 0.92);
 }
 
+// Voice-to-text via Gemini audio understanding (works in the browser and Electron).
+export const TRANSCRIBE_MODEL = 'gemini-2.5-flash';
+
+export async function transcribeAudio(settings, blob) {
+  const key = settings.geminiKey;
+  if (!key) throw new Error('NO_GEMINI_KEY');
+
+  const dataURL = await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(new Error('Could not read the recording.'));
+    r.readAsDataURL(blob);
+  });
+  const [head, data] = dataURL.split(',');
+  const mime = head.match(/data:(.*?);base64/)?.[1] || 'audio/webm';
+
+  const res = await fetch(`${ENDPOINT}/${TRANSCRIBE_MODEL}:generateContent?key=${encodeURIComponent(key)}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: 'Transcribe this audio recording verbatim in its original language. Return ONLY the transcribed text — no commentary, no labels, no quotes.' },
+            { inline_data: { mime_type: mime, data } },
+          ],
+        },
+      ],
+    }),
+  });
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const err = await res.json();
+      detail = err?.error?.message || detail;
+    } catch {
+      /* keep status */
+    }
+    throw new Error(detail);
+  }
+  const out = await res.json();
+  const text = (out?.candidates?.[0]?.content?.parts || [])
+    .map((p) => p.text)
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+  return text;
+}
+
 // Fetch the models available to this key, preferring image-capable ones.
 export async function listImageModels(settings) {
   const key = settings.geminiKey;

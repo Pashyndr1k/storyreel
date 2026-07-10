@@ -8,6 +8,7 @@ import { fileToResizedDataURL } from '../lib/images.js';
 import { useI18n } from '../lib/i18n.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import VoiceButton from '../components/VoiceButton.jsx';
 
 export default function Stage2({ project, update, settings, goNext, onSettings, genLang }) {
   const { t } = useI18n();
@@ -175,7 +176,13 @@ export default function Stage2({ project, update, settings, goNext, onSettings, 
           </div>
 
           <label>{t('s2.synopsis')}</label>
-          <AutoTextarea minRows={7} value={storyline.synopsis} onChange={(e) => setSynopsis(e.target.value)} />
+          <div className="voice-row">
+            <AutoTextarea minRows={7} value={storyline.synopsis} onChange={(e) => setSynopsis(e.target.value)} />
+            <VoiceButton
+              settings={settings}
+              onText={(text) => setSynopsis(storyline.synopsis ? `${storyline.synopsis} ${text}` : text)}
+            />
+          </div>
 
           <div className="section-head">
             <label>{t('s2.characters')}</label>

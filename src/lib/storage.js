@@ -33,12 +33,13 @@ export function loadSettings() {
       apiKey: '',
       model: 'claude-sonnet-5',
       lang: 'en',
+      theme: 'dark',
       geminiKey: '',
       geminiModel: 'gemini-3-pro-image-preview',
       ...(JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}),
     };
   } catch {
-    return { apiKey: '', model: 'claude-sonnet-5', lang: 'en', geminiKey: '', geminiModel: 'gemini-3-pro-image-preview' };
+    return { apiKey: '', model: 'claude-sonnet-5', lang: 'en', theme: 'dark', geminiKey: '', geminiModel: 'gemini-3-pro-image-preview' };
   }
 }
 
@@ -56,6 +57,7 @@ function projectDefaults() {
     createdAt: Date.now(),
     archived: false,
     lang: '', // '' = follow the app language; 'en'/'ru'/'uk' = per-project override
+    scriptType: 'medium', // 'short' 10-30s | 'medium' 1-4min | 'long' 5-10min
     systemPrompt: '', // extra project-specific instructions for the prompt builder
     imageTemplate: '', // optional template for Nano Banana image prompts
     videoTemplate: '', // optional template for image-to-video prompts
@@ -73,11 +75,12 @@ function projectDefaults() {
   };
 }
 
-export function newProject({ title, logline }) {
+export function newProject({ title, logline, scriptType }) {
   return {
     ...projectDefaults(),
     title: (title || '').trim() || 'Untitled project',
     logline: logline || '',
+    scriptType: ['short', 'medium', 'long'].includes(scriptType) ? scriptType : 'medium',
   };
 }
 
@@ -98,6 +101,7 @@ export function migrateProject(raw) {
   p.archived = !!p.archived;
   p.cover = typeof p.cover === 'string' ? p.cover : '';
   p.lang = typeof p.lang === 'string' ? p.lang : '';
+  p.scriptType = ['short', 'medium', 'long'].includes(p.scriptType) ? p.scriptType : 'medium';
   p.systemPrompt = typeof p.systemPrompt === 'string' ? p.systemPrompt : '';
   p.imageTemplate = typeof p.imageTemplate === 'string' ? p.imageTemplate : '';
   p.videoTemplate = typeof p.videoTemplate === 'string' ? p.videoTemplate : '';

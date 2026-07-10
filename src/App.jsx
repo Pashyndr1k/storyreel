@@ -20,6 +20,9 @@ export default function App() {
 
   useEffect(() => saveProjects(projects), [projects]);
   useEffect(() => saveSettings(settings), [settings]);
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', settings.theme || 'dark');
+  }, [settings.theme]);
 
   const updateProject = (id, patch) =>
     setProjects((ps) =>
