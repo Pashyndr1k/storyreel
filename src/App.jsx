@@ -25,6 +25,7 @@ export default function App() {
   const histRef = useRef({ past: [], future: [], lastPush: 0 });
   const saveTimer = useRef(null);
   const pendingRef = useRef(null);
+  const stylesSaveArmed = useRef(false);
 
   const i18n = useMemo(
     () => ({ t: createT(settings.lang), lang: settings.lang || 'en' }),
@@ -53,7 +54,20 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => saveStyles(styles), [styles]);
+  // Persist styles only after a genuine change — never on the initial render, so
+  // a corrupt-load fallback can't overwrite the (stashed) stored data.
+  useEffect(() => {
+    if (!stylesSaveArmed.current) {
+      stylesSaveArmed.current = true;
+      return;
+    }
+    saveStyles(styles);
+  }, [styles]);
+
+  // Ask the browser/Electron to keep our storage instead of evicting it.
+  useEffect(() => {
+    navigator.storage?.persist?.().catch(() => {});
+  }, []);
 
   // All mutations go through this setter so they land in the undo history.
   // Rapid changes (typing) within HISTORY_COALESCE_MS merge into one step.
@@ -211,6 +225,7 @@ export default function App() {
           settings={settings}
           setSettings={setSettings}
           projects={projects}
+          styles={styles}
           onClose={() => setShowSettings(false)}
         />
       )}

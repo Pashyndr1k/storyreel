@@ -3,9 +3,10 @@ import { MODELS } from '../lib/claude.js';
 import { listImageModels } from '../lib/gemini.js';
 import { LANGS, useI18n } from '../lib/i18n.js';
 import { saveProjects, migrateProject } from '../lib/storage.js';
+import { loadStyles, saveStyles, mergeStyles } from '../lib/styles.js';
 import { downloadText } from '../lib/exportScript.js';
 
-export default function SettingsModal({ settings, setSettings, projects = [], onClose }) {
+export default function SettingsModal({ settings, setSettings, projects = [], styles, onClose }) {
   const { t } = useI18n();
   const [apiKey, setApiKey] = useState(settings.apiKey);
   const [model, setModel] = useState(settings.model);
@@ -30,8 +31,17 @@ export default function SettingsModal({ settings, setSettings, projects = [], on
     }
   };
 
+  // Backup carries both projects AND the style library. Format:
+  //   { version, exportedAt, projects: [...], styles: { script, image, video } }
+  // A plain array is still accepted (legacy projects-only backups).
   const exportAll = () => {
-    downloadText('storyreel-backup.json', JSON.stringify(projects, null, 2));
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      projects,
+      styles: styles || loadStyles(),
+    };
+    downloadText('storyreel-backup.json', JSON.stringify(payload, null, 2));
   };
 
   const importAll = (e) => {
@@ -41,9 +51,12 @@ export default function SettingsModal({ settings, setSettings, projects = [], on
     reader.onload = async () => {
       try {
         const data = JSON.parse(reader.result);
-        if (!Array.isArray(data)) throw new Error('bad format');
-        if (window.confirm(t('set.importConfirm', { n: data.length }))) {
-          await saveProjects(data.map(migrateProject));
+        const projs = Array.isArray(data) ? data : data.projects;
+        const incomingStyles = Array.isArray(data) ? null : data.styles;
+        if (!Array.isArray(projs)) throw new Error('bad format');
+        if (window.confirm(t('set.importConfirm', { n: projs.length }))) {
+          if (incomingStyles) saveStyles(mergeStyles(styles || loadStyles(), incomingStyles));
+          await saveProjects(projs.map(migrateProject));
           window.location.reload();
         }
       } catch {

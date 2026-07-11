@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.5.1 — 2026-07-11
+
+- Custom styles are now durable across updates: the style library is stored in a
+  versioned format so future changes migrate it forward instead of dropping it;
+  built-in styles are only seeded once and never overwrite your custom styles.
+- The style library is included in **Settings → Backup** (export/import), so you
+  can carry your styles to another machine or restore them after a reinstall.
+  Importing merges styles by id, so existing custom styles are never lost.
+- Unreadable style data is backed up for recovery instead of being discarded, and
+  the app requests persistent storage so the browser/OS won't evict your data.
+
 ## 1.5.0 — 2026-07-11
 
 - **Aspect ratio** for image & video, chosen when creating a project from an icon
