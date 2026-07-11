@@ -5,13 +5,15 @@ import Stage3 from '../stages/Stage3.jsx';
 import Stage4 from '../stages/Stage4.jsx';
 import Stage5 from '../stages/Stage5.jsx';
 import { buildProjectExport, downloadText } from '../lib/exportScript.js';
-import { LANGS, useI18n } from '../lib/i18n.js';
+import { useI18n } from '../lib/i18n.js';
 import { resolveStyleText } from '../lib/styles.js';
 import ProjectSettingsModal from '../components/ProjectSettingsModal.jsx';
 import SmartEditModal from '../components/SmartEditModal.jsx';
-import { ArrowLeft, Download, Sliders, Cog, Wand } from '../components/icons.jsx';
+import Dropdown from '../components/Dropdown.jsx';
+import { ArrowLeft, Download, Sliders, Cog, Wand, Check, Globe } from '../components/icons.jsx';
+import { LANGS } from '../lib/i18n.js';
 
-export default function Project({ project, updateProject, settings, styles, setStyles, library, libUpsert, onBack, onSettings }) {
+export default function Project({ project, updateProject, settings, setSettings, styles, setStyles, library, libUpsert, onBack, onSettings }) {
   const { t, lang } = useI18n();
   const [view, setView] = useState(Math.min(project.stage, 5));
   const [showProjectSettings, setShowProjectSettings] = useState(false);
@@ -20,8 +22,9 @@ export default function Project({ project, updateProject, settings, styles, setS
 
   const STAGES = [1, 2, 3, 4, 5].map((n) => ({ n, label: t(`stages.${n}`) }));
 
-  // Language of the generated script content: per-project override, else app language.
-  const genLang = project.lang || lang;
+  // One global language drives both the UI and script generation (prompts for
+  // image/video generation stay English). Already-generated text is untouched.
+  const genLang = lang;
 
   const update = (patch) => updateProject(project.id, patch);
 
@@ -63,6 +66,11 @@ export default function Project({ project, updateProject, settings, styles, setS
     libUpsert,
   };
 
+  const langOptions = LANGS.map((l) => ({
+    value: l.id,
+    label: { en: 'EN', ru: 'RU', uk: 'UA' }[l.id] || l.id.toUpperCase(),
+  }));
+
   return (
     <div className="page project-page">
       <header className="project-header">
@@ -86,25 +94,26 @@ export default function Project({ project, updateProject, settings, styles, setS
           />
         </div>
         <div className="header-actions">
-          <select
-            className="lang-select"
-            title={t('proj.langLabel')}
-            value={project.lang || ''}
-            onChange={(e) => update({ lang: e.target.value })}
-          >
-            <option value="">{t('proj.langDefault')}</option>
-            {LANGS.map((l) => (
-              <option key={l.id} value={l.id}>{l.label}</option>
-            ))}
-          </select>
-          <button className="btn" onClick={() => setShowSmartEdit(true)}>
-            <Wand size={16} /> {t('edit.button')}
+          <Dropdown
+            pill
+            value={settings.lang || 'en'}
+            options={langOptions}
+            onChange={(l) => setSettings({ ...settings, lang: l })}
+            icon={<Globe size={15} />}
+            title={t('set.language')}
+          />
+          <button className="icon-btn h44" title={t('edit.button')} aria-label={t('edit.button')} onClick={() => setShowSmartEdit(true)}>
+            <Wand size={18} />
           </button>
-          <button className="btn" onClick={exportScript}><Download size={16} />{t('proj.export')}</button>
-          <button className="btn" title={t('proj.settings')} onClick={() => setShowProjectSettings(true)}>
-            <Sliders size={16} /> {t('proj.settings')}
+          <button className="icon-btn h44" title={t('proj.export')} aria-label={t('proj.export')} onClick={exportScript}>
+            <Download size={18} />
           </button>
-          <button className="btn" title={t('set.title')} aria-label={t('set.title')} onClick={onSettings}><Cog size={16} /></button>
+          <button className="icon-btn h44" title={t('proj.settings')} aria-label={t('proj.settings')} onClick={() => setShowProjectSettings(true)}>
+            <Sliders size={18} />
+          </button>
+          <button className="icon-btn h44" title={t('set.title')} aria-label={t('set.title')} onClick={onSettings}>
+            <Cog size={18} />
+          </button>
         </div>
       </header>
 
@@ -128,18 +137,24 @@ export default function Project({ project, updateProject, settings, styles, setS
         />
       )}
 
-      <nav className="stage-timeline">
-        {STAGES.map((s) => (
-          <button
-            key={s.n}
-            className={`tl-seg ${view === s.n ? 'current' : ''} ${s.n < project.stage && view !== s.n ? 'done' : ''}`}
-            disabled={s.n > project.stage}
-            onClick={() => setView(s.n)}
-          >
-            <span className="tl-num">{s.n < project.stage && view !== s.n ? '✓' : s.n}</span>
-            <span className="tl-label">{s.label}</span>
-          </button>
-        ))}
+      <nav className="stg-bar">
+        {STAGES.map((s) => {
+          const sel = view === s.n;
+          const done = s.n < project.stage;
+          const pos = sel ? 'sel' : s.n === view - 1 ? 'nb-left' : s.n === view + 1 ? 'nb-right' : 'far';
+          return (
+            <button
+              key={s.n}
+              className={`stg ${pos}`}
+              disabled={s.n > project.stage}
+              onClick={() => setView(s.n)}
+            >
+              <span className="stg-num">{s.n}</span>
+              <span className="stg-title">{s.label}</span>
+              {done && !sel && <Check size={16} className="stg-check" />}
+            </button>
+          );
+        })}
       </nav>
 
       {view === 1 && <Stage1 {...stageProps} />}

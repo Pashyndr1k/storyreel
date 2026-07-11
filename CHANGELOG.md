@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.8.0 — 2026-07-11
+
+- Settings moved to a gear icon in the upper-right corner of every screen
+  (replacing the avatar); the rail's bottom settings icon is gone.
+- Stage navigation replaced with a gapless segmented stepper with light-spill
+  states (design 2a), reskinned for all three themes.
+- All project-page blocks now share the same width as the header and stepper.
+- Project header actions (Smart edit, Export, Project settings, Settings) are
+  icon-only, same-height buttons; the language selector there is the compact
+  pill from the main page.
+- One global language everywhere: it switches the interface and the script
+  generation language instantly from any screen (image/video prompts stay
+  English); the per-project language override is gone. Existing text is never
+  rewritten by a language change.
+- Animatic preview rebuilt as a video-editor-style timeline (design 3a): black
+  surface, per-second time ruler, square clips proportional to duration,
+  violet selection, red playhead, live timecode; click a clip to select/seek.
+- "Copy" above prompt fields is now a plain clickable text link.
+
 ## 1.7.1 — 2026-07-11
 
 - Stage 1 idea cards now note which random modifiers shaped that generation —

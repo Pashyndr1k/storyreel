@@ -255,6 +255,7 @@ export default function App() {
           project={current}
           updateProject={updateProject}
           settings={settings}
+          setSettings={setSettings}
           styles={styles}
           setStyles={setStyles}
           library={library}

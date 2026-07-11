@@ -139,6 +139,12 @@ export const Sliders = (p) => (
   </S>
 );
 
+export const Check = (p) => (
+  <S {...p} sw={2.4}>
+    <path d="M20 6 9 17l-5-5" />
+  </S>
+);
+
 export const User = (p) => (
   <S {...p} sw={1.7}>
     <circle cx="12" cy="8" r="4" />

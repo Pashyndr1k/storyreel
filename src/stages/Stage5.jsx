@@ -20,7 +20,7 @@ function CopyButton({ text }) {
     }
   };
   return (
-    <button className="btn tiny" disabled={!text} onClick={copy}>
+    <button type="button" className="copy-link" disabled={!text} onClick={copy}>
       {copied ? t('s5.copied') : t('s5.copy')}
     </button>
   );

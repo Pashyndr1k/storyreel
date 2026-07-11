@@ -3,16 +3,14 @@ import { generateStoryboardImage } from '../lib/gemini.js';
 import { useI18n } from '../lib/i18n.js';
 import { Play, StopSq } from './icons.jsx';
 
-const PPS = 26; // timeline pixels per second
-const MIN_CLIP = 44;
-
 // Local prompt for a cheap, rough frame — no Claude call needed.
 function framePrompt(shot, scene) {
   return `Rough cinematic storyboard frame, ${shot.shotType || 'medium'} shot, simple loose sketch-style composition, muted colors: ${shot.action || scene.summary || ''}. Setting: ${shot.location || scene.title || ''}. No text, no labels, no captions.`;
 }
 
-// Low-res storyboard strip: NLE-style clips sized by duration, drag to reorder,
-// batch generation of rough frames, and real-time playback for pacing checks.
+// NLE-style animatic timeline (design 3a): black surface with a per-second time
+// ruler, square clips butted together whose widths are proportional to their
+// durations, a red playhead spanning ruler + track, and real-time playback.
 export default function StoryboardTimeline({ project, scene, shots, settings, onReorder, onFrames, onSettings }) {
   const { t } = useI18n();
   const [busy, setBusy] = useState(false);
@@ -20,6 +18,7 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
   const [err, setErr] = useState('');
   const [playing, setPlaying] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const [selectedId, setSelectedId] = useState(null);
   const dragIdx = useRef(null);
   const [overIdx, setOverIdx] = useState(null);
 
@@ -27,12 +26,13 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
   const total = shots.reduce((a, s) => a + (s.duration || 0), 0);
   const missing = shots.filter((s) => !sb[s.id]);
 
-  // playback clock
+  // playback clock (resumes from the current position)
   useEffect(() => {
     if (!playing || total <= 0) return;
+    const start = elapsed;
     const t0 = performance.now();
     const iv = setInterval(() => {
-      const e = (performance.now() - t0) / 1000;
+      const e = start + (performance.now() - t0) / 1000;
       if (e >= total) {
         setPlaying(false);
         setElapsed(0);
@@ -41,6 +41,7 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
       }
     }, 80);
     return () => clearInterval(iv);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing, total]);
 
   // current shot for the preview
@@ -54,6 +55,8 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
     acc += s.duration || 0;
     current = s;
   }
+
+  const startOf = (idx) => shots.slice(0, idx).reduce((a, s) => a + (s.duration || 0), 0);
 
   const generate = async () => {
     if (!settings.geminiKey) {
@@ -94,11 +97,13 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
 
   if (!shots.length) return null;
 
+  const seconds = Math.max(1, Math.ceil(total));
+  const showPlayhead = total > 0 && (playing || elapsed > 0);
+
   return (
     <div className="sb-block">
       <div className="sb-head">
         <strong>{t('sb.title')}</strong>
-        <span className="hint">{t('sb.hint')}</span>
       </div>
 
       {playing && (
@@ -108,52 +113,64 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
           ) : (
             <div className="sb-preview-empty">{t('s4.shot', { n: shots.indexOf(current) + 1 })}</div>
           )}
-          <span className="sb-clock">{elapsed.toFixed(1)}s / {total}s</span>
         </div>
       )}
 
-      <div className="sb-strip-wrap">
-        <div className="sb-strip">
-          {shots.map((s, i) => {
-            const w = Math.max(MIN_CLIP, (s.duration || 2) * PPS);
-            return (
-              <div
-                key={s.id}
-                className={`sb-clip ${overIdx === i ? 'drag-over' : ''} ${playing && current?.id === s.id ? 'live' : ''}`}
-                style={{ width: `${w}px` }}
-                title={`${i + 1} · ${s.duration}s · ${s.shotType || ''}`}
-                draggable
-                onDragStart={(e) => {
-                  dragIdx.current = i;
-                  e.dataTransfer.effectAllowed = 'move';
-                  e.dataTransfer.setData('text/plain', String(i));
-                }}
-                onDragEnd={() => {
-                  dragIdx.current = null;
-                  setOverIdx(null);
-                }}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  if (overIdx !== i) setOverIdx(i);
-                }}
-                onDragLeave={() => setOverIdx((v) => (v === i ? null : v))}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setOverIdx(null);
-                  const from = dragIdx.current;
-                  dragIdx.current = null;
-                  if (from != null && from !== i) onReorder(from, i);
-                }}
-              >
-                {sb[s.id] ? <img src={sb[s.id]} alt="" draggable={false} /> : <span className="sb-clip-num">{i + 1}</span>}
-                <span className="sb-clip-dur">{s.duration}s</span>
-              </div>
-            );
-          })}
-          {playing && total > 0 && (
-            <div className="sb-playhead" style={{ left: `${(elapsed / total) * 100}%` }} />
-          )}
+      <div className="nle">
+        <div className="nle-ruler">
+          {Array.from({ length: seconds }, (_, i) => (
+            <div key={i} className="nle-cell"><span>{i}s</span></div>
+          ))}
         </div>
+        <div className="nle-track">
+          {shots.map((s, i) => (
+            <div
+              key={s.id}
+              className={`nle-clip ${selectedId === s.id ? 'selected' : ''} ${overIdx === i ? 'drag-over' : ''}`}
+              style={{ flexGrow: Math.max(0.5, s.duration || 1) }}
+              title={`${i + 1} · ${s.duration}s · ${s.shotType || ''}`}
+              draggable
+              onClick={() => {
+                setSelectedId(s.id);
+                setElapsed(startOf(i));
+              }}
+              onDragStart={(e) => {
+                dragIdx.current = i;
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', String(i));
+              }}
+              onDragEnd={() => {
+                dragIdx.current = null;
+                setOverIdx(null);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (overIdx !== i) setOverIdx(i);
+              }}
+              onDragLeave={() => setOverIdx((v) => (v === i ? null : v))}
+              onDrop={(e) => {
+                e.preventDefault();
+                setOverIdx(null);
+                const from = dragIdx.current;
+                dragIdx.current = null;
+                if (from != null && from !== i) onReorder(from, i);
+              }}
+            >
+              {sb[s.id] ? <img src={sb[s.id]} alt="" draggable={false} /> : <span className="nle-clip-num">{i + 1}</span>}
+              <span className="nle-dur">{Number(s.duration || 0).toFixed(1)}s</span>
+            </div>
+          ))}
+        </div>
+        {showPlayhead && (
+          <div className="nle-playhead" style={{ left: `${Math.min(100, (elapsed / total) * 100)}%` }}>
+            <span className="nle-playhead-cap" />
+          </div>
+        )}
+      </div>
+
+      <div className="nle-footer">
+        <span>{t('sb.caption', { n: shots.length })}</span>
+        <span className="nle-timecode">{elapsed.toFixed(1).padStart(4, '0')} / {total.toFixed(1).padStart(4, '0')}s</span>
       </div>
 
       <div className="row">
@@ -163,10 +180,7 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
         <button
           className="btn small primary"
           disabled={busy || total <= 0}
-          onClick={() => {
-            setElapsed(0);
-            setPlaying((v) => !v);
-          }}
+          onClick={() => setPlaying((v) => !v)}
         >
           {playing ? <><StopSq size={14} /> {t('sb.stop')}</> : <><Play size={14} /> {t('sb.play')}</>}
         </button>
