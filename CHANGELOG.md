@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.6.1 — 2026-07-11
+
+- Randomization Method 2 replaced: "Cliché Breaker" (which tuned the temperature
+  parameter, now deprecated for Sonnet) is now **Auteur Persona** — it filters the
+  idea through a random, highly opinionated auteur director's philosophy from a new
+  library of 15. No temperature tuning is used anywhere.
+- Stage 1 now uses a strong default plot-generation persona when no persona-setting
+  randomization is active, so ideas stay bold and non-formulaic by default.
+
 ## 1.6.0 — 2026-07-11
 
 - **Plot Randomization Engine** on Stage 1: pick up to two methods to steer idea

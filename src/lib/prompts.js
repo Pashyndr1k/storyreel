@@ -41,13 +41,18 @@ function characterBlock(project) {
     .join('\n');
 }
 
+// Default Stage-1 plot-generation persona, used when no randomization method
+// supplies its own directorial persona.
+const STAGE1_DEFAULT_PERSONA =
+  "You are a fiercely original, award-winning indie film director and screenwriting partner. Your goal is to take the user's brief idea and pitch four distinct, compelling narrative directions optimized for a short film or commercial. Reject the first three ideas that come to mind. Avoid predictable twists, moral lessons, and neat resolutions.";
+
 export function stage1Prompt(project, lang, scriptStyle, randomizationMethods) {
   const d = durationOf(project);
-  // Plot Randomization Engine: composes extra directives + temperature.
-  const { systemAppend, temperature } = buildRandomization(randomizationMethods);
+  // Plot Randomization Engine: composes extra system directives from the selection.
+  const { systemAppend, overridesPersona } = buildRandomization(randomizationMethods);
+  const persona = overridesPersona ? '' : `\n\n${STAGE1_DEFAULT_PERSONA}`;
   return {
-    system: system(lang, scriptStyle) + systemAppend,
-    temperature,
+    system: system(lang, scriptStyle) + persona + systemAppend,
     maxTokens: 2500,
     user: `Brief plot description for a short video (target length: ${d.min}–${d.max} seconds):
 

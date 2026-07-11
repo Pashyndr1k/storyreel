@@ -8,26 +8,25 @@
 // and feeds stage1Prompt() + the Claude client. Behaviour matches the spec.
 import obliqueConstraints from '../data/oblique_constraints.json';
 import microTones from '../data/micro_tones.json';
+import auteurPersonas from '../data/auteur_personas.json';
 
 /** @typedef {{id:string,name:string,category:string,prompt_injection:string}} ObliqueConstraint */
 /** @typedef {{id:string,name:string,vibe:string}} MicroTone */
+/** @typedef {{id:string,name:string,persona_instruction:string}} AuteurPersona */
 
 /** @type {ObliqueConstraint[]} */
 const CONSTRAINTS = Array.isArray(obliqueConstraints) ? obliqueConstraints : [];
 /** @type {MicroTone[]} */
 const TONES = Array.isArray(microTones) ? microTones : [];
+/** @type {AuteurPersona[]} */
+const PERSONAS = Array.isArray(auteurPersonas) ? auteurPersonas : [];
 
-export const DEFAULT_TEMPERATURE = 0.7;
-export const HIGH_TEMPERATURE = 0.95;
 export const MAX_METHODS = 2;
 
 // The four selectable methods (order defines the card grid). Labels/tips are
 // looked up by id in i18n; the injection text below is English-only (it's sent
 // to the model, and Stage-1 output language is governed elsewhere).
-export const RANDOMIZATION_METHODS = ['oblique_strategies', 'high_temp', 'genre_mashup', 'forced_variance'];
-
-const HIGH_TEMP_INJECTION =
-  'You are a fiercely original indie film director. Reject the first three ideas that come to your mind, as they are likely clichés. Explicitly avoid: standard hero\'s journey arcs, neat moral lessons, \'it was all a dream\' twists, and predictable betrayals. Subvert standard expectations completely.';
+export const RANDOMIZATION_METHODS = ['oblique_strategies', 'auteur_persona', 'genre_mashup', 'forced_variance'];
 
 // Spec method 4 ends with "Format as 4 distinct Markdown headings." Stage 1 must
 // return strict JSON, so that final formatting clause is adapted to map the four
@@ -56,12 +55,11 @@ export function sanitizeMethods(active) {
   return deduped.slice(0, MAX_METHODS);
 }
 
-// Build the system-prompt append + temperature for the selected methods.
-// Fallback safety: if an asset library is empty, that method is skipped instead
-// of crashing generation.
+// Build the system-prompt append for the selected methods. Fallback safety: if
+// an asset library is empty, that method is skipped instead of crashing
+// generation. (No temperature tuning — that parameter is deprecated for Sonnet.)
 export function buildRandomization(methods) {
   const selected = sanitizeMethods(methods);
-  let temperature = DEFAULT_TEMPERATURE;
   const parts = [];
 
   for (const id of selected) {
@@ -72,9 +70,13 @@ export function buildRandomization(methods) {
           `CRITICAL CONSTRAINT: To avoid clichés, you must strictly integrate this random constraint into the narrative logic: [${c.prompt_injection}]. It must act as the primary structural friction driving the plot, not just a background detail.`
         );
       }
-    } else if (id === 'high_temp') {
-      temperature = HIGH_TEMPERATURE;
-      parts.push(HIGH_TEMP_INJECTION);
+    } else if (id === 'auteur_persona') {
+      const persona = getRandomElement(PERSONAS);
+      if (persona?.persona_instruction) {
+        parts.push(
+          `DIRECTORIAL LENS RULE: You must abandon your default helpful AI persona. You are now acting as a highly opinionated Auteur director with the following philosophy: [${persona.persona_instruction}]. You must aggressively filter the user's idea through this specific psychological and artistic lens. Force the narrative to conform to these specific biases.`
+        );
+      }
     } else if (id === 'genre_mashup') {
       const tone = getRandomElement(TONES);
       if (tone?.vibe) {
@@ -87,5 +89,8 @@ export function buildRandomization(methods) {
     }
   }
 
-  return { temperature, systemAppend: parts.length ? '\n\n' + parts.join('\n\n') : '' };
+  // Whether a method already supplies a strong directorial persona (so the
+  // Stage-1 default persona should step aside).
+  const overridesPersona = selected.includes('auteur_persona');
+  return { systemAppend: parts.length ? '\n\n' + parts.join('\n\n') : '', overridesPersona };
 }
