@@ -1,4 +1,5 @@
 import { dataURLToImageBlock } from './images.js';
+import { aspectDescription } from './aspect.js';
 
 const LANG_NAMES = { en: 'English', ru: 'Russian', uk: 'Ukrainian' };
 
@@ -152,6 +153,8 @@ export function stage5Prompt(project, scene, shots, lang, imageStyle, videoStyle
     : '';
   const img = (imageStyle || '').trim();
   const vid = (videoStyle || '').trim();
+  const ratio = project.aspectRatio || '16:9';
+  const aspectNote = `\n\nASPECT RATIO — every "image_prompt" and every "video_prompt" MUST explicitly state the framing as ${aspectDescription(ratio)} (${ratio}), and compose for that frame.`;
   const styleNote =
     (img ? `\n\nVISUAL STYLE — bake this into EVERY "image_prompt": ${img}` : '') +
     (vid ? `\n\nCINEMATIC STYLE — bake this into EVERY "video_prompt": ${vid}` : '');
@@ -178,7 +181,7 @@ For EVERY shot above, write two prompts:
 JSON schema:
 {"prompts":[{"shot":1,"image_prompt":"...","video_prompt":"..."}]}
 
-Return exactly one entry per shot, in order.` + styleNote + envNote),
+Return exactly one entry per shot, in order.` + aspectNote + styleNote + envNote),
   };
 }
 

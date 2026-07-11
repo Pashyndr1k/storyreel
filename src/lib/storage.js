@@ -1,4 +1,5 @@
 import { idbGetAll, idbPutMany, idbDeleteMany } from './idb.js';
+import { isValidAspect } from './aspect.js';
 
 const LEGACY_PROJECTS_KEY = 'storyreel.projects.v1'; // pre-1.3.0 localStorage store
 const SETTINGS_KEY = 'storyreel.settings.v1';
@@ -154,6 +155,7 @@ function projectDefaults() {
     archived: false,
     lang: '', // '' = follow the app language; 'en'/'ru'/'uk' = per-project override
     scriptType: 'medium', // 'short' 10-30s | 'medium' 1-4min | 'long' 5-10min
+    aspectRatio: '16:9', // image/video aspect ratio: 16:9|4:3|1:1|3:4|9:16
     scriptStyleId: '', // selected style from the library (empty = neutral)
     imageStyleId: '',
     videoStyleId: '',
@@ -171,12 +173,13 @@ function projectDefaults() {
   };
 }
 
-export function newProject({ title, logline, scriptType }) {
+export function newProject({ title, logline, scriptType, aspectRatio }) {
   return {
     ...projectDefaults(),
     title: (title || '').trim() || 'Untitled project',
     logline: logline || '',
     scriptType: ['short', 'medium', 'long'].includes(scriptType) ? scriptType : 'medium',
+    aspectRatio: isValidAspect(aspectRatio) ? aspectRatio : '16:9',
   };
 }
 
@@ -198,6 +201,7 @@ export function migrateProject(raw) {
   p.cover = typeof p.cover === 'string' ? p.cover : '';
   p.lang = typeof p.lang === 'string' ? p.lang : '';
   p.scriptType = ['short', 'medium', 'long'].includes(p.scriptType) ? p.scriptType : 'medium';
+  p.aspectRatio = isValidAspect(p.aspectRatio) ? p.aspectRatio : '16:9';
   p.scriptStyleId = typeof p.scriptStyleId === 'string' ? p.scriptStyleId : '';
   p.imageStyleId = typeof p.imageStyleId === 'string' ? p.imageStyleId : '';
   p.videoStyleId = typeof p.videoStyleId === 'string' ? p.videoStyleId : '';

@@ -3,6 +3,7 @@ import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage } from '../lib/gemini.js';
 import { stage5Prompt } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
+import { aspectDescription } from '../lib/aspect.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 
@@ -116,12 +117,13 @@ export default function Stage5({ project, update, settings, onSettings, genLang,
       if (useLoc.length)
         text += ` The ${useLoc.length === 1 ? 'last reference image shows' : `last ${useLoc.length} reference images show`} the location/environment — match its architecture, colors and lighting.`;
     }
-    text += `\n\nRender in 16:9 widescreen aspect ratio.`;
+    const ratio = project.aspectRatio || '16:9';
+    text += `\n\nRender in ${aspectDescription(ratio)} (${ratio}) aspect ratio.`;
 
     setImgBusy(shot.id);
     setImgErr(null);
     try {
-      const img = await generateImage(settings, { prompt: text, images, aspectRatio: '16:9', imageSize: '2K' });
+      const img = await generateImage(settings, { prompt: text, images, aspectRatio: ratio, imageSize: '2K' });
       update((p) => ({ shotImages: { ...p.shotImages, [shot.id]: img } }));
     } catch (e) {
       setImgErr({ id: shot.id, msg: e.message || String(e) });

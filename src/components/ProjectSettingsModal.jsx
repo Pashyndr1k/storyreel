@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useI18n } from '../lib/i18n.js';
 import { STYLE_CATEGORIES } from '../lib/styles.js';
 import StylesModal from './StylesModal.jsx';
+import AspectSelector from './AspectSelector.jsx';
 
 export default function ProjectSettingsModal({ project, update, styles, setStyles, onClose }) {
   const { t } = useI18n();
@@ -39,6 +40,13 @@ export default function ProjectSettingsModal({ project, update, styles, setStyle
           value={project.title}
           onChange={(e) => update({ title: e.target.value })}
           placeholder={t('pset.projectTitle')}
+        />
+
+        <label className="section-label">{t('pset.aspect')}</label>
+        <p className="hint">{t('pset.aspectHint')}</p>
+        <AspectSelector
+          value={project.aspectRatio || '16:9'}
+          onChange={(v) => update({ aspectRatio: v })}
         />
 
         <label className="section-label">{t('pset.styles')}</label>

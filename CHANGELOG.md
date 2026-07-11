@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.0 — 2026-07-11
+
+- **Aspect ratio** for image & video, chosen when creating a project from an icon
+  row (16:9, 4:3, 1:1, 3:4, 9:16) and changeable anytime in Project settings.
+- Stage 5 prompts now state the chosen aspect ratio in every image and video
+  prompt and compose for that frame; generated images are rendered at that ratio.
+
 ## 1.4.0 — 2026-07-10
 
 - **Style library** replaces the per-project system prompt and prompt templates.

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useI18n } from '../lib/i18n.js';
 import AutoTextarea from './AutoTextarea.jsx';
 import VoiceButton from './VoiceButton.jsx';
+import AspectSelector from './AspectSelector.jsx';
 
 const TYPES = ['short', 'medium', 'long'];
 
@@ -10,6 +11,7 @@ export default function NewProjectModal({ onCreate, onClose, settings }) {
   const [title, setTitle] = useState('');
   const [logline, setLogline] = useState('');
   const [type, setType] = useState('medium');
+  const [aspect, setAspect] = useState('16:9');
 
   return (
     <div className="overlay" onClick={onClose}>
@@ -36,6 +38,9 @@ export default function NewProjectModal({ onCreate, onClose, settings }) {
             </button>
           ))}
         </div>
+        <label>{t('new.aspect')}</label>
+        <AspectSelector value={aspect} onChange={setAspect} />
+
         <label>{t('new.plotLabel')}</label>
         <div className="voice-row">
           <AutoTextarea
@@ -54,7 +59,7 @@ export default function NewProjectModal({ onCreate, onClose, settings }) {
           <button
             className="btn primary"
             disabled={!logline.trim()}
-            onClick={() => onCreate(title, logline.trim(), type)}
+            onClick={() => onCreate(title, logline.trim(), type, aspect)}
           >
             {t('new.create')}
           </button>

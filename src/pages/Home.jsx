@@ -42,8 +42,8 @@ export default function Home({
     return 0;
   });
 
-  const create = (title, logline, scriptType) => {
-    const p = newProject({ title, logline, scriptType });
+  const create = (title, logline, scriptType, aspectRatio) => {
+    const p = newProject({ title, logline, scriptType, aspectRatio });
     setProjects((ps) => [p, ...ps]);
     setShowNew(false);
     onOpen(p.id);
