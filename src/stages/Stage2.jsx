@@ -10,7 +10,7 @@ import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import VoiceButton from '../components/VoiceButton.jsx';
 
-export default function Stage2({ project, update, settings, goNext, onSettings, genLang }) {
+export default function Stage2({ project, update, settings, goNext, onSettings, genLang, scriptStyle, imageStyle }) {
   const { t } = useI18n();
   const { busy, error, run } = useGenerate(settings);
   const storyline = project.storyline;
@@ -21,7 +21,7 @@ export default function Stage2({ project, update, settings, goNext, onSettings, 
 
   const generate = () => {
     if (storyline && !window.confirm(t('s2.replaceConfirm'))) return;
-    run(stage2Prompt(project, genLang), (data) =>
+    run(stage2Prompt(project, genLang, scriptStyle), (data) =>
       update((p) => ({
         storyline: {
           synopsis: data.synopsis || '',
@@ -47,9 +47,9 @@ export default function Stage2({ project, update, settings, goNext, onSettings, 
     setCoverBusy(true);
     setCoverErr('');
     try {
-      const promptData = await generateJSON(settings, coverPromptSpec(project, genLang));
+      const promptData = await generateJSON(settings, coverPromptSpec(project, genLang, imageStyle));
       let coverPrompt = '';
-      if (project.systemPrompt?.trim()) coverPrompt += `Project style direction: ${project.systemPrompt.trim()}\n\n`;
+      if (imageStyle?.trim()) coverPrompt += `Visual style: ${imageStyle.trim()}\n\n`;
       coverPrompt += `${promptData.image_prompt}\n\nRender in 16:9 widescreen aspect ratio.`;
       const cover = await generateImage(settings, {
         prompt: coverPrompt,

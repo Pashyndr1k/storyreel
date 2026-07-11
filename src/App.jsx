@@ -5,6 +5,7 @@ import Project from './pages/Project.jsx';
 import SettingsModal from './components/SettingsModal.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { loadProjects, saveProjects, loadSettings, saveSettings } from './lib/storage.js';
+import { loadStyles, saveStyles, absorbLegacyStyles } from './lib/styles.js';
 import { checkForUpdate } from './lib/updateCheck.js';
 import { I18nContext, createT } from './lib/i18n.js';
 
@@ -16,6 +17,7 @@ export default function App() {
   const [projects, setProjectsRaw] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [settings, setSettings] = useState(loadSettings);
+  const [styles, setStyles] = useState(loadStyles);
   const [route, setRoute] = useState({ name: 'home' });
   const [showSettings, setShowSettings] = useState(false);
   const [updateInfo, setUpdateInfo] = useState(null);
@@ -30,19 +32,28 @@ export default function App() {
   );
   const { t } = i18n;
 
-  // Load projects from IndexedDB (with one-time localStorage migration).
+  // Load projects from IndexedDB (with one-time localStorage migration), then
+  // absorb any pre-1.4.0 per-project prompts into the shared style library.
   useEffect(() => {
     let alive = true;
     loadProjects().then((ps) => {
-      if (alive) {
-        setProjectsRaw(ps);
-        setLoaded(true);
+      if (!alive) return;
+      const res = absorbLegacyStyles(ps, styles);
+      if (res.changed) {
+        setStyles(res.styles);
+        saveStyles(res.styles);
+        saveProjects(res.projects);
       }
+      setProjectsRaw(res.changed ? res.projects : ps);
+      setLoaded(true);
     });
     return () => {
       alive = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => saveStyles(styles), [styles]);
 
   // All mutations go through this setter so they land in the undo history.
   // Rapid changes (typing) within HISTORY_COALESCE_MS merge into one step.
@@ -188,6 +199,8 @@ export default function App() {
           project={current}
           updateProject={updateProject}
           settings={settings}
+          styles={styles}
+          setStyles={setStyles}
           onBack={() => setRoute({ name: 'home' })}
           onSettings={() => setShowSettings(true)}
         />

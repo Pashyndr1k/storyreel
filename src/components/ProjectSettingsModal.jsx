@@ -1,8 +1,33 @@
+import { useState } from 'react';
 import { useI18n } from '../lib/i18n.js';
-import AutoTextarea from './AutoTextarea.jsx';
+import { STYLE_CATEGORIES } from '../lib/styles.js';
+import StylesModal from './StylesModal.jsx';
 
-export default function ProjectSettingsModal({ project, update, onClose }) {
+export default function ProjectSettingsModal({ project, update, styles, setStyles, onClose }) {
   const { t } = useI18n();
+  const [manageCat, setManageCat] = useState(null); // opens the library manager at a category
+
+  const idField = { script: 'scriptStyleId', image: 'imageStyleId', video: 'videoStyleId' };
+
+  const selector = (cat) => (
+    <div className="style-select" key={cat}>
+      <label>{t(`pset.style_${cat}`)}</label>
+      <p className="hint">{t(`pset.styleHint_${cat}`)}</p>
+      <div className="row">
+        <select
+          className="grow"
+          value={project[idField[cat]] || ''}
+          onChange={(e) => update({ [idField[cat]]: e.target.value })}
+        >
+          <option value="">{t('pset.styleNone')}</option>
+          {(styles[cat] || []).map((s) => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
+        <button className="btn small" onClick={() => setManageCat(cat)}>{t('pset.manage')}</button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="overlay" onClick={onClose}>
@@ -16,36 +41,22 @@ export default function ProjectSettingsModal({ project, update, onClose }) {
           placeholder={t('pset.projectTitle')}
         />
 
-        <label>{t('pset.systemPrompt')}</label>
-        <p className="hint">{t('pset.systemPromptHint')}</p>
-        <AutoTextarea
-          minRows={4}
-          value={project.systemPrompt || ''}
-          onChange={(e) => update({ systemPrompt: e.target.value })}
-          placeholder={t('pset.systemPromptPh')}
-        />
-
-        <label>{t('pset.templates')}</label>
-        <p className="hint">{t('pset.templatesHint')}</p>
-        <label className="sub-label">{t('pset.imageTpl')}</label>
-        <AutoTextarea
-          minRows={3}
-          value={project.imageTemplate || ''}
-          onChange={(e) => update({ imageTemplate: e.target.value })}
-          placeholder={t('pset.imageTplPh')}
-        />
-        <label className="sub-label">{t('pset.videoTpl')}</label>
-        <AutoTextarea
-          minRows={3}
-          value={project.videoTemplate || ''}
-          onChange={(e) => update({ videoTemplate: e.target.value })}
-          placeholder={t('pset.videoTplPh')}
-        />
+        <label className="section-label">{t('pset.styles')}</label>
+        {STYLE_CATEGORIES.map((c) => selector(c))}
 
         <div className="modal-actions">
           <button className="btn primary" onClick={onClose}>{t('pset.done')}</button>
         </div>
       </div>
+
+      {manageCat && (
+        <StylesModal
+          styles={styles}
+          setStyles={setStyles}
+          initialCat={manageCat}
+          onClose={() => setManageCat(null)}
+        />
+      )}
     </div>
   );
 }

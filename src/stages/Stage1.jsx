@@ -6,12 +6,12 @@ import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import VoiceButton from '../components/VoiceButton.jsx';
 
-export default function Stage1({ project, update, settings, goNext, onSettings, genLang }) {
+export default function Stage1({ project, update, settings, goNext, onSettings, genLang, scriptStyle }) {
   const { t } = useI18n();
   const { busy, error, run } = useGenerate(settings);
 
   const generate = () =>
-    run(stage1Prompt(project, genLang), (data) =>
+    run(stage1Prompt(project, genLang, scriptStyle), (data) =>
       update({
         ideas: (data.ideas || []).map((i) => ({ id: uid(), ...i })),
         selectedIdeaId: null,

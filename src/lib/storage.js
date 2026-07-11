@@ -154,9 +154,9 @@ function projectDefaults() {
     archived: false,
     lang: '', // '' = follow the app language; 'en'/'ru'/'uk' = per-project override
     scriptType: 'medium', // 'short' 10-30s | 'medium' 1-4min | 'long' 5-10min
-    systemPrompt: '', // extra project-specific instructions for the prompt builder
-    imageTemplate: '', // optional template for Nano Banana image prompts
-    videoTemplate: '', // optional template for image-to-video prompts
+    scriptStyleId: '', // selected style from the library (empty = neutral)
+    imageStyleId: '',
+    videoStyleId: '',
     stage: 1,
     cover: '', // generated project cover image (data URL)
     shotImages: {}, // shotId -> generated image (data URL)
@@ -198,9 +198,12 @@ export function migrateProject(raw) {
   p.cover = typeof p.cover === 'string' ? p.cover : '';
   p.lang = typeof p.lang === 'string' ? p.lang : '';
   p.scriptType = ['short', 'medium', 'long'].includes(p.scriptType) ? p.scriptType : 'medium';
-  p.systemPrompt = typeof p.systemPrompt === 'string' ? p.systemPrompt : '';
-  p.imageTemplate = typeof p.imageTemplate === 'string' ? p.imageTemplate : '';
-  p.videoTemplate = typeof p.videoTemplate === 'string' ? p.videoTemplate : '';
+  p.scriptStyleId = typeof p.scriptStyleId === 'string' ? p.scriptStyleId : '';
+  p.imageStyleId = typeof p.imageStyleId === 'string' ? p.imageStyleId : '';
+  p.videoStyleId = typeof p.videoStyleId === 'string' ? p.videoStyleId : '';
+  // Legacy per-project prompt fields (systemPrompt/imageTemplate/videoTemplate) are
+  // intentionally preserved here so absorbLegacyStyles() can convert them to library
+  // styles once, then strip them.
   p.shotImages = p.shotImages && typeof p.shotImages === 'object' ? p.shotImages : {};
   p.shotPrompts = p.shotPrompts && typeof p.shotPrompts === 'object' ? p.shotPrompts : {};
 

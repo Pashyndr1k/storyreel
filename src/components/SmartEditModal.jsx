@@ -108,7 +108,9 @@ export default function SmartEditModal({ project, update, settings, genLang, onC
     setError('');
     setResult(null);
     try {
-      const data = await generateJSON(settings, smartEditPrompt(project, instruction.trim(), genLang));
+      // Smart edit runs on the standard Sonnet 5 model, ungoverned by styles.
+      const editSettings = { ...settings, model: 'claude-sonnet-5' };
+      const data = await generateJSON(editSettings, smartEditPrompt(project, instruction.trim(), genLang));
       const { patch, count } = computeSmartPatch(project, data);
       if (count > 0) update(patch);
       setResult(count);

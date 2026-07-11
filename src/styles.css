@@ -780,6 +780,28 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 }
 .voice-dots { font-weight: 700; }
 
+/* style library */
+.section-label { margin-top: 20px; font-size: 13px; }
+.style-select { margin-bottom: 6px; }
+.style-select .hint { margin: 2px 0 6px; }
+.style-tabs { display: flex; gap: 8px; margin: 4px 0 10px; }
+.style-list { display: flex; flex-direction: column; gap: 8px; margin: 6px 0 12px; }
+.style-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  background: var(--glass);
+  border: 1px solid var(--glass-border-soft);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.style-item-body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.style-item-body strong { font-size: 14px; }
+.style-item-body span { font-size: 12.5px; color: var(--muted); }
+.style-item-actions { display: flex; gap: 6px; flex: none; }
+.style-editor { display: flex; flex-direction: column; margin: 6px 0 12px; }
+
 /* drag & drop reorder */
 .drag-handle {
   display: flex;

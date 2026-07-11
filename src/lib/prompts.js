@@ -39,10 +39,10 @@ function characterBlock(project) {
     .join('\n');
 }
 
-export function stage1Prompt(project, lang) {
+export function stage1Prompt(project, lang, scriptStyle) {
   const d = durationOf(project);
   return {
-    system: system(lang, project.systemPrompt),
+    system: system(lang, scriptStyle),
     maxTokens: 2500,
     user: `Brief plot description for a short video (target length: ${d.min}–${d.max} seconds):
 
@@ -57,9 +57,9 @@ JSON schema:
   };
 }
 
-export function stage2Prompt(project, lang) {
+export function stage2Prompt(project, lang, scriptStyle) {
   return {
-    system: system(lang, project.systemPrompt),
+    system: system(lang, scriptStyle),
     maxTokens: 3500,
     user: `Original plot description:
 """
@@ -78,9 +78,9 @@ JSON schema:
   };
 }
 
-export function stage3Prompt(project, lang) {
+export function stage3Prompt(project, lang, scriptStyle) {
   return {
-    system: system(lang, project.systemPrompt),
+    system: system(lang, scriptStyle),
     maxTokens: 3000,
     user: `Title: ${project.title}
 Genres: ${project.genres.join(', ')}
@@ -100,7 +100,7 @@ JSON schema:
   };
 }
 
-export function stage4Prompt(project, scene, lang) {
+export function stage4Prompt(project, scene, lang, scriptStyle) {
   const outlineList = project.outline
     .map((s, i) => `${i + 1}. ${s.title} — ${s.summary} (~${s.duration}s)`)
     .join('\n');
@@ -108,7 +108,7 @@ export function stage4Prompt(project, scene, lang) {
     ? `\n\nAttached are reference photos of this scene's environment. Match the locations, lighting and mood in your shot descriptions to these photos.`
     : '';
   return {
-    system: system(lang, project.systemPrompt),
+    system: system(lang, scriptStyle),
     maxTokens: 5000,
     user: withPhotos(scene.photos, `Title: ${project.title}
 
@@ -137,7 +137,7 @@ JSON schema:
   };
 }
 
-export function stage5Prompt(project, scene, shots, lang) {
+export function stage5Prompt(project, scene, shots, lang, imageStyle, videoStyle) {
   const shotList = shots.map((s, i) => ({
     shot: i + 1,
     duration_sec: s.duration,
@@ -150,16 +150,13 @@ export function stage5Prompt(project, scene, shots, lang) {
   const envNote = scene.photos?.length
     ? `\n\nAttached are reference photos of this scene's environment. Ground the image prompts in what these photos show: architecture, interior details, colors, lighting and atmosphere.`
     : '';
-  const imgTpl = (project.imageTemplate || '').trim();
-  const vidTpl = (project.videoTemplate || '').trim();
-  const tplNote =
-    imgTpl || vidTpl
-      ? '\n\nFollow these prompt templates for this project. Adapt each shot to the template while keeping the required content; the template defines style, structure and any fixed wording, but every prompt must still be in English.' +
-        (imgTpl ? `\n\nIMAGE PROMPT TEMPLATE:\n${imgTpl}` : '') +
-        (vidTpl ? `\n\nVIDEO PROMPT TEMPLATE:\n${vidTpl}` : '')
-      : '';
+  const img = (imageStyle || '').trim();
+  const vid = (videoStyle || '').trim();
+  const styleNote =
+    (img ? `\n\nVISUAL STYLE — bake this into EVERY "image_prompt": ${img}` : '') +
+    (vid ? `\n\nCINEMATIC STYLE — bake this into EVERY "video_prompt": ${vid}` : '');
   return {
-    system: system(lang, project.systemPrompt),
+    system: system(lang),
     maxTokens: 8000,
     user: withPhotos(scene.photos, `Title: ${project.title}
 Genres: ${project.genres.join(', ')}
@@ -181,15 +178,18 @@ For EVERY shot above, write two prompts:
 JSON schema:
 {"prompts":[{"shot":1,"image_prompt":"...","video_prompt":"..."}]}
 
-Return exactly one entry per shot, in order.` + tplNote + envNote),
+Return exactly one entry per shot, in order.` + styleNote + envNote),
   };
 }
 
 // Asks Claude to pick the key visual from the synopsis and write an English
 // image prompt for the project cover (poster). Returns { image_prompt }.
-export function coverPromptSpec(project, lang) {
+export function coverPromptSpec(project, lang, imageStyle) {
+  const styleReq = (imageStyle || '').trim()
+    ? `\n- Render it in this visual style: ${imageStyle.trim()}`
+    : '';
   return {
-    system: system(lang, project.systemPrompt),
+    system: system(lang),
     maxTokens: 900,
     user: `Title: ${project.title}
 Genres: ${project.genres.join(', ')}
@@ -207,7 +207,7 @@ Identify the SINGLE most striking key event or key visual moment in this synopsi
 Requirements:
 - The prompt MUST be in English only.
 - Compose it as a 16:9 widescreen cinematic key frame / cover image, no text or lettering in the image.
-- Describe the subject and action, setting, lighting, mood, color palette and cinematic style; include the key characters' consistent physical details if they appear.
+- Describe the subject and action, setting, lighting, mood, color palette and cinematic style; include the key characters' consistent physical details if they appear.${styleReq}
 - One dense paragraph, no lists.
 
 JSON schema:
@@ -248,8 +248,10 @@ export function smartEditPrompt(project, instruction, lang) {
     })),
   };
 
+  // The smart-edit agent is intentionally NOT governed by project styles — it
+  // uses the base system prompt (and the caller forces the standard Sonnet 5 model).
   return {
-    system: system(lang, project.systemPrompt),
+    system: system(lang),
     maxTokens: 8000,
     user: `You are performing a TARGETED find-and-adapt edit on an existing short-video script. Do NOT rewrite, improve or regenerate anything beyond what the requested change strictly requires.
 

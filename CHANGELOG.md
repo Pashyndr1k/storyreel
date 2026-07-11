@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.4.0 — 2026-07-10
+
+- **Style library** replaces the per-project system prompt and prompt templates.
+  Styles are reusable, organized in three independent categories, and managed in
+  a library you can add to, edit and delete from:
+  - **Script styles** govern the script text (stages 1–4) — e.g. a literary or
+    documentary voice, or a genre.
+  - **Image styles** govern image prompts, the project cover, and in-app image
+    generation (stage 5 + cover).
+  - **Video styles** govern the video prompts (stage 5).
+- Each project selects one style per category (or none) in Project settings.
+- The **Smart-edit agent no longer uses styles or custom instructions** — it runs
+  on the standard Claude Sonnet 5 model.
+- Existing per-project prompts are converted into library styles automatically on
+  first launch, so nothing is lost.
+
 ## 1.3.0 — 2026-07-10
 
 - Projects moved from localStorage to **IndexedDB** (hundreds of MB instead of

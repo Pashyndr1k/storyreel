@@ -6,11 +6,12 @@ import Stage4 from '../stages/Stage4.jsx';
 import Stage5 from '../stages/Stage5.jsx';
 import { buildProjectExport, downloadText } from '../lib/exportScript.js';
 import { LANGS, useI18n } from '../lib/i18n.js';
+import { resolveStyleText } from '../lib/styles.js';
 import ProjectSettingsModal from '../components/ProjectSettingsModal.jsx';
 import SmartEditModal from '../components/SmartEditModal.jsx';
 import { ArrowLeft, Download, Sliders, Cog, Wand } from '../components/icons.jsx';
 
-export default function Project({ project, updateProject, settings, onBack, onSettings }) {
+export default function Project({ project, updateProject, settings, styles, setStyles, onBack, onSettings }) {
   const { t, lang } = useI18n();
   const [view, setView] = useState(Math.min(project.stage, 5));
   const [showProjectSettings, setShowProjectSettings] = useState(false);
@@ -43,7 +44,22 @@ export default function Project({ project, updateProject, settings, onBack, onSe
     downloadText(`${safe}.md`, buildProjectExport(project, genLang));
   };
 
-  const stageProps = { project, update: stageUpdate, settings, goNext, onSettings, genLang };
+  // Resolve the project's selected styles into instruction text for the prompts.
+  const scriptStyle = resolveStyleText(styles, 'script', project.scriptStyleId);
+  const imageStyle = resolveStyleText(styles, 'image', project.imageStyleId);
+  const videoStyle = resolveStyleText(styles, 'video', project.videoStyleId);
+
+  const stageProps = {
+    project,
+    update: stageUpdate,
+    settings,
+    goNext,
+    onSettings,
+    genLang,
+    scriptStyle,
+    imageStyle,
+    videoStyle,
+  };
 
   return (
     <div className="page project-page">
@@ -94,6 +110,8 @@ export default function Project({ project, updateProject, settings, onBack, onSe
         <ProjectSettingsModal
           project={project}
           update={update}
+          styles={styles}
+          setStyles={setStyles}
           onClose={() => setShowProjectSettings(false)}
         />
       )}

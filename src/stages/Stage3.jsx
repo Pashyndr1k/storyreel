@@ -13,7 +13,7 @@ function fmt(sec) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export default function Stage3({ project, update, settings, goNext, onSettings, genLang }) {
+export default function Stage3({ project, update, settings, goNext, onSettings, genLang, scriptStyle }) {
   const { t } = useI18n();
   const { busy, error, run } = useGenerate(settings);
   const outline = project.outline;
@@ -22,7 +22,7 @@ export default function Stage3({ project, update, settings, goNext, onSettings, 
 
   const generate = () => {
     if (outline.length && !window.confirm(t('s3.replaceConfirm'))) return;
-    run(stage3Prompt(project, genLang), (data) =>
+    run(stage3Prompt(project, genLang, scriptStyle), (data) =>
       update({
         outline: (data.scenes || []).map((s, i) => ({
           id: uid(),

@@ -38,7 +38,7 @@ const mapShots = (rawShots) =>
     notes: s.notes || '',
   }));
 
-export default function Stage4({ project, update, settings, goNext, onSettings, genLang }) {
+export default function Stage4({ project, update, settings, goNext, onSettings, genLang, scriptStyle }) {
   const { t } = useI18n();
   const [sceneId, setSceneId] = useState(project.outline[0]?.id || null);
   const [prog, setProg] = useState(null);
@@ -57,7 +57,7 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
   const generate = () => {
     if (shots.length && !window.confirm(t('s4.replaceConfirm'))) return;
     run(
-      stage4Prompt(project, { ...scene, number: project.outline.indexOf(scene) + 1 }, genLang),
+      stage4Prompt(project, { ...scene, number: project.outline.indexOf(scene) + 1 }, genLang, scriptStyle),
       (data) => applyShots(scene.id, data.shots)
     );
   };
@@ -70,7 +70,7 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
     }
     runBatch(
       targets,
-      (s) => stage4Prompt(project, { ...s, number: project.outline.indexOf(s) + 1 }, genLang),
+      (s) => stage4Prompt(project, { ...s, number: project.outline.indexOf(s) + 1 }, genLang, scriptStyle),
       (s, data) => applyShots(s.id, data.shots),
       (a, b) => setProg(b ? { a, b } : null)
     );

@@ -25,7 +25,7 @@ function CopyButton({ text }) {
   );
 }
 
-export default function Stage5({ project, update, settings, onSettings, genLang }) {
+export default function Stage5({ project, update, settings, onSettings, genLang, imageStyle, videoStyle }) {
   const { t } = useI18n();
   const [sceneId, setSceneId] = useState(project.outline[0]?.id || null);
   const [prog, setProg] = useState(null);
@@ -61,7 +61,14 @@ export default function Stage5({ project, update, settings, onSettings, genLang 
     });
 
   const specFor = (s) =>
-    stage5Prompt(project, { ...s, number: project.outline.indexOf(s) + 1 }, project.sceneDetails[s.id]?.shots || [], genLang);
+    stage5Prompt(
+      project,
+      { ...s, number: project.outline.indexOf(s) + 1 },
+      project.sceneDetails[s.id]?.shots || [],
+      genLang,
+      imageStyle,
+      videoStyle
+    );
 
   const generate = () => {
     if (hasPrompts && !window.confirm(t('s5.replaceConfirm'))) return;
@@ -100,7 +107,7 @@ export default function Stage5({ project, update, settings, onSettings, genLang 
     const images = [...useChar, ...useLoc];
 
     let text = '';
-    if (project.systemPrompt?.trim()) text += `Project style direction: ${project.systemPrompt.trim()}\n\n`;
+    if (imageStyle?.trim()) text += `Visual style: ${imageStyle.trim()}\n\n`;
     text += prompt;
     if (useChar.length || useLoc.length) {
       text += `\n\nReference images are attached.`;
