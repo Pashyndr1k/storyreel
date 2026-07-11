@@ -11,13 +11,17 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
   const { t } = useI18n();
   const { busy, error, run } = useGenerate(settings);
 
-  const generate = () =>
-    run(stage1Prompt(project, genLang, scriptStyle, project.randomization), (data) =>
+  const generate = () => {
+    const spec = stage1Prompt(project, genLang, scriptStyle, project.randomization);
+    run(spec, (data) =>
       update({
-        ideas: (data.ideas || []).map((i) => ({ id: uid(), ...i })),
+        // Stamp each idea with the concrete random modifiers that shaped this
+        // generation (e.g. which constraint / persona / micro-tone was rolled).
+        ideas: (data.ideas || []).map((i) => ({ id: uid(), ...i, modifiers: spec.applied || [] })),
         selectedIdeaId: null,
       })
     );
+  };
 
   const pickIdea = (idea) =>
     update((p) => ({
@@ -64,6 +68,14 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
               <h3>{idea.title}</h3>
               <p>{idea.pitch}</p>
               <p className="why"><em>{idea.why_it_works}</em></p>
+              {(idea.modifiers || []).length > 0 && (
+                <p className="idea-mods">
+                  🎲{' '}
+                  {idea.modifiers
+                    .map((m) => (m.name ? `${t(`rand.name_${m.method}`)}: ${m.name}` : t(`rand.name_${m.method}`)))
+                    .join(' · ')}
+                </p>
+              )}
               <button className="btn small primary" onClick={() => pickIdea(idea)}>
                 {project.selectedIdeaId === idea.id ? t('s1.selected') : t('s1.develop')}
               </button>

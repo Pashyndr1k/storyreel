@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.1 — 2026-07-11
+
+- Stage 1 idea cards now note which random modifiers shaped that generation —
+  e.g. "🎲 Oblique Strategy: The Spatial Limit · Genre Mashup: Neon Noir" —
+  whenever at least one randomizer was active.
+
 ## 1.7.0 — 2026-07-11
 
 - **Character library**: create, edit, delete and sort characters (by date,

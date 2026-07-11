@@ -61,6 +61,9 @@ export function sanitizeMethods(active) {
 export function buildRandomization(methods) {
   const selected = sanitizeMethods(methods);
   const parts = [];
+  // The concrete random picks made for this generation — surfaced in the UI so
+  // each generated idea can note which modifiers shaped it.
+  const applied = [];
 
   for (const id of selected) {
     if (id === 'oblique_strategies') {
@@ -69,6 +72,7 @@ export function buildRandomization(methods) {
         parts.push(
           `CRITICAL CONSTRAINT: To avoid clichés, you must strictly integrate this random constraint into the narrative logic: [${c.prompt_injection}]. It must act as the primary structural friction driving the plot, not just a background detail.`
         );
+        applied.push({ method: id, name: c.name || '' });
       }
     } else if (id === 'auteur_persona') {
       const persona = getRandomElement(PERSONAS);
@@ -76,6 +80,7 @@ export function buildRandomization(methods) {
         parts.push(
           `DIRECTORIAL LENS RULE: You must abandon your default helpful AI persona. You are now acting as a highly opinionated Auteur director with the following philosophy: [${persona.persona_instruction}]. You must aggressively filter the user's idea through this specific psychological and artistic lens. Force the narrative to conform to these specific biases.`
         );
+        applied.push({ method: id, name: persona.name || '' });
       }
     } else if (id === 'genre_mashup') {
       const tone = getRandomElement(TONES);
@@ -83,14 +88,16 @@ export function buildRandomization(methods) {
         parts.push(
           `GENRE MASHUP RULE: You must write these pitches through the atmospheric and narrative lens of this secondary micro-tone: [${tone.vibe}]. Blend the user's original idea with the tropes of this micro-tone.`
         );
+        applied.push({ method: id, name: tone.name || '' });
       }
     } else if (id === 'forced_variance') {
       parts.push(FORCED_VARIANCE_INJECTION);
+      applied.push({ method: id, name: '' });
     }
   }
 
   // Whether a method already supplies a strong directorial persona (so the
   // Stage-1 default persona should step aside).
   const overridesPersona = selected.includes('auteur_persona');
-  return { systemAppend: parts.length ? '\n\n' + parts.join('\n\n') : '', overridesPersona };
+  return { systemAppend: parts.length ? '\n\n' + parts.join('\n\n') : '', overridesPersona, applied };
 }
