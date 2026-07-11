@@ -139,6 +139,32 @@ export const Sliders = (p) => (
   </S>
 );
 
+export const User = (p) => (
+  <S {...p} sw={1.7}>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
+  </S>
+);
+
+export const MapPin = (p) => (
+  <S {...p} sw={1.7}>
+    <path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z" />
+    <circle cx="12" cy="10" r="2.5" />
+  </S>
+);
+
+export const Play = (p) => (
+  <S {...p} sw={1.7}>
+    <path d="M7 5v14l12-7z" />
+  </S>
+);
+
+export const StopSq = (p) => (
+  <S {...p} sw={1.7}>
+    <rect x="6" y="6" width="12" height="12" rx="2" />
+  </S>
+);
+
 export const Dice = (p) => (
   <S {...p} sw={1.7}>
     <rect x="3" y="3" width="18" height="18" rx="3" />

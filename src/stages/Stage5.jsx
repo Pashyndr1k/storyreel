@@ -33,6 +33,7 @@ export default function Stage5({ project, update, settings, onSettings, genLang,
   const [refPrefs, setRefPrefs] = useState({}); // shotId -> { char, loc }
   const [imgBusy, setImgBusy] = useState(null); // shotId being generated
   const [imgErr, setImgErr] = useState(null); // { id, msg }
+  const [refineText, setRefineText] = useState({}); // shotId -> instruction draft
   const { busy, error, run, runBatch } = useGenerate(settings);
 
   const scene = project.outline.find((s) => s.id === sceneId) || project.outline[0];
@@ -124,7 +125,53 @@ export default function Stage5({ project, update, settings, onSettings, genLang,
     setImgErr(null);
     try {
       const img = await generateImage(settings, { prompt: text, images, aspectRatio: ratio, imageSize: '2K' });
-      update((p) => ({ shotImages: { ...p.shotImages, [shot.id]: img } }));
+      pushVersion(shot.id, img);
+    } catch (e) {
+      setImgErr({ id: shot.id, msg: e.message || String(e) });
+    } finally {
+      setImgBusy(null);
+    }
+  };
+
+  // New image becomes current; the previous current joins the history (max 5).
+  const pushVersion = (shotId, img) =>
+    update((p) => {
+      const hist = { ...(p.shotImageHistory || {}) };
+      const cur = (p.shotImages || {})[shotId];
+      if (cur) hist[shotId] = [cur, ...(hist[shotId] || [])].slice(0, 5);
+      return { shotImages: { ...p.shotImages, [shotId]: img }, shotImageHistory: hist };
+    });
+
+  // Swap a history version back to current (current takes its place in history).
+  const restoreVersion = (shotId, idx) =>
+    update((p) => {
+      const hist = [...((p.shotImageHistory || {})[shotId] || [])];
+      const chosen = hist[idx];
+      if (!chosen) return {};
+      hist.splice(idx, 1);
+      const cur = (p.shotImages || {})[shotId];
+      if (cur) hist.unshift(cur);
+      return {
+        shotImages: { ...p.shotImages, [shotId]: chosen },
+        shotImageHistory: { ...(p.shotImageHistory || {}), [shotId]: hist.slice(0, 5) },
+      };
+    });
+
+  // Edit-by-instruction: send the current image back to Nano Banana as the edit
+  // reference with the user's refinement ("make it darker", "move camera lower").
+  const refineImage = async (shot) => {
+    const cur = (project.shotImages || {})[shot.id];
+    const instruction = (refineText[shot.id] || '').trim();
+    if (!cur || !instruction) return;
+    if (!settings.geminiKey) return setImgErr({ id: shot.id, msg: 'NO_GEMINI_KEY' });
+    const ratio = project.aspectRatio || '16:9';
+    const prompt = `Edit the attached image according to this instruction: ${instruction}. Keep the subject, composition and style unchanged except for the requested change. Maintain ${ratio} aspect ratio.`;
+    setImgBusy(shot.id);
+    setImgErr(null);
+    try {
+      const img = await generateImage(settings, { prompt, images: [cur], aspectRatio: ratio, imageSize: '2K' });
+      pushVersion(shot.id, img);
+      setRefineText((v) => ({ ...v, [shot.id]: '' }));
     } catch (e) {
       setImgErr({ id: shot.id, msg: e.message || String(e) });
     } finally {
@@ -254,7 +301,38 @@ export default function Stage5({ project, update, settings, onSettings, genLang,
                 {genImg && (
                   <div className="gen-image">
                     <img src={genImg} alt="" />
-                    <button className="btn tiny" onClick={() => downloadImage(shot, i)}>{t('img.download')}</button>
+                    <div className="row">
+                      <button className="btn tiny" onClick={() => downloadImage(shot, i)}>{t('img.download')}</button>
+                      {((project.shotImageHistory || {})[shot.id] || []).length > 0 && (
+                        <span className="hint">{t('ver.label')}:</span>
+                      )}
+                      {((project.shotImageHistory || {})[shot.id] || []).map((v, vi) => (
+                        <button
+                          key={vi}
+                          type="button"
+                          className="ver-thumb"
+                          title={t('ver.restore')}
+                          onClick={() => restoreVersion(shot.id, vi)}
+                        >
+                          <img src={v} alt="" />
+                        </button>
+                      ))}
+                    </div>
+                    <div className="voice-row refine-row">
+                      <input
+                        value={refineText[shot.id] || ''}
+                        placeholder={t('ver.refinePh')}
+                        onChange={(e) => setRefineText((v) => ({ ...v, [shot.id]: e.target.value }))}
+                        onKeyDown={(e) => e.key === 'Enter' && refineImage(shot)}
+                      />
+                      <button
+                        className="btn small"
+                        disabled={imgBusy === shot.id || !(refineText[shot.id] || '').trim()}
+                        onClick={() => refineImage(shot)}
+                      >
+                        {imgBusy === shot.id ? t('img.generating') : t('ver.refine')}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

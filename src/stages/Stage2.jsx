@@ -9,8 +9,10 @@ import { useI18n } from '../lib/i18n.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import VoiceButton from '../components/VoiceButton.jsx';
+import LibraryPicker from '../components/LibraryPicker.jsx';
 
-export default function Stage2({ project, update, settings, goNext, onSettings, genLang, scriptStyle, imageStyle }) {
+export default function Stage2({ project, update, settings, goNext, onSettings, genLang, scriptStyle, imageStyle, library, libUpsert }) {
+  const [pickFor, setPickFor] = useState(null); // character id awaiting a library pick
   const { t } = useI18n();
   const { busy, error, run } = useGenerate(settings);
   const storyline = project.storyline;
@@ -99,13 +101,49 @@ export default function Stage2({ project, update, settings, goNext, onSettings, 
       storyline: { ...p.storyline, characters: p.storyline.characters.filter((c) => c.id !== id) },
     }));
 
+  // Keep the global character library in sync: any character that gets photos
+  // is auto-added (or updated) as a library entry.
+  const syncToLibrary = (char, photos) => {
+    if (!libUpsert || !photos.length) return;
+    const entryId = char.libId || `libc_${project.id}_${char.id}`;
+    libUpsert({
+      id: entryId,
+      kind: 'character',
+      name: char.name || '',
+      type: 'other',
+      description: char.description || '',
+      photos,
+      projectId: project.id,
+      projectTitle: project.title,
+      createdAt: Date.now(),
+    });
+    if (!char.libId) updateChar(char.id, { libId: entryId });
+  };
+
   const addPhoto = async (id, file) => {
     try {
       const dataURL = await fileToResizedDataURL(file);
-      updateChar(id, (c) => ({ photos: [...(c.photos || []), dataURL].slice(0, 3) }));
+      const char = project.storyline.characters.find((c) => c.id === id);
+      const photos = [...(char?.photos || []), dataURL].slice(0, 3);
+      updateChar(id, { photos });
+      if (char) syncToLibrary(char, photos);
     } catch (e) {
       window.alert(e.message);
     }
+  };
+
+  // Import a library character: photos fill the remaining slots; empty
+  // name/description are taken from the entry; the character links to it.
+  const pickFromLibrary = (charId, entry) => {
+    const char = project.storyline.characters.find((c) => c.id === charId);
+    if (!char) return;
+    const photos = [...(char.photos || []), ...entry.photos].slice(0, 3);
+    updateChar(charId, {
+      photos,
+      libId: entry.id,
+      ...(char.name ? {} : { name: entry.name }),
+      ...(char.description ? {} : { description: entry.description }),
+    });
   };
 
   const removePhoto = (id, idx) =>
@@ -220,19 +258,24 @@ export default function Stage2({ project, update, settings, goNext, onSettings, 
                   </div>
                 ))}
                 {(c.photos || []).length < 3 && (
-                  <label className="btn small file-btn">
-                    {t('char.addPhoto')}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      hidden
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        e.target.value = '';
-                        if (f) addPhoto(c.id, f);
-                      }}
-                    />
-                  </label>
+                  <>
+                    <label className="btn small file-btn">
+                      {t('pick.upload')}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          e.target.value = '';
+                          if (f) addPhoto(c.id, f);
+                        }}
+                      />
+                    </label>
+                    <button className="btn small" onClick={() => setPickFor(c.id)}>
+                      {t('pick.fromLib')}
+                    </button>
+                  </>
                 )}
                 {(c.photos || []).length > 0 && (
                   <button className="btn small" disabled={busy} onClick={() => extract(c)}>
@@ -243,6 +286,15 @@ export default function Stage2({ project, update, settings, goNext, onSettings, 
             </div>
           ))}
         </>
+      )}
+
+      {pickFor && (
+        <LibraryPicker
+          kind="character"
+          library={library}
+          onPick={(entry) => pickFromLibrary(pickFor, entry)}
+          onClose={() => setPickFor(null)}
+        />
       )}
 
       <footer className="stage-footer">

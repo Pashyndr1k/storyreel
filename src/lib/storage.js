@@ -163,7 +163,9 @@ function projectDefaults() {
     randomization: [], // Stage-1 plot randomization method ids (max 2, ordered)
     stage: 1,
     cover: '', // generated project cover image (data URL)
-    shotImages: {}, // shotId -> generated image (data URL)
+    shotImages: {}, // shotId -> current generated image (data URL)
+    shotImageHistory: {}, // shotId -> older versions, newest first (max 5)
+    storyboards: {}, // shotId -> low-res storyboard frame (data URL)
     logline: '',
     ideas: [],
     selectedIdeaId: null,
@@ -212,6 +214,8 @@ export function migrateProject(raw) {
   // intentionally preserved here so absorbLegacyStyles() can convert them to library
   // styles once, then strip them.
   p.shotImages = p.shotImages && typeof p.shotImages === 'object' ? p.shotImages : {};
+  p.shotImageHistory = p.shotImageHistory && typeof p.shotImageHistory === 'object' ? p.shotImageHistory : {};
+  p.storyboards = p.storyboards && typeof p.storyboards === 'object' ? p.storyboards : {};
   p.shotPrompts = p.shotPrompts && typeof p.shotPrompts === 'object' ? p.shotPrompts : {};
 
   p.storyline =
@@ -225,6 +229,7 @@ export function migrateProject(raw) {
                 role: c.role || '',
                 description: c.description || '',
                 photos: Array.isArray(c.photos) ? c.photos : [],
+                libId: typeof c.libId === 'string' ? c.libId : '',
               }))
             : [],
         }

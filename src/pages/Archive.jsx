@@ -3,7 +3,7 @@ import AppShell from '../components/AppShell.jsx';
 import { Clapperboard } from '../components/icons.jsx';
 import { useI18n } from '../lib/i18n.js';
 
-export default function Archive({ projects, updateProject, removeProject, settings, setSettings, onOpen, onBack, onSettings }) {
+export default function Archive({ projects, updateProject, removeProject, settings, setSettings, onOpen, onNav, onBack, onSettings }) {
   const { t } = useI18n();
   const archived = projects
     .filter((p) => p.archived)
@@ -16,7 +16,7 @@ export default function Archive({ projects, updateProject, removeProject, settin
   return (
     <AppShell
       route="archive"
-      onNavigate={(r) => r === 'home' && onBack()}
+      onNavigate={onNav || ((r) => r === 'home' && onBack())}
       onSettings={onSettings}
       lang={settings.lang || 'en'}
       setLang={(l) => setSettings({ ...settings, lang: l })}

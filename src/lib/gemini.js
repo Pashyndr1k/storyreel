@@ -67,6 +67,68 @@ export async function generateImage(settings, { prompt, images = [], aspectRatio
   });
 }
 
+// ---- Low-res storyboard frames (Stage 4) --------------------------------
+// Uses the cheapest image-capable model on the key (flash-image preferred) and
+// downscales the result to ~320px wide, so pacing can be judged before spending
+// credits on full Nano Banana renders.
+let storyboardModelCache = null;
+
+async function pickStoryboardModel(key, fallback) {
+  if (storyboardModelCache) return storyboardModelCache;
+  try {
+    const res = await fetch(`${ENDPOINT}?key=${encodeURIComponent(key)}&pageSize=1000`);
+    if (res.ok) {
+      const data = await res.json();
+      const names = (data.models || [])
+        .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
+        .map((m) => (m.name || '').replace(/^models\//, ''))
+        .filter((n) => /image/i.test(n) && !/veo|embed|imagen/i.test(n));
+      const flash = names.find((n) => /flash/i.test(n));
+      storyboardModelCache = flash || names[0] || fallback;
+      return storyboardModelCache;
+    }
+  } catch {
+    /* fall through to fallback */
+  }
+  storyboardModelCache = fallback;
+  return fallback;
+}
+
+export async function generateStoryboardImage(settings, { prompt, aspectRatio }) {
+  const key = settings.geminiKey;
+  if (!key) throw new Error('NO_GEMINI_KEY');
+  const model = await pickStoryboardModel(key, settings.geminiModel || DEFAULT_IMAGE_MODEL);
+
+  const generationConfig = { responseModalities: ['IMAGE'] };
+  if (aspectRatio) generationConfig.imageConfig = { aspectRatio, imageSize: '1K' };
+
+  return withRetry(async () => {
+    const res = await fetch(`${ENDPOINT}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig,
+      }),
+    });
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try {
+        const err = await res.json();
+        detail = err?.error?.message || detail;
+      } catch {
+        /* keep status */
+      }
+      const err = new Error(detail);
+      err.status = res.status;
+      throw err;
+    }
+    const data = await res.json();
+    const raw = extractImage(data);
+    return resizeDataURL(raw, 320 * 200, 0.72); // ~320x200 total pixels
+  });
+}
+
 // Voice-to-text via Gemini audio understanding (works in the browser and Electron).
 // Model availability varies per key/generation, so discover a usable text model
 // from the key's own model list instead of hardcoding one.

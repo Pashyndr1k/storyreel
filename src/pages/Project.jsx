@@ -11,7 +11,7 @@ import ProjectSettingsModal from '../components/ProjectSettingsModal.jsx';
 import SmartEditModal from '../components/SmartEditModal.jsx';
 import { ArrowLeft, Download, Sliders, Cog, Wand } from '../components/icons.jsx';
 
-export default function Project({ project, updateProject, settings, styles, setStyles, onBack, onSettings }) {
+export default function Project({ project, updateProject, settings, styles, setStyles, library, libUpsert, onBack, onSettings }) {
   const { t, lang } = useI18n();
   const [view, setView] = useState(Math.min(project.stage, 5));
   const [showProjectSettings, setShowProjectSettings] = useState(false);
@@ -59,6 +59,8 @@ export default function Project({ project, updateProject, settings, styles, setS
     scriptStyle,
     imageStyle,
     videoStyle,
+    library,
+    libUpsert,
   };
 
   return (

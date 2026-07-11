@@ -7,6 +7,8 @@ import { fileToResizedDataURL } from '../lib/images.js';
 import { useI18n } from '../lib/i18n.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import LibraryPicker from '../components/LibraryPicker.jsx';
+import StoryboardTimeline from '../components/StoryboardTimeline.jsx';
 
 export function fmt(sec) {
   const m = Math.floor(sec / 60);
@@ -38,7 +40,8 @@ const mapShots = (rawShots) =>
     notes: s.notes || '',
   }));
 
-export default function Stage4({ project, update, settings, goNext, onSettings, genLang, scriptStyle }) {
+export default function Stage4({ project, update, settings, goNext, onSettings, genLang, scriptStyle, library, libUpsert }) {
+  const [pickLoc, setPickLoc] = useState(false);
   const { t } = useI18n();
   const [sceneId, setSceneId] = useState(project.outline[0]?.id || null);
   const [prog, setProg] = useState(null);
@@ -103,13 +106,36 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
       outline: p.outline.map((s) => (s.id === scene.id ? { ...s, photos } : s)),
     }));
 
+  // Auto-add scene environments to the global location library.
+  const syncLocationToLibrary = (photos) => {
+    if (!libUpsert || !photos.length) return;
+    libUpsert({
+      id: `libl_${project.id}_${scene.id}`,
+      kind: 'location',
+      name: scene.title || '',
+      type: 'other',
+      description: scene.summary || '',
+      photos,
+      projectId: project.id,
+      projectTitle: project.title,
+      createdAt: Date.now(),
+    });
+  };
+
   const addScenePhoto = async (file) => {
     try {
       const dataURL = await fileToResizedDataURL(file);
-      updateScenePhotos([...(scene.photos || []), dataURL].slice(0, 3));
+      const photos = [...(scene.photos || []), dataURL].slice(0, 3);
+      updateScenePhotos(photos);
+      syncLocationToLibrary(photos);
     } catch (e) {
       window.alert(e.message);
     }
+  };
+
+  const pickLocationFromLibrary = (entry) => {
+    const photos = [...(scene.photos || []), ...entry.photos].slice(0, 3);
+    updateScenePhotos(photos);
   };
 
   if (!project.outline.length) {
@@ -164,19 +190,24 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
             </div>
           ))}
           {(scene.photos || []).length < 3 && (
-            <label className="btn small file-btn">
-              {t('char.addPhoto')}
-              <input
-                type="file"
-                accept="image/*"
-                hidden
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  e.target.value = '';
-                  if (f) addScenePhoto(f);
-                }}
-              />
-            </label>
+            <>
+              <label className="btn small file-btn">
+                {t('pick.upload')}
+                <input
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = '';
+                    if (f) addScenePhoto(f);
+                  }}
+                />
+              </label>
+              <button className="btn small" onClick={() => setPickLoc(true)}>
+                {t('pick.fromLib')}
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -193,6 +224,27 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
         )}
       </div>
       <ErrorNote error={error} onSettings={onSettings} />
+
+      {shots.length > 0 && (
+        <StoryboardTimeline
+          project={project}
+          scene={scene}
+          shots={shots}
+          settings={settings}
+          onReorder={moveShotTo}
+          onFrames={(frames) => update((p) => ({ storyboards: { ...p.storyboards, ...frames } }))}
+          onSettings={onSettings}
+        />
+      )}
+
+      {pickLoc && (
+        <LibraryPicker
+          kind="location"
+          library={library}
+          onPick={pickLocationFromLibrary}
+          onClose={() => setPickLoc(false)}
+        />
+      )}
 
       {shots.map((shot, i) => {
         const start = cursor;

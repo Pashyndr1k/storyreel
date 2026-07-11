@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Home from './pages/Home.jsx';
 import Archive from './pages/Archive.jsx';
 import Project from './pages/Project.jsx';
+import LibraryPage from './pages/LibraryPage.jsx';
+import { loadLibrary, persistLibraryEntry, deleteLibraryEntry } from './lib/library.js';
 import SettingsModal from './components/SettingsModal.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { loadProjects, saveProjects, loadSettings, saveSettings } from './lib/storage.js';
@@ -18,6 +20,7 @@ export default function App() {
   const [loaded, setLoaded] = useState(false);
   const [settings, setSettings] = useState(loadSettings);
   const [styles, setStyles] = useState(loadStyles);
+  const [library, setLibrary] = useState([]);
   const [route, setRoute] = useState({ name: 'home' });
   const [showSettings, setShowSettings] = useState(false);
   const [updateInfo, setUpdateInfo] = useState(null);
@@ -68,6 +71,31 @@ export default function App() {
   useEffect(() => {
     navigator.storage?.persist?.().catch(() => {});
   }, []);
+
+  // Character/location library (IndexedDB, write-through).
+  useEffect(() => {
+    let alive = true;
+    loadLibrary().then((rows) => alive && setLibrary(rows));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const libUpsert = (entry) => {
+    setLibrary((prev) => {
+      const ex = prev.find((e) => e.id === entry.id);
+      const merged = { ...entry, createdAt: ex?.createdAt ?? entry.createdAt ?? Date.now() };
+      persistLibraryEntry(merged);
+      return ex ? prev.map((e) => (e.id === merged.id ? merged : e)) : [...prev, merged];
+    });
+  };
+
+  const libDelete = (id) => {
+    setLibrary((prev) => prev.filter((e) => e.id !== id));
+    deleteLibraryEntry(id);
+  };
+
+  const onNav = (r) => setRoute({ name: r });
 
   // All mutations go through this setter so they land in the undo history.
   // Rapid changes (typing) within HISTORY_COALESCE_MS merge into one step.
@@ -192,6 +220,7 @@ export default function App() {
           settings={settings}
           setSettings={setSettings}
           onOpen={(id) => setRoute({ name: 'project', id })}
+          onNav={onNav}
           onArchivePage={() => setRoute({ name: 'archive' })}
           onSettings={() => setShowSettings(true)}
         />
@@ -204,7 +233,20 @@ export default function App() {
           settings={settings}
           setSettings={setSettings}
           onOpen={(id) => setRoute({ name: 'project', id })}
+          onNav={onNav}
           onBack={() => setRoute({ name: 'home' })}
+          onSettings={() => setShowSettings(true)}
+        />
+      )}
+      {loaded && (route.name === 'characters' || route.name === 'locations') && (
+        <LibraryPage
+          kind={route.name === 'locations' ? 'location' : 'character'}
+          library={library}
+          libUpsert={libUpsert}
+          libDelete={libDelete}
+          settings={settings}
+          setSettings={setSettings}
+          onNav={onNav}
           onSettings={() => setShowSettings(true)}
         />
       )}
@@ -215,6 +257,8 @@ export default function App() {
           settings={settings}
           styles={styles}
           setStyles={setStyles}
+          library={library}
+          libUpsert={libUpsert}
           onBack={() => setRoute({ name: 'home' })}
           onSettings={() => setShowSettings(true)}
         />

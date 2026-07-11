@@ -780,6 +780,142 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 }
 .voice-dots { font-weight: 700; }
 
+/* character / location libraries */
+.lib-poster { height: 150px; }
+.lib-poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lib-pick-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+  margin: 10px 0;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.lib-pick-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  color: var(--text-2);
+  font-family: inherit;
+  cursor: pointer;
+  transition: 0.15s;
+  text-align: left;
+}
+.lib-pick-card:hover { border-color: rgba(139, 92, 246, 0.5); background: var(--hover-bg); }
+.lib-pick-card img { width: 100%; height: 84px; object-fit: cover; border-radius: 8px; }
+.lib-pick-card strong { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lib-pick-card span { font-size: 11px; color: var(--muted-2); }
+
+/* shot image versions + refine (Stage 5) */
+.ver-thumb {
+  width: 46px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--glass);
+  cursor: pointer;
+  flex: none;
+}
+.ver-thumb:hover { border-color: rgba(139, 92, 246, 0.6); }
+.ver-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.refine-row { margin-top: 8px; width: 100%; max-width: 420px; }
+.refine-row input { flex: 1; }
+
+/* storyboard timeline (Stage 4) */
+.sb-block {
+  background: var(--glass);
+  border: 1px solid var(--glass-border-soft);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin: 14px 0;
+}
+.sb-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.sb-head strong { font-size: 13.5px; }
+.sb-head .hint { margin: 0; font-size: 12px; }
+.sb-preview {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 10px;
+  border: 1px solid var(--glass-border);
+}
+.sb-preview img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.sb-preview-empty {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-2);
+  font-size: 13px;
+}
+.sb-clock {
+  position: absolute;
+  bottom: 8px;
+  right: 10px;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: #fff;
+  background: rgba(12, 11, 24, 0.6);
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+.sb-strip-wrap { overflow-x: auto; padding-bottom: 4px; }
+.sb-strip { position: relative; display: flex; gap: 3px; min-height: 56px; width: max-content; }
+.sb-clip {
+  position: relative;
+  height: 56px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--panel-2);
+  border: 1px solid var(--glass-border);
+  cursor: grab;
+  flex: none;
+}
+.sb-clip:active { cursor: grabbing; }
+.sb-clip img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.sb-clip.live { border-color: var(--accent); box-shadow: 0 0 0 1.5px var(--accent); }
+.sb-clip-num {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-2);
+  font-size: 13px;
+  font-weight: 700;
+}
+.sb-clip-dur {
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(12, 11, 24, 0.6);
+  padding: 0 5px;
+  border-radius: 999px;
+}
+.sb-playhead {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 6px rgba(168, 85, 247, 0.8);
+  pointer-events: none;
+}
+
 /* plot randomization selector (Stage 1) */
 .rand-block { margin: 4px 0 14px; }
 .rand-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--muted); font-size: 12.5px; font-weight: 600; }

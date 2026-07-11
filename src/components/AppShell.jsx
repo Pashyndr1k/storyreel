@@ -1,5 +1,5 @@
 import Dropdown from './Dropdown.jsx';
-import { Clapperboard, Grid, Layers, Settings, Globe, Search } from './icons.jsx';
+import { Clapperboard, Grid, Layers, Settings, Globe, Search, User, MapPin } from './icons.jsx';
 import { LANGS, useI18n } from '../lib/i18n.js';
 
 // Persistent violet app frame with the left icon rail and the top bar.
@@ -43,6 +43,8 @@ export default function AppShell({
           </div>
           {railItem('home', <Grid size={20} />, route === 'home', () => onNavigate('home'), t('nav.projects'))}
           {railItem('archive', <Layers size={20} />, route === 'archive', () => onNavigate('archive'), t('nav.archive'))}
+          {railItem('characters', <User size={20} />, route === 'characters', () => onNavigate('characters'), t('nav.characters'))}
+          {railItem('locations', <MapPin size={20} />, route === 'locations', () => onNavigate('locations'), t('nav.locations'))}
           <div className="rail-spacer" />
           {railItem('settings', <Settings size={20} />, false, onSettings, t('nav.settings'))}
         </aside>

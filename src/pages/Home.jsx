@@ -16,6 +16,7 @@ export default function Home({
   settings,
   setSettings,
   onOpen,
+  onNav,
   onArchivePage,
   onSettings,
 }) {
@@ -92,7 +93,7 @@ export default function Home({
   return (
     <AppShell
       route="home"
-      onNavigate={(r) => r === 'archive' && onArchivePage()}
+      onNavigate={onNav || ((r) => r === 'archive' && onArchivePage())}
       onSettings={onSettings}
       lang={settings.lang || 'en'}
       setLang={(l) => setSettings({ ...settings, lang: l })}

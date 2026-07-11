@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.7.0 — 2026-07-11
+
+- **Character library**: create, edit, delete and sort characters (by date,
+  project, or type — male/female/child/animal/robot/other), reachable from a new
+  rail icon on the main screen. Characters that get reference photos in Stage 2
+  are added to the library automatically, and the Stage 2 photo button now
+  offers "Upload photo" or "From library".
+- **Location library**: the same for locations (interior/exterior/urban/nature/
+  fantasy/other), with its rail icon directly below the characters icon. Stage 4
+  scene environments sync to it and can be picked from it.
+- **Stage 5 — image versions & refine**: regenerating no longer overwrites the
+  shot image; up to 5 previous versions are kept as clickable thumbnails, and a
+  new refine field ("make it darker, move camera lower…") sends the current
+  image back to Nano Banana as an edit reference.
+- **Stage 4 — low-res storyboard + timeline**: a cheap flash-image model renders
+  rough ~320px frames per shot; an NLE-style timeline shows clips sized by their
+  real 2–10s durations, supports drag-and-drop reordering, and plays the frames
+  in sequence at real speed to judge pacing before spending on full renders.
+- **8 new script styles** imported from text_styles.pdf (Ad Spot, Comedy Skit,
+  Animated Film, Indie Drama, Thriller, Anime Action, Mockumentary, Visual Poem)
+  and **20 new image styles** from visual styles.pdf (1970s Panavision, Cyberpunk
+  Neon, IMAX Epic, Pixar 3D, Spider-Verse, Claymation and more) — added to the
+  style library for both new and existing users.
+
 ## 1.6.1 — 2026-07-11
 
 - Randomization Method 2 replaced: "Cliché Breaker" (which tuned the temperature
