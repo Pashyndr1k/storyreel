@@ -201,6 +201,17 @@ export const Mic = (p) => (
   </S>
 );
 
+export const PencilStar = (p) => (
+  <S {...p} sw={1.7}>
+    <path d="M17.5 6.5a2.1 2.1 0 0 1 3 3L9 21l-4 1 1-4Z" />
+    <path
+      d="M6.5 1.5 7.4 3.6 9.5 4.5 7.4 5.4 6.5 7.5 5.6 5.4 3.5 4.5 5.6 3.6Z"
+      fill="currentColor"
+      stroke="none"
+    />
+  </S>
+);
+
 export const Wand = (p) => (
   <S {...p} sw={1.7}>
     <path d="m15 4 1 2 2 1-2 1-1 2-1-2-2-1 2-1z" />

@@ -292,12 +292,18 @@ Every top-level key is optional — include a key only if something under it cha
 }
 
 export function extractCharacterPrompt(character, lang) {
+  const existing = (character.description || '').trim();
   const text = `Look carefully at the attached reference photo(s) of the character "${character.name || 'the character'}".
 
-Write a detailed visual description (3–5 sentences) that can be used to generate consistent AI images of this character: apparent age, face shape and features, hair (color, length, style), eyes, build, skin tone, clothing style, and any distinctive features. Be specific and concrete — no vague words like "attractive" or "ordinary".
+Current character description:
+"""
+${existing || '(empty)'}
+"""
+
+Rewrite this description, updating ONLY what the photos show about physical appearance: facial features (face shape, eyes, skin tone, distinctive marks), hairstyle (color, length, style) and apparent age. Every trait unrelated to those — personality, habits, motivations, role, backstory, clothing style and any other characteristics — must be preserved exactly as written. If the current description is empty, write a new 2–4 sentence description covering only the face, hair and apparent age. Be specific and concrete so generated images stay consistent.
 
 JSON schema:
-{"description":"..."}`;
+{"description":"the full updated description"}`;
   return {
     system: system(lang),
     maxTokens: 1500,

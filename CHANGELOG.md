@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.8.1 — 2026-07-11
+
+- Storyboard preview frames now use gemini-3.1-flash-lite-image (with automatic
+  fallback discovery if that id isn't available on the key).
+- "Describe appearance from photos" now updates only the character's facial
+  features, hairstyle and apparent age — personality, habits and every other
+  non-appearance trait in the description is preserved verbatim.
+- Smart edit icon is now a pencil + star.
+- Stages selector: number and label keep identical size, weight and position in
+  every state; added micro-animations (breathing glow on the selected stage,
+  number pop on selection, draw-in checkmarks) with reduced-motion support.
+- Stage 1 idea cards now lay out in a 2×2 grid.
+
 ## 1.8.0 — 2026-07-11
 
 - Settings moved to a gear icon in the upper-right corner of every screen

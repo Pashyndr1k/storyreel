@@ -550,7 +550,8 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 .note.warn { background: rgba(240, 180, 41, 0.08); border: 1px solid rgba(240, 180, 41, 0.3); color: #ffd469; }
 .note.error { background: rgba(255, 107, 138, 0.1); border: 1px solid rgba(255, 107, 138, 0.35); color: #ff9db0; }
 
-.ideas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; margin: 16px 0; }
+.ideas-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 16px 0; }
+@media (max-width: 680px) { .ideas-grid { grid-template-columns: 1fr; } }
 .idea-card { background: var(--card-grad); border: 1px solid var(--glass-border-soft); border-radius: 16px; padding: 16px; }
 .idea-card.selected { border-color: rgba(139, 92, 246, 0.5); background: rgba(139, 92, 246, 0.12); }
 .idea-card p { margin: 0 0 10px; font-size: 13.5px; }
@@ -782,16 +783,42 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 .stg.nb-left .stg-num, .stg.nb-right .stg-num { color: var(--stg-num-nb); }
 .stg.nb-left .stg-title, .stg.nb-right .stg-title { color: var(--stg-title-nb); }
 .stg.nb-left .stg-check, .stg.nb-right .stg-check { color: #8a7ccf; }
-/* selected block */
+/* selected block — identical text size/weight/position to other states;
+   only colors, background and glow change */
 .stg.sel {
-  flex: 1.05;
   background: linear-gradient(135deg, #7c5cff, #a855f7);
   box-shadow: 0 0 40px rgba(124, 92, 255, 0.55);
   border-right-color: var(--stg-sep-hot);
+  animation: stg-breathe 3.2s ease-in-out infinite;
 }
-.stg.sel .stg-num { color: rgba(255, 255, 255, 0.85); }
-.stg.sel .stg-title { color: #fff; font-weight: 700; }
+.stg.sel .stg-num {
+  color: rgba(255, 255, 255, 0.85);
+  animation: stg-num-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.stg.sel .stg-title { color: #fff; }
 .stg.far:hover:not(:disabled) { background: var(--stg-hover); }
+.stg:not(.sel):hover:not(:disabled) .stg-num { color: var(--stg-num-nb); }
+
+/* micro-animations */
+@keyframes stg-breathe {
+  0%, 100% { box-shadow: 0 0 40px rgba(124, 92, 255, 0.55); }
+  50% { box-shadow: 0 0 58px rgba(124, 92, 255, 0.78); }
+}
+@keyframes stg-num-pop {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.stg-check path {
+  stroke-dasharray: 24;
+  animation: stg-check-draw 0.45s ease-out 0.05s backwards;
+}
+@keyframes stg-check-draw {
+  from { stroke-dashoffset: 24; }
+  to { stroke-dashoffset: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stg.sel, .stg.sel .stg-num, .stg-check path { animation: none; }
+}
 
 /* stale-stages toast */
 .stale-toast {
