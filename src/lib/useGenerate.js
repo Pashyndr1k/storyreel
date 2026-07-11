@@ -22,26 +22,42 @@ export function useGenerate(settings) {
     }
   };
 
-  // Sequentially processes `items`, building a request per item and applying
-  // each result as it arrives, so partial progress survives an error mid-batch.
-  const runBatch = async (items, makeSpec, onEach, onProgress) => {
+  // Processes `items` with a small worker pool (results apply as they arrive, so
+  // partial progress survives failures). Individual failures don't stop the rest;
+  // the first error is surfaced at the end. generateJSON retries transient errors.
+  const runBatch = async (items, makeSpec, onEach, onProgress, concurrency = 3) => {
     if (!settings.apiKey) {
       setError('NO_KEY');
       return;
     }
     setBusy(true);
     setError('');
-    try {
-      for (let i = 0; i < items.length; i++) {
-        if (onProgress) onProgress(i + 1, items.length);
-        const data = await generateJSON(settings, makeSpec(items[i], i));
-        onEach(items[i], data, i);
+    const errors = [];
+    let nextIdx = 0;
+    let done = 0;
+    if (onProgress) onProgress(0, items.length);
+    const worker = async () => {
+      for (;;) {
+        const i = nextIdx++;
+        if (i >= items.length) return;
+        try {
+          const data = await generateJSON(settings, makeSpec(items[i], i));
+          onEach(items[i], data, i);
+        } catch (e) {
+          errors.push(e);
+        }
+        done++;
+        if (onProgress) onProgress(done, items.length);
       }
-    } catch (e) {
-      setError(e.message || String(e));
+    };
+    try {
+      await Promise.all(
+        Array.from({ length: Math.max(1, Math.min(concurrency, items.length)) }, worker)
+      );
     } finally {
       setBusy(false);
       if (onProgress) onProgress(0, 0);
+      if (errors.length) setError(errors[0].message || String(errors[0]));
     }
   };
 

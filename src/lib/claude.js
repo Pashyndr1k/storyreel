@@ -1,3 +1,5 @@
+import { withRetry } from './retry.js';
+
 export const MODELS = [
   { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 (recommended)' },
   { id: 'claude-opus-4-8', label: 'Claude Opus 4.8 (highest quality)' },
@@ -29,7 +31,9 @@ async function callClaude(settings, { system, user, maxTokens = 4096 }) {
     } catch {
       /* keep status text */
     }
-    throw new Error(detail);
+    const err = new Error(detail);
+    err.status = res.status;
+    throw err;
   }
 
   const data = await res.json();
@@ -54,6 +58,8 @@ function extractJSON(text) {
 }
 
 export async function generateJSON(settings, spec) {
-  const text = await callClaude(settings, spec);
-  return extractJSON(text);
+  return withRetry(async () => {
+    const text = await callClaude(settings, spec);
+    return extractJSON(text);
+  });
 }

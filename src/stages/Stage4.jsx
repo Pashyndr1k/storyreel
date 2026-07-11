@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { Grip } from '../components/icons.jsx';
 import { useGenerate } from '../lib/useGenerate.js';
 import { stage4Prompt } from '../lib/prompts.js';
 import { uid } from '../lib/storage.js';
@@ -82,11 +83,13 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
 
   const updateShot = (id, patch) => setShots(shots.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   const removeShot = (id) => setShots(shots.filter((s) => s.id !== id));
-  const moveShot = (i, dir) => {
-    const j = i + dir;
-    if (j < 0 || j >= shots.length) return;
+
+  const dragIdx = useRef(null);
+  const [overIdx, setOverIdx] = useState(null);
+  const moveShotTo = (from, to) => {
     const next = [...shots];
-    [next[i], next[j]] = [next[j], next[i]];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
     setShots(next);
   };
   const addShot = () =>
@@ -195,13 +198,42 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
         const start = cursor;
         cursor += shot.duration || 0;
         return (
-          <div key={shot.id} className="shot-card">
+          <div
+            key={shot.id}
+            className={`shot-card ${overIdx === i ? 'drag-over' : ''}`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              if (overIdx !== i) setOverIdx(i);
+            }}
+            onDragLeave={() => setOverIdx((v) => (v === i ? null : v))}
+            onDrop={(e) => {
+              e.preventDefault();
+              setOverIdx(null);
+              const from = dragIdx.current;
+              dragIdx.current = null;
+              if (from != null && from !== i) moveShotTo(from, i);
+            }}
+          >
             <div className="shot-head">
               <strong>{t('s4.shot', { n: i + 1 })}</strong>
               <span className="timecode">{fmt(start)} – {fmt(cursor)}</span>
               <div className="scene-tools">
-                <button className="btn tiny" disabled={i === 0} onClick={() => moveShot(i, -1)}>↑</button>
-                <button className="btn tiny" disabled={i === shots.length - 1} onClick={() => moveShot(i, 1)}>↓</button>
+                <span
+                  className="drag-handle"
+                  title={t('dnd.reorder')}
+                  draggable
+                  onDragStart={(e) => {
+                    dragIdx.current = i;
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', String(i));
+                  }}
+                  onDragEnd={() => {
+                    dragIdx.current = null;
+                    setOverIdx(null);
+                  }}
+                >
+                  <Grip size={16} />
+                </span>
                 <button className="btn danger tiny" onClick={() => removeShot(shot.id)}>✕</button>
               </div>
             </div>

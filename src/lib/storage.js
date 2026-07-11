@@ -1,4 +1,6 @@
-const PROJECTS_KEY = 'storyreel.projects.v1';
+import { idbGetAll, idbPutMany, idbDeleteMany } from './idb.js';
+
+const LEGACY_PROJECTS_KEY = 'storyreel.projects.v1'; // pre-1.3.0 localStorage store
 const SETTINGS_KEY = 'storyreel.settings.v1';
 
 // Bump when the project shape changes. Used only to tag exports; import/load
@@ -9,42 +11,136 @@ export function uid() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 
-export function loadProjects() {
+// Reference map of what's already persisted, so saveProjects only writes
+// projects whose object identity changed (and deletes removed ones).
+let lastSaved = new Map();
+// When IndexedDB can't be opened (blocked by another window, corrupted, …)
+// fall back to the legacy localStorage store so the app keeps working.
+let idbBroken = false;
+
+function readLegacy() {
   try {
-    const raw = JSON.parse(localStorage.getItem(PROJECTS_KEY)) || [];
-    return Array.isArray(raw) ? raw.map(migrateProject) : [];
+    const raw = JSON.parse(localStorage.getItem(LEGACY_PROJECTS_KEY));
+    return Array.isArray(raw) ? raw : [];
   } catch {
     return [];
   }
 }
 
-export function saveProjects(projects) {
+export async function loadProjects() {
+  let list;
   try {
-    localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+    list = await idbGetAll();
+    if (!list.length) {
+      // One-time migration from the pre-1.3.0 localStorage store.
+      const legacy = readLegacy();
+      if (legacy.length) {
+        list = legacy.map(migrateProject);
+        await idbPutMany(list);
+        localStorage.removeItem(LEGACY_PROJECTS_KEY); // frees the old quota
+      }
+    }
+  } catch (e) {
+    console.error('IndexedDB unavailable, falling back to localStorage', e);
+    idbBroken = true;
+    list = readLegacy();
+  }
+  const migrated = list.map(migrateProject);
+  migrated.sort((a, b) => b.createdAt - a.createdAt);
+  lastSaved = new Map(migrated.map((p) => [p.id, p]));
+  return migrated;
+}
+
+export async function saveProjects(projects) {
+  if (idbBroken) {
+    try {
+      localStorage.setItem(LEGACY_PROJECTS_KEY, JSON.stringify(projects));
+    } catch (e) {
+      console.error('legacy save failed', e);
+      window.alert('Storage is full — the latest change could not be saved. Remove some reference photos or delete old projects.');
+    }
+    return;
+  }
+  try {
+    const next = new Map(projects.map((p) => [p.id, p]));
+    const changed = projects.filter((p) => lastSaved.get(p.id) !== p);
+    const removed = [...lastSaved.keys()].filter((id) => !next.has(id));
+    await idbPutMany(changed);
+    await idbDeleteMany(removed);
+    lastSaved = next;
   } catch (e) {
     console.error('saveProjects failed', e);
-    window.alert('Storage is full — the latest change could not be saved. Remove some reference photos or delete old projects.');
+    window.alert('Could not save the latest change (storage error). Free some disk space and try again.');
+  }
+}
+
+// --- API keys at rest -------------------------------------------------------
+// In Electron a preload bridge (window.secureStore) exposes safeStorage, so the
+// Anthropic/Gemini keys are stored OS-encrypted. In a plain browser (dev) they
+// stay as-is. Encrypted values are prefixed so both forms can be read back.
+const ENC_PREFIX = 'enc.v1:';
+
+function secureStore() {
+  try {
+    const ss = typeof window !== 'undefined' ? window.secureStore : null;
+    return ss && ss.available && ss.available() ? ss : null;
+  } catch {
+    return null;
+  }
+}
+
+function protectKey(value) {
+  const ss = secureStore();
+  if (!ss || !value) return value || '';
+  try {
+    const enc = ss.encrypt(value);
+    return enc ? ENC_PREFIX + enc : value;
+  } catch {
+    return value;
+  }
+}
+
+function revealKey(value) {
+  if (!value) return '';
+  const s = String(value);
+  if (!s.startsWith(ENC_PREFIX)) return s;
+  const ss = secureStore();
+  if (!ss) return ''; // encrypted blob without the bridge (e.g. dev browser)
+  try {
+    return ss.decrypt(s.slice(ENC_PREFIX.length)) || '';
+  } catch {
+    return '';
   }
 }
 
 export function loadSettings() {
+  const defaults = {
+    apiKey: '',
+    model: 'claude-sonnet-5',
+    lang: 'en',
+    theme: 'dark',
+    geminiKey: '',
+    geminiModel: 'gemini-3-pro-image-preview',
+  };
   try {
-    return {
-      apiKey: '',
-      model: 'claude-sonnet-5',
-      lang: 'en',
-      theme: 'dark',
-      geminiKey: '',
-      geminiModel: 'gemini-3-pro-image-preview',
-      ...(JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}),
-    };
+    const s = { ...defaults, ...(JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}) };
+    s.apiKey = revealKey(s.apiKey);
+    s.geminiKey = revealKey(s.geminiKey);
+    return s;
   } catch {
-    return { apiKey: '', model: 'claude-sonnet-5', lang: 'en', theme: 'dark', geminiKey: '', geminiModel: 'gemini-3-pro-image-preview' };
+    return defaults;
   }
 }
 
 export function saveSettings(settings) {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  localStorage.setItem(
+    SETTINGS_KEY,
+    JSON.stringify({
+      ...settings,
+      apiKey: protectKey(settings.apiKey),
+      geminiKey: protectKey(settings.geminiKey),
+    })
+  );
 }
 
 // The complete default shape of a project. Single source of truth for the schema.

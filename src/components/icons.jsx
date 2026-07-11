@@ -139,6 +139,17 @@ export const Sliders = (p) => (
   </S>
 );
 
+export const Grip = (p) => (
+  <S {...p} sw={1.8}>
+    <circle cx="9" cy="6" r="1" />
+    <circle cx="15" cy="6" r="1" />
+    <circle cx="9" cy="12" r="1" />
+    <circle cx="15" cy="12" r="1" />
+    <circle cx="9" cy="18" r="1" />
+    <circle cx="15" cy="18" r="1" />
+  </S>
+);
+
 export const Mic = (p) => (
   <S {...p} sw={1.7}>
     <rect x="9" y="2" width="6" height="12" rx="3" />

@@ -1,7 +1,7 @@
 {
   "name": "storyreel",
   "productName": "StoryReel",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
   "description": "AI assistant for writing short videos: from plot idea to per-shot image & video generation prompts.",
   "author": "StoryReel",
@@ -27,6 +27,7 @@
   "build": {
     "appId": "com.storyreel.app",
     "productName": "StoryReel",
+    "publish": [{ "provider": "github", "owner": "Pashyndr1k", "repo": "storyreel" }],
     "files": ["dist/**", "electron/**"],
     "directories": { "output": "release" },
     "win": { "target": ["nsis", "portable"] },

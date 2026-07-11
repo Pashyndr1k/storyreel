@@ -4,6 +4,8 @@ import { uid } from '../lib/storage.js';
 import { useI18n } from '../lib/i18n.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import { Grip } from '../components/icons.jsx';
+import { useRef, useState } from 'react';
 
 function fmt(sec) {
   const m = Math.floor(sec / 60);
@@ -45,12 +47,14 @@ export default function Stage3({ project, update, settings, goNext, onSettings, 
       return { outline: p.outline.filter((s) => s.id !== id), sceneDetails: details };
     });
 
-  const move = (i, dir) =>
+  const dragIdx = useRef(null);
+  const [overIdx, setOverIdx] = useState(null);
+
+  const moveTo = (from, to) =>
     update((p) => {
       const next = [...p.outline];
-      const j = i + dir;
-      if (j < 0 || j >= next.length) return {};
-      [next[i], next[j]] = [next[j], next[i]];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
       return { outline: next };
     });
 
@@ -77,7 +81,22 @@ export default function Stage3({ project, update, settings, goNext, onSettings, 
       <ErrorNote error={error} onSettings={onSettings} />
 
       {outline.map((s, i) => (
-        <div key={s.id} className="scene-row">
+        <div
+          key={s.id}
+          className={`scene-row ${overIdx === i ? 'drag-over' : ''}`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            if (overIdx !== i) setOverIdx(i);
+          }}
+          onDragLeave={() => setOverIdx((v) => (v === i ? null : v))}
+          onDrop={(e) => {
+            e.preventDefault();
+            setOverIdx(null);
+            const from = dragIdx.current;
+            dragIdx.current = null;
+            if (from != null && from !== i) moveTo(from, i);
+          }}
+        >
           <div className="scene-num">{i + 1}</div>
           <div className="scene-fields">
             <div className="row">
@@ -105,8 +124,22 @@ export default function Stage3({ project, update, settings, goNext, onSettings, 
             />
           </div>
           <div className="scene-tools">
-            <button className="btn tiny" disabled={i === 0} onClick={() => move(i, -1)}>↑</button>
-            <button className="btn tiny" disabled={i === outline.length - 1} onClick={() => move(i, 1)}>↓</button>
+            <span
+              className="drag-handle"
+              title={t('dnd.reorder')}
+              draggable
+              onDragStart={(e) => {
+                dragIdx.current = i;
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', String(i));
+              }}
+              onDragEnd={() => {
+                dragIdx.current = null;
+                setOverIdx(null);
+              }}
+            >
+              <Grip size={16} />
+            </span>
             <button className="btn danger tiny" onClick={() => removeScene(s.id)}>✕</button>
           </div>
         </div>

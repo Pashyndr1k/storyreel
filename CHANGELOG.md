@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.3.0 — 2026-07-10
+
+- Projects moved from localStorage to **IndexedDB** (hundreds of MB instead of
+  ~5 MB — room for many fully illustrated projects). Existing data migrates
+  automatically on first launch.
+- Saves are **debounced and diffed**: only changed projects are written, at most
+  twice a second, with a flush when the window closes — typing no longer
+  re-serializes the whole library on every keystroke.
+- **Batch generation is concurrent** (3 scenes at a time) and individual scene
+  failures no longer stop the rest of the batch.
+- Transient API errors (rate limits / overloaded / gateway) are **retried
+  automatically** with backoff, for both Claude and Gemini calls.
+- **API keys are encrypted at rest** in the desktop app via the OS keychain
+  (Electron safeStorage); plain browsers keep the old behavior.
+- **Undo / redo** for structural changes (deletes, reorders, regenerations,
+  smart edits): Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z (text fields keep native undo).
+- Scenes and shots are reordered by **drag and drop** (grip handle) instead of
+  up/down buttons.
+- **Update notification**: the app checks GitHub Releases on start and offers a
+  download when a newer version exists; tag builds now publish releases
+  automatically. (Silent auto-install would require code-signed builds.)
+
 ## 1.2.0 — 2026-07-08
 
 - Smart-edit agent: describe one specific change (rename a character, move the

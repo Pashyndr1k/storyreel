@@ -1,4 +1,5 @@
 import { dataURLToInline, resizeDataURL } from './images.js';
+import { withRetry } from './retry.js';
 
 // "Nano Banana 2" (Gemini 3 Pro Image). Overridable in Settings if the id changes.
 export const DEFAULT_IMAGE_MODEL = 'gemini-3-pro-image-preview';
@@ -36,30 +37,34 @@ export async function generateImage(settings, { prompt, images = [], aspectRatio
   if (imageSize) imageConfig.imageSize = imageSize;
   if (Object.keys(imageConfig).length) generationConfig.imageConfig = imageConfig;
 
-  const res = await fetch(`${ENDPOINT}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ role: 'user', parts }],
-      generationConfig,
-    }),
-  });
+  return withRetry(async () => {
+    const res = await fetch(`${ENDPOINT}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts }],
+        generationConfig,
+      }),
+    });
 
-  if (!res.ok) {
-    let detail = `HTTP ${res.status}`;
-    try {
-      const err = await res.json();
-      detail = err?.error?.message || detail;
-    } catch {
-      /* keep status */
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try {
+        const err = await res.json();
+        detail = err?.error?.message || detail;
+      } catch {
+        /* keep status */
+      }
+      const err = new Error(detail);
+      err.status = res.status;
+      throw err;
     }
-    throw new Error(detail);
-  }
 
-  const data = await res.json();
-  const raw = extractImage(data);
-  // Keep the model's native resolution; only re-encode to JPEG to keep storage sane.
-  return resizeDataURL(raw, Number.POSITIVE_INFINITY, 0.92);
+    const data = await res.json();
+    const raw = extractImage(data);
+    // Keep the model's native resolution; only re-encode to JPEG to keep storage sane.
+    return resizeDataURL(raw, Number.POSITIVE_INFINITY, 0.92);
+  });
 }
 
 // Voice-to-text via Gemini audio understanding (works in the browser and Electron).

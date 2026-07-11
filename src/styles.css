@@ -780,6 +780,28 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 }
 .voice-dots { font-weight: 700; }
 
+/* drag & drop reorder */
+.drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  color: var(--muted-3);
+  cursor: grab;
+}
+.drag-handle:hover { color: var(--text-2); background: var(--hover-bg); }
+.drag-handle:active { cursor: grabbing; }
+.scene-row.drag-over,
+.shot-card.drag-over {
+  border-color: rgba(139, 92, 246, 0.6);
+  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.35);
+}
+
+/* update-available toast (bottom-left; stale toast owns bottom-right) */
+.update-toast { right: auto; left: 24px; }
+
 /* crash fallback */
 .crash { max-width: 620px; margin: 40px auto; text-align: center; }
 .crash h2 { font-size: 22px; margin-bottom: 8px; }

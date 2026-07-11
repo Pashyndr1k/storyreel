@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { MODELS } from '../lib/claude.js';
 import { listImageModels } from '../lib/gemini.js';
 import { LANGS, useI18n } from '../lib/i18n.js';
-import { loadProjects, saveProjects, migrateProject } from '../lib/storage.js';
+import { saveProjects, migrateProject } from '../lib/storage.js';
 import { downloadText } from '../lib/exportScript.js';
 
-export default function SettingsModal({ settings, setSettings, onClose }) {
+export default function SettingsModal({ settings, setSettings, projects = [], onClose }) {
   const { t } = useI18n();
   const [apiKey, setApiKey] = useState(settings.apiKey);
   const [model, setModel] = useState(settings.model);
@@ -31,19 +31,19 @@ export default function SettingsModal({ settings, setSettings, onClose }) {
   };
 
   const exportAll = () => {
-    downloadText('storyreel-backup.json', JSON.stringify(loadProjects(), null, 2));
+    downloadText('storyreel-backup.json', JSON.stringify(projects, null, 2));
   };
 
   const importAll = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
         const data = JSON.parse(reader.result);
         if (!Array.isArray(data)) throw new Error('bad format');
         if (window.confirm(t('set.importConfirm', { n: data.length }))) {
-          saveProjects(data.map(migrateProject));
+          await saveProjects(data.map(migrateProject));
           window.location.reload();
         }
       } catch {
