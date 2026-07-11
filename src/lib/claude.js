@@ -6,7 +6,15 @@ export const MODELS = [
   { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (fastest)' },
 ];
 
-async function callClaude(settings, { system, user, maxTokens = 4096 }) {
+async function callClaude(settings, { system, user, maxTokens = 4096, temperature }) {
+  const body = {
+    model: settings.model,
+    max_tokens: maxTokens,
+    system,
+    messages: [{ role: 'user', content: user }],
+  };
+  if (typeof temperature === 'number') body.temperature = temperature;
+
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -15,12 +23,7 @@ async function callClaude(settings, { system, user, maxTokens = 4096 }) {
       'anthropic-version': '2023-06-01',
       'anthropic-dangerous-direct-browser-access': 'true',
     },
-    body: JSON.stringify({
-      model: settings.model,
-      max_tokens: maxTokens,
-      system,
-      messages: [{ role: 'user', content: user }],
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {

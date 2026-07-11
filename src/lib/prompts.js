@@ -1,5 +1,6 @@
 import { dataURLToImageBlock } from './images.js';
 import { aspectDescription } from './aspect.js';
+import { buildRandomization } from './randomization.js';
 
 const LANG_NAMES = { en: 'English', ru: 'Russian', uk: 'Ukrainian' };
 
@@ -40,10 +41,13 @@ function characterBlock(project) {
     .join('\n');
 }
 
-export function stage1Prompt(project, lang, scriptStyle) {
+export function stage1Prompt(project, lang, scriptStyle, randomizationMethods) {
   const d = durationOf(project);
+  // Plot Randomization Engine: composes extra directives + temperature.
+  const { systemAppend, temperature } = buildRandomization(randomizationMethods);
   return {
-    system: system(lang, scriptStyle),
+    system: system(lang, scriptStyle) + systemAppend,
+    temperature,
     maxTokens: 2500,
     user: `Brief plot description for a short video (target length: ${d.min}–${d.max} seconds):
 

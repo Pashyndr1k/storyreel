@@ -1,5 +1,6 @@
 import { idbGetAll, idbPutMany, idbDeleteMany } from './idb.js';
 import { isValidAspect } from './aspect.js';
+import { sanitizeMethods } from './randomization.js';
 
 const LEGACY_PROJECTS_KEY = 'storyreel.projects.v1'; // pre-1.3.0 localStorage store
 const SETTINGS_KEY = 'storyreel.settings.v1';
@@ -159,6 +160,7 @@ function projectDefaults() {
     scriptStyleId: '', // selected style from the library (empty = neutral)
     imageStyleId: '',
     videoStyleId: '',
+    randomization: [], // Stage-1 plot randomization method ids (max 2, ordered)
     stage: 1,
     cover: '', // generated project cover image (data URL)
     shotImages: {}, // shotId -> generated image (data URL)
@@ -205,6 +207,7 @@ export function migrateProject(raw) {
   p.scriptStyleId = typeof p.scriptStyleId === 'string' ? p.scriptStyleId : '';
   p.imageStyleId = typeof p.imageStyleId === 'string' ? p.imageStyleId : '';
   p.videoStyleId = typeof p.videoStyleId === 'string' ? p.videoStyleId : '';
+  p.randomization = sanitizeMethods(p.randomization);
   // Legacy per-project prompt fields (systemPrompt/imageTemplate/videoTemplate) are
   // intentionally preserved here so absorbLegacyStyles() can convert them to library
   // styles once, then strip them.

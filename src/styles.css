@@ -780,6 +780,49 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 }
 .voice-dots { font-weight: 700; }
 
+/* plot randomization selector (Stage 1) */
+.rand-block { margin: 4px 0 14px; }
+.rand-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--muted); font-size: 12.5px; font-weight: 600; }
+.rand-head svg { color: var(--accent); }
+.rand-count { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--muted-2); }
+.rand-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.rand-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  padding: 11px 12px 12px;
+  border-radius: 12px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  color: var(--text-2);
+  font-family: inherit;
+  cursor: pointer;
+  transition: 0.15s;
+}
+.rand-card:hover { background: var(--hover-bg); }
+.rand-card.on { background: rgba(139, 92, 246, 0.16); border-color: rgba(139, 92, 246, 0.55); color: var(--text); }
+.rand-card strong { font-size: 13px; letter-spacing: -0.01em; }
+.rand-tip { font-size: 11px; color: var(--muted-2); line-height: 1.4; }
+.rand-card.on .rand-tip { color: var(--violet-text); }
+.rand-check {
+  position: absolute;
+  top: 9px;
+  right: 10px;
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  border: 1.5px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: #fff;
+}
+.rand-card.on .rand-check { background: var(--accent); border-color: var(--accent); }
+@media (max-width: 720px) { .rand-grid { grid-template-columns: repeat(2, 1fr); } }
+
 /* aspect-ratio selector */
 .aspect-row {
   display: inline-flex;

@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.6.0 — 2026-07-11
+
+- **Plot Randomization Engine** on Stage 1: pick up to two methods to steer idea
+  generation. Selecting a third drops the oldest.
+  - *Oblique Strategy* — injects a random creative constraint (from a library of
+    30) as the plot's main structural friction.
+  - *Cliché Breaker* — raises the model temperature to 0.95 and pushes for bold,
+    non-formulaic ideas.
+  - *Genre Mashup* — blends your idea with a random micro-tone (from a library of
+    50, e.g. Neon Noir, Cozy Murder Mystery).
+  - *Structural Variance* — forces each of the four pitches into a different
+    narrative framework.
+- Stage 1 now generates at temperature 0.7 by default.
+
 ## 1.5.1 — 2026-07-11
 
 - Custom styles are now durable across updates: the style library is stored in a

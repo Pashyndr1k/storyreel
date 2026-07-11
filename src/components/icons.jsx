@@ -139,6 +139,17 @@ export const Sliders = (p) => (
   </S>
 );
 
+export const Dice = (p) => (
+  <S {...p} sw={1.7}>
+    <rect x="3" y="3" width="18" height="18" rx="3" />
+    <circle cx="8.5" cy="8.5" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="15.5" cy="8.5" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="8.5" cy="15.5" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="15.5" cy="15.5" r="1.1" fill="currentColor" stroke="none" />
+  </S>
+);
+
 export const Grip = (p) => (
   <S {...p} sw={1.8}>
     <circle cx="9" cy="6" r="1" />
