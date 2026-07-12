@@ -786,14 +786,14 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 .stg:last-child { border-right: none; }
 .stg:disabled { cursor: not-allowed; }
 .stg-num {
-  font-size: clamp(26px, 3.4vw, 39px);
+  font-size: clamp(21px, 2.72vw, 31px);
   font-weight: 800;
   line-height: 1;
   color: var(--stg-num-far);
   flex: none;
 }
 .stg-title {
-  font-size: clamp(13px, 1.7vw, 20px);
+  font-size: clamp(10.5px, 1.36vw, 16px);
   line-height: 1.25;
   font-weight: 600;
   color: var(--stg-title-far);
