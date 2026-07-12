@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.11.2 — 2026-07-12
+
+- Stage 6 timeline now scales for long stories: a Scale selector (Fit + fixed
+  px/second presets), − / + zoom buttons, and horizontal scroll. Stories with
+  more than 12 shots auto-zoom so no clip is too small to grab; the playhead
+  stays in view while playing, and edge-trim stays precise at any zoom. Short
+  stories keep the fit-to-width view.
+
 ## 1.11.1 — 2026-07-12
 
 - Fixed Gemini text generation failing with "quota exceeded / limit: 0" on

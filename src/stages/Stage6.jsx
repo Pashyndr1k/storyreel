@@ -3,6 +3,23 @@ import { useI18n } from '../lib/i18n.js';
 import { videoDims, saveToLocalOutputs } from '../lib/comfy.js';
 import { Play, StopSq, Grip, Download } from '../components/icons.jsx';
 
+// Timeline zoom: 'fit' stretches the whole assembly to the pane width (good for
+// short stories); a numeric value is pixels-per-second, which makes the track
+// wider than the pane so it scrolls — keeping individual shots operable in long
+// stories with tens or hundreds of shots.
+const SCALES = [10, 20, 40, 80, 160]; // px per second
+const ZOOM_STEPS = ['fit', ...SCALES];
+const MIN_CLIP_PX = 48; // a shot narrower than this is hard to grab
+
+// Below 13 shots the fit view stays comfortable; past that, auto-zoom to a
+// scale that keeps even the shortest shot at least MIN_CLIP_PX wide.
+function defaultScale(project) {
+  const shots = (project.outline || []).flatMap((s) => project.sceneDetails?.[s.id]?.shots || []);
+  if (shots.length <= 12) return 'fit';
+  const minDur = Math.max(1, Math.min(...shots.map((s) => s.duration || 1)));
+  return SCALES.find((s) => s >= MIN_CLIP_PX / minDur) || SCALES[SCALES.length - 1];
+}
+
 // Stage 6 — Final Assembly. The whole script becomes one timeline (same NLE
 // design as the Stage-4 preview): every shot is a clip, grouped by scene.
 // A shot's clip shows its generated video (preferred), else its first-frame
@@ -28,6 +45,12 @@ export default function Stage6({ project, update, settings }) {
   const [overKey, setOverKey] = useState(null);
   const pvRef = useRef(null);
   const cancelRef = useRef(false);
+  const [scale, setScale] = useState(() => defaultScale(project));
+  const scrollRef = useRef(null);
+  const zoomed = scale !== 'fit';
+  const zoomIdx = ZOOM_STEPS.indexOf(scale);
+  const zoomOut = () => zoomIdx > 0 && setScale(ZOOM_STEPS[zoomIdx - 1]);
+  const zoomIn = () => zoomIdx < ZOOM_STEPS.length - 1 && setScale(ZOOM_STEPS[zoomIdx + 1]);
 
   // Flat assembly sequence in scene order.
   const scenes = project.outline.map((scene) => ({
@@ -132,13 +155,18 @@ export default function Stage6({ project, update, settings }) {
     setShotDuration(it.sceneId, it.shot.id, clampDur(Math.round(((it.shot.duration || 0) + delta) * 2) / 2));
   };
 
+  // Effective pixels-per-second: the fixed zoom scale, or (in fit mode) the
+  // measured track width divided by the total duration.
+  const pxPerSec = () => (zoomed ? scale : trackRef.current ? trackRef.current.clientWidth / total : 0);
+
   // Edge-trim with pointer capture (same interaction as the Stage-4 timeline).
   const startTrim = (e, it) => {
-    if (!trackRef.current || total <= 0) return;
+    if (total <= 0) return;
+    const pps = pxPerSec();
+    if (!pps) return;
     e.preventDefault();
     e.stopPropagation();
     const handle = e.currentTarget;
-    const pxPerSec = trackRef.current.clientWidth / total;
     const startX = e.clientX;
     const startDur = it.shot.duration || 1;
     setPlaying(false);
@@ -151,7 +179,7 @@ export default function Stage6({ project, update, settings }) {
     }
     let curD = startDur;
     const move = (ev) => {
-      const raw = startDur + (ev.clientX - startX) / pxPerSec;
+      const raw = startDur + (ev.clientX - startX) / pps;
       const next = clampDur(Math.round(raw * 2) / 2);
       if (next !== curD) {
         curD = next;
@@ -173,6 +201,16 @@ export default function Stage6({ project, update, settings }) {
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
   };
+
+  // While playing a zoomed timeline, scroll to keep the playhead in view.
+  useEffect(() => {
+    if (!zoomed || !scrollRef.current) return;
+    const el = scrollRef.current;
+    const x = elapsed * scale;
+    if (x < el.scrollLeft + 40 || x > el.scrollLeft + el.clientWidth - 60) {
+      el.scrollLeft = Math.max(0, x - el.clientWidth / 2);
+    }
+  }, [elapsed, zoomed, scale]);
 
   // ---- render to a video file ----------------------------------------------
   const blobToDataURL = (blob) =>
@@ -330,9 +368,12 @@ export default function Stage6({ project, update, settings }) {
   }
 
   const seconds = Math.max(1, Math.ceil(total));
-  const labelEvery = seconds > 120 ? 10 : seconds > 40 ? 5 : 1;
+  const labelEvery = zoomed
+    ? Math.max(1, Math.ceil(40 / scale))
+    : seconds > 120 ? 10 : seconds > 40 ? 5 : 1;
   const showPlayhead = total > 0 && (playing || elapsed > 0);
   const selected = items.find((x) => x.shot.id === selectedId);
+  const innerWidth = zoomed ? seconds * scale : undefined; // px in zoom mode
 
   return (
     <section className="stage">
@@ -351,18 +392,39 @@ export default function Stage6({ project, update, settings }) {
         )}
       </div>
 
+      <div className="nle-zoom">
+        <span className="nle-zoom-label">{t('s6.scale')}</span>
+        <button type="button" className="zoom-btn" title={t('s6.zoomOut')} aria-label={t('s6.zoomOut')} disabled={zoomIdx === 0} onClick={zoomOut}>−</button>
+        <select
+          className="zoom-select"
+          value={String(scale)}
+          onChange={(e) => setScale(e.target.value === 'fit' ? 'fit' : Number(e.target.value))}
+        >
+          <option value="fit">{t('s6.fit')}</option>
+          {SCALES.map((s) => (
+            <option key={s} value={s}>{s} px/s</option>
+          ))}
+        </select>
+        <button type="button" className="zoom-btn" title={t('s6.zoomIn')} aria-label={t('s6.zoomIn')} disabled={zoomIdx === ZOOM_STEPS.length - 1} onClick={zoomIn}>+</button>
+        {zoomed && <span className="nle-zoom-hint">{t('s6.scrollHint')}</span>}
+      </div>
+
       <div className="nle">
+       <div className={`nle-scroll ${zoomed ? 'zoomed' : ''}`} ref={scrollRef}>
+        <div className="nle-inner" style={zoomed ? { width: innerWidth } : undefined}>
         <div className="nle-ruler">
           {Array.from({ length: seconds }, (_, i) => (
-            <div key={i} className="nle-cell"><span>{i % labelEvery === 0 ? `${i}s` : ''}</span></div>
+            <div key={i} className="nle-cell" style={zoomed ? { flex: 'none', width: scale } : undefined}><span>{i % labelEvery === 0 ? `${i}s` : ''}</span></div>
           ))}
         </div>
         <div className="nle-track asm-track" ref={trackRef}>
-          {scenes.map((g, gi) => (
+          {scenes.map((g, gi) => {
+            const sceneDur = g.shots.reduce((a, it) => a + (it.shot.duration || 0), 0);
+            return (
             <div
               key={g.scene.id}
               className={`asm-scene ${overKey === `scene-${gi}` ? 'drag-over' : ''}`}
-              style={{ flexGrow: Math.max(0.5, g.shots.reduce((a, it) => a + (it.shot.duration || 0), 0)) }}
+              style={zoomed ? { flex: 'none', width: Math.max(1, sceneDur) * scale } : { flexGrow: Math.max(0.5, sceneDur) }}
               onDragOver={(e) => {
                 if (dragScene.current === null) return;
                 e.preventDefault();
@@ -402,7 +464,7 @@ export default function Stage6({ project, update, settings }) {
                     <div
                       key={it.shot.id}
                       className={`nle-clip ${selectedId === it.shot.id ? 'selected' : ''} ${overKey === `shot-${it.shot.id}` ? 'drag-over' : ''} ${trimId === it.shot.id ? 'trimming' : ''}`}
-                      style={{ flexGrow: Math.max(0.5, it.shot.duration || 1) }}
+                      style={zoomed ? { flex: 'none', width: (it.shot.duration || 1) * scale } : { flexGrow: Math.max(0.5, it.shot.duration || 1) }}
                       title={`${globalIdx + 1} · ${it.shot.duration}s · ${it.shot.shotType || ''}`}
                       draggable={trimId === null}
                       onClick={() => {
@@ -464,13 +526,19 @@ export default function Stage6({ project, update, settings }) {
                 })}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
         {showPlayhead && (
-          <div className="nle-playhead" style={{ left: `${Math.min(100, (elapsed / total) * 100)}%` }}>
+          <div
+            className="nle-playhead"
+            style={zoomed ? { left: elapsed * scale } : { left: `${Math.min(100, (elapsed / total) * 100)}%` }}
+          >
             <span className="nle-playhead-cap" />
           </div>
         )}
+        </div>
+       </div>
       </div>
 
       <div className="nle-footer">

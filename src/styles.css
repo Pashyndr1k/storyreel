@@ -1244,6 +1244,23 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 .asm-scene-label span { overflow: hidden; text-overflow: ellipsis; }
 .asm-clips { display: flex; flex: 1; gap: 2px; min-height: 0; }
 
+/* Stage 6 timeline zoom + horizontal scroll */
+.nle-scroll { overflow-x: auto; overflow-y: hidden; }
+.nle-scroll.zoomed { cursor: grab; }
+.nle-inner { position: relative; }
+.nle-zoom { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; flex-wrap: wrap; }
+.nle-zoom-label { font-size: 12px; color: var(--muted-2, #8b87a0); font-weight: 600; }
+.zoom-btn {
+  width: 28px; height: 28px; flex: none; border-radius: 7px;
+  border: 1px solid rgba(139, 92, 246, 0.35); background: rgba(139, 92, 246, 0.1);
+  color: var(--violet-text, #c3b6ef); font-size: 16px; font-weight: 700; line-height: 1;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.zoom-btn:hover:not(:disabled) { background: rgba(139, 92, 246, 0.22); border-color: #7c5cff; }
+.zoom-btn:disabled { opacity: 0.4; cursor: default; }
+.zoom-select { height: 28px; padding: 0 8px; }
+.nle-zoom-hint { font-size: 11px; color: var(--muted-2, #8b87a0); }
+
 /* ============ SETTINGS ============ */
 .settings-section {
   margin: 18px 0 4px;
