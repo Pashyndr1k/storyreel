@@ -14,8 +14,10 @@ export const DEFAULT_COMFY_URL = 'http://127.0.0.1:8000';
 export const DEFAULT_OUTPUT_DIR = 'D:\\Claude work\\ComfyUI\\Output';
 
 function base(settings) {
-  // Vite dev server proxies /comfy → the local ComfyUI to sidestep its
-  // same-origin check; everywhere else we hit the configured URL directly.
+  // In Electron the main-process bridge talks to ComfyUI directly (no CORS);
+  // the Vite dev server proxies /comfy to sidestep ComfyUI's same-origin
+  // check; a plain production browser build hits the URL directly.
+  if (window.comfyBridge?.request) return (settings.comfyUrl || DEFAULT_COMFY_URL).replace(/\/+$/, '');
   if (import.meta.env.DEV) return '/comfy';
   return (settings.comfyUrl || DEFAULT_COMFY_URL).replace(/\/+$/, '');
 }
@@ -39,52 +41,102 @@ const T2I_ASPECT = {
   '9:16': '9:16 (Portrait Widescreen)',
 };
 
-async function api(settings, path, opts = {}) {
+const textDecoder = new TextDecoder();
+
+function b64ToBytes(b64) {
+  const bin = atob(b64 || '');
+  const u = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  return u;
+}
+
+function throwComfy(status, bytes) {
+  let detail = `ComfyUI HTTP ${status}`;
+  try {
+    const err = JSON.parse(textDecoder.decode(bytes));
+    detail = err?.error?.message || err?.error || detail;
+    if (err?.node_errors && Object.keys(err.node_errors).length) {
+      const first = Object.values(err.node_errors)[0];
+      const msg = first?.errors?.[0]?.message;
+      if (msg) detail += ` — ${msg}`;
+    }
+  } catch {
+    /* keep status */
+  }
+  if (status === 403) {
+    detail += ' — ComfyUI rejected the request origin. Restart StoryReel; if this persists, start ComfyUI with --enable-cors-header.';
+  }
+  throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+}
+
+// Unified transport. In Electron every request runs in the main process
+// (window.comfyBridge), which carries no Origin header — the reason renderer
+// fetches got HTTP 403 from ComfyUI. Browsers use fetch (dev proxy or direct).
+async function request(settings, path, { method = 'GET', json = null, upload = null } = {}) {
+  const url = `${base(settings)}${path}`;
+
+  if (window.comfyBridge?.request) {
+    let out;
+    try {
+      out = await window.comfyBridge.request({ url, method, json, upload });
+    } catch {
+      throw new Error('COMFY_UNREACHABLE');
+    }
+    const bytes = b64ToBytes(out.base64);
+    if (!out.ok) throwComfy(out.status, bytes);
+    return {
+      json: () => JSON.parse(textDecoder.decode(bytes)),
+      blob: () => new Blob([bytes], { type: out.contentType || 'application/octet-stream' }),
+    };
+  }
+
+  const opts = { method };
+  if (upload) {
+    const blob = new Blob([b64ToBytes(upload.base64)], { type: upload.mime || 'image/png' });
+    const fd = new FormData();
+    fd.append('image', blob, upload.filename);
+    fd.append('overwrite', 'true');
+    opts.body = fd;
+  } else if (json != null) {
+    // text/plain keeps this a "simple" request (no CORS preflight); the
+    // aiohttp server parses the JSON body regardless of content type.
+    opts.headers = { 'content-type': 'text/plain' };
+    opts.body = JSON.stringify(json);
+  }
   let res;
   try {
-    res = await fetch(`${base(settings)}${path}`, opts);
+    res = await fetch(url, opts);
   } catch {
     throw new Error('COMFY_UNREACHABLE');
   }
-  if (!res.ok) {
-    let detail = `ComfyUI HTTP ${res.status}`;
-    try {
-      const err = await res.json();
-      detail = err?.error?.message || err?.error || detail;
-      if (err?.node_errors && Object.keys(err.node_errors).length) {
-        const first = Object.values(err.node_errors)[0];
-        const msg = first?.errors?.[0]?.message;
-        if (msg) detail += ` — ${msg}`;
-      }
-    } catch {
-      /* keep status */
-    }
-    throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
-  }
-  return res;
+  const buf = new Uint8Array(await res.arrayBuffer());
+  if (!res.ok) throwComfy(res.status, buf);
+  const ct = res.headers.get('content-type') || 'application/octet-stream';
+  return {
+    json: () => JSON.parse(textDecoder.decode(buf)),
+    blob: () => new Blob([buf], { type: ct }),
+  };
 }
 
 // Upload a data-URL image into ComfyUI's input folder; returns the stored name.
 async function uploadInput(settings, dataURL, name) {
-  const blob = await (await fetch(dataURL)).blob();
-  const fd = new FormData();
-  fd.append('image', blob, name);
-  fd.append('overwrite', 'true');
-  const res = await api(settings, '/upload/image', { method: 'POST', body: fd });
-  const data = await res.json();
+  const [head, base64] = dataURL.split(',');
+  const mime = head.match(/data:(.*?)(;|$)/)?.[1] || 'image/png';
+  const res = await request(settings, '/upload/image', {
+    method: 'POST',
+    upload: { base64, mime, filename: name },
+  });
+  const data = res.json();
   return data.subfolder ? `${data.subfolder}/${data.name}` : data.name;
 }
 
 // Queue an API-format graph; resolves with the outputs map once execution ends.
 async function runGraph(settings, graph, { timeoutMs = 15 * 60 * 1000, onStatus } = {}) {
-  const res = await api(settings, '/prompt', {
+  const res = await request(settings, '/prompt', {
     method: 'POST',
-    // text/plain keeps this a "simple" request (no CORS preflight); the
-    // aiohttp server parses the JSON body regardless of content type.
-    headers: { 'content-type': 'text/plain' },
-    body: JSON.stringify({ prompt: graph, client_id: 'storyreel' }),
+    json: { prompt: graph, client_id: 'storyreel' },
   });
-  const { prompt_id: id } = await res.json();
+  const { prompt_id: id } = res.json();
   if (!id) throw new Error('ComfyUI did not accept the workflow.');
 
   const started = Date.now();
@@ -93,8 +145,7 @@ async function runGraph(settings, graph, { timeoutMs = 15 * 60 * 1000, onStatus 
     if (Date.now() - started > timeoutMs) throw new Error('ComfyUI generation timed out.');
     let hist;
     try {
-      const hres = await api(settings, `/history/${id}`);
-      hist = await hres.json();
+      hist = (await request(settings, `/history/${id}`)).json();
     } catch {
       continue; // transient poll failure — keep waiting
     }
@@ -134,7 +185,7 @@ async function fetchOutputBlob(settings, file) {
     subfolder: file.subfolder || '',
     type: file.type || 'output',
   });
-  const res = await api(settings, `/view?${q}`);
+  const res = await request(settings, `/view?${q}`);
   return res.blob();
 }
 

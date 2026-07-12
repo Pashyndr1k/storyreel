@@ -1,6 +1,11 @@
 const { app, BrowserWindow, shell, ipcMain, safeStorage, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { comfyRequest } = require('./comfyRequest.cjs');
+
+// All ComfyUI traffic goes through the main process — renderer fetches carry
+// an Origin header that ComfyUI rejects with HTTP 403.
+ipcMain.handle('comfy-request', (_e, opts) => comfyRequest(opts));
 
 // Write a generated ComfyUI result (video/image, base64) into a local folder
 // chosen in the app settings (default D:\Claude work\ComfyUI\Output).
@@ -73,7 +78,11 @@ const LOOPBACK = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//i;
 app.whenReady().then(() => {
   session.defaultSession.webRequest.onBeforeSendHeaders((details, cb) => {
     const headers = details.requestHeaders;
-    if (LOOPBACK.test(details.url)) delete headers['Origin'];
+    if (LOOPBACK.test(details.url)) {
+      for (const k of Object.keys(headers)) {
+        if (k.toLowerCase() === 'origin') delete headers[k];
+      }
+    }
     cb({ requestHeaders: headers });
   });
   session.defaultSession.webRequest.onHeadersReceived((details, cb) => {

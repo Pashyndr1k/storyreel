@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.10.1 — 2026-07-12
+
+- Fixed "ComfyUI HTTP 403" during video/storyboard generation in the desktop
+  app: all ComfyUI traffic now runs through the Electron main process, which
+  carries no browser Origin header — the reason ComfyUI's same-origin guard
+  rejected renderer requests. Browser dev keeps using the /comfy proxy, and a
+  403 now comes with an actionable hint.
+
 ## 1.10.0 — 2026-07-12
 
 - Local video generation via ComfyUI (MCP ComfyUI setup): every Stage-5 shot
