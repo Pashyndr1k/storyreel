@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Grip } from '../components/icons.jsx';
+import { Grip, Upload, Layers } from '../components/icons.jsx';
 import { useGenerate } from '../lib/useGenerate.js';
 import { stage4Prompt } from '../lib/prompts.js';
 import { uid } from '../lib/storage.js';
@@ -193,8 +193,8 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
           ))}
           {(scene.photos || []).length < 3 && (
             <>
-              <label className="btn small file-btn">
-                {t('pick.upload')}
+              <label className="photo-add" title={t('pick.upload')} aria-label={t('pick.upload')}>
+                <Upload size={20} />
                 <input
                   type="file"
                   accept="image/*"
@@ -206,8 +206,14 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
                   }}
                 />
               </label>
-              <button className="btn small" onClick={() => setPickLoc(true)}>
-                {t('pick.fromLib')}
+              <button
+                type="button"
+                className="photo-add"
+                title={t('pick.fromLib')}
+                aria-label={t('pick.fromLib')}
+                onClick={() => setPickLoc(true)}
+              >
+                <Layers size={20} />
               </button>
             </>
           )}
