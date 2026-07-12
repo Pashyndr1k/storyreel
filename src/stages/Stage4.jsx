@@ -232,6 +232,7 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
           shots={shots}
           settings={settings}
           onReorder={moveShotTo}
+          onDuration={(id, d) => updateShot(id, { duration: clamp(d, 2, 10) })}
           onFrames={(frames) => update((p) => ({ storyboards: { ...p.storyboards, ...frames } }))}
           onSettings={onSettings}
         />
@@ -296,6 +297,7 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
                   type="number"
                   min={2}
                   max={10}
+                  step={0.5}
                   value={shot.duration}
                   onChange={(e) => updateShot(shot.id, { duration: clamp(e.target.value, 2, 10) })}
                 />

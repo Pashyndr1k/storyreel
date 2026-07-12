@@ -1041,6 +1041,33 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
   border-radius: 3px;
 }
 .nle-clip.selected .nle-dur { background: rgba(124, 92, 255, 0.85); }
+.nle-trim {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 9px;
+  cursor: ew-resize;
+  touch-action: none;
+  background: transparent;
+}
+.nle-trim::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 3px;
+  width: 2px;
+  height: 18px;
+  transform: translateY(-50%);
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.25);
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+.nle-clip:hover .nle-trim::before { opacity: 1; }
+.nle-trim:hover::before,
+.nle-clip.trimming .nle-trim::before { opacity: 1; background: #a855f7; }
+.nle-clip.trimming { box-shadow: inset 0 0 0 2px #a855f7; }
 .nle-playhead {
   position: absolute;
   top: 0;

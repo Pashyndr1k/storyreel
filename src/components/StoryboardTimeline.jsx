@@ -11,7 +11,9 @@ function framePrompt(shot, scene) {
 // NLE-style animatic timeline (design 3a): black surface with a per-second time
 // ruler, square clips butted together whose widths are proportional to their
 // durations, a red playhead spanning ruler + track, and real-time playback.
-export default function StoryboardTimeline({ project, scene, shots, settings, onReorder, onFrames, onSettings }) {
+// Clips are editable: drag a clip to reorder, drag its right edge to trim or
+// extend the duration — both write straight into the shot breakdown data.
+export default function StoryboardTimeline({ project, scene, shots, settings, onReorder, onDuration, onFrames, onSettings }) {
   const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const [prog, setProg] = useState(null);
@@ -21,6 +23,39 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
   const [selectedId, setSelectedId] = useState(null);
   const dragIdx = useRef(null);
   const [overIdx, setOverIdx] = useState(null);
+  const trackRef = useRef(null);
+  const [trimId, setTrimId] = useState(null);
+
+  // Drag the right edge of a clip: convert the pointer delta into seconds using
+  // the track's px-per-second at drag start, snap to 0.5s and clamp to the
+  // 2–10s shot rule. Updates flow into the shot data live, so the breakdown
+  // cards' durations and timecodes follow while dragging.
+  const startTrim = (e, shot) => {
+    if (!onDuration || !trackRef.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const totalNow = shots.reduce((a, s) => a + (s.duration || 0), 0);
+    if (totalNow <= 0) return;
+    const pxPerSec = trackRef.current.clientWidth / totalNow;
+    const startX = e.clientX;
+    const startDur = shot.duration || 1;
+    setPlaying(false);
+    setTrimId(shot.id);
+    setSelectedId(shot.id);
+    const move = (ev) => {
+      const raw = startDur + (ev.clientX - startX) / pxPerSec;
+      const next = Math.max(2, Math.min(10, Math.round(raw * 2) / 2));
+      if (next !== shot.duration) onDuration(shot.id, next);
+      shot = { ...shot, duration: next };
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      setTrimId(null);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
 
   const sb = project.storyboards || {};
   const total = shots.reduce((a, s) => a + (s.duration || 0), 0);
@@ -122,14 +157,14 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
             <div key={i} className="nle-cell"><span>{i}s</span></div>
           ))}
         </div>
-        <div className="nle-track">
+        <div className="nle-track" ref={trackRef}>
           {shots.map((s, i) => (
             <div
               key={s.id}
-              className={`nle-clip ${selectedId === s.id ? 'selected' : ''} ${overIdx === i ? 'drag-over' : ''}`}
+              className={`nle-clip ${selectedId === s.id ? 'selected' : ''} ${overIdx === i ? 'drag-over' : ''} ${trimId === s.id ? 'trimming' : ''}`}
               style={{ flexGrow: Math.max(0.5, s.duration || 1) }}
               title={`${i + 1} · ${s.duration}s · ${s.shotType || ''}`}
-              draggable
+              draggable={trimId === null}
               onClick={() => {
                 setSelectedId(s.id);
                 setElapsed(startOf(i));
@@ -158,6 +193,19 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
             >
               {sb[s.id] ? <img src={sb[s.id]} alt="" draggable={false} /> : <span className="nle-clip-num">{i + 1}</span>}
               <span className="nle-dur">{Number(s.duration || 0).toFixed(1)}s</span>
+              {onDuration && (
+                <span
+                  className="nle-trim"
+                  title={t('sb.trim')}
+                  draggable={false}
+                  onClick={(e) => e.stopPropagation()}
+                  onDragStart={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onPointerDown={(e) => startTrim(e, s)}
+                />
+              )}
             </div>
           ))}
         </div>

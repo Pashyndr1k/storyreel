@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.9.1 — 2026-07-11
+
+- Stage 4 timeline clips are now editable: drag a clip's right edge to trim or
+  extend its duration (snaps to 0.5s, clamped to the 2–10s shot rule) — the
+  matching Shot Breakdown card's duration and all timecodes update live, just
+  as drag-reordering already syncs shot order both ways.
+- Shot duration inputs on the breakdown cards accept half-second steps.
+
 ## 1.9.0 — 2026-07-11
 
 - Project cover generation now uses gemini-3.1-flash-lite-image (same automatic
