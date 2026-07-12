@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.12.0 — 2026-07-12
+
+- Assets library: upload and reuse your own images — logos, props, wardrobe,
+  UI screenshots — across projects. An "Assets library" button at the top of
+  Stage 5 opens a manager to create named assets (with a description) and edit
+  or delete them.
+- Per-shot assets: each Stage 5 shot has an "Assets in this shot" row (like the
+  character-photo row) to attach assets from the library or upload a new one.
+  Attached assets are sent to image generation alongside the character and
+  location references, described by name so the model places them accurately;
+  a "Use assets" toggle turns them off per shot.
+- Stage 2: removed the "cover is generated automatically" note, and the Script
+  / Image / Video style labels now sit directly above their selectors.
+
 ## 1.11.2 — 2026-07-12
 
 - Stage 6 timeline now scales for long stories: a Scale selector (Fit + fixed

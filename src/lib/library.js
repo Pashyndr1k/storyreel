@@ -6,11 +6,17 @@ import { uid } from './storage.js';
 
 export const CHARACTER_TYPES = ['male', 'female', 'child', 'animal', 'robot', 'other'];
 export const LOCATION_TYPES = ['interior', 'exterior', 'urban', 'nature', 'fantasy', 'other'];
+export const ASSET_TYPES = ['prop', 'logo', 'ui', 'wardrobe', 'other'];
+export const LIBRARY_KINDS = ['character', 'location', 'asset'];
+
+function typesFor(kind) {
+  return kind === 'location' ? LOCATION_TYPES : kind === 'asset' ? ASSET_TYPES : CHARACTER_TYPES;
+}
 
 export function newLibraryEntry(kind) {
   return {
     id: 'lib_' + uid(),
-    kind, // 'character' | 'location'
+    kind, // 'character' | 'location' | 'asset'
     name: '',
     type: 'other',
     description: '',
@@ -23,8 +29,8 @@ export function newLibraryEntry(kind) {
 
 function normalizeEntry(e) {
   if (!e || typeof e !== 'object') return null;
-  const kind = e.kind === 'location' ? 'location' : 'character';
-  const types = kind === 'location' ? LOCATION_TYPES : CHARACTER_TYPES;
+  const kind = LIBRARY_KINDS.includes(e.kind) ? e.kind : 'character';
+  const types = typesFor(kind);
   return {
     ...newLibraryEntry(kind),
     ...e,

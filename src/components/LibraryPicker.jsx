@@ -30,7 +30,7 @@ export default function LibraryPicker({ kind, library, onPick, onClose }) {
               >
                 <img src={e.photos[0]} alt="" />
                 <strong>{e.name || t('lib.unnamed')}</strong>
-                <span>{t(`type.${e.type}`)}</span>
+                {kind !== 'asset' && <span>{t(`type.${e.type}`)}</span>}
               </button>
             ))}
           </div>

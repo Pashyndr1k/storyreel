@@ -221,7 +221,6 @@ export default function Stage2({ project, update, rawUpdate, settings, goNext, o
               </div>
               <div className="cover-side">
                 <StylePicker project={project} update={rawUpdate || update} styles={styles} />
-                <p className="hint">{t('cover.auto')}</p>
                 {!project.cover && (
                   <button className="btn small" disabled={coverBusy} onClick={genCover}>
                     {coverBusy ? t('cover.generating') : t('cover.generate')}

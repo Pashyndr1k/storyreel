@@ -14,7 +14,7 @@ import Dropdown from '../components/Dropdown.jsx';
 import { ArrowLeft, Download, Sliders, Cog, PencilStar, Check, Globe } from '../components/icons.jsx';
 import { LANGS } from '../lib/i18n.js';
 
-export default function Project({ project, updateProject, settings, setSettings, styles, setStyles, library, libUpsert, onBack, onSettings }) {
+export default function Project({ project, updateProject, settings, setSettings, styles, setStyles, library, libUpsert, libDelete, onBack, onSettings }) {
   const { t, lang } = useI18n();
   const [view, setView] = useState(Math.min(project.stage, 6));
   const [showProjectSettings, setShowProjectSettings] = useState(false);
@@ -70,6 +70,7 @@ export default function Project({ project, updateProject, settings, setSettings,
     videoStyle,
     library,
     libUpsert,
+    libDelete,
   };
 
   const langOptions = LANGS.map((l) => ({

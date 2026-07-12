@@ -260,6 +260,7 @@ export default function App() {
           setStyles={setStyles}
           library={library}
           libUpsert={libUpsert}
+          libDelete={libDelete}
           onBack={() => setRoute({ name: 'home' })}
           onSettings={() => setShowSettings(true)}
         />

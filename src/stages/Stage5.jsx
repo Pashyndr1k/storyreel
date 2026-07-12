@@ -9,7 +9,11 @@ import { aspectDescription } from '../lib/aspect.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import { StyleIndicator } from '../components/StyleControls.jsx';
-import { Download, RestoreIcon, MapPin } from '../components/icons.jsx';
+import AssetsModal from '../components/AssetsModal.jsx';
+import LibraryPicker from '../components/LibraryPicker.jsx';
+import { newLibraryEntry } from '../lib/library.js';
+import { fileToResizedDataURL } from '../lib/images.js';
+import { Download, RestoreIcon, MapPin, Upload, Layers, Grid } from '../components/icons.jsx';
 
 // Small white icon on a round semi-transparent black chip, overlaid on images.
 function IconAction({ title, disabled, onClick, children }) {
@@ -39,7 +43,7 @@ function CopyButton({ text }) {
   );
 }
 
-export default function Stage5({ project, update, settings, onSettings, onProjectSettings, genLang, styles, imageStyle, videoStyle, libUpsert, goNext }) {
+export default function Stage5({ project, update, settings, onSettings, onProjectSettings, genLang, styles, imageStyle, videoStyle, library, libUpsert, libDelete, goNext }) {
   const { t } = useI18n();
   const [sceneId, setSceneId] = useState(project.outline[0]?.id || null);
   const [prog, setProg] = useState(null);
@@ -48,6 +52,8 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const [imgErr, setImgErr] = useState(null); // { id, msg }
   const [refineText, setRefineText] = useState({}); // shotId -> instruction draft
   const [locSaved, setLocSaved] = useState(null); // shotId whose location ref was just saved
+  const [showAssets, setShowAssets] = useState(false); // asset library manager
+  const [assetPickFor, setAssetPickFor] = useState(null); // shotId choosing an asset
   const { busy, error, runMany, runBatch } = useGenerate(settings);
 
   const scene = project.outline.find((s) => s.id === sceneId) || project.outline[0];
@@ -61,9 +67,47 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     .slice(0, 3);
   const locRefs = (scene?.photos || []).slice(0, 3);
 
-  const prefFor = (shotId) => refPrefs[shotId] || { char: true, loc: true };
+  // Assets attached to a shot, resolved from the global library (dropping any
+  // that were deleted). Used in image generation alongside char/loc refs.
+  const assetsFor = (shotId) =>
+    ((project.shotAssets || {})[shotId] || [])
+      .map((id) => (library || []).find((e) => e.id === id && e.kind === 'asset'))
+      .filter((a) => a && a.photos?.length);
+
+  const attachAsset = (shotId, assetId) =>
+    update((p) => {
+      const cur = (p.shotAssets || {})[shotId] || [];
+      if (cur.includes(assetId)) return {};
+      return { shotAssets: { ...(p.shotAssets || {}), [shotId]: [...cur, assetId] } };
+    });
+
+  const detachAsset = (shotId, assetId) =>
+    update((p) => ({
+      shotAssets: { ...(p.shotAssets || {}), [shotId]: ((p.shotAssets || {})[shotId] || []).filter((id) => id !== assetId) },
+    }));
+
+  // Direct upload from a shot: create a named asset in the library (named after
+  // the file, editable later) and attach it to the shot.
+  const uploadAsset = async (shotId, file) => {
+    try {
+      const url = await fileToResizedDataURL(file);
+      const entry = {
+        ...newLibraryEntry('asset'),
+        name: (file.name || '').replace(/\.[^.]+$/, '').slice(0, 40) || t('asset.untitled'),
+        photos: [url],
+        projectId: project.id,
+        projectTitle: project.title,
+      };
+      libUpsert(entry);
+      attachAsset(shotId, entry.id);
+    } catch (e) {
+      window.alert(e.message || String(e));
+    }
+  };
+
+  const prefFor = (shotId) => refPrefs[shotId] || { char: true, loc: true, asset: true };
   const setPref = (shotId, patch) =>
-    setRefPrefs((prev) => ({ ...prev, [shotId]: { char: true, loc: true, ...prev[shotId], ...patch } }));
+    setRefPrefs((prev) => ({ ...prev, [shotId]: { char: true, loc: true, asset: true, ...prev[shotId], ...patch } }));
 
   // Each generation is two calls (image prompts, then video prompts), each
   // returning only its own field — so merge into the existing entry, never
@@ -128,17 +172,34 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const pref = prefFor(shot.id);
     const useChar = pref.char ? charRefs : [];
     const useLoc = pref.loc ? locRefs : [];
-    const images = [...useChar, ...useLoc];
+    const shotAssets = pref.asset ? assetsFor(shot.id) : [];
+    const useAssets = shotAssets.map((a) => a.photos[0]);
+    const images = [...useChar, ...useLoc, ...useAssets];
 
     let text = '';
     if (imageStyle?.trim()) text += `Visual style: ${imageStyle.trim()}\n\n`;
     text += prompt;
-    if (useChar.length || useLoc.length) {
-      text += `\n\nReference images are attached.`;
-      if (useChar.length)
-        text += ` The first ${useChar.length} reference image(s) show the main character(s) — reproduce their faces and appearance faithfully and keep them consistent.`;
-      if (useLoc.length)
-        text += ` The ${useLoc.length === 1 ? 'last reference image shows' : `last ${useLoc.length} reference images show`} the location/environment — match its architecture, colors and lighting.`;
+    if (images.length) {
+      // Describe each reference group by its exact position in the list so the
+      // model knows which images are characters, location and assets.
+      text += `\n\n${images.length} reference image(s) are attached.`;
+      let off = 0;
+      const range = (n) => (n === 1 ? `image ${off + 1}` : `images ${off + 1}–${off + n}`);
+      if (useChar.length) {
+        text += ` The main character(s) appear in ${range(useChar.length)} — reproduce their faces and appearance faithfully and keep them consistent.`;
+        off += useChar.length;
+      }
+      if (useLoc.length) {
+        text += ` The location/environment is shown in ${range(useLoc.length)} — match its architecture, colors and lighting.`;
+        off += useLoc.length;
+      }
+      if (useAssets.length) {
+        const names = shotAssets
+          .map((a) => (a.description ? `${a.name} (${a.description})` : a.name))
+          .join('; ');
+        text += ` ${range(useAssets.length)} show specific assets/props to include exactly as shown — ${names}. Place them naturally and keep their appearance accurate.`;
+        off += useAssets.length;
+      }
     }
     const ratio = project.aspectRatio || '16:9';
     text += `\n\nRender in ${aspectDescription(ratio)} (${ratio}) aspect ratio.`;
@@ -351,7 +412,12 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
 
   return (
     <section className="stage">
-      <h2>{t('s5.title')}</h2>
+      <div className="stage-head-row">
+        <h2>{t('s5.title')}</h2>
+        <button className="btn small" onClick={() => setShowAssets(true)}>
+          <Grid size={15} /> {t('asset.libBtn')}
+        </button>
+      </div>
       <p className="stage-desc">{t('s5.desc')}</p>
       <StyleIndicator project={project} styles={styles} cats={['image', 'video']} onClick={onProjectSettings} />
 
@@ -395,6 +461,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           const vidBusy = imgBusy === `${shot.id}:vid`;
           const anyBusy = imgBusy === shot.id || finalBusy || locBusy || vidBusy;
           const shotVid = (project.shotVideos || {})[shot.id];
+          const shotAssets = assetsFor(shot.id);
           return (
             <div key={shot.id} className="shot-card">
               <div className="shot-head">
@@ -414,6 +481,39 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                   placeholder={t('s5.ph')}
                   onChange={(e) => setPrompt(shot.id, { imagePrompt: e.target.value })}
                 />
+
+                <label className="photos-label">{t('asset.shotLabel')}</label>
+                <div className="photo-row">
+                  {shotAssets.map((a) => (
+                    <div key={a.id} className="photo-thumb asset-thumb-sm" title={a.name}>
+                      <img src={a.photos[0]} alt="" />
+                      <span className="asset-tag">{a.name}</span>
+                      <button className="photo-x" onClick={() => detachAsset(shot.id, a.id)}>✕</button>
+                    </div>
+                  ))}
+                  <label className="photo-add" title={t('pick.upload')} aria-label={t('pick.upload')}>
+                    <Upload size={20} />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        e.target.value = '';
+                        if (f) uploadAsset(shot.id, f);
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="photo-add"
+                    title={t('asset.fromLib')}
+                    aria-label={t('asset.fromLib')}
+                    onClick={() => setAssetPickFor(shot.id)}
+                  >
+                    <Layers size={20} />
+                  </button>
+                </div>
 
                 <div className="img-gen">
                   {!genImg && (
@@ -445,6 +545,16 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                   >
                     <span className="box" />
                     {t('img.useLoc')}
+                  </button>
+                  <button
+                    type="button"
+                    className={`check-toggle ${pref.asset ? 'on' : ''}`}
+                    disabled={!assetsFor(shot.id).length}
+                    aria-pressed={pref.asset}
+                    onClick={() => setPref(shot.id, { asset: !pref.asset })}
+                  >
+                    <span className="box" />
+                    {t('img.useAssets')}
                   </button>
                 </div>
 
@@ -616,6 +726,23 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
             {t('s5.continue')}
           </button>
         </footer>
+      )}
+
+      {showAssets && (
+        <AssetsModal
+          library={library}
+          libUpsert={libUpsert}
+          libDelete={libDelete}
+          onClose={() => setShowAssets(false)}
+        />
+      )}
+      {assetPickFor && (
+        <LibraryPicker
+          kind="asset"
+          library={library}
+          onPick={(entry) => attachAsset(assetPickFor, entry.id)}
+          onClose={() => setAssetPickFor(null)}
+        />
       )}
     </section>
   );

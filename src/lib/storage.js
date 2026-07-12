@@ -172,6 +172,7 @@ function projectDefaults() {
     shotImageHistory: {}, // shotId -> older versions, newest first (max 5)
     shotFinalImages: {}, // shotId -> generated FINAL frame (data URL), paired with shotImages
     shotVideos: {}, // shotId -> generated shot video (data URL, ComfyUI LTX-2)
+    shotAssets: {}, // shotId -> [assetId] referencing the global asset library
     storyboards: {}, // shotId -> low-res storyboard frame (data URL)
     logline: '',
     ideas: [],
@@ -224,6 +225,7 @@ export function migrateProject(raw) {
   p.shotImageHistory = p.shotImageHistory && typeof p.shotImageHistory === 'object' ? p.shotImageHistory : {};
   p.shotFinalImages = p.shotFinalImages && typeof p.shotFinalImages === 'object' ? p.shotFinalImages : {};
   p.shotVideos = p.shotVideos && typeof p.shotVideos === 'object' ? p.shotVideos : {};
+  p.shotAssets = p.shotAssets && typeof p.shotAssets === 'object' ? p.shotAssets : {};
   p.storyboards = p.storyboards && typeof p.storyboards === 'object' ? p.storyboards : {};
   p.shotPrompts = p.shotPrompts && typeof p.shotPrompts === 'object' ? p.shotPrompts : {};
 
