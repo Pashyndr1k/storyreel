@@ -1,5 +1,5 @@
 // Circular stage-progress ring rendered with SVG for crisp edges.
-export default function StageRing({ stage, total = 5, size = 52 }) {
+export default function StageRing({ stage, total = 6, size = 52 }) {
   const clamped = Math.max(0, Math.min(stage, total));
   const stroke = 4;
   const r = (size - stroke) / 2;

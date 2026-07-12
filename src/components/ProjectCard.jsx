@@ -61,7 +61,7 @@ export default function ProjectCard({ project, onOpen, onArchive, onRestore, onD
             {!project.genres.length && <span className="sr-tag muted">{t('card.noGenre')}</span>}
           </div>
         </div>
-        <StageRing stage={Math.min(project.stage, 5)} total={5} />
+        <StageRing stage={Math.min(project.stage, 6)} total={6} />
       </div>
 
       <div className="sr-actions">
