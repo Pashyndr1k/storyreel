@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
 import { generateJSON } from '../lib/claude.js';
-import { generateImage } from '../lib/gemini.js';
+import { generateCoverImage } from '../lib/gemini.js';
 import { stage2Prompt, extractCharacterPrompt, coverPromptSpec } from '../lib/prompts.js';
 import { uid } from '../lib/storage.js';
 import { fileToResizedDataURL } from '../lib/images.js';
@@ -53,10 +53,9 @@ export default function Stage2({ project, update, settings, goNext, onSettings, 
       let coverPrompt = '';
       if (imageStyle?.trim()) coverPrompt += `Visual style: ${imageStyle.trim()}\n\n`;
       coverPrompt += `${promptData.image_prompt}\n\nRender in 16:9 widescreen aspect ratio.`;
-      const cover = await generateImage(settings, {
+      const cover = await generateCoverImage(settings, {
         prompt: coverPrompt,
         aspectRatio: '16:9',
-        imageSize: '2K',
       });
       update({ cover });
     } catch (e) {

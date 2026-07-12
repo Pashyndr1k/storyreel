@@ -22,9 +22,33 @@ export function useGenerate(settings) {
     }
   };
 
+  // Runs several specs sequentially as one busy operation (e.g. Stage 5's
+  // image-prompt call followed by its video-prompt call). Results apply as they
+  // arrive so a failure mid-way keeps the earlier results.
+  const runMany = async (specs, onResult) => {
+    if (!settings.apiKey) {
+      setError('NO_KEY');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      for (let i = 0; i < specs.length; i++) {
+        const data = await generateJSON(settings, specs[i]);
+        onResult(data, i);
+      }
+    } catch (e) {
+      setError(e.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   // Processes `items` with a small worker pool (results apply as they arrive, so
   // partial progress survives failures). Individual failures don't stop the rest;
   // the first error is surfaced at the end. generateJSON retries transient errors.
+  // makeSpec may return a single spec or an array of specs; an array runs
+  // sequentially for that item (onEach fires per result, progress once per item).
   const runBatch = async (items, makeSpec, onEach, onProgress, concurrency = 3) => {
     if (!settings.apiKey) {
       setError('NO_KEY');
@@ -41,8 +65,12 @@ export function useGenerate(settings) {
         const i = nextIdx++;
         if (i >= items.length) return;
         try {
-          const data = await generateJSON(settings, makeSpec(items[i], i));
-          onEach(items[i], data, i);
+          const spec = makeSpec(items[i], i);
+          const specs = Array.isArray(spec) ? spec : [spec];
+          for (const s of specs) {
+            const data = await generateJSON(settings, s);
+            onEach(items[i], data, i);
+          }
         } catch (e) {
           errors.push(e);
         }
@@ -61,5 +89,5 @@ export function useGenerate(settings) {
     }
   };
 
-  return { busy, error, run, runBatch };
+  return { busy, error, run, runMany, runBatch };
 }

@@ -149,8 +149,8 @@ JSON schema:
   };
 }
 
-export function stage5Prompt(project, scene, shots, lang, imageStyle, videoStyle) {
-  const shotList = shots.map((s, i) => ({
+function stage5ShotList(shots) {
+  return shots.map((s, i) => ({
     shot: i + 1,
     duration_sec: s.duration,
     shot_type: s.shotType,
@@ -159,19 +159,22 @@ export function stage5Prompt(project, scene, shots, lang, imageStyle, videoStyle
     dialogue: s.dialogue,
     notes: s.notes,
   }));
+}
+
+// Stage 5 runs as TWO separate calls per scene: image prompts (first frames,
+// full static detail) and video prompts (motion only, via the Video Motion
+// instruction below) — one call could never satisfy both rule sets at once.
+export function stage5Prompt(project, scene, shots, lang, imageStyle) {
   const envNote = scene.photos?.length
     ? `\n\nAttached are reference photos of this scene's environment. Ground the image prompts in what these photos show: architecture, interior details, colors, lighting and atmosphere.`
     : '';
   const img = (imageStyle || '').trim();
-  const vid = (videoStyle || '').trim();
   const ratio = project.aspectRatio || '16:9';
-  const aspectNote = `\n\nASPECT RATIO — every "image_prompt" and every "video_prompt" MUST explicitly state the framing as ${aspectDescription(ratio)} (${ratio}), and compose for that frame.`;
-  const styleNote =
-    (img ? `\n\nVISUAL STYLE — bake this into EVERY "image_prompt": ${img}` : '') +
-    (vid ? `\n\nCINEMATIC STYLE — bake this into EVERY "video_prompt": ${vid}` : '');
+  const aspectNote = `\n\nASPECT RATIO — every "image_prompt" MUST explicitly state the framing as ${aspectDescription(ratio)} (${ratio}), and compose for that frame.`;
+  const styleNote = img ? `\n\nVISUAL STYLE — bake this into EVERY "image_prompt": ${img}` : '';
   return {
     system: system(lang),
-    maxTokens: 8000,
+    maxTokens: 6000,
     user: withPhotos(scene.photos, `Title: ${project.title}
 Genres: ${project.genres.join(', ')}
 
@@ -181,18 +184,65 @@ ${characterBlock(project)}
 Scene ${scene.number}: "${scene.title}" — ${scene.summary}
 
 Shots of this scene:
-${JSON.stringify(shotList, null, 2)}
+${JSON.stringify(stage5ShotList(shots), null, 2)}
 
-For EVERY shot above, write two prompts:
-
-1) "image_prompt" — a detailed English prompt for the Nano Banana image generation model to create the FIRST FRAME of the shot. Describe: the subject and action frozen at the shot's opening moment, each visible character with their consistent physical details, the environment, lighting, camera angle and lens (e.g. 35mm, shallow depth of field), composition, and an overall cinematic style. Write it as one dense paragraph, no lists.
-
-2) "video_prompt" — a detailed English prompt for an image-to-video model that animates that image for the shot's duration. Describe: what moves and how, character actions and expressions, camera movement (static / pan / dolly / handheld...), pacing, and atmosphere or sound cues. Assume the generated image is the starting frame.
+For EVERY shot above, write one "image_prompt" — a detailed English prompt for the Nano Banana image generation model to create the FIRST FRAME of the shot. Describe: the subject and action frozen at the shot's opening moment, each visible character with their consistent physical details, the environment, lighting, camera angle and lens (e.g. 35mm, shallow depth of field), composition, and an overall cinematic style. Write it as one dense paragraph, no lists.
 
 JSON schema:
-{"prompts":[{"shot":1,"image_prompt":"...","video_prompt":"..."}]}
+{"prompts":[{"shot":1,"image_prompt":"..."}]}
 
 Return exactly one entry per shot, in order.` + aspectNote + styleNote + envNote),
+  };
+}
+
+// Default directorial style substituted into {{VIDEO_STYLE_INJECTION}} when the
+// project has no video style selected (or the user clears it).
+export const DEFAULT_VIDEO_MOTION_STYLE =
+  'Naturalistic cinematic motion: smooth, motivated camera movement (subtle push-ins, gentle pans, stable handheld only when the action calls for it), grounded physical acting with realistic weight and restrained gestures, conversational speech delivered at a natural pace, and organic pauses where the emotional beat requires them.';
+
+// Video Motion Prompt System Instruction (verbatim). {{VIDEO_STYLE_INJECTION}}
+// receives the selected video style's instructions, or DEFAULT_VIDEO_MOTION_STYLE.
+const VIDEO_MOTION_SYSTEM = `You are an expert AI cinematic director translating a scene outline into precise image-to-video motion prompts.
+
+CRITICAL RULE 1 (STATIC AVOIDANCE): The video generation model will be provided with an exact starting frame. DO NOT describe any static visual elements. Never describe character appearances, wardrobe, lighting, or the background environment. Repeating static details causes the video model to morph, hallucinate, or lose character consistency.
+
+CRITICAL RULE 2 (DIRECTORIAL STYLE): You must strictly apply the following camera physics, actor kinetics, and speech dynamics to the scene: "{{VIDEO_STYLE_INJECTION}}". Use this to dictate the exact framerate, camera stability, physical acting style, and pause durations.
+
+Your ONLY job is to describe how the static frame changes over time: camera trajectory, character motion, dialogue pacing, and sound.
+
+When writing the motion prompt, strictly follow these constraints:
+1. Camera Dynamics: Define the exact camera movement first, directly applying the camera behavior from the injected style.
+2. Actor Kinetics: Describe character movement, physical weight, and gestures strictly matching the acting style specified (e.g., naturalistic, theatrical, jerky, frenetic).
+3. Chronological Timing & Pauses: Map actions sequentially across the shot. You MUST apply the specific pause dynamics from the style injection (e.g., deadpan 2-second pauses, fast-paced zero pauses, lingering uncomfortable holds).
+4. Audio & Speech Delivery: Include spoken phrases and sound effects, formatting the dialogue delivery exactly as the style dictates (e.g., stumbling, projected, rapid-fire, breathless).
+
+Output the prompt using the following strict syntax, ensuring it is highly concise:
+
+[Camera Dynamics] + [Actor Kinetics & Chronological Action] + [Speech Delivery, Pauses & Audio]
+
+Example Output (assuming a 'Dramatic Film' style injection):
+"Smooth dolly track push-in, 24fps motion blur. Character shifts weight slowly, displaying restrained micro-expressions as they look down. At 0:02, they slowly raise their head. Lips sync in a measured, slow delivery: 'I never forgot,' followed by a heavy 4-second pregnant pause. Audio: low ambient room tone, faint rustle of fabric."`;
+
+export function stage5VideoPrompt(project, scene, shots, videoStyle) {
+  const injection = (videoStyle || '').trim() || DEFAULT_VIDEO_MOTION_STYLE;
+  return {
+    system:
+      VIDEO_MOTION_SYSTEM.replace('{{VIDEO_STYLE_INJECTION}}', injection) +
+      `\n\nResponse format:
+- Respond with VALID JSON ONLY. No markdown, no code fences, no commentary outside the JSON.
+- Every "video_prompt" must be written entirely in English; character names always in Latin letters.`,
+    maxTokens: 6000,
+    user: `Scene ${scene.number}: "${scene.title}" — ${scene.summary}
+
+Shots of this scene (each has an exact duration in seconds — map the motion, dialogue and pauses chronologically within it):
+${JSON.stringify(stage5ShotList(shots), null, 2)}
+
+For EVERY shot above, write one "video_prompt" motion prompt following your system instruction. The starting frame of each shot already exists — describe only how it changes over the shot's duration.
+
+JSON schema:
+{"prompts":[{"shot":1,"video_prompt":"..."}]}
+
+Return exactly one entry per shot, in order.`,
   };
 }
 

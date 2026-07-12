@@ -67,15 +67,13 @@ export async function generateImage(settings, { prompt, images = [], aspectRatio
   });
 }
 
-// ---- Low-res storyboard frames (Stage 4) --------------------------------
-// Uses gemini-3.1-flash-lite-image (cheap text-to-image). If that id isn't
-// available on the key, falls back to another image-capable flash model from
-// ListModels. Result is downscaled to ~320x200 so pacing can be judged before
-// spending credits on full Nano Banana renders.
-const STORYBOARD_MODEL = 'gemini-3.1-flash-lite-image';
-let storyboardModelCache = null;
+// ---- Cheap lite-image pipeline (storyboard frames + project covers) ------
+// Pinned to gemini-3.1-flash-lite-image; if that id isn't available on the
+// key, falls back once to another image-capable flash model from ListModels.
+const LITE_IMAGE_MODEL = 'gemini-3.1-flash-lite-image';
+let liteModelCache = null;
 
-async function discoverStoryboardFallback(key, fallback) {
+async function discoverLiteFallback(key, fallback) {
   try {
     const res = await fetch(`${ENDPOINT}?key=${encodeURIComponent(key)}&pageSize=1000`);
     if (res.ok) {
@@ -93,10 +91,10 @@ async function discoverStoryboardFallback(key, fallback) {
   return fallback;
 }
 
-export async function generateStoryboardImage(settings, { prompt, aspectRatio }, _retried) {
+async function liteImageCall(settings, { prompt, aspectRatio, maxPixels, quality }, _retried) {
   const key = settings.geminiKey;
   if (!key) throw new Error('NO_GEMINI_KEY');
-  const model = storyboardModelCache || STORYBOARD_MODEL;
+  const model = liteModelCache || LITE_IMAGE_MODEL;
 
   const generationConfig = { responseModalities: ['IMAGE'] };
   if (aspectRatio) generationConfig.imageConfig = { aspectRatio, imageSize: '1K' };
@@ -125,16 +123,27 @@ export async function generateStoryboardImage(settings, { prompt, aspectRatio },
       }
       const data = await res.json();
       const raw = extractImage(data);
-      return resizeDataURL(raw, 320 * 200, 0.72); // ~320x200 total pixels
+      return resizeDataURL(raw, maxPixels, quality);
     });
   } catch (e) {
     // Preferred model missing on this key — discover a substitute once.
     if (!_retried && (e.status === 404 || /not found|not supported/i.test(String(e.message)))) {
-      storyboardModelCache = await discoverStoryboardFallback(key, settings.geminiModel || DEFAULT_IMAGE_MODEL);
-      return generateStoryboardImage(settings, { prompt, aspectRatio }, true);
+      liteModelCache = await discoverLiteFallback(key, settings.geminiModel || DEFAULT_IMAGE_MODEL);
+      return liteImageCall(settings, { prompt, aspectRatio, maxPixels, quality }, true);
     }
     throw e;
   }
+}
+
+// Stage-4 animatic frames: tiny (~320x200) so pacing can be judged before
+// spending credits on full Nano Banana renders.
+export function generateStoryboardImage(settings, { prompt, aspectRatio }) {
+  return liteImageCall(settings, { prompt, aspectRatio, maxPixels: 320 * 200, quality: 0.72 });
+}
+
+// Project cover: same cheap lite model, but kept at native resolution.
+export function generateCoverImage(settings, { prompt, aspectRatio }) {
+  return liteImageCall(settings, { prompt, aspectRatio, maxPixels: Number.POSITIVE_INFINITY, quality: 0.9 });
 }
 
 // Voice-to-text via Gemini audio understanding (works in the browser and Electron).

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage } from '../lib/gemini.js';
-import { stage5Prompt } from '../lib/prompts.js';
+import { stage5Prompt, stage5VideoPrompt } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
 import { aspectDescription } from '../lib/aspect.js';
 import ErrorNote from '../components/ErrorNote.jsx';
@@ -34,7 +34,7 @@ export default function Stage5({ project, update, settings, onSettings, genLang,
   const [imgBusy, setImgBusy] = useState(null); // shotId being generated
   const [imgErr, setImgErr] = useState(null); // { id, msg }
   const [refineText, setRefineText] = useState({}); // shotId -> instruction draft
-  const { busy, error, run, runBatch } = useGenerate(settings);
+  const { busy, error, runMany, runBatch } = useGenerate(settings);
 
   const scene = project.outline.find((s) => s.id === sceneId) || project.outline[0];
   const shots = (scene && project.sceneDetails[scene.id]?.shots) || [];
@@ -51,30 +51,38 @@ export default function Stage5({ project, update, settings, onSettings, genLang,
   const setPref = (shotId, patch) =>
     setRefPrefs((prev) => ({ ...prev, [shotId]: { char: true, loc: true, ...prev[shotId], ...patch } }));
 
+  // Each generation is two calls (image prompts, then video prompts), each
+  // returning only its own field — so merge into the existing entry, never
+  // overwrite the other field.
   const applyPrompts = (targetScene, data) =>
     update((p) => {
       const sceneShots = p.sceneDetails[targetScene.id]?.shots || [];
       const next = { ...p.shotPrompts };
       (data.prompts || []).forEach((pr) => {
         const shot = sceneShots[(Number(pr.shot) || 1) - 1];
-        if (shot) next[shot.id] = { imagePrompt: pr.image_prompt || '', videoPrompt: pr.video_prompt || '' };
+        if (!shot) return;
+        const cur = next[shot.id] || {};
+        next[shot.id] = {
+          ...cur,
+          imagePrompt: pr.image_prompt != null ? pr.image_prompt : cur.imagePrompt || '',
+          videoPrompt: pr.video_prompt != null ? pr.video_prompt : cur.videoPrompt || '',
+        };
       });
       return { shotPrompts: next };
     });
 
-  const specFor = (s) =>
-    stage5Prompt(
-      project,
-      { ...s, number: project.outline.indexOf(s) + 1 },
-      project.sceneDetails[s.id]?.shots || [],
-      genLang,
-      imageStyle,
-      videoStyle
-    );
+  const specFor = (s) => {
+    const sceneArg = { ...s, number: project.outline.indexOf(s) + 1 };
+    const sceneShots = project.sceneDetails[s.id]?.shots || [];
+    return [
+      stage5Prompt(project, sceneArg, sceneShots, genLang, imageStyle),
+      stage5VideoPrompt(project, sceneArg, sceneShots, videoStyle),
+    ];
+  };
 
   const generate = () => {
     if (hasPrompts && !window.confirm(t('s5.replaceConfirm'))) return;
-    run(specFor(scene), (data) => applyPrompts(scene, data));
+    runMany(specFor(scene), (data) => applyPrompts(scene, data));
   };
 
   const processAll = () => {

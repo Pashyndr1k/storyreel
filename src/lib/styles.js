@@ -10,9 +10,11 @@
 // so future format changes migrate old data forward instead of dropping it.
 // Custom styles are only ever seeded on first run and are never overwritten by
 // defaults on later launches. They are also included in Settings → Backup.
+import videoMotionPresets from '../data/video_motion_presets.json';
+
 const STYLES_KEY = 'storyreel.styles.v1';
 const STYLES_BACKUP_KEY = 'storyreel.styles.corrupt'; // last unreadable value, for recovery
-export const STYLES_VERSION = 2;
+export const STYLES_VERSION = 3;
 export const STYLE_CATEGORIES = ['script', 'image', 'video'];
 
 // v2 built-ins, imported from text_styles.pdf (script) and visual styles.pdf
@@ -52,6 +54,29 @@ const BUILTINS_V2 = {
     { id: 'bi2.image.gothic_stopmotion', builtin: true, name: 'Gothic Stop-Motion', instructions: 'dark gothic stop-motion style, elongated surreal character proportions, burlap and stitch textures, moody dramatic shadows, desaturated Victorian color palette (Tim Burton / Henry Selick style). Avoid: bright, cheerful, corporate, smooth Pixar 3D, colorful, shiny plastic, real human.' },
   ],
   video: [],
+};
+
+// v3 built-ins: video motion styles from video_motion_presets.json. The
+// instructions text is the raw prompt_injection — it is substituted into the
+// {{VIDEO_STYLE_INJECTION}} slot of the Video Motion system instruction.
+const BUILTINS_V3 = {
+  script: [],
+  image: [],
+  video: videoMotionPresets.map((p) => ({
+    id: `bi3.video.${p.id}`,
+    builtin: true,
+    name: p.name,
+    instructions: p.prompt_injection,
+  })),
+};
+
+// The v1 factory video styles predate the Video Motion instruction and are
+// superseded by the v3 presets. During the v3 migration they are removed —
+// but only if the user never edited them (instructions still factory text).
+const RETIRED_V3_VIDEO = {
+  'bi.video.handheld': 'Naturalistic handheld camera: subtle breathing movement, quick reframes, imperfect follow focus, vérité energy — motivated and unshowy.',
+  'bi.video.epic': 'Sweeping cinematic motion: slow dollies, cranes and orbits, deliberate push-ins on emotional beats, smooth stabilised moves, grand scale.',
+  'bi.video.static': 'Locked-off static compositions or very slow pushes; stillness and negative space — let the action move within a fixed frame.',
 };
 
 function addMissingBuiltins(styles, additions) {
@@ -109,6 +134,17 @@ function migrate(fromVersion, styles) {
     // v2: add the PDF-imported built-ins (idempotent by id).
     s = addMissingBuiltins(s, BUILTINS_V2);
   }
+  if (fromVersion < 3) {
+    // v3: retire the factory video styles (unless the user edited them) and
+    // add the Video Motion presets (idempotent by id).
+    s = {
+      ...s,
+      video: (s.video || []).filter(
+        (st) => !(st.id in RETIRED_V3_VIDEO && (st.instructions || '') === RETIRED_V3_VIDEO[st.id])
+      ),
+    };
+    s = addMissingBuiltins(s, BUILTINS_V3);
+  }
   return s;
 }
 
@@ -121,10 +157,10 @@ export function loadStyles() {
   try {
     raw = localStorage.getItem(STYLES_KEY);
   } catch {
-    return seedDefaults();
+    return migrate(1, seedDefaults());
   }
   if (raw == null) {
-    const d = addMissingBuiltins(seedDefaults(), BUILTINS_V2);
+    const d = migrate(1, seedDefaults());
     try {
       persist(d);
     } catch {
@@ -156,7 +192,7 @@ export function loadStyles() {
     } catch {
       /* ignore */
     }
-    return seedDefaults();
+    return migrate(1, seedDefaults());
   }
 }
 
