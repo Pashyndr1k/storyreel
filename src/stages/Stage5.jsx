@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage } from '../lib/gemini.js';
-import { stage5Prompt, stage5VideoPrompt } from '../lib/prompts.js';
+import { generateJSON } from '../lib/claude.js';
+import { stage5Prompt, stage5VideoPrompt, finalFramePrompt } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
 import { aspectDescription } from '../lib/aspect.js';
 import ErrorNote from '../components/ErrorNote.jsx';
@@ -187,13 +188,56 @@ export default function Stage5({ project, update, settings, onSettings, genLang,
     }
   };
 
-  const downloadImage = (shot, i) => {
-    const img = project.shotImages[shot.id];
+  // FLF: generate the shot's FINAL frame from its first frame. Claude looks at
+  // the first frame + the shot's plot and writes an edit prompt (same location,
+  // same camera, only the subjects move to the action's end state), plus the
+  // names of characters needed in the final frame that the first frame lacks —
+  // their reference photos are attached so their appearance is preserved.
+  const genFinalFrame = async (shot) => {
+    const first = (project.shotImages || {})[shot.id];
+    if (!first) return;
+    if (!settings.apiKey) return setImgErr({ id: shot.id, msg: 'NO_KEY' });
+    if (!settings.geminiKey) return setImgErr({ id: shot.id, msg: 'NO_GEMINI_KEY' });
+    const sceneArg = { ...scene, number: project.outline.indexOf(scene) + 1 };
+    setImgBusy(`${shot.id}:final`);
+    setImgErr(null);
+    try {
+      const data = await generateJSON(settings, finalFramePrompt(project, sceneArg, shot, first, genLang));
+      const wanted = (data.characters_to_add || []).map((n) => String(n).toLowerCase());
+      const missingRefs = (project.storyline?.characters || [])
+        .filter((c) => wanted.includes((c.name || '').toLowerCase()))
+        .map((c) => ({ name: c.name, photo: c.photos?.[0] }))
+        .filter((c) => c.photo)
+        .slice(0, 3);
+
+      const ratio = project.aspectRatio || '16:9';
+      let text = `${data.image_prompt}\n\nThe FIRST attached image is the shot's first frame — edit it: keep the location, environment, lighting, camera angle and framing exactly as they are, and keep every character's appearance identical.`;
+      if (missingRefs.length) {
+        text += ` The ${missingRefs.length === 1 ? 'next attached image is a reference photo' : `next ${missingRefs.length} attached images are reference photos`} of ${missingRefs.map((c) => c.name).join(', ')} — these characters appear in the final frame; reproduce their faces and appearance faithfully.`;
+      }
+      text += `\n\nRender in ${aspectDescription(ratio)} (${ratio}) aspect ratio, matching the first frame's dimensions.`;
+
+      const img = await generateImage(settings, {
+        prompt: text,
+        images: [first, ...missingRefs.map((c) => c.photo)],
+        aspectRatio: ratio,
+        imageSize: '2K',
+      });
+      update((p) => ({ shotFinalImages: { ...(p.shotFinalImages || {}), [shot.id]: img } }));
+    } catch (e) {
+      setImgErr({ id: shot.id, msg: e.message || String(e) });
+    } finally {
+      setImgBusy(null);
+    }
+  };
+
+  const downloadImage = (shot, i, final) => {
+    const img = final ? (project.shotFinalImages || {})[shot.id] : project.shotImages[shot.id];
     if (!img) return;
     const safe = (project.title || 'shot').replace(/[^\w\d]+/g, '-');
     const a = document.createElement('a');
     a.href = img;
-    a.download = `${safe}-scene${project.outline.indexOf(scene) + 1}-shot${i + 1}.jpg`;
+    a.download = `${safe}-scene${project.outline.indexOf(scene) + 1}-shot${i + 1}${final ? '-final' : ''}.jpg`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -247,6 +291,8 @@ export default function Stage5({ project, update, settings, onSettings, genLang,
           const p = project.shotPrompts[shot.id] || { imagePrompt: '', videoPrompt: '' };
           const pref = prefFor(shot.id);
           const genImg = (project.shotImages || {})[shot.id];
+          const finalImg = (project.shotFinalImages || {})[shot.id];
+          const finalBusy = imgBusy === `${shot.id}:final`;
           return (
             <div key={shot.id} className="shot-card">
               <div className="shot-head">
@@ -298,9 +344,10 @@ export default function Stage5({ project, update, settings, onSettings, genLang,
                 </div>
 
                 {imgErr?.id === shot.id &&
-                  (imgErr.msg === 'NO_GEMINI_KEY' ? (
+                  (imgErr.msg === 'NO_GEMINI_KEY' || imgErr.msg === 'NO_KEY' ? (
                     <div className="note warn">
-                      {t('err.noGeminiKey')} <button className="btn small" onClick={onSettings}>{t('err.openSettings')}</button>
+                      {t(imgErr.msg === 'NO_KEY' ? 'err.noKey' : 'err.noGeminiKey')}{' '}
+                      <button className="btn small" onClick={onSettings}>{t('err.openSettings')}</button>
                     </div>
                   ) : (
                     <div className="note error">{imgErr.msg}</div>
@@ -308,9 +355,34 @@ export default function Stage5({ project, update, settings, onSettings, genLang,
 
                 {genImg && (
                   <div className="gen-image">
-                    <img src={genImg} alt="" />
+                    {finalImg ? (
+                      <div className="frame-pair">
+                        <figure>
+                          <img src={genImg} alt="" />
+                          <figcaption>{t('img.first')}</figcaption>
+                        </figure>
+                        <figure>
+                          <img src={finalImg} alt="" />
+                          <figcaption>{t('img.final')}</figcaption>
+                        </figure>
+                      </div>
+                    ) : (
+                      <img src={genImg} alt="" />
+                    )}
                     <div className="row">
                       <button className="btn tiny" onClick={() => downloadImage(shot, i)}>{t('img.download')}</button>
+                      <button
+                        className="btn tiny"
+                        disabled={finalBusy || imgBusy === shot.id}
+                        onClick={() => genFinalFrame(shot)}
+                      >
+                        {finalBusy ? t('img.generating') : finalImg ? t('img.finalRegen') : t('img.finalCreate')}
+                      </button>
+                      {finalImg && (
+                        <button className="btn tiny" onClick={() => downloadImage(shot, i, true)}>
+                          {t('img.downloadFinal')}
+                        </button>
+                      )}
                       {((project.shotImageHistory || {})[shot.id] || []).length > 0 && (
                         <span className="hint">{t('ver.label')}:</span>
                       )}

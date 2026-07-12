@@ -698,6 +698,11 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 .check-toggle.on .box::after { content: '✓'; color: #fff; font-size: 11px; line-height: 1; }
 .gen-image { margin-top: 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .gen-image img { max-width: 360px; max-height: 340px; width: auto; height: auto; border-radius: 12px; border: 1px solid var(--glass-border); display: block; }
+/* FLF pair: first frame + final frame side by side, identical size. */
+.frame-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 360px)); gap: 10px; width: 100%; }
+.frame-pair figure { margin: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.frame-pair img { width: 100%; max-width: none; max-height: none; height: auto; }
+.frame-pair figcaption { font-size: 11px; color: var(--text-dim, #8b87a0); letter-spacing: 0.02em; }
 
 /* ============ STAGES BAR (gapless segmented stepper, design 2a) ============ */
 .stg-bar {

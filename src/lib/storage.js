@@ -165,6 +165,7 @@ function projectDefaults() {
     cover: '', // generated project cover image (data URL)
     shotImages: {}, // shotId -> current generated image (data URL)
     shotImageHistory: {}, // shotId -> older versions, newest first (max 5)
+    shotFinalImages: {}, // shotId -> generated FINAL frame (data URL), paired with shotImages
     storyboards: {}, // shotId -> low-res storyboard frame (data URL)
     logline: '',
     ideas: [],
@@ -215,6 +216,7 @@ export function migrateProject(raw) {
   // styles once, then strip them.
   p.shotImages = p.shotImages && typeof p.shotImages === 'object' ? p.shotImages : {};
   p.shotImageHistory = p.shotImageHistory && typeof p.shotImageHistory === 'object' ? p.shotImageHistory : {};
+  p.shotFinalImages = p.shotFinalImages && typeof p.shotFinalImages === 'object' ? p.shotFinalImages : {};
   p.storyboards = p.storyboards && typeof p.storyboards === 'object' ? p.storyboards : {};
   p.shotPrompts = p.shotPrompts && typeof p.shotPrompts === 'object' ? p.shotPrompts : {};
 

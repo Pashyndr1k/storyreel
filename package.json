@@ -1,7 +1,7 @@
 {
   "name": "storyreel",
   "productName": "StoryReel",
-  "version": "1.9.2",
+  "version": "1.9.3",
   "private": true,
   "description": "AI assistant for writing short videos: from plot idea to per-shot image & video generation prompts.",
   "author": "StoryReel",

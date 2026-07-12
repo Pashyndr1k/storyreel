@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.9.3 — 2026-07-11
+
+- FLF (first→last frame) generation on Stage 5: every shot with a generated
+  first frame gets a "Create Final Frame" button. Claude examines the first
+  frame plus the shot's plot description and writes an edit prompt for the
+  final frame (the action's end state) that keeps the location, lighting,
+  camera angle and framing exactly as in the first frame. If characters that
+  belong in the final frame are missing from the first one, their reference
+  photos are attached to the generation automatically so their appearance is
+  preserved. The final frame renders at the same size to the right of the
+  first frame, with its own download button, and survives export/import.
+
 ## 1.9.2 — 2026-07-11
 
 - Stage 5 image prompts now describe the shot's INITIAL state (second zero,

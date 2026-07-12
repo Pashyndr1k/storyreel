@@ -250,6 +250,47 @@ Return exactly one entry per shot, in order.`,
   };
 }
 
+// FLF (first→last frame): looks at the shot's generated FIRST frame plus the
+// shot's plot description and writes an image-EDIT prompt that turns that frame
+// into the shot's FINAL frame (the end state of the action). Also reports which
+// characters must appear in the final frame but are missing from the first one,
+// so the caller can attach their reference photos. Returns
+// { image_prompt, characters_to_add: ["Name", ...] }.
+export function finalFramePrompt(project, scene, shot, firstFrame, lang) {
+  const chars = project.storyline?.characters || [];
+  const charList = chars.length ? characterBlock(project) : '(none defined)';
+  return {
+    system: system(lang),
+    maxTokens: 1500,
+    user: withPhotos([firstFrame], `Attached is the generated FIRST frame of a shot (the scene's state at the moment the shot begins).
+
+Title: ${project.title}
+Scene: "${scene.title}" — ${scene.summary}
+
+Shot (duration ${shot.duration}s, ${shot.shotType || 'unspecified framing'}):
+- Location: ${shot.location || '—'}
+- Action across the shot: ${shot.action || '—'}
+- Dialogue: ${shot.dialogue || '—'}
+- Notes: ${shot.notes || '—'}
+
+Characters in this project:
+${charList}
+
+Write ONE image-editing prompt (for the Nano Banana image generation model) that transforms the attached first frame into the shot's FINAL frame — the state of the scene at the END of the action, at the last second of the shot.
+
+Requirements for the "image_prompt":
+- English only, one dense paragraph, no lists.
+- Phrase it as an EDIT of the attached image: state explicitly that the location, environment, architecture, lighting, color palette, camera angle and framing must stay EXACTLY the same as in the provided first frame — only the subjects change.
+- Describe precisely where each visible character has ended up and what pose, gesture and expression they hold at the action's end (and any props that moved).
+- Every character visible in the final frame must keep the exact same face, hair, body and wardrobe as in the first frame or in their attached reference photo.
+
+Also fill "characters_to_add": the names (exactly as written in the character list above) of characters who SHOULD be visible in the final frame but are NOT visible in the attached first frame — their reference photos will be attached for the generation. Use an empty array if everyone needed is already in the first frame.
+
+JSON schema:
+{"image_prompt":"...","characters_to_add":["Name"]}`),
+  };
+}
+
 // Asks Claude to pick the key visual from the synopsis and write an English
 // image prompt for the project cover (poster). Returns { image_prompt }.
 export function coverPromptSpec(project, lang, imageStyle) {
