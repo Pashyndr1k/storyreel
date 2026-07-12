@@ -2,6 +2,10 @@
 
 ## 1.9.3 — 2026-07-11
 
+- Stage 4 timeline: shot durations can now be shortened, not just extended.
+  The edge-trim drag captures the pointer so a leftward drag is no longer
+  hijacked by the clip's reorder drag-and-drop, and the footer gains −0.5s /
+  +0.5s nudge buttons for the selected clip (disabled at the 2s / 10s limits).
 - FLF (first→last frame) generation on Stage 5: every shot with a generated
   first frame gets a "Create Final Frame" button. Claude examines the first
   frame plus the shot's plot description and writes an edit prompt for the

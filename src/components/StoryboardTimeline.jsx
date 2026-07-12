@@ -26,35 +26,63 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
   const trackRef = useRef(null);
   const [trimId, setTrimId] = useState(null);
 
-  // Drag the right edge of a clip: convert the pointer delta into seconds using
-  // the track's px-per-second at drag start, snap to 0.5s and clamp to the
-  // 2–10s shot rule. Updates flow into the shot data live, so the breakdown
-  // cards' durations and timecodes follow while dragging.
+  const clampDur = (d) => Math.max(2, Math.min(10, d));
+
+  // Nudge the selected clip's duration in 0.5s steps (footer − / + buttons) —
+  // a click alternative to edge-dragging that works in both directions.
+  const nudge = (delta) => {
+    const s = shots.find((x) => x.id === selectedId);
+    if (!s || !onDuration) return;
+    onDuration(s.id, clampDur(Math.round(((s.duration || 0) + delta) * 2) / 2));
+  };
+
+  // Drag the right edge of a clip in EITHER direction: convert the pointer
+  // delta into seconds using the track's px-per-second at drag start, snap to
+  // 0.5s and clamp to the 2–10s shot rule. The pointer is captured by the
+  // handle so a leftward drag over the (draggable) clip body can't be hijacked
+  // by the reorder drag-and-drop. Updates flow into the shot data live, so the
+  // breakdown cards' durations and timecodes follow while dragging.
   const startTrim = (e, shot) => {
     if (!onDuration || !trackRef.current) return;
     e.preventDefault();
     e.stopPropagation();
     const totalNow = shots.reduce((a, s) => a + (s.duration || 0), 0);
     if (totalNow <= 0) return;
+    const handle = e.currentTarget;
     const pxPerSec = trackRef.current.clientWidth / totalNow;
     const startX = e.clientX;
     const startDur = shot.duration || 1;
     setPlaying(false);
     setTrimId(shot.id);
     setSelectedId(shot.id);
+    try {
+      handle.setPointerCapture(e.pointerId);
+    } catch {
+      /* capture is best-effort; window listeners still work */
+    }
+    let cur = startDur;
     const move = (ev) => {
       const raw = startDur + (ev.clientX - startX) / pxPerSec;
-      const next = Math.max(2, Math.min(10, Math.round(raw * 2) / 2));
-      if (next !== shot.duration) onDuration(shot.id, next);
-      shot = { ...shot, duration: next };
+      const next = clampDur(Math.round(raw * 2) / 2);
+      if (next !== cur) {
+        cur = next;
+        onDuration(shot.id, next);
+      }
     };
-    const up = () => {
+    const up = (ev) => {
+      try {
+        handle.releasePointerCapture(ev.pointerId);
+      } catch {
+        /* already released */
+      }
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
       setTrimId(null);
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
   };
 
   const sb = project.storyboards || {};
@@ -170,6 +198,11 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
                 setElapsed(startOf(i));
               }}
               onDragStart={(e) => {
+                // A trim in progress must never turn into a reorder drag.
+                if (trimId !== null) {
+                  e.preventDefault();
+                  return;
+                }
                 dragIdx.current = i;
                 e.dataTransfer.effectAllowed = 'move';
                 e.dataTransfer.setData('text/plain', String(i));
@@ -218,6 +251,27 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
 
       <div className="nle-footer">
         <span>{t('sb.caption', { n: shots.length })}</span>
+        {onDuration && shots.some((s) => s.id === selectedId) && (
+          <span className="nle-nudge">
+            {t('s4.shot', { n: shots.findIndex((s) => s.id === selectedId) + 1 })}
+            <button
+              type="button"
+              title={t('sb.shorter')}
+              disabled={(shots.find((s) => s.id === selectedId)?.duration || 0) <= 2}
+              onClick={() => nudge(-0.5)}
+            >
+              −0.5s
+            </button>
+            <button
+              type="button"
+              title={t('sb.longer')}
+              disabled={(shots.find((s) => s.id === selectedId)?.duration || 0) >= 10}
+              onClick={() => nudge(0.5)}
+            >
+              +0.5s
+            </button>
+          </span>
+        )}
         <span className="nle-timecode">{elapsed.toFixed(1).padStart(4, '0')} / {total.toFixed(1).padStart(4, '0')}s</span>
       </div>
 
