@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.9.2 — 2026-07-11
+
+- Stage 5 image prompts now describe the shot's INITIAL state (second zero,
+  before the planned action starts to unfold) instead of drifting toward the
+  action's midpoint: the generation instruction gets an explicit FIRST FRAME
+  TIMING rule with a worked example, and uses the previous shot's end state
+  as a cue for the opening state.
+
 ## 1.9.1 — 2026-07-11
 
 - Stage 4 timeline clips are now editable: drag a clip's right edge to trim or
