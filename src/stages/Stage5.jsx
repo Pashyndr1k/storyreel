@@ -7,6 +7,16 @@ import { useI18n } from '../lib/i18n.js';
 import { aspectDescription } from '../lib/aspect.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import { Download, RestoreIcon, MapPin } from '../components/icons.jsx';
+
+// Small white icon on a round semi-transparent black chip, overlaid on images.
+function IconAction({ title, disabled, onClick, children }) {
+  return (
+    <button type="button" className="img-icon-btn" title={title} aria-label={title} disabled={disabled} onClick={onClick}>
+      {children}
+    </button>
+  );
+}
 
 function CopyButton({ text }) {
   const { t } = useI18n();
@@ -27,7 +37,7 @@ function CopyButton({ text }) {
   );
 }
 
-export default function Stage5({ project, update, settings, onSettings, genLang, imageStyle, videoStyle }) {
+export default function Stage5({ project, update, settings, onSettings, genLang, imageStyle, videoStyle, libUpsert }) {
   const { t } = useI18n();
   const [sceneId, setSceneId] = useState(project.outline[0]?.id || null);
   const [prog, setProg] = useState(null);
@@ -35,6 +45,7 @@ export default function Stage5({ project, update, settings, onSettings, genLang,
   const [imgBusy, setImgBusy] = useState(null); // shotId being generated
   const [imgErr, setImgErr] = useState(null); // { id, msg }
   const [refineText, setRefineText] = useState({}); // shotId -> instruction draft
+  const [locSaved, setLocSaved] = useState(null); // shotId whose location ref was just saved
   const { busy, error, runMany, runBatch } = useGenerate(settings);
 
   const scene = project.outline.find((s) => s.id === sceneId) || project.outline[0];
@@ -231,6 +242,48 @@ export default function Stage5({ project, update, settings, onSettings, genLang,
     }
   };
 
+  // Turn the shot's first frame into a clean location reference: Gemini removes
+  // every character and extends the frame outward on all sides (same aspect
+  // ratio) to reveal more of the space. The result joins the scene's location
+  // reference photos (newest kept, max 3) and the global location library.
+  const makeLocationRef = async (shot) => {
+    const first = (project.shotImages || {})[shot.id];
+    if (!first) return;
+    if (!settings.geminiKey) return setImgErr({ id: shot.id, msg: 'NO_GEMINI_KEY' });
+    const ratio = project.aspectRatio || '16:9';
+    const prompt = `Edit the attached image into a clean LOCATION REFERENCE plate. Remove ALL people, characters, animals and creatures from the frame, realistically reconstructing the environment behind them. Keep the location itself — architecture, interior/exterior details, furniture, props, colors, lighting, atmosphere and visual style — exactly as in the original. At the same time, zoom out: extend the frame boundaries in ALL directions (top, bottom, left and right) to reveal a bit more of the surrounding space beyond the original edges, seamlessly and plausibly continuing the environment, while keeping the exact same ${ratio} aspect ratio and camera perspective. No people, no text, no watermarks.`;
+    setImgBusy(`${shot.id}:loc`);
+    setImgErr(null);
+    setLocSaved(null);
+    try {
+      const img = await generateImage(settings, { prompt, images: [first], aspectRatio: ratio, imageSize: '2K' });
+      update((p) => ({
+        outline: p.outline.map((s) =>
+          s.id === scene.id ? { ...s, photos: [...(s.photos || []), img].slice(-3) } : s
+        ),
+      }));
+      // Keep the global location library entry (shared with Stage 4) in sync.
+      if (libUpsert) {
+        libUpsert({
+          id: `libl_${project.id}_${scene.id}`,
+          kind: 'location',
+          name: scene.title || '',
+          type: 'other',
+          description: scene.summary || '',
+          photos: [...(scene.photos || []), img].slice(-3),
+          projectId: project.id,
+          projectTitle: project.title,
+          createdAt: Date.now(),
+        });
+      }
+      setLocSaved(shot.id);
+    } catch (e) {
+      setImgErr({ id: shot.id, msg: e.message || String(e) });
+    } finally {
+      setImgBusy(null);
+    }
+  };
+
   const downloadImage = (shot, i, final) => {
     const img = final ? (project.shotFinalImages || {})[shot.id] : project.shotImages[shot.id];
     if (!img) return;
@@ -293,6 +346,8 @@ export default function Stage5({ project, update, settings, onSettings, genLang,
           const genImg = (project.shotImages || {})[shot.id];
           const finalImg = (project.shotFinalImages || {})[shot.id];
           const finalBusy = imgBusy === `${shot.id}:final`;
+          const locBusy = imgBusy === `${shot.id}:loc`;
+          const anyBusy = imgBusy === shot.id || finalBusy || locBusy;
           return (
             <div key={shot.id} className="shot-card">
               <div className="shot-head">
@@ -314,13 +369,16 @@ export default function Stage5({ project, update, settings, onSettings, genLang,
                 />
 
                 <div className="img-gen">
-                  <button
-                    className="btn small primary"
-                    disabled={imgBusy === shot.id || !p.imagePrompt}
-                    onClick={() => genImage(shot)}
-                  >
-                    {imgBusy === shot.id ? t('img.generating') : genImg ? t('img.regenerate') : t('img.generate')}
-                  </button>
+                  {!genImg && (
+                    <button
+                      className="btn small primary"
+                      disabled={imgBusy === shot.id || !p.imagePrompt}
+                      onClick={() => genImage(shot)}
+                    >
+                      {imgBusy === shot.id ? t('img.generating') : t('img.generate')}
+                    </button>
+                  )}
+                  {genImg && anyBusy && <span className="hint">{t('img.generating')}</span>}
                   <button
                     type="button"
                     className={`check-toggle ${pref.char ? 'on' : ''}`}
@@ -355,34 +413,62 @@ export default function Stage5({ project, update, settings, onSettings, genLang,
 
                 {genImg && (
                   <div className="gen-image">
-                    {finalImg ? (
-                      <div className="frame-pair">
-                        <figure>
+                    {(() => {
+                      const firstActions = (
+                        <div className="img-actions">
+                          <IconAction
+                            title={t('img.regenerate')}
+                            disabled={anyBusy || !p.imagePrompt}
+                            onClick={() => genImage(shot)}
+                          >
+                            <RestoreIcon size={14} />
+                          </IconAction>
+                          <IconAction title={t('img.download')} onClick={() => downloadImage(shot, i)}>
+                            <Download size={14} />
+                          </IconAction>
+                          <IconAction title={t('img.locRef')} disabled={anyBusy} onClick={() => makeLocationRef(shot)}>
+                            <MapPin size={14} />
+                          </IconAction>
+                        </div>
+                      );
+                      return finalImg ? (
+                        <div className="frame-pair">
+                          <figure>
+                            <div className="img-wrap">
+                              <img src={genImg} alt="" />
+                              {firstActions}
+                            </div>
+                            <figcaption>{t('img.first')}</figcaption>
+                          </figure>
+                          <figure>
+                            <div className="img-wrap">
+                              <img src={finalImg} alt="" />
+                              <div className="img-actions">
+                                <IconAction title={t('img.finalRegen')} disabled={anyBusy} onClick={() => genFinalFrame(shot)}>
+                                  <RestoreIcon size={14} />
+                                </IconAction>
+                                <IconAction title={t('img.downloadFinal')} onClick={() => downloadImage(shot, i, true)}>
+                                  <Download size={14} />
+                                </IconAction>
+                              </div>
+                            </div>
+                            <figcaption>{t('img.final')}</figcaption>
+                          </figure>
+                        </div>
+                      ) : (
+                        <div className="img-wrap">
                           <img src={genImg} alt="" />
-                          <figcaption>{t('img.first')}</figcaption>
-                        </figure>
-                        <figure>
-                          <img src={finalImg} alt="" />
-                          <figcaption>{t('img.final')}</figcaption>
-                        </figure>
-                      </div>
-                    ) : (
-                      <img src={genImg} alt="" />
-                    )}
+                          {firstActions}
+                        </div>
+                      );
+                    })()}
                     <div className="row">
-                      <button className="btn tiny" onClick={() => downloadImage(shot, i)}>{t('img.download')}</button>
-                      <button
-                        className="btn tiny"
-                        disabled={finalBusy || imgBusy === shot.id}
-                        onClick={() => genFinalFrame(shot)}
-                      >
-                        {finalBusy ? t('img.generating') : finalImg ? t('img.finalRegen') : t('img.finalCreate')}
-                      </button>
-                      {finalImg && (
-                        <button className="btn tiny" onClick={() => downloadImage(shot, i, true)}>
-                          {t('img.downloadFinal')}
+                      {!finalImg && (
+                        <button className="btn tiny" disabled={anyBusy} onClick={() => genFinalFrame(shot)}>
+                          {finalBusy ? t('img.generating') : t('img.finalCreate')}
                         </button>
                       )}
+                      {locSaved === shot.id && <span className="hint">{t('img.locSaved')}</span>}
                       {((project.shotImageHistory || {})[shot.id] || []).length > 0 && (
                         <span className="hint">{t('ver.label')}:</span>
                       )}

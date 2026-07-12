@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.9.4 — 2026-07-11
+
+- Stage 5: a shot's first frame can now become a location reference — a map-pin
+  icon on the image asks Gemini to remove all characters (reconstructing the
+  environment behind them) and extend the frame boundaries in every direction
+  at the same aspect ratio to reveal more of the space. The result is saved to
+  the scene's location reference photos (max 3, newest kept) and the global
+  location library, ready to feed image generation via the existing toggle.
+- Stage 5 declutter: Download and Regenerate for the first and final frames
+  are now small white icons on round semi-transparent black chips in the
+  top-right corner of the image they belong to; the text buttons are gone
+  (the "Generate image" / "Create Final Frame" buttons remain only until
+  their image exists).
+- The Copy label above prompt fields sits a few pixels higher, no longer
+  touching the text area's edge.
+
 ## 1.9.3 — 2026-07-11
 
 - Stage 4 timeline: shot durations can now be shortened, not just extended.
