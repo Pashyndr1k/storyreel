@@ -10,6 +10,7 @@ import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import VoiceButton from '../components/VoiceButton.jsx';
 import LibraryPicker from '../components/LibraryPicker.jsx';
+import { RestoreIcon } from '../components/icons.jsx';
 
 export default function Stage2({ project, update, settings, goNext, onSettings, genLang, scriptStyle, imageStyle, library, libUpsert }) {
   const [pickFor, setPickFor] = useState(null); // character id awaiting a library pick
@@ -200,13 +201,29 @@ export default function Stage2({ project, update, settings, goNext, onSettings, 
                 ) : (
                   <div className="cover-placeholder">{coverBusy ? '…' : '16:9'}</div>
                 )}
+                {project.cover && (
+                  <div className="img-actions">
+                    <button
+                      type="button"
+                      className="img-icon-btn"
+                      title={t('cover.regenerate')}
+                      aria-label={t('cover.regenerate')}
+                      disabled={coverBusy}
+                      onClick={genCover}
+                    >
+                      <RestoreIcon size={14} />
+                    </button>
+                  </div>
+                )}
                 {coverBusy && <div className="cover-loading">{t('cover.generating')}</div>}
               </div>
               <div className="cover-side">
                 <p className="hint">{t('cover.auto')}</p>
-                <button className="btn small" disabled={coverBusy} onClick={genCover}>
-                  {coverBusy ? t('cover.generating') : project.cover ? t('cover.regenerate') : t('cover.generate')}
-                </button>
+                {!project.cover && (
+                  <button className="btn small" disabled={coverBusy} onClick={genCover}>
+                    {coverBusy ? t('cover.generating') : t('cover.generate')}
+                  </button>
+                )}
                 {coverErrNode()}
               </div>
             </div>
