@@ -14,6 +14,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
   const [theme, setTheme] = useState(settings.theme || 'dark');
   const [geminiKey, setGeminiKey] = useState(settings.geminiKey || '');
   const [geminiModel, setGeminiModel] = useState(settings.geminiModel || 'gemini-3-pro-image-preview');
+  const [textService, setTextService] = useState(settings.textService || 'claude');
   const [storyboardService, setStoryboardService] = useState(settings.storyboardService || 'gemini');
   const [videoService, setVideoService] = useState(settings.videoService || 'comfy');
   const [comfyUrl, setComfyUrl] = useState(settings.comfyUrl || 'http://127.0.0.1:8000');
@@ -144,6 +145,11 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
         )}
 
         <h3 className="settings-section">{t('set.services')}</h3>
+        <label>{t('set.textService')}</label>
+        <select value={textService} onChange={(e) => setTextService(e.target.value)}>
+          <option value="claude">{t('set.svcClaude')}</option>
+          <option value="gemini">{t('set.svcGeminiText')}</option>
+        </select>
         <label>{t('set.storyboardService')}</label>
         <select value={storyboardService} onChange={(e) => setStoryboardService(e.target.value)}>
           <option value="gemini">{t('set.svcGemini')}</option>
@@ -190,6 +196,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
                 theme,
                 geminiKey: geminiKey.trim(),
                 geminiModel: geminiModel.trim() || 'gemini-3-pro-image-preview',
+                textService,
                 storyboardService,
                 videoService,
                 comfyUrl: comfyUrl.trim() || 'http://127.0.0.1:8000',

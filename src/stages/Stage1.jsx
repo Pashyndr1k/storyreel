@@ -46,6 +46,8 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
         <VoiceButton
           settings={settings}
           onText={(text) => update({ logline: project.logline ? `${project.logline} ${text}` : text })}
+          getText={() => project.logline}
+          onReplace={(text) => update({ logline: text })}
         />
       </div>
 
@@ -97,6 +99,8 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
           onText={(text) =>
             update({ approvedPlot: project.approvedPlot ? `${project.approvedPlot} ${text}` : text, selectedIdeaId: null })
           }
+          getText={() => project.approvedPlot}
+          onReplace={(text) => update({ approvedPlot: text, selectedIdeaId: null })}
         />
       </div>
       <div className="row">

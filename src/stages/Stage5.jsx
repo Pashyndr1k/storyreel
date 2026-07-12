@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage } from '../lib/gemini.js';
-import { generateJSON } from '../lib/claude.js';
+import { generateJSON, textKeyError } from '../lib/claude.js';
 import { generateComfyVideo, saveToLocalOutputs } from '../lib/comfy.js';
 import { stage5Prompt, stage5VideoPrompt, finalFramePrompt } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
@@ -209,7 +209,8 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const genFinalFrame = async (shot) => {
     const first = (project.shotImages || {})[shot.id];
     if (!first) return;
-    if (!settings.apiKey) return setImgErr({ id: shot.id, msg: 'NO_KEY' });
+    const keyErr = textKeyError(settings);
+    if (keyErr) return setImgErr({ id: shot.id, msg: keyErr });
     if (!settings.geminiKey) return setImgErr({ id: shot.id, msg: 'NO_GEMINI_KEY' });
     const sceneArg = { ...scene, number: project.outline.indexOf(scene) + 1 };
     setImgBusy(`${shot.id}:final`);

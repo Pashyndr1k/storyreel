@@ -626,6 +626,24 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 .photo-thumb { position: relative; width: 64px; height: 64px; border-radius: 10px; overflow: hidden; border: 1px solid var(--glass-border); flex-shrink: 0; }
 .photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .photo-x { position: absolute; top: 2px; right: 2px; background: rgba(0, 0, 0, 0.65); color: #fff; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; cursor: pointer; line-height: 1; padding: 0; }
+/* square add-photo buttons sized like the photo thumbs */
+.photo-add {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1.5px dashed rgba(139, 92, 246, 0.45);
+  background: rgba(139, 92, 246, 0.07);
+  color: var(--violet-text, #c3b6ef);
+  cursor: pointer;
+  margin: 0;
+  padding: 0;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.photo-add:hover { border-color: #7c5cff; background: rgba(139, 92, 246, 0.16); }
 
 /* cover generation (Stage 2) */
 .cover-block { margin: 14px 0 6px; }
@@ -918,7 +936,19 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 /* voice input */
 .voice-row { display: flex; gap: 8px; align-items: flex-start; }
 .voice-row .auto-ta { flex: 1; }
+.voice-col { display: flex; flex-direction: column; gap: 6px; flex: none; }
 .voice-btn { flex: none; }
+/* "refine text" — small square button, white wand icon, under the mic */
+.groom-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(124, 92, 255, 0.28);
+  border: 1px solid rgba(139, 92, 246, 0.45);
+  color: #fff;
+}
+.groom-btn:hover:not(:disabled) { background: rgba(124, 92, 255, 0.45); border-color: #7c5cff; color: #fff; }
+.groom-btn:disabled { opacity: 0.5; }
 .voice-btn.rec {
   background: rgba(255, 107, 138, 0.16);
   border-color: var(--danger);

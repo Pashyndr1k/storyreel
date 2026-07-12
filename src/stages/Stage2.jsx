@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
-import { generateJSON } from '../lib/claude.js';
+import { generateJSON, textKeyError } from '../lib/claude.js';
 import { generateCoverImage } from '../lib/gemini.js';
 import { stage2Prompt, extractCharacterPrompt, coverPromptSpec } from '../lib/prompts.js';
 import { uid } from '../lib/storage.js';
@@ -11,7 +11,7 @@ import AutoTextarea from '../components/AutoTextarea.jsx';
 import VoiceButton from '../components/VoiceButton.jsx';
 import LibraryPicker from '../components/LibraryPicker.jsx';
 import { StylePicker } from '../components/StyleControls.jsx';
-import { RestoreIcon } from '../components/icons.jsx';
+import { RestoreIcon, Upload, Layers } from '../components/icons.jsx';
 
 export default function Stage2({ project, update, rawUpdate, settings, goNext, onSettings, genLang, styles, scriptStyle, imageStyle, library, libUpsert }) {
   const [pickFor, setPickFor] = useState(null); // character id awaiting a library pick
@@ -45,7 +45,8 @@ export default function Stage2({ project, update, rawUpdate, settings, goNext, o
 
   // Cover = Claude picks the key visual from the synopsis, Gemini renders it.
   const genCover = async () => {
-    if (!settings.apiKey) return setCoverErr('NO_KEY');
+    const keyErr = textKeyError(settings);
+    if (keyErr) return setCoverErr(keyErr);
     if (!settings.geminiKey) return setCoverErr('NO_GEMINI_KEY');
     if (!project.storyline?.synopsis?.trim()) return;
     setCoverBusy(true);
@@ -237,6 +238,8 @@ export default function Stage2({ project, update, rawUpdate, settings, goNext, o
             <VoiceButton
               settings={settings}
               onText={(text) => setSynopsis(storyline.synopsis ? `${storyline.synopsis} ${text}` : text)}
+              getText={() => storyline.synopsis}
+              onReplace={setSynopsis}
             />
           </div>
 
@@ -277,8 +280,8 @@ export default function Stage2({ project, update, rawUpdate, settings, goNext, o
                 ))}
                 {(c.photos || []).length < 3 && (
                   <>
-                    <label className="btn small file-btn">
-                      {t('pick.upload')}
+                    <label className="photo-add" title={t('pick.upload')} aria-label={t('pick.upload')}>
+                      <Upload size={20} />
                       <input
                         type="file"
                         accept="image/*"
@@ -290,8 +293,14 @@ export default function Stage2({ project, update, rawUpdate, settings, goNext, o
                         }}
                       />
                     </label>
-                    <button className="btn small" onClick={() => setPickFor(c.id)}>
-                      {t('pick.fromLib')}
+                    <button
+                      type="button"
+                      className="photo-add"
+                      title={t('pick.fromLib')}
+                      aria-label={t('pick.fromLib')}
+                      onClick={() => setPickFor(c.id)}
+                    >
+                      <Layers size={20} />
                     </button>
                   </>
                 )}

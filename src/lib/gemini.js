@@ -246,6 +246,148 @@ export async function transcribeAudio(settings, blob, _retried) {
   return text;
 }
 
+// Clean up dictated text: strip fillers, false starts and stray speech from
+// other people, fix grammar and structure. Same fast model as transcription.
+export async function groomText(settings, text, _retried) {
+  const key = settings.geminiKey;
+  if (!key) throw new Error('NO_GEMINI_KEY');
+  const model = await pickTranscribeModel(key);
+  const res = await fetch(`${ENDPOINT}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: `The text below was dictated by voice. Clean it up: remove filler words, false starts, duplicated words, and any unrelated speech accidentally captured from other people nearby; fix grammar, punctuation and sentence structure so it reads clearly. Keep the author's language, meaning, tone and every substantive detail. Return ONLY the cleaned text — no commentary, no labels, no quotes.\n\n"""\n${text}\n"""`,
+            },
+          ],
+        },
+      ],
+    }),
+  });
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const err = await res.json();
+      detail = err?.error?.message || detail;
+    } catch {
+      /* keep status */
+    }
+    if (!_retried && (res.status === 404 || /not found|not supported/i.test(detail))) {
+      transcribeModelCache = null;
+      return groomText(settings, text, true);
+    }
+    throw new Error(detail);
+  }
+  const out = await res.json();
+  return (out?.candidates?.[0]?.content?.parts || [])
+    .map((p) => p.text)
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+}
+
+// ---- Text generation (optional alternative to Claude) ----------------------
+// Discovered from the key's model list, preferring the strongest text models.
+const TEXTGEN_PREFERENCES = [
+  /^gemini-3.*pro(?!.*image)/,
+  /^gemini-3(?!.*image)(?!.*lite)/,
+  /^gemini-flash-latest$/,
+  /^gemini-2\.5-pro/,
+  /^gemini-2\.5-flash/,
+  /flash/,
+];
+let textGenModelCache = null;
+
+async function pickTextGenModel(key) {
+  if (textGenModelCache) return textGenModelCache;
+  const res = await fetch(`${ENDPOINT}?key=${encodeURIComponent(key)}&pageSize=1000`);
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const err = await res.json();
+      detail = err?.error?.message || detail;
+    } catch {
+      /* keep status */
+    }
+    throw new Error(detail);
+  }
+  const data = await res.json();
+  const names = (data.models || [])
+    .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
+    .map((m) => (m.name || '').replace(/^models\//, ''))
+    .filter((n) => n && !/image|imagen|embed|tts|veo|aqa|live|audio-dialog/i.test(n));
+  for (const re of TEXTGEN_PREFERENCES) {
+    const hit = names.find((n) => re.test(n));
+    if (hit) {
+      textGenModelCache = hit;
+      return hit;
+    }
+  }
+  if (names.length) {
+    textGenModelCache = names[0];
+    return names[0];
+  }
+  throw new Error('No Gemini text model available on this API key.');
+}
+
+// Anthropic-style content (plain string or [{type:'text'|'image'}]) → parts.
+function toGeminiParts(user) {
+  if (!Array.isArray(user)) return [{ text: String(user) }];
+  return user.map((b) =>
+    b.type === 'image'
+      ? { inline_data: { mime_type: b.source.media_type, data: b.source.data } }
+      : { text: b.text || '' }
+  );
+}
+
+// Runs the same {system, user, maxTokens} spec Claude uses; returns raw text
+// (the specs demand JSON-only output, enforced here via responseMimeType).
+export async function generateGeminiText(settings, { system, user, maxTokens = 4096 }, _retried) {
+  const key = settings.geminiKey;
+  if (!key) throw new Error('NO_GEMINI_KEY');
+  const model = await pickTextGenModel(key);
+  const res = await fetch(`${ENDPOINT}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: system || '' }] },
+      contents: [{ role: 'user', parts: toGeminiParts(user) }],
+      // Thinking models spend output tokens on reasoning — leave headroom.
+      generationConfig: { maxOutputTokens: maxTokens * 2, responseMimeType: 'application/json' },
+    }),
+  });
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const err = await res.json();
+      detail = err?.error?.message || detail;
+    } catch {
+      /* keep status */
+    }
+    if (!_retried && (res.status === 404 || /not found|not supported/i.test(detail))) {
+      textGenModelCache = null;
+      return generateGeminiText(settings, { system, user, maxTokens }, true);
+    }
+    const err = new Error(detail);
+    err.status = res.status;
+    throw err;
+  }
+  const out = await res.json();
+  const text = (out?.candidates?.[0]?.content?.parts || [])
+    .map((p) => p.text)
+    .filter(Boolean)
+    .join('');
+  if (!text) {
+    const block = out?.promptFeedback?.blockReason;
+    throw new Error(block ? `Request was blocked by Gemini (${block}).` : 'Gemini returned no text.');
+  }
+  return text;
+}
+
 // Fetch the models available to this key, preferring image-capable ones.
 export async function listImageModels(settings) {
   const key = settings.geminiKey;

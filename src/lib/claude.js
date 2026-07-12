@@ -1,4 +1,5 @@
 import { withRetry } from './retry.js';
+import { generateGeminiText } from './gemini.js';
 
 export const MODELS = [
   { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 (recommended)' },
@@ -57,9 +58,23 @@ function extractJSON(text) {
   }
 }
 
+// Which key the selected text service needs; returns the error code the UI
+// already knows ('NO_KEY' / 'NO_GEMINI_KEY') or null when the key is present.
+export function textKeyError(settings) {
+  if ((settings.textService || 'claude') === 'gemini') {
+    return settings.geminiKey ? null : 'NO_GEMINI_KEY';
+  }
+  return settings.apiKey ? null : 'NO_KEY';
+}
+
+// All script/prompt generation funnels through here; the text service setting
+// picks the engine (Claude by default, Gemini as the alternative).
 export async function generateJSON(settings, spec) {
   return withRetry(async () => {
-    const text = await callClaude(settings, spec);
+    const text =
+      (settings.textService || 'claude') === 'gemini'
+        ? await generateGeminiText(settings, spec)
+        : await callClaude(settings, spec);
     return extractJSON(text);
   });
 }

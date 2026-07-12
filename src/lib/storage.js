@@ -123,6 +123,7 @@ export function loadSettings() {
     theme: 'dark',
     geminiKey: '',
     geminiModel: 'gemini-3-pro-image-preview',
+    textService: 'claude', // 'claude' | 'gemini' — plots, scripts and prompts
     storyboardService: 'gemini', // 'gemini' | 'comfy' — Stage-4 storyboard frames
     videoService: 'comfy', // shot video generation (only ComfyUI for now)
     comfyUrl: 'http://127.0.0.1:8000',

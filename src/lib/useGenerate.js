@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { generateJSON } from './claude.js';
+import { generateJSON, textKeyError } from './claude.js';
 
 export function useGenerate(settings) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   const run = async (spec, onResult) => {
-    if (!settings.apiKey) {
-      setError('NO_KEY');
+    const keyErr = textKeyError(settings);
+    if (keyErr) {
+      setError(keyErr);
       return;
     }
     setBusy(true);
@@ -26,8 +27,9 @@ export function useGenerate(settings) {
   // image-prompt call followed by its video-prompt call). Results apply as they
   // arrive so a failure mid-way keeps the earlier results.
   const runMany = async (specs, onResult) => {
-    if (!settings.apiKey) {
-      setError('NO_KEY');
+    const keyErr = textKeyError(settings);
+    if (keyErr) {
+      setError(keyErr);
       return;
     }
     setBusy(true);
@@ -50,8 +52,9 @@ export function useGenerate(settings) {
   // makeSpec may return a single spec or an array of specs; an array runs
   // sequentially for that item (onEach fires per result, progress once per item).
   const runBatch = async (items, makeSpec, onEach, onProgress, concurrency = 3) => {
-    if (!settings.apiKey) {
-      setError('NO_KEY');
+    const keyErr = textKeyError(settings);
+    if (keyErr) {
+      setError(keyErr);
       return;
     }
     setBusy(true);

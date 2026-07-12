@@ -52,6 +52,8 @@ export default function NewProjectModal({ onCreate, onClose, settings }) {
           <VoiceButton
             settings={settings}
             onText={(text) => setLogline((v) => (v ? `${v} ${text}` : text))}
+            getText={() => logline}
+            onReplace={setLogline}
           />
         </div>
         <div className="modal-actions">

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { generateJSON } from '../lib/claude.js';
+import { generateJSON, textKeyError } from '../lib/claude.js';
 import { smartEditPrompt } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
 import AutoTextarea from './AutoTextarea.jsx';
@@ -100,8 +100,9 @@ export default function SmartEditModal({ project, update, settings, genLang, onC
   const [result, setResult] = useState(null); // number of updated fields
 
   const apply = async () => {
-    if (!settings.apiKey) {
-      setError('NO_KEY');
+    const keyErr = textKeyError(settings);
+    if (keyErr) {
+      setError(keyErr);
       return;
     }
     setBusy(true);
@@ -136,12 +137,15 @@ export default function SmartEditModal({ project, update, settings, genLang, onC
           <VoiceButton
             settings={settings}
             onText={(text) => setInstruction((v) => (v ? `${v} ${text}` : text))}
+            getText={() => instruction}
+            onReplace={setInstruction}
           />
         </div>
 
-        {error === 'NO_KEY' ? (
+        {error === 'NO_KEY' || error === 'NO_GEMINI_KEY' ? (
           <div className="note warn">
-            {t('err.noKey')} <button className="btn small" onClick={onSettings}>{t('err.openSettings')}</button>
+            {t(error === 'NO_GEMINI_KEY' ? 'err.noGeminiKey' : 'err.noKey')}{' '}
+            <button className="btn small" onClick={onSettings}>{t('err.openSettings')}</button>
           </div>
         ) : error ? (
           <div className="note error">{t('err.failed')} {error}</div>

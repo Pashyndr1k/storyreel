@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.11.0 — 2026-07-12
+
+- "Refine text" button below every voice-input mic (plot, approved plot,
+  synopsis, new project, smart edit): Gemini cleans the dictated text —
+  removes filler words, false starts and speech accidentally captured from
+  other people nearby, and fixes grammar and structure, keeping the language
+  and meaning.
+- Stage 2 character cards: "+ Upload photo" and "From library" are now square
+  64px icon buttons matching the photo frames.
+- Text generation service switcher: plots, scripts and prompts can run on
+  Google Gemini instead of Claude (Settings → Generation services). The best
+  text model is discovered automatically from your key; all key checks and
+  error messages follow the selected service.
+
 ## 1.10.2 — 2026-07-12
 
 - Styles are now visible throughout the pipeline: Stage 2 gets script/image/
