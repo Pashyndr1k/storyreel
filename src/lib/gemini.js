@@ -301,9 +301,12 @@ const TEXTGEN_PREFERENCES = [
   /flash/,
 ];
 let textGenModelCache = null;
+// Models this key's plan can't actually use (free tier reports limit: 0 for
+// paid-only models like gemini-*-pro). Skipped so we fall back to Flash.
+const textGenBlocked = new Set();
 
 async function pickTextGenModel(key) {
-  if (textGenModelCache) return textGenModelCache;
+  if (textGenModelCache && !textGenBlocked.has(textGenModelCache)) return textGenModelCache;
   const res = await fetch(`${ENDPOINT}?key=${encodeURIComponent(key)}&pageSize=1000`);
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
@@ -319,7 +322,7 @@ async function pickTextGenModel(key) {
   const names = (data.models || [])
     .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
     .map((m) => (m.name || '').replace(/^models\//, ''))
-    .filter((n) => n && !/image|imagen|embed|tts|veo|aqa|live|audio-dialog/i.test(n));
+    .filter((n) => n && !/image|imagen|embed|tts|veo|aqa|live|audio-dialog/i.test(n) && !textGenBlocked.has(n));
   for (const re of TEXTGEN_PREFERENCES) {
     const hit = names.find((n) => re.test(n));
     if (hit) {
@@ -331,7 +334,19 @@ async function pickTextGenModel(key) {
     textGenModelCache = names[0];
     return names[0];
   }
-  throw new Error('No Gemini text model available on this API key.');
+  throw new Error(
+    textGenBlocked.size
+      ? 'This Gemini key has no text model with available quota — the free tier does not cover the Pro models. Enable billing in Google AI Studio or switch the text service back to Claude in Settings.'
+      : 'No Gemini text model available on this API key.'
+  );
+}
+
+// A quota/plan error where THIS model isn't usable on the key's plan at all:
+// the free tier returns 429 with "limit: 0". Must stay narrow — a temporary
+// rate limit (limit: N>0) also mentions "free_tier" but should be retried on
+// the SAME model by withRetry, not cause a permanent fallback.
+function isPlanUnavailable(status, detail) {
+  return status === 429 && /\blimit:\s*0\b/i.test(detail || '');
 }
 
 // Anthropic-style content (plain string or [{type:'text'|'image'}]) → parts.
@@ -346,7 +361,7 @@ function toGeminiParts(user) {
 
 // Runs the same {system, user, maxTokens} spec Claude uses; returns raw text
 // (the specs demand JSON-only output, enforced here via responseMimeType).
-export async function generateGeminiText(settings, { system, user, maxTokens = 4096 }, _retried) {
+export async function generateGeminiText(settings, { system, user, maxTokens = 4096 }, _attempt = 0) {
   const key = settings.geminiKey;
   if (!key) throw new Error('NO_GEMINI_KEY');
   const model = await pickTextGenModel(key);
@@ -368,9 +383,16 @@ export async function generateGeminiText(settings, { system, user, maxTokens = 4
     } catch {
       /* keep status */
     }
-    if (!_retried && (res.status === 404 || /not found|not supported/i.test(detail))) {
+    // This model isn't usable on the key's plan — blacklist it and try the
+    // next candidate (typically a Flash model with free-tier quota).
+    if (isPlanUnavailable(res.status, detail) && _attempt < 4) {
+      textGenBlocked.add(model);
       textGenModelCache = null;
-      return generateGeminiText(settings, { system, user, maxTokens }, true);
+      return generateGeminiText(settings, { system, user, maxTokens }, _attempt + 1);
+    }
+    if (_attempt < 4 && (res.status === 404 || /not found|not supported/i.test(detail))) {
+      textGenModelCache = null;
+      return generateGeminiText(settings, { system, user, maxTokens }, _attempt + 1);
     }
     const err = new Error(detail);
     err.status = res.status;

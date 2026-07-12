@@ -76,6 +76,15 @@ function createWindow() {
 // can talk to ComfyUI directly. Remote APIs (Anthropic/Gemini) are untouched.
 const LOOPBACK = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//i;
 app.whenReady().then(() => {
+  // Microphone (voice input): grant media once at the session level so each
+  // recording doesn't re-trigger an OS permission prompt. macOS still shows
+  // its own one-time system prompt, gated by NSMicrophoneUsageDescription.
+  const MEDIA = new Set(['media', 'microphone', 'audioCapture']);
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
+    callback(MEDIA.has(permission));
+  });
+  session.defaultSession.setPermissionCheckHandler((_wc, permission) => MEDIA.has(permission));
+
   session.defaultSession.webRequest.onBeforeSendHeaders((details, cb) => {
     const headers = details.requestHeaders;
     if (LOOPBACK.test(details.url)) {

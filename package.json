@@ -1,7 +1,7 @@
 {
   "name": "storyreel",
   "productName": "StoryReel",
-  "version": "1.11.0",
+  "version": "1.11.1",
   "private": true,
   "description": "AI assistant for writing short videos: from plot idea to per-shot image & video generation prompts.",
   "author": "StoryReel",
@@ -35,7 +35,10 @@
     "mac": {
       "target": [{ "target": "dmg", "arch": "universal" }],
       "category": "public.app-category.video",
-      "minimumSystemVersion": "11.0"
+      "minimumSystemVersion": "11.0",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "StoryReel uses the microphone to transcribe your spoken plot ideas and script edits."
+      }
     }
   }
 }

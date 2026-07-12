@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.11.1 — 2026-07-12
+
+- Fixed Gemini text generation failing with "quota exceeded / limit: 0" on
+  free-tier keys: the engine used a Pro model that the free tier doesn't
+  cover. It now detects a plan-unavailable model, skips it, and falls back to
+  a Flash model (which has free-tier quota) automatically — and gives a clear
+  message if no model on the key has quota.
+- Fixed endless microphone permission requests in the macOS/desktop app: the
+  Electron session now grants media permission once (with a proper macOS
+  microphone usage description), instead of re-prompting on every recording.
+
 ## 1.11.0 — 2026-07-12
 
 - "Refine text" button below every voice-input mic (plot, approved plot,
