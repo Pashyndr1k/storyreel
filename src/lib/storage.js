@@ -123,6 +123,10 @@ export function loadSettings() {
     theme: 'dark',
     geminiKey: '',
     geminiModel: 'gemini-3-pro-image-preview',
+    storyboardService: 'gemini', // 'gemini' | 'comfy' — Stage-4 storyboard frames
+    videoService: 'comfy', // shot video generation (only ComfyUI for now)
+    comfyUrl: 'http://127.0.0.1:8000',
+    comfyOutputDir: 'D:\\Claude work\\ComfyUI\\Output',
   };
   try {
     const s = { ...defaults, ...(JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}) };
@@ -166,6 +170,7 @@ function projectDefaults() {
     shotImages: {}, // shotId -> current generated image (data URL)
     shotImageHistory: {}, // shotId -> older versions, newest first (max 5)
     shotFinalImages: {}, // shotId -> generated FINAL frame (data URL), paired with shotImages
+    shotVideos: {}, // shotId -> generated shot video (data URL, ComfyUI LTX-2)
     storyboards: {}, // shotId -> low-res storyboard frame (data URL)
     logline: '',
     ideas: [],
@@ -217,6 +222,7 @@ export function migrateProject(raw) {
   p.shotImages = p.shotImages && typeof p.shotImages === 'object' ? p.shotImages : {};
   p.shotImageHistory = p.shotImageHistory && typeof p.shotImageHistory === 'object' ? p.shotImageHistory : {};
   p.shotFinalImages = p.shotFinalImages && typeof p.shotFinalImages === 'object' ? p.shotFinalImages : {};
+  p.shotVideos = p.shotVideos && typeof p.shotVideos === 'object' ? p.shotVideos : {};
   p.storyboards = p.storyboards && typeof p.storyboards === 'object' ? p.storyboards : {};
   p.shotPrompts = p.shotPrompts && typeof p.shotPrompts === 'object' ? p.shotPrompts : {};
 

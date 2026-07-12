@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage } from '../lib/gemini.js';
 import { generateJSON } from '../lib/claude.js';
+import { generateComfyVideo, saveToLocalOutputs } from '../lib/comfy.js';
 import { stage5Prompt, stage5VideoPrompt, finalFramePrompt } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
 import { aspectDescription } from '../lib/aspect.js';
@@ -37,7 +38,7 @@ function CopyButton({ text }) {
   );
 }
 
-export default function Stage5({ project, update, settings, onSettings, genLang, imageStyle, videoStyle, libUpsert }) {
+export default function Stage5({ project, update, settings, onSettings, genLang, imageStyle, videoStyle, libUpsert, goNext }) {
   const { t } = useI18n();
   const [sceneId, setSceneId] = useState(project.outline[0]?.id || null);
   const [prog, setProg] = useState(null);
@@ -296,6 +297,47 @@ export default function Stage5({ project, update, settings, onSettings, genLang,
     a.remove();
   };
 
+  const downloadVideo = (shot, i) => {
+    const vid = (project.shotVideos || {})[shot.id];
+    if (!vid) return;
+    const safe = (project.title || 'shot').replace(/[^\w\d]+/g, '-');
+    const a = document.createElement('a');
+    a.href = vid;
+    a.download = `${safe}-scene${project.outline.indexOf(scene) + 1}-shot${i + 1}.mp4`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
+  // Generate the shot video on the local ComfyUI: first frame + video prompt
+  // through LTX-2 image-to-video, or first + final frame through the
+  // first/last-frame workflow when a final frame exists. The result plays
+  // inline and a copy lands in the local outputs folder.
+  const genVideo = async (shot, i) => {
+    const first = (project.shotImages || {})[shot.id];
+    const vPrompt = (project.shotPrompts[shot.id]?.videoPrompt || '').trim();
+    if (!first || !vPrompt) return;
+    const last = (project.shotFinalImages || {})[shot.id] || null;
+    setImgBusy(`${shot.id}:vid`);
+    setImgErr(null);
+    try {
+      const { dataURL, filename } = await generateComfyVideo(settings, {
+        prompt: vPrompt,
+        firstFrame: first,
+        lastFrame: last,
+        durationSec: shot.duration,
+        aspectRatio: project.aspectRatio || '16:9',
+        name: `${(project.title || 'project').slice(0, 24)}_sc${project.outline.indexOf(scene) + 1}_shot${i + 1}`,
+      });
+      saveToLocalOutputs(settings, filename, dataURL); // best-effort local copy
+      update((p) => ({ shotVideos: { ...(p.shotVideos || {}), [shot.id]: dataURL } }));
+    } catch (e) {
+      setImgErr({ id: shot.id, msg: e.message === 'COMFY_UNREACHABLE' ? 'COMFY_UNREACHABLE' : e.message || String(e) });
+    } finally {
+      setImgBusy(null);
+    }
+  };
+
   if (!project.outline.length) {
     return (
       <section className="stage">
@@ -347,7 +389,9 @@ export default function Stage5({ project, update, settings, onSettings, genLang,
           const finalImg = (project.shotFinalImages || {})[shot.id];
           const finalBusy = imgBusy === `${shot.id}:final`;
           const locBusy = imgBusy === `${shot.id}:loc`;
-          const anyBusy = imgBusy === shot.id || finalBusy || locBusy;
+          const vidBusy = imgBusy === `${shot.id}:vid`;
+          const anyBusy = imgBusy === shot.id || finalBusy || locBusy || vidBusy;
+          const shotVid = (project.shotVideos || {})[shot.id];
           return (
             <div key={shot.id} className="shot-card">
               <div className="shot-head">
@@ -402,9 +446,15 @@ export default function Stage5({ project, update, settings, onSettings, genLang,
                 </div>
 
                 {imgErr?.id === shot.id &&
-                  (imgErr.msg === 'NO_GEMINI_KEY' || imgErr.msg === 'NO_KEY' ? (
+                  (imgErr.msg === 'NO_GEMINI_KEY' || imgErr.msg === 'NO_KEY' || imgErr.msg === 'COMFY_UNREACHABLE' ? (
                     <div className="note warn">
-                      {t(imgErr.msg === 'NO_KEY' ? 'err.noKey' : 'err.noGeminiKey')}{' '}
+                      {t(
+                        imgErr.msg === 'NO_KEY'
+                          ? 'err.noKey'
+                          : imgErr.msg === 'COMFY_UNREACHABLE'
+                            ? 'err.comfyDown'
+                            : 'err.noGeminiKey'
+                      )}{' '}
                       <button className="btn small" onClick={onSettings}>{t('err.openSettings')}</button>
                     </div>
                   ) : (
@@ -514,10 +564,55 @@ export default function Stage5({ project, update, settings, onSettings, genLang,
                   placeholder={t('s5.ph')}
                   onChange={(e) => setPrompt(shot.id, { videoPrompt: e.target.value })}
                 />
+
+                <div className="img-gen">
+                  {!shotVid && (
+                    <button
+                      className="btn small primary"
+                      disabled={anyBusy || !p.videoPrompt?.trim() || !genImg}
+                      onClick={() => genVideo(shot, i)}
+                    >
+                      {vidBusy ? t('vid.generating') : t('vid.generate')}
+                    </button>
+                  )}
+                  {shotVid && vidBusy && <span className="hint">{t('vid.generating')}</span>}
+                  {!genImg && <span className="hint">{t('vid.needFrame')}</span>}
+                  {genImg && (
+                    <span className="hint">{finalImg ? t('vid.modeFLF') : t('vid.modeI2V')}</span>
+                  )}
+                </div>
+
+                {shotVid && (
+                  <div className="gen-image">
+                    <div className="img-wrap vid-wrap">
+                      <video src={shotVid} controls preload="metadata" />
+                      <div className="img-actions">
+                        <IconAction
+                          title={t('vid.regenerate')}
+                          disabled={anyBusy}
+                          onClick={() => genVideo(shot, i)}
+                        >
+                          <RestoreIcon size={14} />
+                        </IconAction>
+                        <IconAction title={t('vid.download')} onClick={() => downloadVideo(shot, i)}>
+                          <Download size={14} />
+                        </IconAction>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           );
         })
+      )}
+
+      {shots.length > 0 && (
+        <footer className="stage-footer">
+          <button className="btn primary big" onClick={goNext}>
+            {t('s5.continue')}
+          </button>
+        </footer>
       )}
     </section>
   );

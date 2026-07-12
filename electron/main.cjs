@@ -1,5 +1,20 @@
-const { app, BrowserWindow, shell, ipcMain, safeStorage } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, safeStorage, session } = require('electron');
 const path = require('path');
+const fs = require('fs');
+
+// Write a generated ComfyUI result (video/image, base64) into a local folder
+// chosen in the app settings (default D:\Claude work\ComfyUI\Output).
+ipcMain.handle('save-output', async (_e, { dir, filename, base64 }) => {
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    const safe = String(filename).replace(/[\\/:*?"<>|]/g, '_');
+    const target = path.join(dir, safe);
+    fs.writeFileSync(target, Buffer.from(base64, 'base64'));
+    return { ok: true, path: target };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
 
 // safeStorage bridge: encrypt API keys at rest with the OS keychain/DPAPI.
 ipcMain.on('secure-available', (e) => {
@@ -50,7 +65,28 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(createWindow);
+// The local ComfyUI server rejects requests carrying a foreign Origin and
+// sends no CORS headers. For loopback requests only: strip the Origin on the
+// way out and inject permissive CORS headers on the way back, so the renderer
+// can talk to ComfyUI directly. Remote APIs (Anthropic/Gemini) are untouched.
+const LOOPBACK = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//i;
+app.whenReady().then(() => {
+  session.defaultSession.webRequest.onBeforeSendHeaders((details, cb) => {
+    const headers = details.requestHeaders;
+    if (LOOPBACK.test(details.url)) delete headers['Origin'];
+    cb({ requestHeaders: headers });
+  });
+  session.defaultSession.webRequest.onHeadersReceived((details, cb) => {
+    const headers = details.responseHeaders || {};
+    if (LOOPBACK.test(details.url)) {
+      headers['access-control-allow-origin'] = ['*'];
+      headers['access-control-allow-headers'] = ['*'];
+      headers['access-control-allow-methods'] = ['GET,POST,OPTIONS'];
+    }
+    cb({ responseHeaders: headers });
+  });
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();

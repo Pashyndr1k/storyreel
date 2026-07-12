@@ -1124,6 +1124,78 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
   box-shadow: 0 0 8px rgba(255, 84, 112, 0.7);
   pointer-events: none;
 }
+.nle-clip video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+
+/* ============ STAGE 5 — shot video player ============ */
+.vid-wrap { max-width: 480px; width: 100%; }
+.vid-wrap video { display: block; width: 100%; border-radius: 12px; border: 1px solid var(--glass-border); background: #000; }
+
+/* ============ STAGE 6 — final assembly ============ */
+.asm-preview {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  max-height: 420px;
+  margin: 0 auto 14px;
+  width: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #000;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.asm-preview img,
+.asm-preview video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
+.asm-blank {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #5a566e;
+  font-size: 14px;
+  font-weight: 700;
+  background: #000;
+}
+.asm-track { height: 96px; gap: 6px; }
+.asm-scene {
+  display: flex;
+  flex-direction: column;
+  flex-basis: 0;
+  min-width: 48px;
+  gap: 2px;
+}
+.asm-scene.drag-over { outline: 2px solid rgba(139, 92, 246, 0.7); outline-offset: 1px; border-radius: 4px; }
+.asm-scene-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 16px;
+  padding: 0 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #a89fd0;
+  background: rgba(124, 92, 255, 0.16);
+  border-radius: 3px;
+  cursor: grab;
+  user-select: none;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.asm-scene-label:active { cursor: grabbing; }
+.asm-scene-label span { overflow: hidden; text-overflow: ellipsis; }
+.asm-clips { display: flex; flex: 1; gap: 2px; min-height: 0; }
+
+/* ============ SETTINGS ============ */
+.settings-section {
+  margin: 18px 0 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--glass-border);
+  font-size: 14px;
+}
 .nle-playhead-cap {
   position: absolute;
   top: 0;

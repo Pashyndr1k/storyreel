@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.10.0 — 2026-07-12
+
+- Local video generation via ComfyUI (MCP ComfyUI setup): every Stage-5 shot
+  with a first frame and a video prompt gets a "Generate video" button. With
+  only a first frame it runs the LTX-2 image-to-video workflow (ltx_i2v);
+  when a final frame exists it runs the first+last-frame workflow (ltx_flf2v).
+  The result plays inline in a video player with the same regenerate/download
+  corner icons as images, and a copy is saved into the local outputs folder
+  (default D:\Claude work\ComfyUI\Output) in the desktop app.
+- Settings now have a "Generation services" section: choose the Stage-4
+  storyboard engine (Gemini lite or MCP ComfyUI Krea-2 Turbo) and the video
+  engine (MCP ComfyUI — the only option for now), plus the ComfyUI server URL
+  and the local outputs folder.
+- Stage-4 storyboards can render through the local Krea-2 Turbo workflow
+  (krea2_turbo_t2i); full-resolution copies land in the outputs folder.
+- New Stage 6 — Final Assembly: the film assembles automatically from the
+  planned shot timings. The preview player sits above an NLE timeline in the
+  Stage-4 design; each shot's clip shows its video (preferred), else its
+  first-frame image, else a placeholder. Scenes and shots reorder by drag &
+  drop, durations trim with the clip-edge drag or ±0.5s nudges (extra time
+  beyond a clip's video stays black — frames are never stretched), and
+  "Render & save video" records the assembly (with audio) into a .webm file
+  on your drive plus a copy in the outputs folder.
+- The Electron app bridges the local ComfyUI server (Origin handling) and
+  saves generated results to the outputs folder; the Vite dev server proxies
+  /comfy for browser development.
+
 ## 1.9.4 — 2026-07-11
 
 - Stage 5: a shot's first frame can now become a location reference — a map-pin

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { generateStoryboardImage } from '../lib/gemini.js';
+import { generateComfyStoryboard, saveToLocalOutputs } from '../lib/comfy.js';
+import { resizeDataURL } from '../lib/images.js';
 import { useI18n } from '../lib/i18n.js';
 import { Play, StopSq } from './icons.jsx';
 
@@ -121,8 +123,28 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
 
   const startOf = (idx) => shots.slice(0, idx).reduce((a, s) => a + (s.duration || 0), 0);
 
+  const useComfy = settings.storyboardService === 'comfy';
+
+  // One frame via the selected service: Gemini lite (default) or the local
+  // ComfyUI Krea-2 Turbo workflow. Comfy frames keep a full-res copy in the
+  // local outputs folder; the animatic strip stores the small version.
+  const genFrame = async (shot, idx) => {
+    const prompt = framePrompt(shot, scene);
+    const aspectRatio = project.aspectRatio || '16:9';
+    if (useComfy) {
+      const { dataURL, filename } = await generateComfyStoryboard(settings, {
+        prompt,
+        aspectRatio,
+        name: `${(project.title || 'project').slice(0, 24)}_sb_shot${idx + 1}`,
+      });
+      saveToLocalOutputs(settings, filename, dataURL); // best-effort local copy
+      return resizeDataURL(dataURL, 320 * 200, 0.72);
+    }
+    return generateStoryboardImage(settings, { prompt, aspectRatio });
+  };
+
   const generate = async () => {
-    if (!settings.geminiKey) {
+    if (!useComfy && !settings.geminiKey) {
       setErr('NO_GEMINI_KEY');
       return;
     }
@@ -141,10 +163,7 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
         const i = idx++;
         if (i >= targets.length) return;
         try {
-          const img = await generateStoryboardImage(settings, {
-            prompt: framePrompt(targets[i], scene),
-            aspectRatio: project.aspectRatio || '16:9',
-          });
+          const img = await genFrame(targets[i], shots.indexOf(targets[i]));
           onFrames({ [targets[i].id]: img });
         } catch (e) {
           setErr(e.message === 'NO_GEMINI_KEY' ? 'NO_GEMINI_KEY' : e.message || String(e));
@@ -153,7 +172,8 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
         setProg({ a: done, b: targets.length });
       }
     };
-    await Promise.all(Array.from({ length: Math.min(2, targets.length) }, worker));
+    // ComfyUI runs one job at a time on the local GPU; Gemini can take two.
+    await Promise.all(Array.from({ length: useComfy ? 1 : Math.min(2, targets.length) }, worker));
     setBusy(false);
     setProg(null);
   };

@@ -14,6 +14,10 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
   const [theme, setTheme] = useState(settings.theme || 'dark');
   const [geminiKey, setGeminiKey] = useState(settings.geminiKey || '');
   const [geminiModel, setGeminiModel] = useState(settings.geminiModel || 'gemini-3-pro-image-preview');
+  const [storyboardService, setStoryboardService] = useState(settings.storyboardService || 'gemini');
+  const [videoService, setVideoService] = useState(settings.videoService || 'comfy');
+  const [comfyUrl, setComfyUrl] = useState(settings.comfyUrl || 'http://127.0.0.1:8000');
+  const [comfyOutputDir, setComfyOutputDir] = useState(settings.comfyOutputDir || 'D:\\Claude work\\ComfyUI\\Output');
   const [modelList, setModelList] = useState(null);
   const [fetching, setFetching] = useState(false);
   const [fetchErr, setFetchErr] = useState('');
@@ -139,6 +143,30 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
           )
         )}
 
+        <h3 className="settings-section">{t('set.services')}</h3>
+        <label>{t('set.storyboardService')}</label>
+        <select value={storyboardService} onChange={(e) => setStoryboardService(e.target.value)}>
+          <option value="gemini">{t('set.svcGemini')}</option>
+          <option value="comfy">{t('set.svcComfySb')}</option>
+        </select>
+        <label>{t('set.videoService')}</label>
+        <select value={videoService} onChange={(e) => setVideoService(e.target.value)}>
+          <option value="comfy">{t('set.svcComfyVid')}</option>
+        </select>
+        <label>{t('set.comfyUrl')}</label>
+        <input
+          value={comfyUrl}
+          onChange={(e) => setComfyUrl(e.target.value)}
+          placeholder="http://127.0.0.1:8000"
+        />
+        <label>{t('set.comfyOutputDir')}</label>
+        <input
+          value={comfyOutputDir}
+          onChange={(e) => setComfyOutputDir(e.target.value)}
+          placeholder="D:\Claude work\ComfyUI\Output"
+        />
+        <p className="hint">{t('set.comfyHint')}</p>
+
         <div className="settings-io">
           <label>{t('set.backup')}</label>
           <div className="row">
@@ -162,6 +190,10 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
                 theme,
                 geminiKey: geminiKey.trim(),
                 geminiModel: geminiModel.trim() || 'gemini-3-pro-image-preview',
+                storyboardService,
+                videoService,
+                comfyUrl: comfyUrl.trim() || 'http://127.0.0.1:8000',
+                comfyOutputDir: comfyOutputDir.trim() || 'D:\\Claude work\\ComfyUI\\Output',
               });
               onClose();
             }}
