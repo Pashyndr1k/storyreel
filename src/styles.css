@@ -702,14 +702,14 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 /* Overlay icon actions on generated images: small white icons on round
    semi-transparent black chips, pinned to the image's top-right corner. */
 .img-wrap { position: relative; display: inline-block; max-width: 100%; }
-.img-actions { position: absolute; top: 6px; right: 6px; display: flex; gap: 6px; }
+.img-actions { position: absolute; top: 6px; right: 6px; display: flex; gap: 0; }
 .img-icon-btn {
   width: 28px;
   height: 28px;
   border-radius: 50%;
   border: none;
   padding: 0;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.3);
   color: #fff;
   display: flex;
   align-items: center;
