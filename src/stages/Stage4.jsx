@@ -9,6 +9,7 @@ import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import LibraryPicker from '../components/LibraryPicker.jsx';
 import StoryboardTimeline from '../components/StoryboardTimeline.jsx';
+import { StyleIndicator } from '../components/StyleControls.jsx';
 
 export function fmt(sec) {
   const m = Math.floor(sec / 60);
@@ -40,7 +41,7 @@ const mapShots = (rawShots) =>
     notes: s.notes || '',
   }));
 
-export default function Stage4({ project, update, settings, goNext, onSettings, genLang, scriptStyle, library, libUpsert }) {
+export default function Stage4({ project, update, settings, goNext, onSettings, onProjectSettings, genLang, styles, scriptStyle, library, libUpsert }) {
   const [pickLoc, setPickLoc] = useState(false);
   const { t } = useI18n();
   const [sceneId, setSceneId] = useState(project.outline[0]?.id || null);
@@ -158,6 +159,7 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
         {t('s4.desc')}{' '}
         <strong>{t('s4.progress', { a: doneCount, b: project.outline.length })}</strong>
       </p>
+      <StyleIndicator project={project} styles={styles} cats={['script']} onClick={onProjectSettings} />
 
       <div className="scene-chips">
         {project.outline.map((s, i) => (

@@ -8,6 +8,7 @@ import { useI18n } from '../lib/i18n.js';
 import { aspectDescription } from '../lib/aspect.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import { StyleIndicator } from '../components/StyleControls.jsx';
 import { Download, RestoreIcon, MapPin } from '../components/icons.jsx';
 
 // Small white icon on a round semi-transparent black chip, overlaid on images.
@@ -38,7 +39,7 @@ function CopyButton({ text }) {
   );
 }
 
-export default function Stage5({ project, update, settings, onSettings, genLang, imageStyle, videoStyle, libUpsert, goNext }) {
+export default function Stage5({ project, update, settings, onSettings, onProjectSettings, genLang, styles, imageStyle, videoStyle, libUpsert, goNext }) {
   const { t } = useI18n();
   const [sceneId, setSceneId] = useState(project.outline[0]?.id || null);
   const [prog, setProg] = useState(null);
@@ -351,6 +352,7 @@ export default function Stage5({ project, update, settings, onSettings, genLang,
     <section className="stage">
       <h2>{t('s5.title')}</h2>
       <p className="stage-desc">{t('s5.desc')}</p>
+      <StyleIndicator project={project} styles={styles} cats={['image', 'video']} onClick={onProjectSettings} />
 
       <div className="scene-chips">
         {project.outline.map((s, i) => {

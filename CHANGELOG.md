@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.10.2 — 2026-07-12
+
+- Styles are now visible throughout the pipeline: Stage 2 gets script/image/
+  video style selectors right next to the cover image (two-way linked with
+  the project settings), Stages 3 and 4 show a clickable "Script style" chip,
+  and Stage 5 shows "Image style" and "Video style" chips — clicking any chip
+  opens the project settings. Changing a style this way never triggers the
+  stale-stages warning, matching the settings modal.
+- Project cards on the main page now show all 6 stages in the progress ring
+  (was still counting to 5).
+- Stage stepper text is 20% smaller, giving the six-stage bar more room.
+
 ## 1.10.1 — 2026-07-12
 
 - Fixed "ComfyUI HTTP 403" during video/storyboard generation in the desktop

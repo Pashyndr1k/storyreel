@@ -56,10 +56,15 @@ export default function Project({ project, updateProject, settings, setSettings,
   const stageProps = {
     project,
     update: stageUpdate,
+    // Style selection is configuration, not content — changing it shouldn't
+    // trigger the "later stages are stale" toast, matching the settings modal.
+    rawUpdate: update,
     settings,
     goNext,
     onSettings,
+    onProjectSettings: () => setShowProjectSettings(true),
     genLang,
+    styles,
     scriptStyle,
     imageStyle,
     videoStyle,

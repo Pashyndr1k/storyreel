@@ -4,6 +4,7 @@ import { uid } from '../lib/storage.js';
 import { useI18n } from '../lib/i18n.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import { StyleIndicator } from '../components/StyleControls.jsx';
 import { Grip } from '../components/icons.jsx';
 import { useRef, useState } from 'react';
 
@@ -13,7 +14,7 @@ function fmt(sec) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export default function Stage3({ project, update, settings, goNext, onSettings, genLang, scriptStyle }) {
+export default function Stage3({ project, update, settings, goNext, onSettings, onProjectSettings, genLang, styles, scriptStyle }) {
   const { t } = useI18n();
   const { busy, error, run } = useGenerate(settings);
   const outline = project.outline;
@@ -67,6 +68,7 @@ export default function Stage3({ project, update, settings, goNext, onSettings, 
     <section className="stage">
       <h2>{t('s3.title')}</h2>
       <p className="stage-desc">{t('s3.desc')}</p>
+      <StyleIndicator project={project} styles={styles} cats={['script']} onClick={onProjectSettings} />
 
       <div className="row">
         <button className="btn primary" disabled={busy} onClick={generate}>

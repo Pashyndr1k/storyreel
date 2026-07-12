@@ -10,9 +10,10 @@ import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import VoiceButton from '../components/VoiceButton.jsx';
 import LibraryPicker from '../components/LibraryPicker.jsx';
+import { StylePicker } from '../components/StyleControls.jsx';
 import { RestoreIcon } from '../components/icons.jsx';
 
-export default function Stage2({ project, update, settings, goNext, onSettings, genLang, scriptStyle, imageStyle, library, libUpsert }) {
+export default function Stage2({ project, update, rawUpdate, settings, goNext, onSettings, genLang, styles, scriptStyle, imageStyle, library, libUpsert }) {
   const [pickFor, setPickFor] = useState(null); // character id awaiting a library pick
   const { t } = useI18n();
   const { busy, error, run } = useGenerate(settings);
@@ -218,6 +219,7 @@ export default function Stage2({ project, update, settings, goNext, onSettings, 
                 {coverBusy && <div className="cover-loading">{t('cover.generating')}</div>}
               </div>
               <div className="cover-side">
+                <StylePicker project={project} update={rawUpdate || update} styles={styles} />
                 <p className="hint">{t('cover.auto')}</p>
                 {!project.cover && (
                   <button className="btn small" disabled={coverBusy} onClick={genCover}>

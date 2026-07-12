@@ -667,6 +667,31 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 .cover-side { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
 .cover-side .hint { margin: 0; }
 
+/* compact style pickers (Stage 2, right of the cover) */
+.style-picks { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 420px; margin-bottom: 6px; }
+.style-pick { display: flex; align-items: center; gap: 10px; }
+.style-pick label { flex: none; width: 128px; margin: 0; font-size: 12.5px; color: var(--muted-2, #8b87a0); }
+.style-pick select { flex: 1; min-width: 0; }
+
+/* clickable "current style" chips (Stages 3–5) */
+.style-ind-row { display: flex; flex-wrap: wrap; gap: 8px; margin: -6px 0 14px; }
+.style-ind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 12.5px;
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.22);
+  color: var(--muted-2, #8b87a0);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.style-ind:hover { border-color: rgba(139, 92, 246, 0.55); background: rgba(139, 92, 246, 0.14); }
+.style-ind-name { font-weight: 600; color: var(--violet-text, #c3b6ef); }
+
 /* image generation (Stage 5) */
 .img-gen { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
 .check-toggle {
