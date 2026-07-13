@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.12.1 — 2026-07-12
+
+- Video Motion system instruction gains CRITICAL RULE 3 (Continuity & State
+  Tracking): each shot carries over the previous shot's momentum, velocity and
+  posture (the Inertia Law, "match on action" openings, no reset to a neutral
+  pose between cuts). Actor Kinetics now anchors shot openings with continuous
+  gerunds ("Continuing their brisk walk…"), and the example output demonstrates
+  a continuous action. Since all shots of a scene are written in one call, each
+  shot chains to the one above it; the scene's first shot derives its entry
+  momentum from its own action.
+
 ## 1.12.0 — 2026-07-12
 
 - Assets library: upload and reuse your own images — logos, props, wardrobe,

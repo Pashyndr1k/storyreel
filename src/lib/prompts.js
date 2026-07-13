@@ -205,18 +205,26 @@ export const DEFAULT_VIDEO_MOTION_STYLE =
   'Naturalistic cinematic motion: smooth, motivated camera movement (subtle push-ins, gentle pans, stable handheld only when the action calls for it), grounded physical acting with realistic weight and restrained gestures, conversational speech delivered at a natural pace, and organic pauses where the emotional beat requires them.';
 
 // Video Motion Prompt System Instruction (verbatim). {{VIDEO_STYLE_INJECTION}}
-// receives the selected video style's instructions, or DEFAULT_VIDEO_MOTION_STYLE.
+// receives the selected video style's instructions (or DEFAULT_VIDEO_MOTION_STYLE);
+// {{PREVIOUS_SHOT_MOMENTUM}} receives the continuity source description — all
+// shots of a scene are written in one call, so each shot chains to the one
+// directly above it in the list.
 const VIDEO_MOTION_SYSTEM = `You are an expert AI cinematic director translating a scene outline into precise image-to-video motion prompts.
 
 CRITICAL RULE 1 (STATIC AVOIDANCE): The video generation model will be provided with an exact starting frame. DO NOT describe any static visual elements. Never describe character appearances, wardrobe, lighting, or the background environment. Repeating static details causes the video model to morph, hallucinate, or lose character consistency.
 
 CRITICAL RULE 2 (DIRECTORIAL STYLE): You must strictly apply the following camera physics, actor kinetics, and speech dynamics to the scene: "{{VIDEO_STYLE_INJECTION}}". Use this to dictate the exact framerate, camera stability, physical acting style, and pause durations.
 
+CRITICAL RULE 3 (CONTINUITY & STATE TRACKING): This shot is part of a continuous, real-time scene. You must strictly maintain the physical momentum, velocity, and posture established in the previous shot: "{{PREVIOUS_SHOT_MOMENTUM}}".
+- The Inertia Law: If a character is walking, running, or falling in the previous shot, they MUST continue doing so in this shot unless the script explicitly dictates they stop.
+- "Match on Action": Start the new motion prompt by explicitly establishing the carried-over motion (e.g., "Continuing their brisk walk...", "Still sprinting...").
+- Do not let characters return to a "neutral standing pose" between cuts unless commanded.
+
 Your ONLY job is to describe how the static frame changes over time: camera trajectory, character motion, dialogue pacing, and sound.
 
 When writing the motion prompt, strictly follow these constraints:
 1. Camera Dynamics: Define the exact camera movement first, directly applying the camera behavior from the injected style.
-2. Actor Kinetics: Describe character movement, physical weight, and gestures strictly matching the acting style specified (e.g., naturalistic, theatrical, jerky, frenetic).
+2. Actor Kinetics: Describe character movement, physical weight, and gestures strictly matching the acting style specified (e.g., naturalistic, theatrical, jerky, frenetic). Anchor the start of the shot with the Continuity Vocabulary — continuous gerunds that carry over the established motion (e.g., "Walking into frame", "Continuing to turn", "Still holding the glass").
 3. Chronological Timing & Pauses: Map actions sequentially across the shot. You MUST apply the specific pause dynamics from the style injection (e.g., deadpan 2-second pauses, fast-paced zero pauses, lingering uncomfortable holds).
 4. Audio & Speech Delivery: Include spoken phrases and sound effects, formatting the dialogue delivery exactly as the style dictates (e.g., stumbling, projected, rapid-fire, breathless).
 
@@ -225,13 +233,23 @@ Output the prompt using the following strict syntax, ensuring it is highly conci
 [Camera Dynamics] + [Actor Kinetics & Chronological Action] + [Speech Delivery, Pauses & Audio]
 
 Example Output (assuming a 'Dramatic Film' style injection):
-"Smooth dolly track push-in, 24fps motion blur. Character shifts weight slowly, displaying restrained micro-expressions as they look down. At 0:02, they slowly raise their head. Lips sync in a measured, slow delivery: 'I never forgot,' followed by a heavy 4-second pregnant pause. Audio: low ambient room tone, faint rustle of fabric."`;
+"Smooth lateral dolly track keeping pace, 24fps motion blur. Continuing their brisk walk down the corridor, the character maintains a heavy, purposeful stride, jaw tight, never breaking pace. At 0:02, still walking, they glance sideways and deliver in a measured, low voice: 'I never forgot,' followed by a 2-second pause carried on unbroken footsteps. Audio: rhythmic footfalls on concrete, low ambient room tone."`;
+
+// All shots of a scene are written in one request, so the "previous shot" for
+// continuity is the preceding entry in the same list — the model chains its
+// own outputs. The first shot of the scene derives its entry momentum from its
+// own action description.
+const MOMENTUM_SOURCE =
+  "the ending motion state of the immediately preceding shot in the provided shot list, as established by that shot's action and your own previous video_prompt; for the FIRST shot of the scene, derive the entry momentum from its own action description (if the action implies the character is already moving, they enter the shot mid-motion)";
 
 export function stage5VideoPrompt(project, scene, shots, videoStyle) {
   const injection = (videoStyle || '').trim() || DEFAULT_VIDEO_MOTION_STYLE;
   return {
     system:
-      VIDEO_MOTION_SYSTEM.replace('{{VIDEO_STYLE_INJECTION}}', injection) +
+      VIDEO_MOTION_SYSTEM.replace('{{VIDEO_STYLE_INJECTION}}', injection).replace(
+        '{{PREVIOUS_SHOT_MOMENTUM}}',
+        MOMENTUM_SOURCE
+      ) +
       `\n\nResponse format:
 - Respond with VALID JSON ONLY. No markdown, no code fences, no commentary outside the JSON.
 - Every "video_prompt" must be written entirely in English; character names always in Latin letters.`,
@@ -241,7 +259,7 @@ export function stage5VideoPrompt(project, scene, shots, videoStyle) {
 Shots of this scene (each has an exact duration in seconds — map the motion, dialogue and pauses chronologically within it):
 ${JSON.stringify(stage5ShotList(shots), null, 2)}
 
-For EVERY shot above, write one "video_prompt" motion prompt following your system instruction. The starting frame of each shot already exists — describe only how it changes over the shot's duration.
+For EVERY shot above, write one "video_prompt" motion prompt following your system instruction. The starting frame of each shot already exists — describe only how it changes over the shot's duration. Write the prompts in order, carrying each shot's ending momentum into the next per CRITICAL RULE 3.
 
 JSON schema:
 {"prompts":[{"shot":1,"video_prompt":"..."}]}
