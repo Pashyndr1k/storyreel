@@ -161,6 +161,19 @@ function stage5ShotList(shots) {
   }));
 }
 
+// Continuity rules for the image-prompt writer, mirroring the Video Motion
+// instruction's CRITICAL RULE 3: consecutive first frames inside one scene must
+// chain — each frame freezes the momentum carried over from the previous
+// shot's end, never a reset to a neutral pose.
+const FRAME_CONTINUITY_SYSTEM = `
+
+FRAME CONTINUITY (STATE TRACKING): The shots of a scene form one continuous, real-time flow, and every first frame you describe seeds an image-to-video clip. Each shot's first frame must carry over the physical momentum, velocity and posture established at the END of the previous shot in the list:
+- The Inertia Law: if a character was walking, running, falling or mid-gesture at the end of the previous shot, this shot's first frame MUST catch them still in that motion — frozen mid-stride, mid-turn, mid-reach — never reset to a neutral standing pose between shots.
+- Match on action: place them as the direct continuation of the previous shot's end state — same position in space, same direction of travel, same posture, same held props.
+- Motion-freeze vocabulary: anchor the frozen instant with phrases like "frozen mid-stride", "caught mid-turn", "hand still raised", "coat still swinging from the turn".
+- Break the carried momentum ONLY when the shot's action explicitly stops it (they halt, sit down, or the moment jumps in time).
+- For the FIRST shot of the scene, derive the entry state from its own action: if the action implies arriving or moving, the character enters the frame already in motion.`;
+
 // Stage 5 runs as TWO separate calls per scene: image prompts (first frames,
 // full static detail) and video prompts (motion only, via the Video Motion
 // instruction below) — one call could never satisfy both rule sets at once.
@@ -173,7 +186,7 @@ export function stage5Prompt(project, scene, shots, lang, imageStyle) {
   const aspectNote = `\n\nASPECT RATIO — every "image_prompt" MUST explicitly state the framing as ${aspectDescription(ratio)} (${ratio}), and compose for that frame.`;
   const styleNote = img ? `\n\nVISUAL STYLE — bake this into EVERY "image_prompt": ${img}` : '';
   return {
-    system: system(lang),
+    system: system(lang) + FRAME_CONTINUITY_SYSTEM,
     maxTokens: 6000,
     user: withPhotos(scene.photos, `Title: ${project.title}
 Genres: ${project.genres.join(', ')}
@@ -188,7 +201,7 @@ ${JSON.stringify(stage5ShotList(shots), null, 2)}
 
 For EVERY shot above, write one "image_prompt" — a detailed English prompt for the Nano Banana image generation model to create the FIRST FRAME of the shot.
 
-FIRST FRAME TIMING — this is the most important rule. Each shot's "action" field describes everything that happens ACROSS the shot's full duration. The first frame is the state of the scene at second zero, BEFORE that action has started to unfold. Do NOT depict the midpoint, the climax or the result of the action. Freeze the INITIAL state: where each character is, their pose, gesture and expression at the instant the shot begins — at most the very first hint of the described movement. If the action ends somewhere else than it starts, show where it STARTS. Example: for the action "Anna crosses the room and picks up the phone", the first frame shows Anna at her starting position at the far side of the room, the phone still lying untouched — not Anna mid-stride and not Anna holding the phone. Use the previous shot's end state as a cue for what this shot's opening state naturally looks like.
+FIRST FRAME TIMING — this is the most important rule. Each shot's "action" field describes everything that happens ACROSS the shot's full duration. The first frame is the state of the scene at second zero, BEFORE that action has started to unfold. Do NOT depict the midpoint, the climax or the result of the action. Freeze the INITIAL state: where each character is, their pose, gesture and expression at the instant the shot begins. If the action ends somewhere else than it starts, show where it STARTS. Example: for the action "Anna crosses the room and picks up the phone", the first frame shows Anna at her starting position at the far side of the room, the phone still lying untouched — not Anna halfway across the room and not Anna holding the phone. That instant is still governed by your FRAME CONTINUITY rules: if the previous shot ended with Anna already walking, she is frozen mid-stride at that starting position, not standing neutrally.
 
 In each prompt describe: that initial-state subject staging, each visible character with their consistent physical details, the environment, lighting, camera angle and lens (e.g. 35mm, shallow depth of field), composition, and an overall cinematic style. Write it as one dense paragraph, no lists.
 

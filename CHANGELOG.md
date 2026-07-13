@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.12.2 — 2026-07-12
+
+- The image-prompt writer now carries motion across frames too: a FRAME
+  CONTINUITY (STATE TRACKING) block in its system instructions mirrors the
+  video writer's continuity rules — each shot's first frame freezes the
+  momentum carried from the previous shot's end (Inertia Law, match on
+  action, motion-freeze vocabulary like "frozen mid-stride"), never resetting
+  characters to a neutral pose between shots; the scene's first shot derives
+  its entry state from its own action. The FIRST FRAME TIMING example was
+  harmonized so "second zero" and carried momentum don't contradict.
+
 ## 1.12.1 — 2026-07-12
 
 - Video Motion system instruction gains CRITICAL RULE 3 (Continuity & State
