@@ -626,14 +626,23 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 .photo-thumb { position: relative; width: 64px; height: 64px; border-radius: 10px; overflow: hidden; border: 1px solid var(--glass-border); flex-shrink: 0; }
 .photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .photo-x { position: absolute; top: 2px; right: 2px; background: rgba(0, 0, 0, 0.65); color: #fff; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; cursor: pointer; line-height: 1; padding: 0; }
-/* square add-photo buttons sized like the photo thumbs */
+/* square add-photo buttons sized like the photo thumbs — hard-clamped so no
+   flex/stretch context or DPI rounding can deform them anywhere. */
 .photo-add {
   width: 64px;
   height: 64px;
-  flex-shrink: 0;
+  min-width: 64px;
+  max-width: 64px;
+  min-height: 64px;
+  max-height: 64px;
+  aspect-ratio: 1 / 1;
+  flex: 0 0 64px;
+  box-sizing: border-box;
+  align-self: flex-start;
   display: flex;
   align-items: center;
   justify-content: center;
+  line-height: 1;
   border-radius: 10px;
   border: 1.5px dashed rgba(139, 92, 246, 0.45);
   background: rgba(139, 92, 246, 0.07);
@@ -643,11 +652,15 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
   padding: 0;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
+.photo-add svg { flex: none; pointer-events: none; }
+.photo-row { align-items: flex-start; }
 .photo-add:hover { border-color: #7c5cff; background: rgba(139, 92, 246, 0.16); }
 
 /* ============ ASSETS ============ */
 .stage-head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .stage-head-row h2 { margin: 0; }
+.stage-head-row .style-ind-row { margin: 0; justify-content: flex-end; }
+.push-right { margin-left: auto; }
 .modal-head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .modal-head-row h2 { margin: 0; }
 .asset-grid {

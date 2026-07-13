@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.12.4 — 2026-07-13
+
+- The square upload / from-library photo buttons are hard-clamped to 64×64
+  (min/max + aspect-ratio + fixed flex basis) on every page — Stage 2
+  character cards, Stage 4 environment references, Stage 5 shot assets and
+  the assets manager — so no layout or display-scaling context can stretch
+  them.
+- Stage 5 header: the Image/Video style chips moved to the top right (level
+  with the stage title), and the "Assets library" button moved down into the
+  action row, right-aligned on the same line as "Prompts for all scenes".
+
 ## 1.12.3 — 2026-07-12
 
 - Stage 2: the Script / Image / Video style selectors sit in one horizontal

@@ -414,12 +414,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     <section className="stage">
       <div className="stage-head-row">
         <h2>{t('s5.title')}</h2>
-        <button className="btn small" onClick={() => setShowAssets(true)}>
-          <Grid size={15} /> {t('asset.libBtn')}
-        </button>
+        <StyleIndicator project={project} styles={styles} cats={['image', 'video']} onClick={onProjectSettings} />
       </div>
       <p className="stage-desc">{t('s5.desc')}</p>
-      <StyleIndicator project={project} styles={styles} cats={['image', 'video']} onClick={onProjectSettings} />
 
       <div className="scene-chips">
         {project.outline.map((s, i) => {
@@ -445,6 +442,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         )}
         <button className="btn" disabled={busy} onClick={processAll}>{t('batch.run5')}</button>
         {prog && <span className="total-badge">{t('batch.progress', { a: prog.a, b: prog.b })}</span>}
+        <button className="btn push-right" onClick={() => setShowAssets(true)}>
+          <Grid size={15} /> {t('asset.libBtn')}
+        </button>
       </div>
       <ErrorNote error={error} onSettings={onSettings} />
 
