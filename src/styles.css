@@ -713,12 +713,26 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 .cover-side { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
 .cover-side .hint { margin: 0; }
 
-/* compact style pickers (Stage 2, right of the cover) — label sits directly
-   above its selector so the two read as one control. */
-.style-picks { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 320px; margin-bottom: 6px; }
-.style-pick { display: flex; flex-direction: column; gap: 3px; }
-.style-pick label { margin: 0; font-size: 12px; font-weight: 600; color: var(--muted-2, #8b87a0); }
-.style-pick select { width: 100%; min-width: 0; }
+/* style pickers (Stage 2, right of the cover): three columns in one row,
+   each label directly above its selector. The picker labels and the
+   "Project cover" label sit on the same horizontal line. */
+.cover-col { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.cover-col > label,
+.style-pick label {
+  display: block;
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--muted-2, #8b87a0);
+}
+.style-picks { display: grid; grid-template-columns: repeat(3, minmax(140px, 1fr)); gap: 16px; width: 100%; max-width: none; margin: 0; }
+.style-pick { display: flex; flex-direction: column; gap: 8px; }
+.style-pick select { width: 100%; min-width: 0; height: 44px; border-radius: 12px; font-weight: 600; }
+.stylepick-hint { margin: 2px 0 0; }
+@media (max-width: 760px) {
+  .style-picks { grid-template-columns: 1fr; }
+}
 
 /* clickable "current style" chips (Stages 3–5) */
 .style-ind-row { display: flex; flex-wrap: wrap; gap: 8px; margin: -6px 0 14px; }
@@ -1273,22 +1287,25 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 .asm-scene-label span { overflow: hidden; text-overflow: ellipsis; }
 .asm-clips { display: flex; flex: 1; gap: 2px; min-height: 0; }
 
-/* Stage 6 timeline zoom + horizontal scroll */
+/* Stage 6 timeline zoom + horizontal scroll. The scale control lives in the
+   footer, styled exactly like the shot-length nudge control next to it. */
 .nle-scroll { overflow-x: auto; overflow-y: hidden; }
 .nle-scroll.zoomed { cursor: grab; }
 .nle-inner { position: relative; }
-.nle-zoom { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; flex-wrap: wrap; }
-.nle-zoom-label { font-size: 12px; color: var(--muted-2, #8b87a0); font-weight: 600; }
-.zoom-btn {
-  width: 28px; height: 28px; flex: none; border-radius: 7px;
-  border: 1px solid rgba(139, 92, 246, 0.35); background: rgba(139, 92, 246, 0.1);
-  color: var(--violet-text, #c3b6ef); font-size: 16px; font-weight: 700; line-height: 1;
-  cursor: pointer; display: flex; align-items: center; justify-content: center;
+.nle-nudge .zoom-select {
+  width: auto;
+  height: auto;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: #d8d5e6;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  cursor: pointer;
 }
-.zoom-btn:hover:not(:disabled) { background: rgba(139, 92, 246, 0.22); border-color: #7c5cff; }
-.zoom-btn:disabled { opacity: 0.4; cursor: default; }
-.zoom-select { height: 28px; padding: 0 8px; }
-.nle-zoom-hint { font-size: 11px; color: var(--muted-2, #8b87a0); }
+.nle-nudge .zoom-select:hover { background: rgba(124, 92, 255, 0.35); border-color: #7c5cff; }
+.nle-nudge .zoom-select option { background: #17142a; color: #d8d5e6; }
 
 /* ============ SETTINGS ============ */
 .settings-section {

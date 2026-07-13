@@ -392,23 +392,6 @@ export default function Stage6({ project, update, settings }) {
         )}
       </div>
 
-      <div className="nle-zoom">
-        <span className="nle-zoom-label">{t('s6.scale')}</span>
-        <button type="button" className="zoom-btn" title={t('s6.zoomOut')} aria-label={t('s6.zoomOut')} disabled={zoomIdx === 0} onClick={zoomOut}>−</button>
-        <select
-          className="zoom-select"
-          value={String(scale)}
-          onChange={(e) => setScale(e.target.value === 'fit' ? 'fit' : Number(e.target.value))}
-        >
-          <option value="fit">{t('s6.fit')}</option>
-          {SCALES.map((s) => (
-            <option key={s} value={s}>{s} px/s</option>
-          ))}
-        </select>
-        <button type="button" className="zoom-btn" title={t('s6.zoomIn')} aria-label={t('s6.zoomIn')} disabled={zoomIdx === ZOOM_STEPS.length - 1} onClick={zoomIn}>+</button>
-        {zoomed && <span className="nle-zoom-hint">{t('s6.scrollHint')}</span>}
-      </div>
-
       <div className="nle">
        <div className={`nle-scroll ${zoomed ? 'zoomed' : ''}`} ref={scrollRef}>
         <div className="nle-inner" style={zoomed ? { width: innerWidth } : undefined}>
@@ -543,6 +526,25 @@ export default function Stage6({ project, update, settings }) {
 
       <div className="nle-footer">
         <span>{t('s6.caption', { s: scenes.length, n: items.length })}</span>
+        <span className="nle-nudge nle-scale" title={zoomed ? t('s6.scrollHint') : ''}>
+          {t('s6.scale')}
+          <button type="button" title={t('s6.zoomOut')} aria-label={t('s6.zoomOut')} disabled={zoomIdx === 0} onClick={zoomOut}>
+            −
+          </button>
+          <select
+            className="zoom-select"
+            value={String(scale)}
+            onChange={(e) => setScale(e.target.value === 'fit' ? 'fit' : Number(e.target.value))}
+          >
+            <option value="fit">{t('s6.fit')}</option>
+            {SCALES.map((s) => (
+              <option key={s} value={s}>{s} px/s</option>
+            ))}
+          </select>
+          <button type="button" title={t('s6.zoomIn')} aria-label={t('s6.zoomIn')} disabled={zoomIdx === ZOOM_STEPS.length - 1} onClick={zoomIn}>
+            +
+          </button>
+        </span>
         {selected && (
           <span className="nle-nudge">
             {t('s4.shot', { n: items.findIndex((x) => x.shot.id === selectedId) + 1 })}

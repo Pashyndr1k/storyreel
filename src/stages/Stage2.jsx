@@ -195,37 +195,40 @@ export default function Stage2({ project, update, rawUpdate, settings, goNext, o
       {storyline && (
         <>
           <div className="cover-block">
-            <label>{t('cover.label')}</label>
             <div className="cover-row">
-              <div className="cover-frame">
-                {project.cover ? (
-                  <img className="cover-preview" src={project.cover} alt={t('cover.label')} />
-                ) : (
-                  <div className="cover-placeholder">{coverBusy ? '…' : '16:9'}</div>
-                )}
-                {project.cover && (
-                  <div className="img-actions">
-                    <button
-                      type="button"
-                      className="img-icon-btn"
-                      title={t('cover.regenerate')}
-                      aria-label={t('cover.regenerate')}
-                      disabled={coverBusy}
-                      onClick={genCover}
-                    >
-                      <RestoreIcon size={14} />
-                    </button>
-                  </div>
-                )}
-                {coverBusy && <div className="cover-loading">{t('cover.generating')}</div>}
-              </div>
-              <div className="cover-side">
-                <StylePicker project={project} update={rawUpdate || update} styles={styles} />
+              <div className="cover-col">
+                <label>{t('cover.label')}</label>
+                <div className="cover-frame">
+                  {project.cover ? (
+                    <img className="cover-preview" src={project.cover} alt={t('cover.label')} />
+                  ) : (
+                    <div className="cover-placeholder">{coverBusy ? '…' : '16:9'}</div>
+                  )}
+                  {project.cover && (
+                    <div className="img-actions">
+                      <button
+                        type="button"
+                        className="img-icon-btn"
+                        title={t('cover.regenerate')}
+                        aria-label={t('cover.regenerate')}
+                        disabled={coverBusy}
+                        onClick={genCover}
+                      >
+                        <RestoreIcon size={14} />
+                      </button>
+                    </div>
+                  )}
+                  {coverBusy && <div className="cover-loading">{t('cover.generating')}</div>}
+                </div>
                 {!project.cover && (
                   <button className="btn small" disabled={coverBusy} onClick={genCover}>
                     {coverBusy ? t('cover.generating') : t('cover.generate')}
                   </button>
                 )}
+              </div>
+              <div className="cover-side">
+                <StylePicker project={project} update={rawUpdate || update} styles={styles} />
+                <p className="hint stylepick-hint">{t('stylepick.hint')}</p>
                 {coverErrNode()}
               </div>
             </div>

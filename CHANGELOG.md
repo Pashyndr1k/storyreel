@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.12.3 — 2026-07-12
+
+- Stage 2: the Script / Image / Video style selectors sit in one horizontal
+  row beside the cover, with their labels on the same line as the "Project
+  cover" label, taller rounded selects, and a hint underneath.
+- Stage 6: the timeline Scale control moved into the timeline footer and is
+  styled like the shot-length nudge control next to it — compact mono
+  "Scale − [40 px/s] +" instead of the old multi-line toolbar.
+
 ## 1.12.2 — 2026-07-12
 
 - The image-prompt writer now carries motion across frames too: a FRAME
