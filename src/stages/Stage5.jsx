@@ -9,6 +9,8 @@ import { aspectDescription } from '../lib/aspect.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import { StyleIndicator } from '../components/StyleControls.jsx';
+import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
+import { blockForScene, DYNAMICS_CONFIG } from '../lib/dynamics.js';
 import AssetsModal from '../components/AssetsModal.jsx';
 import LibraryPicker from '../components/LibraryPicker.jsx';
 import { newLibraryEntry } from '../lib/library.js';
@@ -132,9 +134,10 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const specFor = (s) => {
     const sceneArg = { ...s, number: project.outline.indexOf(s) + 1 };
     const sceneShots = project.sceneDetails[s.id]?.shots || [];
+    const block = blockForScene(project.dynamicsPlan, sceneArg.number);
     return [
       stage5Prompt(project, sceneArg, sceneShots, genLang, imageStyle),
-      stage5VideoPrompt(project, sceneArg, sceneShots, videoStyle),
+      stage5VideoPrompt(project, sceneArg, sceneShots, videoStyle, block),
     ];
   };
 
@@ -383,17 +386,23 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const last = (project.shotFinalImages || {})[shot.id] || null;
     setImgBusy(`${shot.id}:vid`);
     setImgErr(null);
+    // +2s padding rule: generate longer than the timeline needs; Stage 6 trims
+    // 20 frames from head and tail to mask AI ramp-up and tail degradation.
+    const genDuration = Math.round(shot.duration || 4) + DYNAMICS_CONFIG.generation_padding_sec;
     try {
       const { dataURL, filename } = await generateComfyVideo(settings, {
         prompt: vPrompt,
         firstFrame: first,
         lastFrame: last,
-        durationSec: shot.duration,
+        durationSec: genDuration,
         aspectRatio: project.aspectRatio || '16:9',
         name: `${(project.title || 'project').slice(0, 24)}_sc${project.outline.indexOf(scene) + 1}_shot${i + 1}`,
       });
       saveToLocalOutputs(settings, filename, dataURL); // best-effort local copy
-      update((p) => ({ shotVideos: { ...(p.shotVideos || {}), [shot.id]: dataURL } }));
+      update((p) => ({
+        shotVideos: { ...(p.shotVideos || {}), [shot.id]: dataURL },
+        videoGenDurations: { ...(p.videoGenDurations || {}), [shot.id]: genDuration },
+      }));
     } catch (e) {
       setImgErr({ id: shot.id, msg: e.message === 'COMFY_UNREACHABLE' ? 'COMFY_UNREACHABLE' : e.message || String(e) });
     } finally {
@@ -417,6 +426,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         <StyleIndicator project={project} styles={styles} cats={['image', 'video']} onClick={onProjectSettings} />
       </div>
       <p className="stage-desc">{t('s5.desc')}</p>
+      <DynamicsVisualizer plan={project.dynamicsPlan} />
 
       <div className="scene-chips">
         {project.outline.map((s, i) => {

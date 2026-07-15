@@ -173,6 +173,10 @@ function projectDefaults() {
     shotFinalImages: {}, // shotId -> generated FINAL frame (data URL), paired with shotImages
     shotVideos: {}, // shotId -> generated shot video (data URL, ComfyUI LTX-2)
     shotAssets: {}, // shotId -> [assetId] referencing the global asset library
+    dynamicsPlan: null, // Action Dynamics Plan generated at Stage 3 (see lib/dynamics.js)
+    videoGenDurations: {}, // shotId -> raw seconds requested from the video model (+2s padding)
+    shotTrims: {}, // shotId -> { head, tail } seconds — manual overrides of the 20-frame rule
+    shotTransitions: {}, // shotId -> transition_type override for the cut INTO the next shot
     storyboards: {}, // shotId -> low-res storyboard frame (data URL)
     logline: '',
     ideas: [],
@@ -226,6 +230,10 @@ export function migrateProject(raw) {
   p.shotFinalImages = p.shotFinalImages && typeof p.shotFinalImages === 'object' ? p.shotFinalImages : {};
   p.shotVideos = p.shotVideos && typeof p.shotVideos === 'object' ? p.shotVideos : {};
   p.shotAssets = p.shotAssets && typeof p.shotAssets === 'object' ? p.shotAssets : {};
+  p.dynamicsPlan = p.dynamicsPlan && typeof p.dynamicsPlan === 'object' ? p.dynamicsPlan : null;
+  p.videoGenDurations = p.videoGenDurations && typeof p.videoGenDurations === 'object' ? p.videoGenDurations : {};
+  p.shotTrims = p.shotTrims && typeof p.shotTrims === 'object' ? p.shotTrims : {};
+  p.shotTransitions = p.shotTransitions && typeof p.shotTransitions === 'object' ? p.shotTransitions : {};
   p.storyboards = p.storyboards && typeof p.storyboards === 'object' ? p.storyboards : {};
   p.shotPrompts = p.shotPrompts && typeof p.shotPrompts === 'object' ? p.shotPrompts : {};
 

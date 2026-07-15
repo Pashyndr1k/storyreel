@@ -10,6 +10,8 @@ import AutoTextarea from '../components/AutoTextarea.jsx';
 import LibraryPicker from '../components/LibraryPicker.jsx';
 import StoryboardTimeline from '../components/StoryboardTimeline.jsx';
 import { StyleIndicator } from '../components/StyleControls.jsx';
+import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
+import { blockForScene, densityRange } from '../lib/dynamics.js';
 
 export function fmt(sec) {
   const m = Math.floor(sec / 60);
@@ -30,10 +32,12 @@ export function sceneStartTime(project, sceneId) {
 
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, Number(n) || lo));
 
-const mapShots = (rawShots) =>
+const mapShots = (rawShots, range = { min: 2, max: 10 }) =>
   (rawShots || []).map((s) => ({
     id: uid(),
-    duration: clamp(s.duration_sec, 2, 10),
+    // Dynamics-plan blocks narrow the allowed range; the global 2-10s rule
+    // is the outer bound either way.
+    duration: clamp(clamp(s.duration_sec, range.min, range.max), 2, 10),
     shotType: s.shot_type || '',
     location: s.location || '',
     action: s.action || '',
@@ -53,16 +57,22 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
   const doneCount = project.outline.filter((s) => project.sceneDetails[s.id]?.shots?.length).length;
   const allDone = doneCount === project.outline.length && project.outline.length > 0;
 
-  const applyShots = (targetSceneId, rawShots) =>
+  const blockOf = (s) => blockForScene(project.dynamicsPlan, project.outline.indexOf(s) + 1);
+
+  const applyShots = (targetSceneId, rawShots, block) =>
     update((p) => ({
-      sceneDetails: { ...p.sceneDetails, [targetSceneId]: { shots: mapShots(rawShots) } },
+      sceneDetails: {
+        ...p.sceneDetails,
+        [targetSceneId]: { shots: mapShots(rawShots, block ? densityRange(block) : undefined) },
+      },
     }));
 
   const generate = () => {
     if (shots.length && !window.confirm(t('s4.replaceConfirm'))) return;
+    const block = blockOf(scene);
     run(
-      stage4Prompt(project, { ...scene, number: project.outline.indexOf(scene) + 1 }, genLang, scriptStyle),
-      (data) => applyShots(scene.id, data.shots)
+      stage4Prompt(project, { ...scene, number: project.outline.indexOf(scene) + 1 }, genLang, scriptStyle, block),
+      (data) => applyShots(scene.id, data.shots, block)
     );
   };
 
@@ -74,8 +84,8 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
     }
     runBatch(
       targets,
-      (s) => stage4Prompt(project, { ...s, number: project.outline.indexOf(s) + 1 }, genLang, scriptStyle),
-      (s, data) => applyShots(s.id, data.shots),
+      (s) => stage4Prompt(project, { ...s, number: project.outline.indexOf(s) + 1 }, genLang, scriptStyle, blockOf(s)),
+      (s, data) => applyShots(s.id, data.shots, blockOf(s)),
       (a, b) => setProg(b ? { a, b } : null)
     );
   };
@@ -160,6 +170,7 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
         <strong>{t('s4.progress', { a: doneCount, b: project.outline.length })}</strong>
       </p>
       <StyleIndicator project={project} styles={styles} cats={['script']} onClick={onProjectSettings} />
+      <DynamicsVisualizer plan={project.dynamicsPlan} />
 
       <div className="scene-chips">
         {project.outline.map((s, i) => (

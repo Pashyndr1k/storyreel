@@ -1,7 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../lib/i18n.js';
 import { videoDims, saveToLocalOutputs } from '../lib/comfy.js';
+import { blockForScene, defaultTrim, transitionFor, overlapSeconds } from '../lib/dynamics.js';
+import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
 import { Play, StopSq, Grip, Download } from '../components/icons.jsx';
+
+// Manual transition overrides cycle through these; 'auto' defers to the
+// dynamics transition matrix. Actions mirror smart_editor_assembly_logic.json.
+const CUT_TYPES = ['auto', 'smash_cut', 'match_action_cut', 'directional_crossfade', 'soft_cut', 'rest_cut'];
+const CUT_ACTIONS = {
+  smash_cut: { transition_type: 'smash_cut', audio_bridge: 'j_cut', overlap_frames: 0 },
+  match_action_cut: { transition_type: 'match_action_cut', audio_bridge: 'none', overlap_frames: 0 },
+  directional_crossfade: { transition_type: 'directional_crossfade', audio_bridge: 'l_cut', overlap_frames: 12 },
+  soft_cut: { transition_type: 'soft_cut', audio_bridge: 'l_cut', overlap_frames: 0 },
+  rest_cut: { transition_type: 'rest_cut', audio_bridge: 'l_cut', overlap_frames: 0 },
+};
+const CUT_ABBR = { smash_cut: 'SM', match_action_cut: 'MA', directional_crossfade: 'XF', soft_cut: 'SO', rest_cut: 'RE' };
 
 // Timeline zoom: 'fit' stretches the whole assembly to the pane width (good for
 // short stories); a numeric value is pixels-per-second, which makes the track
@@ -52,16 +66,62 @@ export default function Stage6({ project, update, settings }) {
   const zoomOut = () => zoomIdx > 0 && setScale(ZOOM_STEPS[zoomIdx - 1]);
   const zoomIn = () => zoomIdx < ZOOM_STEPS.length - 1 && setScale(ZOOM_STEPS[zoomIdx + 1]);
 
-  // Flat assembly sequence in scene order.
-  const scenes = project.outline.map((scene) => ({
-    scene,
-    shots: (project.sceneDetails[scene.id]?.shots || []).map((shot) => ({
-      shot,
-      video: (project.shotVideos || {})[shot.id] || null,
-      image: (project.shotImages || {})[shot.id] || null,
-    })),
-  }));
+  // Flat assembly sequence in scene order, enriched with the Action Dynamics
+  // Plan: each shot carries its rhythm block, its head/tail trim (the 20-frame
+  // rule, or a manual override), and the transition into the next shot.
+  const scenes = project.outline.map((scene, si) => {
+    const block = blockForScene(project.dynamicsPlan, si + 1);
+    return {
+      scene,
+      block,
+      shots: (project.sceneDetails[scene.id]?.shots || []).map((shot) => {
+        const video = (project.shotVideos || {})[shot.id] || null;
+        const raw = (project.videoGenDurations || {})[shot.id] || 0;
+        const trim = video
+          ? (project.shotTrims || {})[shot.id] || defaultTrim(shot.duration || 0, raw)
+          : { head: 0, tail: 0 };
+        return {
+          shot,
+          block,
+          video,
+          raw,
+          trim,
+          image: (project.shotImages || {})[shot.id] || null,
+        };
+      }),
+    };
+  });
   const items = scenes.flatMap((g) => g.shots.map((it) => ({ ...it, sceneId: g.scene.id })));
+
+  // Transition INTO the next item, per item index (last item has none).
+  const cutFor = (idx) => {
+    if (idx >= items.length - 1) return null;
+    const override = (project.shotTransitions || {})[items[idx].shot.id];
+    if (override && override !== 'auto' && CUT_ACTIONS[override]) {
+      return { ...CUT_ACTIONS[override], overridden: true };
+    }
+    return { ...transitionFor(items[idx].block, items[idx + 1].block), overridden: false };
+  };
+
+  const cycleCut = (idx) => {
+    const cur = (project.shotTransitions || {})[items[idx].shot.id] || 'auto';
+    const next = CUT_TYPES[(CUT_TYPES.indexOf(cur) + 1) % CUT_TYPES.length];
+    update((p) => ({
+      shotTransitions: { ...(p.shotTransitions || {}), [items[idx].shot.id]: next },
+    }));
+  };
+
+  const setTrim = (shotId, patch) => {
+    const it = items.find((x) => x.shot.id === shotId);
+    if (!it) return;
+    const slack = Math.max(0, (it.raw || 0) - (it.shot.duration || 0));
+    const cur = it.trim;
+    const next = { ...cur, ...patch };
+    next.head = Math.max(0, Math.min(2, Math.round(next.head * 100) / 100));
+    next.tail = Math.max(0, Math.min(2, Math.round(next.tail * 100) / 100));
+    if (next.head + next.tail > slack) return; // can't trim more than the padding
+    update((p) => ({ shotTrims: { ...(p.shotTrims || {}), [shotId]: next } }));
+  };
   const total = items.reduce((a, it) => a + (it.shot.duration || 0), 0);
   const startOf = (idx) => items.slice(0, idx).reduce((a, it) => a + (it.shot.duration || 0), 0);
 
@@ -108,7 +168,8 @@ export default function Stage6({ project, update, settings }) {
     if (!v) return;
     if (playing && cur?.video) {
       try {
-        v.currentTime = Math.max(0, curOffset);
+        // Playback window starts past the head trim (the 20-frame rule).
+        v.currentTime = (cur.trim?.head || 0) + Math.max(0, curOffset);
       } catch {
         /* not seekable yet */
       }
@@ -234,16 +295,30 @@ export default function Stage6({ project, update, settings }) {
     const ctx = canvas.getContext('2d');
     const stream = canvas.captureStream(30);
 
-    // Route the work video element's audio into the recording (not speakers).
-    const vid = document.createElement('video');
-    vid.muted = false;
+    // Two work video elements (crossfades need both clips alive at once), each
+    // routed through its own gain node into the recording — the gains implement
+    // the J-cut / L-cut audio bridges from the assembly rules.
+    const vids = [document.createElement('video'), document.createElement('video')];
+    vids.forEach((v) => {
+      v.muted = false;
+      v.playsInline = true;
+    });
+    const slotOf = (i) => i % 2;
     let ac = null;
-    let mediaSrc = null;
+    const gains = [null, null];
+    const mediaSrcs = [];
     try {
       ac = new (window.AudioContext || window.webkitAudioContext)();
       const dest = ac.createMediaStreamDestination();
-      mediaSrc = ac.createMediaElementSource(vid);
-      mediaSrc.connect(dest);
+      vids.forEach((v, i) => {
+        const src = ac.createMediaElementSource(v);
+        const g = ac.createGain();
+        g.gain.value = 0;
+        src.connect(g);
+        g.connect(dest);
+        gains[i] = g;
+        mediaSrcs.push(src);
+      });
       const track = dest.stream.getAudioTracks()[0];
       if (track) stream.addTrack(track);
     } catch {
@@ -268,69 +343,185 @@ export default function Stage6({ project, update, settings }) {
     });
     rec.start(500);
 
-    const drawFrame = (el, iw, ih) => {
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, 0, w, h);
+    const paint = (el, iw, ih, alpha) => {
       if (!el || !iw || !ih) return;
       const s = Math.min(w / iw, h / ih);
-      const dw = iw * s;
-      const dh = ih * s;
-      ctx.drawImage(el, (w - dw) / 2, (h - dh) / 2, dw, dh);
+      ctx.globalAlpha = alpha;
+      ctx.drawImage(el, (w - iw * s) / 2, (h - ih * s) / 2, iw * s, ih * s);
+      ctx.globalAlpha = 1;
     };
-    // setTimeout, not requestAnimationFrame: rAF throttles/stalls in a
-    // backgrounded window and would freeze a long render mid-way.
-    const holdFor = (t0, clipMs, draw) =>
+
+    // ---- assembly schedule --------------------------------------------------
+    // Each segment keeps the timeline duration; trims select the played window
+    // of the raw clip; crossfades borrow their material from the trimmed
+    // regions, so the film's timing never shifts.
+    const segs = [];
+    {
+      let acc = 0;
+      items.forEach((it, i) => {
+        const dur = it.shot.duration || 0;
+        const cut = i < items.length - 1 ? cutFor(i) : null;
+        segs.push({ it, i, t0: acc, t1: acc + dur, cut, ov: 0, lead: 0 });
+        acc += dur;
+      });
+      segs.forEach((s, i) => {
+        if (!s.cut) return;
+        const next = segs[i + 1];
+        const nextHead = next.it.video ? next.it.trim?.head || 0 : 0;
+        const curTail = s.it.video ? s.it.trim?.tail || 0 : 0;
+        if (s.cut.transition_type === 'directional_crossfade') {
+          s.ov = Math.min(overlapSeconds(s.cut), nextHead, s.t1 - s.t0);
+        }
+        if (s.cut.audio_bridge === 'j_cut') s.lead = Math.min(0.4, nextHead);
+        else if (s.cut.audio_bridge === 'l_cut') s.lead = Math.min(0.4, curTail, next.t1 - next.t0);
+      });
+    }
+
+    const imgCache = {};
+    const getImg = (src) =>
+      imgCache[src] ||
+      (imgCache[src] = (() => {
+        const im = new Image();
+        im.src = src;
+        return im;
+      })());
+
+    const prepare = (i) =>
       new Promise((res) => {
+        const it = segs[i]?.it;
+        if (!it) return res();
+        if (it.video) {
+          const v = vids[slotOf(i)];
+          if (v.src === it.video && v.readyState >= 2) return res();
+          v.src = it.video;
+          v.onloadeddata = () => res();
+          v.onerror = () => res();
+        } else {
+          if (it.image) getImg(it.image);
+          res();
+        }
+      });
+
+    // Audio gain envelope for segment i's clip at absolute time tt.
+    const gainAt = (i, tt) => {
+      const s = segs[i];
+      if (!s?.it.video) return 0;
+      let g = tt >= s.t0 && tt < s.t1 ? 1 : 0;
+      const prev = segs[i - 1];
+      if (prev?.cut && prev.lead > 0) {
+        if (prev.cut.audio_bridge === 'j_cut' && tt >= prev.t1 - prev.lead && tt < prev.t1) g = (tt - (prev.t1 - prev.lead)) / prev.lead;
+        if (prev.cut.audio_bridge === 'l_cut' && tt >= prev.t1 && tt < prev.t1 + prev.lead) g = Math.min(g, (tt - prev.t1) / prev.lead);
+      }
+      if (s.cut && s.lead > 0) {
+        if (s.cut.audio_bridge === 'j_cut' && tt >= s.t1 - s.lead && tt < s.t1) g = Math.min(g, 1 - (tt - (s.t1 - s.lead)) / s.lead);
+        if (s.cut.audio_bridge === 'l_cut' && tt >= s.t1 && tt < s.t1 + s.lead) g = 1 - (tt - s.t1) / s.lead;
+      }
+      return Math.max(0, Math.min(1, g));
+    };
+
+    const drawSeg = (i, mediaTime, alpha) => {
+      const it = segs[i].it;
+      if (it.video) {
+        const v = vids[slotOf(i)];
+        paint(v, v.videoWidth, v.videoHeight, alpha);
+      } else if (it.image) {
+        const im = getImg(it.image);
+        paint(im, im.naturalWidth, im.naturalHeight, alpha);
+      }
+      // placeholder: black stays
+    };
+
+    try {
+      await prepare(0);
+      const startWall = performance.now();
+      const tNow = () => (performance.now() - startWall) / 1000;
+      let cur = -1;
+      const started = new Set(); // segments whose video was started (incl. pre-rolls)
+      const pauses = []; // { at, slot } deferred pauses for l-cut lingering audio
+
+      const startVideo = (i, mediaOffset) => {
+        const it = segs[i].it;
+        if (!it.video || started.has(i)) return;
+        started.add(i);
+        const v = vids[slotOf(i)];
+        try {
+          v.currentTime = Math.max(0, mediaOffset);
+        } catch {
+          /* not seekable yet */
+        }
+        v.play().catch(() => {});
+      };
+
+      // setTimeout, not requestAnimationFrame: rAF throttles/stalls in a
+      // backgrounded window and would freeze a long render mid-way.
+      await new Promise((finish) => {
         const step = () => {
-          if (cancelRef.current || performance.now() - t0 >= clipMs) return res();
-          draw();
+          const tt = tNow();
+          if (cancelRef.current || tt >= total) return finish();
+
+          // segment switching (+ deferred pause of the outgoing clip)
+          while (cur < segs.length - 1 && tt >= (cur < 0 ? 0 : segs[cur].t1)) {
+            if (cur >= 0) {
+              const out = segs[cur];
+              const linger = out.cut?.audio_bridge === 'l_cut' ? out.lead : 0;
+              if (out.it.video) pauses.push({ at: out.t1 + linger, slot: slotOf(cur), seg: cur });
+            }
+            cur++;
+            setRenderProg({ a: cur + 1, b: segs.length });
+            const s = segs[cur];
+            if (s.it.video && !started.has(cur)) startVideo(cur, (s.it.trim?.head || 0) + (tt - s.t0));
+            if (cur < segs.length - 1) prepare(cur + 1);
+          }
+          const s = segs[cur];
+
+          // pre-roll the next clip for crossfade video / j-cut audio
+          if (s.cut && cur < segs.length - 1) {
+            const pre = Math.max(s.ov, s.cut.audio_bridge === 'j_cut' ? s.lead : 0);
+            if (pre > 0 && tt >= s.t1 - pre && !started.has(cur + 1)) {
+              const nit = segs[cur + 1].it;
+              startVideo(cur + 1, (nit.trim?.head || 0) - pre);
+            }
+          }
+
+          // deferred pauses (after l-cut audio lingering ends)
+          for (let k = pauses.length - 1; k >= 0; k--) {
+            if (tt >= pauses[k].at) {
+              vids[pauses[k].slot].pause();
+              pauses.splice(k, 1);
+            }
+          }
+
+          // audio gains
+          if (ac) {
+            for (let sl = 0; sl < 2; sl++) {
+              let g = 0;
+              for (let i = Math.max(0, cur - 1); i <= Math.min(segs.length - 1, cur + 1); i++) {
+                if (slotOf(i) === sl) g = Math.max(g, gainAt(i, tt));
+              }
+              gains[sl].gain.value = g;
+            }
+          }
+
+          // draw: base black, current clip, crossfade overlay of the incoming clip
+          ctx.fillStyle = '#000';
+          ctx.fillRect(0, 0, w, h);
+          const v = segs[cur].it.video ? vids[slotOf(cur)] : null;
+          const pastEnd = v && v.ended;
+          if (!pastEnd) drawSeg(cur, 0, 1);
+          if (s.cut && s.ov > 0 && tt >= s.t1 - s.ov && cur < segs.length - 1) {
+            drawSeg(cur + 1, 0, (tt - (s.t1 - s.ov)) / s.ov);
+          }
+
           setTimeout(step, 33);
         };
         step();
       });
-
-    try {
-      for (let i = 0; i < items.length; i++) {
-        if (cancelRef.current) break;
-        const it = items[i];
-        setRenderProg({ a: i + 1, b: items.length });
-        const clipMs = (it.shot.duration || 0) * 1000;
-        if (clipMs <= 0) continue;
-        const t0 = performance.now();
-        if (it.video) {
-          vid.src = it.video;
-          await new Promise((res) => {
-            vid.onloadeddata = res;
-            vid.onerror = () => res();
-          });
-          vid.currentTime = 0;
-          try {
-            await vid.play();
-          } catch {
-            /* draw whatever is decodable */
-          }
-          // Past the video's end the frame stays black — never stretched.
-          await holdFor(t0, clipMs, () =>
-            vid.ended ? drawFrame(null) : drawFrame(vid, vid.videoWidth, vid.videoHeight)
-          );
-          vid.pause();
-        } else if (it.image) {
-          const img = new Image();
-          img.src = it.image;
-          await new Promise((res) => {
-            img.onload = res;
-            img.onerror = () => res();
-          });
-          await holdFor(t0, clipMs, () => drawFrame(img, img.naturalWidth, img.naturalHeight));
-        } else {
-          await holdFor(t0, clipMs, () => drawFrame(null));
-        }
-      }
     } finally {
       rec.stop();
       await stopped;
+      vids.forEach((v) => v.pause());
       try {
-        if (mediaSrc) mediaSrc.disconnect();
+        mediaSrcs.forEach((m) => m.disconnect());
         if (ac) ac.close();
       } catch {
         /* done */
@@ -379,6 +570,7 @@ export default function Stage6({ project, update, settings }) {
     <section className="stage">
       <h2>{t('s6.title')}</h2>
       <p className="stage-desc">{t('s6.desc')}</p>
+      <DynamicsVisualizer plan={project.dynamicsPlan} playhead={playing || elapsed > 0 ? elapsed : null} defaultOpen />
 
       <div className="asm-preview">
         {cur?.video && !videoEnded ? (
@@ -504,6 +696,34 @@ export default function Stage6({ project, update, settings }) {
                         }}
                         onPointerDown={(e) => startTrim(e, { ...it, sceneId: g.scene.id })}
                       />
+                      {it.trim?.head > 0 && (
+                        <span className="clip-trim-mark head" title={`−${it.trim.head.toFixed(2)}s`} />
+                      )}
+                      {it.trim?.tail > 0 && (
+                        <span className="clip-trim-mark tail" title={`−${it.trim.tail.toFixed(2)}s`} />
+                      )}
+                      {globalIdx < items.length - 1 &&
+                        (() => {
+                          const c = cutFor(globalIdx);
+                          return (
+                            <button
+                              type="button"
+                              className={`cut-badge ${c.overridden ? 'ovr' : ''}`}
+                              title={`${t('cut.tip')}: ${t(`cut.${c.transition_type}`)}${c.audio_bridge !== 'none' ? ` · ${c.audio_bridge.replace('_', '-')}` : ''}`}
+                              draggable={false}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                cycleCut(globalIdx);
+                              }}
+                              onDragStart={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                              }}
+                            >
+                              {CUT_ABBR[c.transition_type] || 'A'}
+                            </button>
+                          );
+                        })()}
                     </div>
                   );
                 })}
@@ -553,6 +773,26 @@ export default function Stage6({ project, update, settings }) {
             </button>
             <button type="button" title={t('sb.longer')} disabled={(selected.shot.duration || 0) >= 10} onClick={() => nudge(0.5)}>
               +0.5s
+            </button>
+          </span>
+        )}
+        {selected && selected.video && selected.raw > (selected.shot.duration || 0) + 0.2 && (
+          <span className="nle-nudge" title={t('s6.trimTip')}>
+            {t('s6.trimLbl')}
+            <button type="button" title={t('s6.headTrim')} disabled={selected.trim.head <= 0} onClick={() => setTrim(selected.shot.id, { head: selected.trim.head - 0.2 })}>
+              −
+            </button>
+            <i className="trim-val">{selected.trim.head.toFixed(1)}s</i>
+            <button type="button" title={t('s6.headTrim')} onClick={() => setTrim(selected.shot.id, { head: selected.trim.head + 0.2 })}>
+              +
+            </button>
+            ·
+            <button type="button" title={t('s6.tailTrim')} disabled={selected.trim.tail <= 0} onClick={() => setTrim(selected.shot.id, { tail: selected.trim.tail - 0.2 })}>
+              −
+            </button>
+            <i className="trim-val">{selected.trim.tail.toFixed(1)}s</i>
+            <button type="button" title={t('s6.tailTrim')} onClick={() => setTrim(selected.shot.id, { tail: selected.trim.tail + 0.2 })}>
+              +
             </button>
           </span>
         )}

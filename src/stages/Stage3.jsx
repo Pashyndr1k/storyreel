@@ -5,6 +5,8 @@ import { useI18n } from '../lib/i18n.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import { StyleIndicator } from '../components/StyleControls.jsx';
+import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
+import { normalizePlan } from '../lib/dynamics.js';
 import { Grip } from '../components/icons.jsx';
 import { useRef, useState } from 'react';
 
@@ -32,6 +34,8 @@ export default function Stage3({ project, update, settings, goNext, onSettings, 
           summary: s.summary || '',
           duration: Number(s.duration_sec) || 20,
         })),
+        // The Action Dynamics Plan travels with the outline it was written for.
+        dynamicsPlan: normalizePlan(data.dynamics_plan),
         sceneDetails: {},
         shotPrompts: {},
       })
@@ -69,6 +73,7 @@ export default function Stage3({ project, update, settings, goNext, onSettings, 
       <h2>{t('s3.title')}</h2>
       <p className="stage-desc">{t('s3.desc')}</p>
       <StyleIndicator project={project} styles={styles} cats={['script']} onClick={onProjectSettings} />
+      <DynamicsVisualizer plan={project.dynamicsPlan} defaultOpen />
 
       <div className="row">
         <button className="btn primary" disabled={busy} onClick={generate}>

@@ -1,0 +1,38 @@
+{
+  "global_trim_rules": {
+    "head_trim_frames": 20,
+    "tail_trim_frames": 20,
+    "assumed_framerate": 25
+  },
+  "generation_padding_sec": 2,
+  "shot_density_duration_map": {
+    "low": { "min_sec": 5, "max_sec": 10 },
+    "medium": { "min_sec": 3.5, "max_sec": 6 },
+    "high": { "min_sec": 2.5, "max_sec": 4 },
+    "hyper_kinetic": { "min_sec": 2, "max_sec": 3 }
+  },
+  "energy_high_threshold": 6,
+  "transition_matrix": [
+    {
+      "condition": { "energy_shift": "low_to_high" },
+      "action": { "transition_type": "smash_cut", "audio_bridge": "j_cut", "overlap_frames": 0 }
+    },
+    {
+      "condition": { "energy_shift": "high_to_high" },
+      "action": { "transition_type": "match_action_cut", "audio_bridge": "none", "overlap_frames": 0 }
+    },
+    {
+      "condition": { "energy_shift": "low_to_low", "momentum_match": true },
+      "action": { "transition_type": "directional_crossfade", "audio_bridge": "l_cut", "overlap_frames": 12 }
+    },
+    {
+      "condition": { "energy_shift": "low_to_low", "momentum_match": false },
+      "action": { "transition_type": "soft_cut", "audio_bridge": "l_cut", "overlap_frames": 0 }
+    },
+    {
+      "condition": { "energy_shift": "high_to_low" },
+      "action": { "transition_type": "rest_cut", "audio_bridge": "l_cut", "overlap_frames": 0 }
+    }
+  ],
+  "transition_types": ["auto", "smash_cut", "match_action_cut", "directional_crossfade", "soft_cut", "rest_cut"]
+}

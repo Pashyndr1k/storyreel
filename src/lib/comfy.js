@@ -225,7 +225,9 @@ export async function generateComfyVideo(
   { onStatus } = {}
 ) {
   const [w, h] = videoDims(aspectRatio);
-  const dur = Math.max(2, Math.min(10, Math.round(durationSec || 4)));
+  // Shots are 2-10s on the timeline, but generation requests carry the +2s
+  // dynamics padding (head/tail get trimmed in assembly) — allow up to 12.
+  const dur = Math.max(2, Math.min(12, Math.round(durationSec || 4)));
   const stamp = Date.now();
   let graph;
 

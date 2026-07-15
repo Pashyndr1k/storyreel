@@ -1319,6 +1319,78 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 }
 .nle-nudge .zoom-select:hover { background: rgba(124, 92, 255, 0.35); border-color: #7c5cff; }
 .nle-nudge .zoom-select option { background: #17142a; color: #d8d5e6; }
+.nle-nudge .trim-val { font-style: normal; color: #8f89ad; font-variant-numeric: tabular-nums; }
+
+/* trimmed head/tail regions of a raw clip (the 20-frame rule) */
+.clip-trim-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  pointer-events: none;
+  background: repeating-linear-gradient(135deg, rgba(255, 84, 112, 0.55) 0 2px, transparent 2px 5px);
+}
+.clip-trim-mark.head { left: 0; }
+.clip-trim-mark.tail { right: 0; }
+
+/* transition badge on the cut into the next shot */
+.cut-badge {
+  position: absolute;
+  right: -9px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid rgba(139, 92, 246, 0.55);
+  background: #17142a;
+  color: #c3b6ef;
+  font-size: 7.5px;
+  font-weight: 800;
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0.02em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+.cut-badge:hover { background: #241f45; border-color: #7c5cff; }
+.cut-badge.ovr { border-color: #d946ef; color: #f0c8ff; }
+
+/* ============ DYNAMICS VISUALIZER ============ */
+.dyn-viz {
+  margin: 0 0 14px;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  background: var(--glass);
+  overflow: hidden;
+}
+.dyn-viz-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 14px;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+.dyn-viz-title { font-weight: 700; }
+.dyn-viz-meta { font-size: 11.5px; color: var(--muted-2, #8b87a0); }
+.dyn-viz-chevron { margin-left: auto; color: var(--muted-2, #8b87a0); font-size: 11px; }
+.dyn-viz-body { padding: 4px 14px 10px; }
+.dyn-viz-body svg { width: 100%; height: 128px; display: block; }
+.dyn-viz-legend { display: flex; gap: 18px; align-items: center; font-size: 11.5px; color: var(--muted-2, #8b87a0); margin-top: 4px; }
+.dyn-dot { display: inline-block; width: 10px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+.dyn-dot.dyn-kin { background: #7c5cff; }
+.dyn-dot.dyn-aud { background: #d946ef; }
+.dyn-genre { margin-left: auto; font-style: italic; }
 
 /* ============ SETTINGS ============ */
 .settings-section {

@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.13.0 — 2026-07-14
+
+- Action Dynamics Plan: Stage 3 now writes the film's pacing schedule
+  alongside the scene outline — rhythm blocks with kinetic energy, dialogue
+  volume, shot density and a camera-momentum contract, derived from the
+  synopsis and script style. A collapsible dual-line Dynamics Visualizer
+  (kinetic energy + audio rhythm over time) appears on Stages 3–6, with a
+  live playhead cursor on Stage 6.
+- Plan-constrained generation: Stage 4 shot lengths are mathematically bound
+  to each block's shot density (low 5–10s … hyper-kinetic 2–3s) and the
+  breakdown prompt carries the block's motion/dialogue/camera contract.
+  Stage 5 video prompts embed each shot's generation payload and must cite
+  its dynamics; every video generation request adds the +2 seconds padding
+  (the raw duration is stored per shot).
+- Smart montage (Stage 6): raw clips are auto-trimmed 20 frames head and
+  tail (0.8s at 25 fps) to mask AI ramp-up and tail degradation — hatched
+  marks show the trimmed regions, and per-shot head/tail trims are manually
+  adjustable in the footer. Transitions are chosen by the dynamics rules
+  engine (low→high smash cut + J-cut, high→high match-action cut, matching
+  low→low directional crossfade + L-cut, high→low rest cut) with a clickable
+  badge on every cut to override. The preview honors trims; the renderer
+  implements real crossfades and J-cut/L-cut audio bridges using the trimmed
+  footage as transition material, so timeline timing never shifts.
+
 ## 1.12.4 — 2026-07-13
 
 - The square upload / from-library photo buttons are hard-clamped to 64×64

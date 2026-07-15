@@ -1,6 +1,7 @@
 import { dataURLToImageBlock } from './images.js';
 import { aspectDescription } from './aspect.js';
 import { buildRandomization } from './randomization.js';
+import { densityRange, buildShotPayload } from './dynamics.js';
 
 const LANG_NAMES = { en: 'English', ru: 'Russian', uk: 'Ukrainian' };
 
@@ -93,7 +94,7 @@ JSON schema:
 export function stage3Prompt(project, lang, scriptStyle) {
   return {
     system: system(lang, scriptStyle),
-    maxTokens: 3000,
+    maxTokens: 4500,
     user: `Title: ${project.title}
 Genres: ${project.genres.join(', ')}
 
@@ -107,17 +108,37 @@ ${characterBlock(project)}
 
 Create a scene-by-scene outline for this short video. The full video must run between ${durationOf(project).min} and ${durationOf(project).max} seconds in total — choose a number of scenes appropriate for that length (a 10–30 second ad may need only 2–4 scenes; a 5–10 minute film may need 6–14). Each scene must be a single continuous location and moment.
 
+Alongside the outline, create the ACTION DYNAMICS PLAN — the film's pacing schedule. Derive it from the synopsis's emotional arc and the script style: where the story breathes, where it accelerates, where dialogue crowds in and where silence carries the weight. Rules for the plan:
+- Divide the full runtime into 2–6 sequential "rhythm_blocks". Each block covers one or more consecutive scenes (list their numbers in "scene_numbers"; every scene belongs to exactly one block).
+- "timestamp_start" and "intended_duration_sec" must be consistent with the scene durations they cover.
+- "kinetic_energy_level" (1–10): how much physical motion is on screen (1 = static contemplation, 10 = hyper-kinetic chaos).
+- "dialogue_volume" (1–10): how dense speech and sound are (1 = silence, 10 = rapid overlapping dialogue).
+- "shot_density": "low" (long 5–10s shots), "medium" (3.5–6s), "high" (2.5–4s) or "hyper_kinetic" (2–3s) — how fast the editing should cut inside this block.
+- "required_camera_momentum": a short snake_case camera behavior contract, e.g. "slow_creeping", "steady_tracking", "locked_off_stillness", "erratic_handheld", "sweeping_orbital".
+- "global_pacing_curve": one of "flat", "accelerating", "decelerating", "wave", "front_loaded" — the overall shape of energy over time.
+- The plan must MEAN something: contrast blocks against each other; a climax block should read differently from an opening block.
+
 JSON schema:
-{"scenes":[{"number":1,"title":"short scene title","summary":"2-3 sentences describing exactly what happens in the scene","duration_sec":20}]}`,
+{"scenes":[{"number":1,"title":"short scene title","summary":"2-3 sentences describing exactly what happens in the scene","duration_sec":20}],"dynamics_plan":{"genre_baseline":"snake_case dominant genre","global_pacing_curve":"accelerating","rhythm_blocks":[{"block_id":"blk_01","timestamp_start":0,"intended_duration_sec":15,"scene_numbers":[1,2],"kinetic_energy_level":2,"dialogue_volume":1,"shot_density":"low","required_camera_momentum":"slow_creeping"}]}}`,
   };
 }
 
-export function stage4Prompt(project, scene, lang, scriptStyle) {
+export function stage4Prompt(project, scene, lang, scriptStyle, block) {
   const outlineList = project.outline
     .map((s, i) => `${i + 1}. ${s.title} — ${s.summary} (~${s.duration}s)`)
     .join('\n');
   const envNote = scene.photos?.length
     ? `\n\nAttached are reference photos of this scene's environment. Match the locations, lighting and mood in your shot descriptions to these photos.`
+    : '';
+  // Action Dynamics Plan: the scene's rhythm block mathematically constrains
+  // shot lengths and dictates motion/dialogue density and camera behavior.
+  const range = block ? densityRange(block) : { min: 2, max: 10 };
+  const dynNote = block
+    ? `\n\nACTION DYNAMICS (this scene belongs to rhythm block "${block.block_id}" — these constraints are mandatory):
+- Kinetic energy ${block.kinetic_energy_level}/10: ${block.kinetic_energy_level >= 6 ? 'stage visible physical motion in almost every shot; actions overlap and interrupt' : 'keep physical action restrained and deliberate; let stillness carry tension'}.
+- Dialogue volume ${block.dialogue_volume}/10: ${block.dialogue_volume >= 6 ? 'dialogue-dense — most shots carry spoken lines, quick exchanges' : 'sparse speech — prefer silence, single lines, ambient sound'}.
+- Shot density "${block.shot_density}": every shot MUST last between ${range.min} and ${range.max} seconds.
+- Camera momentum contract: "${block.required_camera_momentum.replace(/_/g, ' ')}" — reflect it in shot types and notes.`
     : '';
   return {
     system: system(lang, scriptStyle),
@@ -138,14 +159,14 @@ ${outlineList}
 Now break down SCENE ${scene.number}: "${scene.title}" (${scene.summary}) into individual camera shots.
 
 Requirements:
-- Each shot lasts between 2 and 10 seconds.
+- Each shot lasts between ${range.min} and ${range.max} seconds.
 - Shot durations must add up to roughly the scene's target duration (${scene.duration} seconds).
 - "action" must describe precisely what the characters do and what the camera sees — concrete and filmable, no abstractions.
 - "dialogue" contains the spoken lines prefixed by the speaker's name, or an empty string if the shot has no dialogue.
 - "location" is the specific place plus time of day / lighting condition.
 
 JSON schema:
-{"shots":[{"duration_sec":4,"shot_type":"wide / medium / close-up / POV / tracking / etc.","location":"specific location, time of day","action":"what happens and what the camera sees","dialogue":"NAME: line — or empty string","notes":"mood, lighting, sound or continuity note — may be empty"}]}` + envNote),
+{"shots":[{"duration_sec":4,"shot_type":"wide / medium / close-up / POV / tracking / etc.","location":"specific location, time of day","action":"what happens and what the camera sees","dialogue":"NAME: line — or empty string","notes":"mood, lighting, sound or continuity note — may be empty"}]}` + dynNote + envNote),
   };
 }
 
@@ -255,13 +276,31 @@ Example Output (assuming a 'Dramatic Film' style injection):
 const MOMENTUM_SOURCE =
   "the ending motion state of the immediately preceding shot in the provided shot list, as established by that shot's action and your own previous video_prompt; for the FIRST shot of the scene, derive the entry momentum from its own action description (if the action implies the character is already moving, they enter the shot mid-motion)";
 
-export function stage5VideoPrompt(project, scene, shots, videoStyle) {
+export function stage5VideoPrompt(project, scene, shots, videoStyle, block) {
   const injection = (videoStyle || '').trim() || DEFAULT_VIDEO_MOTION_STYLE;
+  // Action Dynamics Plan: attach each shot's generation payload (+2s padding
+  // rule and the block's kinetic/dialogue/camera parameters) so the written
+  // prompts directly cite their assigned dynamics.
+  const shotList = stage5ShotList(shots).map((s, i) => {
+    const payload = buildShotPayload(shots[i], block || null);
+    return {
+      ...s,
+      target_timeline_duration: payload.target_timeline_duration,
+      video_generation_duration: payload.video_generation_duration,
+      ...(payload.applied_dynamics ? { applied_dynamics: payload.applied_dynamics } : {}),
+      generation_directive: payload.prompt_injection_string,
+    };
+  });
+  const dynNote = block
+    ? `\n- This scene's rhythm block is "${block.block_id}" (kinetic energy ${block.kinetic_energy_level}/10, dialogue volume ${block.dialogue_volume}/10, camera momentum "${block.required_camera_momentum.replace(/_/g, ' ')}"). Every video_prompt MUST directly cite these dynamics: motion intensity matching the kinetic energy, speech pacing matching the dialogue volume, and the camera momentum contract.`
+    : '';
   return {
     system:
       VIDEO_MOTION_SYSTEM.replace('{{VIDEO_STYLE_INJECTION}}', injection).replace(
         '{{PREVIOUS_SHOT_MOMENTUM}}',
-        MOMENTUM_SOURCE
+        block
+          ? `${MOMENTUM_SOURCE}. The whole scene additionally carries the rhythm block's camera momentum contract: "${block.required_camera_momentum.replace(/_/g, ' ')}"`
+          : MOMENTUM_SOURCE
       ) +
       `\n\nResponse format:
 - Respond with VALID JSON ONLY. No markdown, no code fences, no commentary outside the JSON.
@@ -270,9 +309,12 @@ export function stage5VideoPrompt(project, scene, shots, videoStyle) {
     user: `Scene ${scene.number}: "${scene.title}" — ${scene.summary}
 
 Shots of this scene (each has an exact duration in seconds — map the motion, dialogue and pauses chronologically within it):
-${JSON.stringify(stage5ShotList(shots), null, 2)}
+${JSON.stringify(shotList, null, 2)}
 
 For EVERY shot above, write one "video_prompt" motion prompt following your system instruction. The starting frame of each shot already exists — describe only how it changes over the shot's duration. Write the prompts in order, carrying each shot's ending momentum into the next per CRITICAL RULE 3.
+
+Additional rules:
+- Begin every "video_prompt" with that shot's "generation_directive" text VERBATIM, then continue with the motion description. The video model must generate the longer padded duration; only the middle is kept in the final cut, so let the core action land in the middle of the clip — never at the very first or very last second.${dynNote}
 
 JSON schema:
 {"prompts":[{"shot":1,"video_prompt":"..."}]}
