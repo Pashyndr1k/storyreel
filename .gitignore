@@ -5,3 +5,4 @@ release/
 *.log
 # stray reference images dropped into the project root
 /original-*.webp
+src/lib/*.zip
