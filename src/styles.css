@@ -664,19 +664,6 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 .pal-swatches { display: inline-flex; gap: 2px; margin-left: 6px; vertical-align: middle; }
 .pal-swatches i { width: 10px; height: 10px; border-radius: 3px; border: 1px solid rgba(255, 255, 255, 0.25); }
 /* Stage 5 scene location refs row */
-/* Environment references live with the media (right) half of the layout. */
-.s5-locrow {
-  margin: 2px 0 4px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  margin-left: 50%;
-  padding-left: 8px;
-}
-.s5-locrow .photos-label { margin-top: 0; }
-@media (max-width: 900px) {
-  .s5-locrow { margin-left: 0; align-items: flex-start; padding-left: 0; }
-}
 
 /* ============ ASSETS ============ */
 .stage-head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
@@ -1681,17 +1668,26 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 }
 
 /* ============ STAGE 5 TWO-COLUMN LAYOUT ============ */
-.s5-cols {
+/* Vertical hierarchy: image pair, then video pair, then audio pair. Each
+   pair puts the prompt beside the media generated from it. */
+.s5-pair {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
   gap: 16px;
   align-items: start;
+  padding: 12px 0 10px;
+  border-top: 1px dashed var(--glass-border-soft);
 }
+.shot-card .s5-pair:first-of-type { border-top: none; padding-top: 4px; }
+.s5-pair-audio { grid-template-columns: 1fr; }
 @media (max-width: 900px) {
-  .s5-cols { grid-template-columns: 1fr; }
+  .s5-pair { grid-template-columns: 1fr; }
 }
-.s5-left .field { margin-bottom: 10px; }
-.s5-right { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.s5-pair-prompt { margin: 0; }
+.s5-pair-media { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.s5-refrows { display: flex; gap: 22px; flex-wrap: wrap; }
+.s5-refcol { min-width: 0; }
+.s5-refcol .photos-label { margin-top: 2px; }
 .s5-media-row { display: flex; gap: 10px; align-items: stretch; }
 .s5-apply {
   flex: none;

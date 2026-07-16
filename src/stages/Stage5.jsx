@@ -644,46 +644,6 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         })}
       </div>
 
-      <div className="s5-locrow">
-        <label className="photos-label">{t('scene.photos')}</label>
-        <div className="photo-row">
-          {(scene?.photos || []).map((ph, i) => (
-            <div key={i} className="photo-thumb">
-              <img src={ph} alt="" />
-              <button className="photo-x" onClick={() => updateScenePhotos((scene.photos || []).filter((_, j) => j !== i))}>
-                ✕
-              </button>
-            </div>
-          ))}
-          {(scene?.photos || []).length < 3 && (
-            <>
-              <label className="photo-add" title={t('pick.upload')} aria-label={t('pick.upload')}>
-                <Upload size={20} />
-                <input
-                  type="file"
-                  accept="image/*"
-                  hidden
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    e.target.value = '';
-                    if (f) addScenePhoto(f);
-                  }}
-                />
-              </label>
-              <button
-                type="button"
-                className="photo-add"
-                title={t('pick.fromLib')}
-                aria-label={t('pick.fromLib')}
-                onClick={() => setPickLoc(true)}
-              >
-                <Layers size={20} />
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
       <div className="row">
         {shots.length > 0 && (
           <button className="btn primary" disabled={busy} onClick={generate}>
@@ -748,49 +708,22 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
               </div>
               <p className="shot-summary">{shot.action}</p>
 
-              <div className="s5-cols">
-                {/* Left half: the prompts and their management. */}
-                <div className="s5-left">
-                  <div className="field">
-                    <div className="prompt-head">
-                      <label>{t('s5.img')}</label>
-                      <CopyButton text={p.imagePrompt} />
-                    </div>
-                    <AutoTextarea
-                      minRows={4}
-                      value={p.imagePrompt}
-                      placeholder={t('s5.ph')}
-                      onChange={(e) => setPrompt(shot.id, { imagePrompt: e.target.value })}
-                    />
+              {/* Block 1 — image: the prompt paired with the frame generated
+                  from it, plus every image-generation control. */}
+              <div className="s5-pair">
+                <div className="field s5-pair-prompt">
+                  <div className="prompt-head">
+                    <label>{t('s5.img')}</label>
+                    <CopyButton text={p.imagePrompt} />
                   </div>
-                  <div className="field">
-                    <div className="prompt-head">
-                      <label>{t('s5.vid', { d: dur })}</label>
-                      <CopyButton text={p.videoPrompt} />
-                    </div>
-                    <AutoTextarea
-                      minRows={4}
-                      value={p.videoPrompt}
-                      placeholder={t('s5.ph')}
-                      onChange={(e) => setPrompt(shot.id, { videoPrompt: e.target.value })}
-                    />
-                  </div>
-                  <div className="field">
-                    <div className="prompt-head">
-                      <label>{t('s5.aud')}</label>
-                      <CopyButton text={p.audioPrompt || ''} />
-                    </div>
-                    <AutoTextarea
-                      minRows={3}
-                      value={p.audioPrompt || ''}
-                      placeholder={t('s5.audPh')}
-                      onChange={(e) => setPrompt(shot.id, { audioPrompt: e.target.value })}
-                    />
-                  </div>
+                  <AutoTextarea
+                    minRows={4}
+                    value={p.imagePrompt}
+                    placeholder={t('s5.ph')}
+                    onChange={(e) => setPrompt(shot.id, { imagePrompt: e.target.value })}
+                  />
                 </div>
-
-                {/* Right half: generated media + every generation control. */}
-                <div className="s5-right">
+                <div className="s5-pair-media">
                   <div className="s5-media-row">
                     <aside className="s5-apply">
                       <span className="s5-apply-title">{t('apply.title')}</span>
@@ -981,40 +914,105 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       <div className="note error">{imgErr.msg}</div>
                     ))}
 
-                  <label className="photos-label">{t('asset.shotLabel')}</label>
-                  <div className="photo-row">
-                    {shotAssets.map((a) => (
-                      <div key={a.id} className="photo-thumb asset-thumb-sm" title={a.name}>
-                        <img src={a.photos[0]} alt="" />
-                        <span className="asset-tag">{a.name}</span>
-                        <button className="photo-x" onClick={() => detachAsset(shot.id, a.id)}>✕</button>
+                  {/* Reference material: shot assets and the scene's
+                      environment references side by side. */}
+                  <div className="s5-refrows">
+                    <div className="s5-refcol">
+                      <label className="photos-label">{t('asset.shotLabel')}</label>
+                      <div className="photo-row">
+                        {shotAssets.map((a) => (
+                          <div key={a.id} className="photo-thumb asset-thumb-sm" title={a.name}>
+                            <img src={a.photos[0]} alt="" />
+                            <span className="asset-tag">{a.name}</span>
+                            <button className="photo-x" onClick={() => detachAsset(shot.id, a.id)}>✕</button>
+                          </div>
+                        ))}
+                        <label className="photo-add" title={t('pick.upload')} aria-label={t('pick.upload')}>
+                          <Upload size={20} />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            hidden
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              e.target.value = '';
+                              if (f) uploadAsset(shot.id, f);
+                            }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          className="photo-add"
+                          title={t('asset.fromLib')}
+                          aria-label={t('asset.fromLib')}
+                          onClick={() => setAssetPickFor(shot.id)}
+                        >
+                          <Layers size={20} />
+                        </button>
                       </div>
-                    ))}
-                    <label className="photo-add" title={t('pick.upload')} aria-label={t('pick.upload')}>
-                      <Upload size={20} />
-                      <input
-                        type="file"
-                        accept="image/*"
-                        hidden
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          e.target.value = '';
-                          if (f) uploadAsset(shot.id, f);
-                        }}
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      className="photo-add"
-                      title={t('asset.fromLib')}
-                      aria-label={t('asset.fromLib')}
-                      onClick={() => setAssetPickFor(shot.id)}
-                    >
-                      <Layers size={20} />
-                    </button>
+                    </div>
+                    <div className="s5-refcol">
+                      <label className="photos-label">{t('scene.photos')}</label>
+                      <div className="photo-row">
+                        {(scene?.photos || []).map((ph, j) => (
+                          <div key={j} className="photo-thumb">
+                            <img src={ph} alt="" />
+                            <button
+                              className="photo-x"
+                              onClick={() => updateScenePhotos((scene.photos || []).filter((_, k) => k !== j))}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                        {(scene?.photos || []).length < 3 && (
+                          <>
+                            <label className="photo-add" title={t('pick.upload')} aria-label={t('pick.upload')}>
+                              <Upload size={20} />
+                              <input
+                                type="file"
+                                accept="image/*"
+                                hidden
+                                onChange={(e) => {
+                                  const f = e.target.files?.[0];
+                                  e.target.value = '';
+                                  if (f) addScenePhoto(f);
+                                }}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              className="photo-add"
+                              title={t('pick.fromLib')}
+                              aria-label={t('pick.fromLib')}
+                              onClick={() => setPickLoc(true)}
+                            >
+                              <Layers size={20} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
                   </div>
+                </div>
+              </div>
 
-                  {/* Video block: player + its control row, same compact design. */}
+              {/* Block 2 — video: the prompt paired with the video generated
+                  from it, plus the video-generation controls. */}
+              <div className="s5-pair">
+                <div className="field s5-pair-prompt">
+                  <div className="prompt-head">
+                    <label>{t('s5.vid', { d: dur })}</label>
+                    <CopyButton text={p.videoPrompt} />
+                  </div>
+                  <AutoTextarea
+                    minRows={4}
+                    value={p.videoPrompt}
+                    placeholder={t('s5.ph')}
+                    onChange={(e) => setPrompt(shot.id, { videoPrompt: e.target.value })}
+                  />
+                </div>
+                <div className="s5-pair-media">
                   {shotVid && (
                     <div className="img-wrap vid-wrap">
                       <video src={shotVid} controls preload="metadata" />
@@ -1056,6 +1054,25 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                   </div>
                 </div>
               </div>
+
+              {/* Block 3 — audio: only when the shot carries character
+                  dialogue (or an audio prompt already exists). */}
+              {((shot.dialogue || '').trim() || (p.audioPrompt || '').trim()) && (
+                <div className="s5-pair s5-pair-audio">
+                  <div className="field s5-pair-prompt">
+                    <div className="prompt-head">
+                      <label>{t('s5.aud')}</label>
+                      <CopyButton text={p.audioPrompt || ''} />
+                    </div>
+                    <AutoTextarea
+                      minRows={3}
+                      value={p.audioPrompt || ''}
+                      placeholder={t('s5.audPh')}
+                      onChange={(e) => setPrompt(shot.id, { audioPrompt: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           );
         })
