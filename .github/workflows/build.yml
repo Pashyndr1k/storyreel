@@ -15,10 +15,12 @@ jobs:
       # its own installer independently.
       fail-fast: false
       matrix:
-        # macos-13 is Intel (x64), macos-14 is Apple Silicon (arm64). We build
+        # macos-15-intel is x64, macos-14 is Apple Silicon (arm64). We build
         # a native dmg on each so ffmpeg-static's single-arch binary matches
         # the target (a universal build can't merge that single-arch binary).
-        os: [windows-latest, macos-13, macos-14]
+        # macos-13 was retired Dec 2025; macos-15-intel is the Intel label
+        # GitHub provides through Aug 2027.
+        os: [windows-latest, macos-15-intel, macos-14]
     runs-on: ${{ matrix.os }}
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
