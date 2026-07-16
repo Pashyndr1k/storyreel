@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
-import { generateCoverImage } from '../lib/gemini.js';
+import { generateCoverImage, generateImage } from '../lib/gemini.js';
+import { resizeDataURL } from '../lib/images.js';
+import { Wand } from '../components/icons.jsx';
 import { stage2Prompt, extractCharacterPrompt, coverPromptSpec } from '../lib/prompts.js';
 import { uid } from '../lib/storage.js';
 import { fileToResizedDataURL } from '../lib/images.js';
@@ -150,6 +152,37 @@ export default function Stage2({ project, update, rawUpdate, settings, goNext, o
 
   const removePhoto = (id, idx) =>
     updateChar(id, (c) => ({ photos: (c.photos || []).filter((_, i) => i !== idx) }));
+
+  // Generate a reference portrait straight from the written description —
+  // no real photo needed. The result joins the photos like an upload would.
+  const [portraitBusy, setPortraitBusy] = useState(null);
+  const genPortrait = async (c) => {
+    if (!settings.geminiKey) {
+      window.alert(t('err.noGeminiKey'));
+      return;
+    }
+    if (!(c.description || '').trim() && !(c.name || '').trim()) {
+      window.alert(t('char.portraitNeedsDesc'));
+      return;
+    }
+    setPortraitBusy(c.id);
+    try {
+      let prompt = '';
+      if (imageStyle?.trim()) prompt += `Visual style: ${imageStyle.trim()}\n\n`;
+      prompt += `Character reference portrait of ${c.name || 'the character'}${c.role ? ` (${c.role})` : ''}: ${c.description || ''}
+
+One single person, chest-up portrait, face fully visible and evenly lit, looking slightly off-camera, plain unobtrusive background, no text, no watermarks. Render the face, hair and distinguishing features precisely and unambiguously — this image becomes the character's visual reference for every future shot.`;
+      const raw = await generateImage(settings, { prompt, aspectRatio: '1:1', imageSize: '1K' });
+      const dataURL = await resizeDataURL(raw, 640 * 640, 0.8); // reference-photo size
+      const photos = [...(c.photos || []), dataURL].slice(0, 3);
+      updateChar(c.id, { photos });
+      syncToLibrary(c, photos);
+    } catch (e) {
+      window.alert(e.message || String(e));
+    } finally {
+      setPortraitBusy(null);
+    }
+  };
 
   const extract = (c) => {
     if (c.description?.trim() && !window.confirm(t('char.extractConfirm'))) return;
@@ -303,6 +336,16 @@ export default function Stage2({ project, update, rawUpdate, settings, goNext, o
                       onClick={() => setPickFor(c.id)}
                     >
                       <Layers size={20} />
+                    </button>
+                    <button
+                      type="button"
+                      className="photo-add"
+                      title={t('char.genPortrait')}
+                      aria-label={t('char.genPortrait')}
+                      disabled={portraitBusy === c.id}
+                      onClick={() => genPortrait(c)}
+                    >
+                      {portraitBusy === c.id ? <span className="voice-dots">…</span> : <Wand size={20} />}
                     </button>
                   </>
                 )}

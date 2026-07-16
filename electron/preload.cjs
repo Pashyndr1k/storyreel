@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('comfyBridge', {
 contextBridge.exposeInMainWorld('ffmpegBridge', {
   check: () => ipcRenderer.invoke('ffmpeg-check'),
   render: (job) => ipcRenderer.invoke('ffmpeg-render', job),
+  cancel: () => ipcRenderer.invoke('ffmpeg-cancel'),
   onProgress: (cb) => {
     const handler = (_e, p) => cb(p);
     ipcRenderer.on('ffmpeg-progress', handler);

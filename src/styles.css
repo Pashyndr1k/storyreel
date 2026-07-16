@@ -656,6 +656,13 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 .photo-row { align-items: flex-start; }
 .photo-add:hover { border-color: #7c5cff; background: rgba(139, 92, 246, 0.16); }
 
+/* scene palette swatches inside the toggle */
+.pal-swatches { display: inline-flex; gap: 2px; margin-left: 6px; vertical-align: middle; }
+.pal-swatches i { width: 10px; height: 10px; border-radius: 3px; border: 1px solid rgba(255, 255, 255, 0.25); }
+/* Stage 5 scene location refs row */
+.s5-locrow { margin: 2px 0 4px; }
+.s5-locrow .photos-label { margin-top: 0; }
+
 /* ============ ASSETS ============ */
 .stage-head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .stage-head-row h2 { margin: 0; }

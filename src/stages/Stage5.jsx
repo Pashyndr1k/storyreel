@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage } from '../lib/gemini.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
@@ -14,8 +14,17 @@ import { blockForScene, DYNAMICS_CONFIG } from '../lib/dynamics.js';
 import AssetsModal from '../components/AssetsModal.jsx';
 import LibraryPicker from '../components/LibraryPicker.jsx';
 import { newLibraryEntry } from '../lib/library.js';
-import { fileToResizedDataURL } from '../lib/images.js';
-import { Download, RestoreIcon, MapPin, Upload, Layers, Grid } from '../components/icons.jsx';
+import { fileToResizedDataURL, resizeDataURL } from '../lib/images.js';
+import { extractPalette } from '../lib/palette.js';
+import { Download, RestoreIcon, MapPin, Upload, Layers, Grid, Trash } from '../components/icons.jsx';
+
+const readFileDataURL = (file) =>
+  new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(new Error('Could not read the file.'));
+    r.readAsDataURL(file);
+  });
 
 // Small white icon on a round semi-transparent black chip, overlaid on images.
 function IconAction({ title, disabled, onClick, children }) {
@@ -56,6 +65,19 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const [locSaved, setLocSaved] = useState(null); // shotId whose location ref was just saved
   const [showAssets, setShowAssets] = useState(false); // asset library manager
   const [assetPickFor, setAssetPickFor] = useState(null); // shotId choosing an asset
+  const [pickLoc, setPickLoc] = useState(false); // scene location picker
+  const [mediaProg, setMediaProg] = useState(null); // { a, b } scene-media queue
+  const mediaCancel = useRef(false);
+  const [palette, setPalette] = useState(null); // { src: shotId, colors: [] } for this scene
+
+  // Always-fresh project reference: generation handlers (and especially the
+  // scene-media queue, which runs across many state updates) must read prompts
+  // and frames at CALL time, never from a render-time closure — a stale
+  // closure is exactly how an edited video prompt got ignored on regeneration.
+  const projectRef = useRef(project);
+  projectRef.current = project;
+  const paletteRef = useRef(palette);
+  paletteRef.current = palette;
   const { busy, error, runMany, runBatch } = useGenerate(settings);
 
   const scene = project.outline.find((s) => s.id === sceneId) || project.outline[0];
@@ -107,9 +129,61 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     }
   };
 
-  const prefFor = (shotId) => refPrefs[shotId] || { char: true, loc: true, asset: true };
+  const prefFor = (shotId) => refPrefs[shotId] || { char: true, loc: true, asset: true, palette: true };
   const setPref = (shotId, patch) =>
-    setRefPrefs((prev) => ({ ...prev, [shotId]: { char: true, loc: true, asset: true, ...prev[shotId], ...patch } }));
+    setRefPrefs((prev) => ({
+      ...prev,
+      [shotId]: { char: true, loc: true, asset: true, palette: true, ...prev[shotId], ...patch },
+    }));
+
+  // Scene palette: quantized from the scene's FIRST generated frame; applied
+  // to later frames (toggleable per shot) to keep the grading consistent.
+  const paletteSrcShot = shots.find((s) => (project.shotImages || {})[s.id]);
+  const paletteSrcImg = paletteSrcShot ? project.shotImages[paletteSrcShot.id] : null;
+  useEffect(() => {
+    let alive = true;
+    if (!paletteSrcImg) {
+      setPalette(null);
+      return undefined;
+    }
+    extractPalette(paletteSrcImg, 5).then((colors) => {
+      if (alive) setPalette(colors.length ? { src: paletteSrcShot.id, colors } : null);
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paletteSrcImg, scene?.id]);
+
+  // Scene location references (same data Stage 4 edits: scene.photos).
+  const updateScenePhotos = (photos) =>
+    update((p) => ({
+      outline: p.outline.map((s) => (s.id === scene.id ? { ...s, photos } : s)),
+    }));
+  const syncLocationToLibrary = (photos) => {
+    if (!libUpsert || !photos.length) return;
+    libUpsert({
+      id: `libl_${project.id}_${scene.id}`,
+      kind: 'location',
+      name: scene.title || '',
+      type: 'other',
+      description: scene.summary || '',
+      photos,
+      projectId: project.id,
+      projectTitle: project.title,
+      createdAt: Date.now(),
+    });
+  };
+  const addScenePhoto = async (file) => {
+    try {
+      const dataURL = await fileToResizedDataURL(file);
+      const photos = [...(scene.photos || []), dataURL].slice(0, 3);
+      updateScenePhotos(photos);
+      syncLocationToLibrary(photos);
+    } catch (e) {
+      window.alert(e.message);
+    }
+  };
 
   // Each generation is two calls (image prompts, then video prompts), each
   // returning only its own field — so merge into the existing entry, never
@@ -166,9 +240,12 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       },
     }));
 
-  // Generate the shot image via Gemini, attaching reference photos per the checkboxes.
+  // Generate the shot image via Gemini, attaching reference photos per the
+  // checkboxes. Prompts and frames are read through projectRef so queued or
+  // rapid regenerations always see the latest edits.
   const genImage = async (shot) => {
-    const prompt = project.shotPrompts[shot.id]?.imagePrompt?.trim();
+    const cur = projectRef.current;
+    const prompt = cur.shotPrompts[shot.id]?.imagePrompt?.trim();
     if (!prompt) return setImgErr({ id: shot.id, msg: t('img.needPrompt') });
     if (!settings.geminiKey) return setImgErr({ id: shot.id, msg: 'NO_GEMINI_KEY' });
 
@@ -178,6 +255,8 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const shotAssets = pref.asset ? assetsFor(shot.id) : [];
     const useAssets = shotAssets.map((a) => a.photos[0]);
     const images = [...useChar, ...useLoc, ...useAssets];
+    const pal = paletteRef.current;
+    const usePalette = pref.palette && pal?.colors?.length && shot.id !== pal.src;
 
     let text = '';
     if (imageStyle?.trim()) text += `Visual style: ${imageStyle.trim()}\n\n`;
@@ -204,6 +283,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         off += useAssets.length;
       }
     }
+    if (usePalette) {
+      text += `\n\nSCENE COLOR PALETTE — grade this frame to match the scene's established palette (extracted from its first frame): ${pal.colors.join(', ')}. Keep hues, color temperature and overall tone consistent with that frame, unless the shot's action explicitly changes the lighting.`;
+    }
     const ratio = project.aspectRatio || '16:9';
     text += `\n\nRender in ${aspectDescription(ratio)} (${ratio}) aspect ratio.`;
 
@@ -218,6 +300,46 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       setImgBusy(null);
     }
   };
+
+  // Upload a finished first frame (replaces generation; joins version history).
+  const uploadShotImage = async (shot, file) => {
+    try {
+      const raw = await readFileDataURL(file);
+      const img = await resizeDataURL(raw, Number.POSITIVE_INFINITY, 0.92);
+      pushVersion(shot.id, img);
+    } catch (e) {
+      setImgErr({ id: shot.id, msg: e.message || String(e) });
+    }
+  };
+
+  // Upload a finished shot video; its real duration is probed so the Stage-6
+  // trim rules know how much raw material exists.
+  const uploadShotVideo = async (shot, file) => {
+    try {
+      const dataURL = await readFileDataURL(file);
+      const dur = await new Promise((res) => {
+        const v = document.createElement('video');
+        v.preload = 'metadata';
+        v.onloadedmetadata = () => res(Number.isFinite(v.duration) ? v.duration : 0);
+        v.onerror = () => res(0);
+        v.src = dataURL;
+      });
+      update((p) => ({
+        shotVideos: { ...(p.shotVideos || {}), [shot.id]: dataURL },
+        videoGenDurations: { ...(p.videoGenDurations || {}), [shot.id]: Math.round(dur * 10) / 10 },
+      }));
+    } catch (e) {
+      setImgErr({ id: shot.id, msg: e.message || String(e) });
+    }
+  };
+
+  // Drop the final frame — video generation reverts to first-frame-only (i2v).
+  const deleteFinalFrame = (shot) =>
+    update((p) => {
+      const next = { ...(p.shotFinalImages || {}) };
+      delete next[shot.id];
+      return { shotFinalImages: next };
+    });
 
   // New image becomes current; the previous current joins the history (max 5).
   const pushVersion = (shotId, img) =>
@@ -351,6 +473,44 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     }
   };
 
+  // Generate every missing image and video for the current scene, one job at
+  // a time (the GPU and the image API both prefer it). Reads state through
+  // projectRef between jobs, so each video sees the frame generated just
+  // before it. Failures are skipped; the queue continues.
+  const processSceneMedia = async () => {
+    mediaCancel.current = false;
+    const list = shots;
+    const planned =
+      list.filter((s) => !(projectRef.current.shotImages || {})[s.id] && projectRef.current.shotPrompts[s.id]?.imagePrompt?.trim()).length +
+      list.filter((s) => !(projectRef.current.shotVideos || {})[s.id] && projectRef.current.shotPrompts[s.id]?.videoPrompt?.trim()).length;
+    if (!planned) return;
+    let done = 0;
+    setMediaProg({ a: 0, b: planned });
+    for (const shot of list) {
+      if (mediaCancel.current) break;
+      const cur = projectRef.current;
+      if (!(cur.shotImages || {})[shot.id] && cur.shotPrompts[shot.id]?.imagePrompt?.trim()) {
+        await genImage(shot);
+        done++;
+        setMediaProg({ a: done, b: planned });
+      }
+    }
+    for (const [i, shot] of list.entries()) {
+      if (mediaCancel.current) break;
+      const cur = projectRef.current;
+      if (
+        !(cur.shotVideos || {})[shot.id] &&
+        cur.shotPrompts[shot.id]?.videoPrompt?.trim() &&
+        (cur.shotImages || {})[shot.id]
+      ) {
+        await genVideo(shot, i);
+        done++;
+        setMediaProg({ a: done, b: planned });
+      }
+    }
+    setMediaProg(null);
+  };
+
   const downloadImage = (shot, i, final) => {
     const img = final ? (project.shotFinalImages || {})[shot.id] : project.shotImages[shot.id];
     if (!img) return;
@@ -380,10 +540,13 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   // first/last-frame workflow when a final frame exists. The result plays
   // inline and a copy lands in the local outputs folder.
   const genVideo = async (shot, i) => {
-    const first = (project.shotImages || {})[shot.id];
-    const vPrompt = (project.shotPrompts[shot.id]?.videoPrompt || '').trim();
+    // Read through projectRef: the prompt/frames must be the LATEST state at
+    // call time (fixes regeneration using a stale video prompt after edits).
+    const cur = projectRef.current;
+    const first = (cur.shotImages || {})[shot.id];
+    const vPrompt = (cur.shotPrompts[shot.id]?.videoPrompt || '').trim();
     if (!first || !vPrompt) return;
-    const last = (project.shotFinalImages || {})[shot.id] || null;
+    const last = (cur.shotFinalImages || {})[shot.id] || null;
     setImgBusy(`${shot.id}:vid`);
     setImgErr(null);
     // +2s padding rule: generate longer than the timeline needs; Stage 6 trims
@@ -444,6 +607,46 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         })}
       </div>
 
+      <div className="s5-locrow">
+        <label className="photos-label">{t('scene.photos')}</label>
+        <div className="photo-row">
+          {(scene?.photos || []).map((ph, i) => (
+            <div key={i} className="photo-thumb">
+              <img src={ph} alt="" />
+              <button className="photo-x" onClick={() => updateScenePhotos((scene.photos || []).filter((_, j) => j !== i))}>
+                ✕
+              </button>
+            </div>
+          ))}
+          {(scene?.photos || []).length < 3 && (
+            <>
+              <label className="photo-add" title={t('pick.upload')} aria-label={t('pick.upload')}>
+                <Upload size={20} />
+                <input
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = '';
+                    if (f) addScenePhoto(f);
+                  }}
+                />
+              </label>
+              <button
+                type="button"
+                className="photo-add"
+                title={t('pick.fromLib')}
+                aria-label={t('pick.fromLib')}
+                onClick={() => setPickLoc(true)}
+              >
+                <Layers size={20} />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
       <div className="row">
         {shots.length > 0 && (
           <button className="btn primary" disabled={busy} onClick={generate}>
@@ -451,7 +654,20 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           </button>
         )}
         <button className="btn" disabled={busy} onClick={processAll}>{t('batch.run5')}</button>
+        {shots.length > 0 && (
+          <button className="btn" disabled={busy || !!mediaProg || !!imgBusy} onClick={processSceneMedia}>
+            {t('s5.genMedia')}
+          </button>
+        )}
         {prog && <span className="total-badge">{t('batch.progress', { a: prog.a, b: prog.b })}</span>}
+        {mediaProg && (
+          <>
+            <span className="total-badge">{t('s5.mediaProg', { a: mediaProg.a, b: mediaProg.b })}</span>
+            <button className="btn small danger" onClick={() => { mediaCancel.current = true; }}>
+              {t('s6.cancel')}
+            </button>
+          </>
+        )}
         <button className="btn push-right" onClick={() => setShowAssets(true)}>
           <Grid size={15} /> {t('asset.libBtn')}
         </button>
@@ -535,6 +751,19 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       {imgBusy === shot.id ? t('img.generating') : t('img.generate')}
                     </button>
                   )}
+                  <label className="btn small file-btn" title={t('img.uploadTip')}>
+                    <Upload size={14} /> {t('img.upload')}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        e.target.value = '';
+                        if (f) uploadShotImage(shot, f);
+                      }}
+                    />
+                  </label>
                   {genImg && anyBusy && <span className="hint">{t('img.generating')}</span>}
                   <button
                     type="button"
@@ -565,6 +794,24 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                   >
                     <span className="box" />
                     {t('img.useAssets')}
+                  </button>
+                  <button
+                    type="button"
+                    className={`check-toggle ${pref.palette ? 'on' : ''}`}
+                    disabled={!palette || palette.src === shot.id}
+                    aria-pressed={pref.palette}
+                    title={t('img.paletteTip')}
+                    onClick={() => setPref(shot.id, { palette: !pref.palette })}
+                  >
+                    <span className="box" />
+                    {t('img.usePalette')}
+                    {palette && (
+                      <span className="pal-swatches">
+                        {palette.colors.map((c) => (
+                          <i key={c} style={{ background: c }} />
+                        ))}
+                      </span>
+                    )}
                   </button>
                 </div>
 
@@ -622,6 +869,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                                 </IconAction>
                                 <IconAction title={t('img.downloadFinal')} onClick={() => downloadImage(shot, i, true)}>
                                   <Download size={14} />
+                                </IconAction>
+                                <IconAction title={t('img.finalDelete')} disabled={anyBusy} onClick={() => deleteFinalFrame(shot)}>
+                                  <Trash size={14} />
                                 </IconAction>
                               </div>
                             </div>
@@ -698,6 +948,19 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       {vidBusy ? t('vid.generating') : t('vid.generate')}
                     </button>
                   )}
+                  <label className="btn small file-btn" title={t('vid.uploadTip')}>
+                    <Upload size={14} /> {t('vid.upload')}
+                    <input
+                      type="file"
+                      accept="video/*"
+                      hidden
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        e.target.value = '';
+                        if (f) uploadShotVideo(shot, f);
+                      }}
+                    />
+                  </label>
                   {shotVid && vidBusy && <span className="hint">{t('vid.generating')}</span>}
                   {!genImg && <span className="hint">{t('vid.needFrame')}</span>}
                   {genImg && (
@@ -752,6 +1015,17 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           library={library}
           onPick={(entry) => attachAsset(assetPickFor, entry.id)}
           onClose={() => setAssetPickFor(null)}
+        />
+      )}
+      {pickLoc && (
+        <LibraryPicker
+          kind="location"
+          library={library}
+          onPick={(entry) => {
+            const photos = [...(scene.photos || []), ...entry.photos].slice(0, 3);
+            updateScenePhotos(photos);
+          }}
+          onClose={() => setPickLoc(false)}
         />
       )}
     </section>

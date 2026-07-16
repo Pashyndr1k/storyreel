@@ -42,6 +42,21 @@ function hasAudio(file) {
 
 const MIN_FADE = 0.04; // one frame @25fps — below this a boundary is a hard cut
 
+// The active render process, so the renderer can cancel it.
+let activeProc = null;
+let canceled = false;
+function cancelActive() {
+  canceled = true;
+  if (activeProc) {
+    try {
+      activeProc.kill('SIGKILL');
+    } catch {
+      /* already gone */
+    }
+  }
+  return true;
+}
+
 // job = {
 //   width, height, fps,
 //   segments: [{ kind:'video'|'image'|'black', file, trimStart, duration, tailSlack }],
@@ -154,7 +169,9 @@ async function renderJob(job, onProgress) {
     const { args, totalSec } = buildArgs({ ...job, segments });
 
     return await new Promise((resolve) => {
+      canceled = false;
       const proc = spawn(ffmpegPath(), args, { windowsHide: true });
+      activeProc = proc;
       let errTail = '';
       proc.stderr.on('data', (d) => {
         errTail = (errTail + d.toString()).slice(-4000);
@@ -166,9 +183,14 @@ async function renderJob(job, onProgress) {
           onProgress({ sec: us / 1e6, total: totalSec });
         }
       });
-      proc.on('error', (e) => resolve({ ok: false, error: String(e.message || e) }));
+      proc.on('error', (e) => {
+        activeProc = null;
+        resolve({ ok: false, error: String(e.message || e) });
+      });
       proc.on('close', (code) => {
-        if (code === 0 && fs.existsSync(job.outPath)) resolve({ ok: true, path: job.outPath });
+        activeProc = null;
+        if (canceled) resolve({ ok: false, canceled: true });
+        else if (code === 0 && fs.existsSync(job.outPath)) resolve({ ok: true, path: job.outPath });
         else resolve({ ok: false, error: errTail.split('\n').slice(-8).join('\n') || `ffmpeg exited with ${code}` });
       });
     });
@@ -181,4 +203,4 @@ async function renderJob(job, onProgress) {
   }
 }
 
-module.exports = { ffmpegPath, ffmpegVersion, buildArgs, renderJob };
+module.exports = { ffmpegPath, ffmpegVersion, buildArgs, renderJob, cancelActive };

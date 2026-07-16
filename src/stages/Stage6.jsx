@@ -398,7 +398,7 @@ export default function Stage6({ project, update, settings }) {
     try {
       const res = await window.ffmpegBridge.render({ width: w, height: h, fps: 25, segments, transitions, outPath });
       if (res?.ok) setRenderDone(res.path);
-      else setRenderErr(res?.error || 'ffmpeg failed');
+      else if (!res?.canceled) setRenderErr(res?.error || 'ffmpeg failed');
     } catch (e) {
       setRenderErr(String(e?.message || e));
     } finally {
@@ -947,11 +947,15 @@ export default function Stage6({ project, update, settings }) {
                   : t('s6.renderProg', { a: renderProg.a, b: renderProg.b })}
               </span>
             )}
-            {!window.ffmpegBridge && (
-              <button className="btn small danger" onClick={() => { cancelRef.current = true; }}>
-                {t('s6.cancel')}
-              </button>
-            )}
+            <button
+              className="btn small danger"
+              onClick={() => {
+                cancelRef.current = true;
+                window.ffmpegBridge?.cancel?.();
+              }}
+            >
+              {t('s6.cancel')}
+            </button>
           </>
         )}
       </div>

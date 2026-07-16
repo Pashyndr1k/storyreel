@@ -42,6 +42,14 @@ function characterBlock(project) {
     .join('\n');
 }
 
+// Hard realizability rules for Stage-1 ideas: every pitched direction must be
+// producible with AI video generation (discrete single-camera shots only).
+const STAGE1_PRODUCTION_CONSTRAINTS = `PRODUCTION CONSTRAINTS (AI video generation limits — every pitched idea MUST be realizable within them):
+- Do NOT propose sequences designed as a single continuous take ("oner", long unbroken tracking shots). Stories must break into discrete, cuttable shots.
+- Do NOT propose split-screen, picture-in-picture, multi-panel or any layout showing more than one video frame at once.
+- No single shot may run longer than 15 seconds — ideally 10 seconds or less. Plan action in short beats that cut well.
+- Every shot is exactly one video frame captured by one camera — no composites, no simultaneous viewpoints, no in-shot montages.`;
+
 // Default Stage-1 plot-generation persona, used when no randomization method
 // supplies its own directorial persona.
 const STAGE1_DEFAULT_PERSONA =
@@ -55,7 +63,7 @@ export function stage1Prompt(project, lang, scriptStyle, randomizationMethods) {
   return {
     // The concrete random picks, so the UI can annotate the generated ideas.
     applied,
-    system: system(lang, scriptStyle) + persona + systemAppend,
+    system: system(lang, scriptStyle) + `\n\n${STAGE1_PRODUCTION_CONSTRAINTS}` + persona + systemAppend,
     maxTokens: 2500,
     user: `Brief plot description for a short video (target length: ${d.min}–${d.max} seconds):
 

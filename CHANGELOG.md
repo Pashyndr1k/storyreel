@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.14.1 — 2026-07-15
+
+- Stage 6: the FFmpeg render can now be cancelled mid-run — the Cancel
+  button kills the encoder process and cleans up without treating it as an
+  error.
+- Stage 1 now enforces production constraints on every pitched idea: no
+  single-continuous-take ("oner") sequences, no split-screen or
+  picture-in-picture layouts, no shot longer than 15 seconds (ideally ≤10),
+  and every shot is exactly one frame captured by one camera.
+- Stage 5: upload your own finished image or video for any shot (the video's
+  duration is probed and recorded so montage math stays correct).
+- Stage 5: a Delete button on the final frame reverts a shot to the
+  first-frame-only (i2v) workflow.
+- Stage 5: "Generate scene media" button batch-generates every missing image
+  and then every missing video in the scene, with progress and a Cancel.
+- Stage 5: scene location references can now be added per scene — upload a
+  photo or pick one from the library.
+- Stage 2: a wand button on each character card generates a reference
+  portrait straight from the character's description (1:1, chest-up, evenly
+  lit) and files it into the character's photos and the library.
+- Stage 5: scene color palette — the dominant colors of the scene's first
+  generated frame are extracted and injected into subsequent frame prompts
+  so the whole scene grades consistently; a per-shot toggle disables it.
+- Fixed: edits made to a video prompt were ignored on re-generation (the
+  generator read a stale copy of the project); it now reads the live state
+  at call time.
+
 ## 1.14.0 — 2026-07-14
 
 - The Stage-6 render engine switched from realtime canvas capture to a
