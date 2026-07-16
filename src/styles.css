@@ -1591,7 +1591,55 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 }
 
 /* update-available toast (bottom-left; stale toast owns bottom-right) */
-.update-toast { right: auto; left: 24px; }
+/* Update notification: deliberately louder than the generic stale toast so a
+   new release is hard to miss — bigger frame, vivid violet, glowing pulse. */
+.update-toast {
+  right: auto;
+  left: 24px;
+  max-width: 440px;
+  padding: 22px 24px;
+  border-radius: 20px;
+  border: 2px solid var(--accent);
+  background: linear-gradient(150deg, #3a1d6e 0%, #241a4a 55%, #1a1330 100%);
+  box-shadow:
+    0 22px 60px rgba(0, 0, 0, 0.55),
+    0 0 0 4px rgba(168, 85, 247, 0.14),
+    0 0 34px rgba(168, 85, 247, 0.5);
+  animation: update-pulse 2.2s ease-in-out infinite;
+}
+.update-toast p {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.35;
+  color: #ffffff;
+}
+.update-toast .row { margin: 14px 0 0; gap: 10px; }
+.update-toast .btn.small {
+  font-size: 13.5px;
+  padding: 9px 16px;
+}
+.update-toast .btn.primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 6px 18px rgba(168, 85, 247, 0.5);
+}
+@keyframes update-pulse {
+  0%, 100% {
+    box-shadow:
+      0 22px 60px rgba(0, 0, 0, 0.55),
+      0 0 0 4px rgba(168, 85, 247, 0.14),
+      0 0 30px rgba(168, 85, 247, 0.4);
+  }
+  50% {
+    box-shadow:
+      0 22px 60px rgba(0, 0, 0, 0.55),
+      0 0 0 6px rgba(168, 85, 247, 0.24),
+      0 0 46px rgba(168, 85, 247, 0.7);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .update-toast { animation: none; }
+}
 
 /* crash fallback */
 .crash { max-width: 620px; margin: 40px auto; text-align: center; }
