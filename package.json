@@ -58,10 +58,7 @@
     },
     "mac": {
       "target": [
-        {
-          "target": "dmg",
-          "arch": "universal"
-        }
+        "dmg"
       ],
       "category": "public.app-category.video",
       "minimumSystemVersion": "11.0",

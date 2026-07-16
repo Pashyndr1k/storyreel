@@ -11,8 +11,14 @@ permissions:
 jobs:
   build:
     strategy:
+      # Don't let one platform's failure cancel the others — each publishes
+      # its own installer independently.
+      fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        # macos-13 is Intel (x64), macos-14 is Apple Silicon (arm64). We build
+        # a native dmg on each so ffmpeg-static's single-arch binary matches
+        # the target (a universal build can't merge that single-arch binary).
+        os: [windows-latest, macos-13, macos-14]
     runs-on: ${{ matrix.os }}
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
