@@ -32,7 +32,8 @@
       {
         "provider": "github",
         "owner": "Pashyndr1k",
-        "repo": "storyreel"
+        "repo": "storyreel",
+        "releaseType": "release"
       }
     ],
     "files": [
