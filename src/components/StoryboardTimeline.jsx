@@ -190,12 +190,25 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
       </div>
 
       {playing && (
-        <div className="sb-preview">
-          {sb[current?.id] ? (
-            <img src={sb[current.id]} alt="" />
-          ) : (
-            <div className="sb-preview-empty">{t('s4.shot', { n: shots.indexOf(current) + 1 })}</div>
-          )}
+        <div className="sb-preview-row">
+          <div className="sb-preview">
+            {sb[current?.id] ? (
+              <img src={sb[current.id]} alt="" />
+            ) : (
+              <div className="sb-preview-empty">{t('s4.shot', { n: shots.indexOf(current) + 1 })}</div>
+            )}
+          </div>
+          {/* Live caption: what the animatic is showing right now. */}
+          <div className="sb-caption">
+            <strong>{scene.title || ''}</strong>
+            <span className="sb-cap-meta">
+              {t('s4.shot', { n: shots.indexOf(current) + 1 })}
+              {current?.shotType ? ` · ${current.shotType}` : ''}
+              {current?.location ? ` · ${current.location}` : ''}
+            </span>
+            <p>{current?.action || scene.summary || ''}</p>
+            {current?.dialogue && <p className="sb-cap-dlg">{current.dialogue}</p>}
+          </div>
         </div>
       )}
 
