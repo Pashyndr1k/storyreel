@@ -17,3 +17,14 @@ contextBridge.exposeInMainWorld('localFiles', {
 contextBridge.exposeInMainWorld('comfyBridge', {
   request: (opts) => ipcRenderer.invoke('comfy-request', opts),
 });
+
+// FFmpeg timeline rendering in the main process.
+contextBridge.exposeInMainWorld('ffmpegBridge', {
+  check: () => ipcRenderer.invoke('ffmpeg-check'),
+  render: (job) => ipcRenderer.invoke('ffmpeg-render', job),
+  onProgress: (cb) => {
+    const handler = (_e, p) => cb(p);
+    ipcRenderer.on('ffmpeg-progress', handler);
+    return () => ipcRenderer.removeListener('ffmpeg-progress', handler);
+  },
+});

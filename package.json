@@ -1,7 +1,7 @@
 {
   "name": "storyreel",
   "productName": "StoryReel",
-  "version": "1.13.0",
+  "version": "1.14.0",
   "private": true,
   "description": "AI assistant for writing short videos: from plot idea to per-shot image & video generation prompts.",
   "author": "StoryReel",
@@ -15,6 +15,7 @@
     "dist:mac": "npm run build && electron-builder --mac"
   },
   "dependencies": {
+    "ffmpeg-static": "^5.3.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -27,13 +28,40 @@
   "build": {
     "appId": "com.storyreel.app",
     "productName": "StoryReel",
-    "publish": [{ "provider": "github", "owner": "Pashyndr1k", "repo": "storyreel" }],
-    "files": ["dist/**", "electron/**"],
-    "directories": { "output": "release" },
-    "win": { "target": ["nsis", "portable"] },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Pashyndr1k",
+        "repo": "storyreel"
+      }
+    ],
+    "files": [
+      "dist/**",
+      "electron/**"
+    ],
+    "asarUnpack": [
+      "**/node_modules/ffmpeg-static/**"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
     "mac": {
-      "target": [{ "target": "dmg", "arch": "universal" }],
+      "target": [
+        {
+          "target": "dmg",
+          "arch": "universal"
+        }
+      ],
       "category": "public.app-category.video",
       "minimumSystemVersion": "11.0",
       "extendInfo": {

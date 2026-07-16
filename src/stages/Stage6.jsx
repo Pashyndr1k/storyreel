@@ -5,17 +5,67 @@ import { blockForScene, defaultTrim, transitionFor, overlapSeconds } from '../li
 import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
 import { Play, StopSq, Grip, Download } from '../components/icons.jsx';
 
-// Manual transition overrides cycle through these; 'auto' defers to the
-// dynamics transition matrix. Actions mirror smart_editor_assembly_logic.json.
-const CUT_TYPES = ['auto', 'smash_cut', 'match_action_cut', 'directional_crossfade', 'soft_cut', 'rest_cut'];
+// Manual transition overrides pick from these; 'auto' defers to the dynamics
+// transition matrix. Actions mirror smart_editor_assembly_logic.json; the
+// ffmpeg field maps each semantic cut to an xfade transition + duration.
+const CUT_TYPES = [
+  'auto',
+  'smash_cut',
+  'match_action_cut',
+  'directional_crossfade',
+  'soft_cut',
+  'rest_cut',
+  'dissolve',
+  'dip_to_black',
+  'dip_to_white',
+  'wipe_left',
+  'slide_left',
+  'circle_open',
+  'whip_pan',
+];
 const CUT_ACTIONS = {
   smash_cut: { transition_type: 'smash_cut', audio_bridge: 'j_cut', overlap_frames: 0 },
   match_action_cut: { transition_type: 'match_action_cut', audio_bridge: 'none', overlap_frames: 0 },
   directional_crossfade: { transition_type: 'directional_crossfade', audio_bridge: 'l_cut', overlap_frames: 12 },
   soft_cut: { transition_type: 'soft_cut', audio_bridge: 'l_cut', overlap_frames: 0 },
   rest_cut: { transition_type: 'rest_cut', audio_bridge: 'l_cut', overlap_frames: 0 },
+  dissolve: { transition_type: 'dissolve', audio_bridge: 'l_cut', overlap_frames: 12 },
+  dip_to_black: { transition_type: 'dip_to_black', audio_bridge: 'none', overlap_frames: 15 },
+  dip_to_white: { transition_type: 'dip_to_white', audio_bridge: 'none', overlap_frames: 12 },
+  wipe_left: { transition_type: 'wipe_left', audio_bridge: 'none', overlap_frames: 10 },
+  slide_left: { transition_type: 'slide_left', audio_bridge: 'none', overlap_frames: 10 },
+  circle_open: { transition_type: 'circle_open', audio_bridge: 'none', overlap_frames: 12 },
+  whip_pan: { transition_type: 'whip_pan', audio_bridge: 'j_cut', overlap_frames: 6 },
 };
-const CUT_ABBR = { smash_cut: 'SM', match_action_cut: 'MA', directional_crossfade: 'XF', soft_cut: 'SO', rest_cut: 'RE' };
+const CUT_ABBR = {
+  smash_cut: 'SM',
+  match_action_cut: 'MA',
+  directional_crossfade: 'XF',
+  soft_cut: 'SO',
+  rest_cut: 'RE',
+  dissolve: 'DS',
+  dip_to_black: 'DB',
+  dip_to_white: 'DW',
+  wipe_left: 'WP',
+  slide_left: 'SL',
+  circle_open: 'CO',
+  whip_pan: 'WH',
+};
+// ffmpeg xfade mapping ('cut' = frame-exact concat).
+const CUT_FFMPEG = {
+  smash_cut: { xfade: 'cut' },
+  match_action_cut: { xfade: 'cut' },
+  directional_crossfade: { xfade: 'smoothleft', dur: 0.48 },
+  soft_cut: { xfade: 'fade', dur: 0.3 },
+  rest_cut: { xfade: 'fadeblack', dur: 0.5 },
+  dissolve: { xfade: 'dissolve', dur: 0.5 },
+  dip_to_black: { xfade: 'fadeblack', dur: 0.6 },
+  dip_to_white: { xfade: 'fadewhite', dur: 0.5 },
+  wipe_left: { xfade: 'wipeleft', dur: 0.4 },
+  slide_left: { xfade: 'slideleft', dur: 0.4 },
+  circle_open: { xfade: 'circleopen', dur: 0.5 },
+  whip_pan: { xfade: 'slideleft', dur: 0.24 },
+};
 
 // Timeline zoom: 'fit' stretches the whole assembly to the pane width (good for
 // short stories); a numeric value is pixels-per-second, which makes the track
@@ -52,6 +102,7 @@ export default function Stage6({ project, update, settings }) {
   const [rendering, setRendering] = useState(false);
   const [renderProg, setRenderProg] = useState(null);
   const [renderErr, setRenderErr] = useState('');
+  const [renderDone, setRenderDone] = useState(null); // output file path (ffmpeg)
   const trackRef = useRef(null);
   const [trimId, setTrimId] = useState(null);
   const dragScene = useRef(null);
@@ -103,12 +154,17 @@ export default function Stage6({ project, update, settings }) {
     return { ...transitionFor(items[idx].block, items[idx + 1].block), overridden: false };
   };
 
-  const cycleCut = (idx) => {
-    const cur = (project.shotTransitions || {})[items[idx].shot.id] || 'auto';
-    const next = CUT_TYPES[(CUT_TYPES.indexOf(cur) + 1) % CUT_TYPES.length];
+  // Transition picker: clicking a cut badge opens a menu with every technique.
+  const [cutMenu, setCutMenu] = useState(null); // { idx, x, y }
+  const openCutMenu = (idx, e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    setCutMenu({ idx, x: Math.min(r.left, window.innerWidth - 230), y: r.bottom + 6 });
+  };
+  const pickCut = (idx, type) => {
     update((p) => ({
-      shotTransitions: { ...(p.shotTransitions || {}), [items[idx].shot.id]: next },
+      shotTransitions: { ...(p.shotTransitions || {}), [items[idx].shot.id]: type },
     }));
+    setCutMenu(null);
   };
 
   const setTrim = (shotId, patch) => {
@@ -161,22 +217,48 @@ export default function Stage6({ project, update, settings }) {
 
   // Preview video element follows the playhead: (re)start it when the current
   // clip changes; a video shorter than its clip goes black via onEnded.
+  // The element remounts per clip (key), so the seek must wait for metadata —
+  // seeking/playing a not-yet-loaded element is what froze playback on the
+  // first frame when clips changed mid-sequence.
   const curShotId = cur?.shot.id;
   useEffect(() => {
     setVideoEnded(false);
     const v = pvRef.current;
     if (!v) return;
     if (playing && cur?.video) {
-      try {
-        // Playback window starts past the head trim (the 20-frame rule).
-        v.currentTime = (cur.trim?.head || 0) + Math.max(0, curOffset);
-      } catch {
-        /* not seekable yet */
-      }
-      v.play().catch(() => {});
-    } else {
-      v.pause();
+      const target = (cur.trim?.head || 0) + Math.max(0, curOffset);
+      const seekPlay = () => {
+        try {
+          v.currentTime = target;
+        } catch {
+          /* not seekable */
+        }
+        // Unmuted play can be rejected (autoplay policy) or silently stall —
+        // this is what froze sequences on the first frame. Muted playback
+        // beats a frozen frame, so fall back rather than give up.
+        const p = v.play();
+        if (p?.catch) {
+          p.catch(() => {
+            v.muted = true;
+            v.play().catch(() => {});
+          });
+        }
+      };
+      if (v.readyState >= 1) seekPlay();
+      else v.addEventListener('loadedmetadata', seekPlay, { once: true });
+      // Watchdog: if the clip still isn't running shortly after, force it.
+      const dog = setTimeout(() => {
+        if (v.paused || v.currentTime <= target + 0.05) {
+          v.muted = v.muted || v.paused;
+          v.play().catch(() => {});
+        }
+      }, 700);
+      return () => {
+        v.removeEventListener('loadedmetadata', seekPlay);
+        clearTimeout(dog);
+      };
     }
+    v.pause();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing, curShotId]);
 
@@ -282,10 +364,56 @@ export default function Stage6({ project, update, settings }) {
       r.readAsDataURL(blob);
     });
 
-  const doRender = async () => {
+  // FFmpeg engine (Electron): frame-exact assembly in the main process — no
+  // realtime capture, no playback stalls, H.264 mp4 out, full xfade palette.
+  const doRenderFfmpeg = async () => {
     if (rendering || total <= 0) return;
     setRendering(true);
     setRenderErr('');
+    setRenderDone(null);
+    setPlaying(false);
+    const [w, h] = videoDims(project.aspectRatio || '16:9');
+    const segments = items.map((it) => {
+      if (it.video)
+        return {
+          kind: 'video',
+          dataURL: it.video,
+          trimStart: it.trim?.head || 0,
+          duration: it.shot.duration || 0,
+          tailSlack: it.trim?.tail || 0,
+        };
+      if (it.image) return { kind: 'image', dataURL: it.image, trimStart: 0, duration: it.shot.duration || 0, tailSlack: 0 };
+      return { kind: 'black', trimStart: 0, duration: it.shot.duration || 0, tailSlack: 0 };
+    });
+    const transitions = items.slice(0, -1).map((_, i) => {
+      const c = cutFor(i);
+      return CUT_FFMPEG[c?.transition_type] || { xfade: 'cut' };
+    });
+    const safe = (project.title || 'storyreel').replace(/[^\w\d\- ]+/g, '').trim().replace(/\s+/g, '-') || 'storyreel';
+    const outDir = (settings.comfyOutputDir || '').replace(/[\\/]+$/, '');
+    const outPath = `${outDir || '.'}/${safe}-final.mp4`;
+    const off = window.ffmpegBridge.onProgress((p) =>
+      setRenderProg({ pct: Math.min(100, Math.round((p.sec / (p.total || 1)) * 100)) })
+    );
+    try {
+      const res = await window.ffmpegBridge.render({ width: w, height: h, fps: 25, segments, transitions, outPath });
+      if (res?.ok) setRenderDone(res.path);
+      else setRenderErr(res?.error || 'ffmpeg failed');
+    } catch (e) {
+      setRenderErr(String(e?.message || e));
+    } finally {
+      off?.();
+      setRendering(false);
+      setRenderProg(null);
+    }
+  };
+
+  const doRender = async () => {
+    if (window.ffmpegBridge?.render) return doRenderFfmpeg();
+    if (rendering || total <= 0) return;
+    setRendering(true);
+    setRenderErr('');
+    setRenderDone(null);
     setPlaying(false);
     cancelRef.current = false;
     const [w, h] = videoDims(project.aspectRatio || '16:9');
@@ -574,13 +702,17 @@ export default function Stage6({ project, update, settings }) {
 
       <div className="asm-preview">
         {cur?.video && !videoEnded ? (
-          <video key={cur.shot.id} ref={pvRef} src={cur.video} onEnded={() => setVideoEnded(true)} playsInline />
+          <video key={cur.shot.id} ref={pvRef} src={cur.video} preload="auto" onEnded={() => setVideoEnded(true)} playsInline />
         ) : cur?.video && videoEnded && playing ? (
           <div className="asm-blank" />
         ) : cur?.image ? (
           <img src={cur.image} alt="" />
         ) : (
           <div className="asm-blank">{cur ? t('s4.shot', { n: curIdx + 1 }) : ''}</div>
+        )}
+        {/* warm the decoder for the next clip so the boundary switch doesn't stall */}
+        {playing && items[curIdx + 1]?.video && (
+          <video key={`pre-${items[curIdx + 1].shot.id}`} src={items[curIdx + 1].video} preload="auto" muted playsInline style={{ display: 'none' }} />
         )}
       </div>
 
@@ -713,7 +845,7 @@ export default function Stage6({ project, update, settings }) {
                               draggable={false}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                cycleCut(globalIdx);
+                                openCutMenu(globalIdx, e);
                               }}
                               onDragStart={(e) => {
                                 e.preventDefault();
@@ -808,15 +940,45 @@ export default function Stage6({ project, update, settings }) {
         </button>
         {rendering && (
           <>
-            {renderProg && <span className="total-badge">{t('s6.renderProg', { a: renderProg.a, b: renderProg.b })}</span>}
-            <button className="btn small danger" onClick={() => { cancelRef.current = true; }}>
-              {t('s6.cancel')}
-            </button>
+            {renderProg && (
+              <span className="total-badge">
+                {renderProg.pct != null
+                  ? t('s6.renderPct', { p: renderProg.pct })
+                  : t('s6.renderProg', { a: renderProg.a, b: renderProg.b })}
+              </span>
+            )}
+            {!window.ffmpegBridge && (
+              <button className="btn small danger" onClick={() => { cancelRef.current = true; }}>
+                {t('s6.cancel')}
+              </button>
+            )}
           </>
         )}
       </div>
-      <p className="hint">{t('s6.hint')}</p>
+      <p className="hint">{t(window.ffmpegBridge ? 's6.hintFfmpeg' : 's6.hint')}</p>
       {renderErr && <div className="note error">{renderErr}</div>}
+      {renderDone && <div className="note ok-note">{t('s6.renderedTo', { p: renderDone })}</div>}
+
+      {cutMenu && (
+        <>
+          <div className="cut-menu-backdrop" onClick={() => setCutMenu(null)} />
+          <div className="cut-menu" style={{ left: cutMenu.x, top: cutMenu.y }}>
+            {CUT_TYPES.map((ty) => {
+              const cur = (project.shotTransitions || {})[items[cutMenu.idx]?.shot.id] || 'auto';
+              return (
+                <button
+                  key={ty}
+                  type="button"
+                  className={`cut-menu-item ${cur === ty ? 'active' : ''}`}
+                  onClick={() => pickCut(cutMenu.idx, ty)}
+                >
+                  <b>{ty === 'auto' ? '🎲' : CUT_ABBR[ty]}</b> {t(`cut.${ty}`)}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
     </section>
   );
 }

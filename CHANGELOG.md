@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.14.0 — 2026-07-14
+
+- The Stage-6 render engine switched from realtime canvas capture to a
+  built-in FFmpeg engine (bundled binary, runs in the Electron main process):
+  frame-exact assembly instead of realtime playback recording, H.264 .mp4
+  output with AAC audio, live progress, and the file saved straight into the
+  outputs folder. Trims, transition timing and the "never stretch frames"
+  rule carry over exactly; the realtime engine remains as a fallback for
+  browser use.
+- Seven new editing techniques joined the transition palette — Dissolve, Dip
+  to black, Dip to white, Wipe, Slide, Circle open and Whip pan — and the cut
+  badge now opens a proper picker menu (with Auto-by-dynamics and all
+  techniques) instead of click-cycling.
+- Fixed sequence playback freezing on the first frame in the Stage-6 preview:
+  clip switches now wait for media metadata before seeking, fall back to
+  muted playback when unmuted play is blocked or stalls, add a watchdog that
+  kicks a stuck clip, and pre-warm the next clip's decoder.
+
 ## 1.13.0 — 2026-07-14
 
 - Action Dynamics Plan: Stage 3 now writes the film's pacing schedule

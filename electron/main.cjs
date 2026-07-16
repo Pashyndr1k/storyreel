@@ -2,10 +2,24 @@ const { app, BrowserWindow, shell, ipcMain, safeStorage, session } = require('el
 const path = require('path');
 const fs = require('fs');
 const { comfyRequest } = require('./comfyRequest.cjs');
+const { ffmpegVersion, renderJob } = require('./ffmpegRender.cjs');
 
 // All ComfyUI traffic goes through the main process — renderer fetches carry
 // an Origin header that ComfyUI rejects with HTTP 403.
 ipcMain.handle('comfy-request', (_e, opts) => comfyRequest(opts));
+
+// FFmpeg assembly engine: renders the Stage-6 timeline into an H.264 mp4 in
+// the main process (native binary), streaming progress back to the renderer.
+ipcMain.handle('ffmpeg-check', () => ({ version: ffmpegVersion() }));
+ipcMain.handle('ffmpeg-render', (e, job) =>
+  renderJob(job, (p) => {
+    try {
+      e.sender.send('ffmpeg-progress', p);
+    } catch {
+      /* window gone */
+    }
+  })
+);
 
 // Write a generated ComfyUI result (video/image, base64) into a local folder
 // chosen in the app settings (default D:\Claude work\ComfyUI\Output).
