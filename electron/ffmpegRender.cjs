@@ -61,11 +61,12 @@ function cancelActive() {
 //   width, height, fps,
 //   segments: [{ kind:'video'|'image'|'black', file, trimStart, duration, tailSlack }],
 //   transitions: [{ xfade:'cut'|<xfade name>, dur }],   // segments.length - 1
+//   audioTracks: [{ file, volume }],  // optional full-film music/voice beds
 //   outPath,
 // }
 // Returns { args, totalSec } — the full ffmpeg argument list.
 function buildArgs(job) {
-  const { width: W, height: H, fps, segments, transitions, outPath } = job;
+  const { width: W, height: H, fps, segments, transitions, audioTracks, outPath } = job;
   const args = ['-hide_banner', '-y'];
   const filters = [];
   const vIn = [];
@@ -140,6 +141,24 @@ function buildArgs(job) {
     aAcc = aOut;
   }
 
+  // Full-film audio tracks (music bed / voice-over): trimmed or padded to the
+  // assembly's exact length, leveled, then mixed over the per-clip audio.
+  const tracks = (audioTracks || []).filter((tr) => tr && tr.file);
+  if (tracks.length) {
+    tracks.forEach((tr, k) => {
+      args.push('-i', tr.file);
+      const idx = inputIdx++;
+      const vol = Number.isFinite(tr.volume) ? tr.volume : 1;
+      filters.push(
+        `[${idx}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,volume=${vol},atrim=0:${accDur.toFixed(3)},apad=whole_dur=${accDur.toFixed(3)}[tk${k}]`
+      );
+    });
+    filters.push(
+      `[${aAcc}]${tracks.map((_, k) => `[tk${k}]`).join('')}amix=inputs=${tracks.length + 1}:duration=first:normalize=0[amix]`
+    );
+    aAcc = 'amix';
+  }
+
   args.push('-filter_complex', filters.join(';'));
   args.push('-map', `[${vAcc}]`, '-map', `[${aAcc}]`);
   args.push('-r', String(fps), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p');
@@ -165,8 +184,19 @@ async function renderJob(job, onProgress) {
       return out;
     });
 
+    const audioTracks = (job.audioTracks || [])
+      .map((tr, i) => {
+        const m = String(tr.dataURL || '').match(/^data:([^;]+);base64,(.*)$/s);
+        if (!m) return null;
+        const ext = m[1].includes('wav') ? 'wav' : m[1].includes('ogg') ? 'ogg' : m[1].includes('aac') || m[1].includes('mp4') || m[1].includes('m4a') ? 'm4a' : 'mp3';
+        const file = path.join(tmp, `track_${i}.${ext}`);
+        fs.writeFileSync(file, Buffer.from(m[2], 'base64'));
+        return { file, volume: tr.volume };
+      })
+      .filter(Boolean);
+
     fs.mkdirSync(path.dirname(job.outPath), { recursive: true });
-    const { args, totalSec } = buildArgs({ ...job, segments });
+    const { args, totalSec } = buildArgs({ ...job, segments, audioTracks });
 
     return await new Promise((resolve) => {
       canceled = false;

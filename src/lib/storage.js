@@ -175,7 +175,9 @@ function projectDefaults() {
     shotAssets: {}, // shotId -> [assetId] referencing the global asset library
     dynamicsPlan: null, // Action Dynamics Plan generated at Stage 3 (see lib/dynamics.js)
     videoGenDurations: {}, // shotId -> raw seconds requested from the video model (+2s padding)
-    shotTrims: {}, // shotId -> { head, tail } seconds — manual overrides of the 20-frame rule
+    shotTrims: {}, // shotId -> { head, tail } seconds — manual overrides of the 15-frame rule
+    musicTrack: null, // { dataURL, name, duration } — full-film music, mixed into the render
+    voiceTrack: null, // { dataURL, name, duration } — full-film voice-over, mixed into the render
     shotTransitions: {}, // shotId -> transition_type override for the cut INTO the next shot
     storyboards: {}, // shotId -> low-res storyboard frame (data URL)
     logline: '',
@@ -185,7 +187,7 @@ function projectDefaults() {
     storyline: null, // { synopsis, characters: [{id, name, role, description, photos}] }
     outline: [], // [{id, number, title, summary, duration, photos}]
     sceneDetails: {}, // sceneId -> { shots: [{id, duration, shotType, location, action, dialogue, notes}] }
-    shotPrompts: {}, // shotId -> { imagePrompt, videoPrompt }
+    shotPrompts: {}, // shotId -> { imagePrompt, videoPrompt, audioPrompt }
   };
 }
 

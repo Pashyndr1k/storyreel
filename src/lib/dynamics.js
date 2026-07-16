@@ -79,9 +79,12 @@ export function buildShotPayload(shot, block) {
           momentum_carryover: block.required_camera_momentum,
         }
       : null,
+    // The directive carries only the shot's dynamics — never the clip's total
+    // duration or any mention of trimming/editing mechanics (those confused
+    // the video model and leaked into the output).
     prompt_injection_string: block
-      ? `CRITICAL: Generate exactly ${genDuration}.0 seconds of video (the final cut uses only the middle ${target} seconds — the head and tail are trimmed). The action must be ${energy === 'high' ? 'highly kinetic' : 'restrained and deliberate'} (kinetic energy ${block.kinetic_energy_level}/10). Dialogue rhythm: ${dialogueRhythm(block.dialogue_volume)}. Camera must mimic ${block.required_camera_momentum.replace(/_/g, ' ')}.`
-      : `CRITICAL: Generate exactly ${genDuration}.0 seconds of video (the final cut uses only the middle ${target} seconds — the head and tail are trimmed).`,
+      ? `The action must be ${energy === 'high' ? 'highly kinetic' : 'restrained and deliberate'} (kinetic energy ${block.kinetic_energy_level}/10). Dialogue rhythm: ${dialogueRhythm(block.dialogue_volume)}. Camera must mimic ${block.required_camera_momentum.replace(/_/g, ' ')}.`
+      : '',
   };
 }
 
@@ -102,7 +105,7 @@ export function trimSeconds() {
   };
 }
 
-// Default trim for a shot's raw video: apply the 20-frame rule only when the
+// Default trim for a shot's raw video: apply the 15-frame rule only when the
 // raw generation is actually longer than the timeline target (old footage
 // generated without the +2s padding is used untrimmed).
 export function defaultTrim(targetSec, rawSec) {

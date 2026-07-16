@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.15.0 — 2026-07-16
+
+- Stage 5 redesigned into two halves: the left half holds the prompts and
+  everything that manages them; the right half holds the generated images
+  and videos with every generation control — assets in the shot, upload
+  image, create final frame, the quick image edit field and the environment
+  references. The reference options (characters, location, assets, scene
+  palette) are grouped into one compact "Apply" toggle block sitting left of
+  the image, and "Turn into location reference" moved from an overlay icon
+  into the image control row. The video controls follow the same compact
+  design.
+- Clicking any generated frame opens it in a large pop-up viewer.
+- Per-shot timing at Stage 5: each shot card now carries a −/+ duration
+  stepper (2–10s, half-second steps) that also updates the Stage 4 and
+  Stage 6 timelines.
+- Audio prompts: a new per-shot audio prompt (character phrases verbatim
+  with precise in-shot timing, voice directions, ambience) for an external
+  audio-generation model, generated per scene with one click and editable
+  like the other prompts.
+- Stage 6 audio timeline: music and voice-over lanes under the video track;
+  upload a ready-made music track for the whole film and/or finished
+  character voice-overs — both are mixed into the FFmpeg render (music as a
+  bed, voice-over at full level, trimmed/padded to the film's exact length).
+  A "Voice-over script" window shows every character phrase with exact
+  film-absolute timing.
+- Video prompts no longer state the clip's total duration or explain the
+  editing mechanics (the "Generate exactly N seconds…" preamble) — the
+  video model now only sees the motion itself. The +2s padding still
+  applies internally.
+- Automatic head/tail trimming reduced from 20 to 15 frames (0.6s at 25 fps)
+  everywhere trims are calculated.
+- Fixed the selected color scheme not applying to the timeline zoom
+  dropdown, the transition picker menu and links — they were hardcoded to
+  dark colors and unreadable in the light/medium themes.
+
 ## 1.14.1 — 2026-07-15
 
 - Stage 6: the FFmpeg render can now be cancelled mid-run — the Cancel

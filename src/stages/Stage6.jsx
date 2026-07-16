@@ -3,7 +3,25 @@ import { useI18n } from '../lib/i18n.js';
 import { videoDims, saveToLocalOutputs } from '../lib/comfy.js';
 import { blockForScene, defaultTrim, transitionFor, overlapSeconds } from '../lib/dynamics.js';
 import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
-import { Play, StopSq, Grip, Download } from '../components/icons.jsx';
+import { Play, StopSq, Grip, Download, Upload } from '../components/icons.jsx';
+
+const readFileDataURL = (file) =>
+  new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(new Error('Could not read the file.'));
+    r.readAsDataURL(file);
+  });
+
+// Probe an audio file's duration via a detached <audio> element.
+const probeAudioDuration = (dataURL) =>
+  new Promise((res) => {
+    const a = document.createElement('audio');
+    a.preload = 'metadata';
+    a.onloadedmetadata = () => res(Number.isFinite(a.duration) ? a.duration : 0);
+    a.onerror = () => res(0);
+    a.src = dataURL;
+  });
 
 // Manual transition overrides pick from these; 'auto' defers to the dynamics
 // transition matrix. Actions mirror smart_editor_assembly_logic.json; the
@@ -112,13 +130,27 @@ export default function Stage6({ project, update, settings }) {
   const cancelRef = useRef(false);
   const [scale, setScale] = useState(() => defaultScale(project));
   const scrollRef = useRef(null);
+  const [showScript, setShowScript] = useState(false); // voice-over script window
+
+  // Ready-made full-film audio tracks (music / character voice-overs),
+  // uploaded once and mixed into the FFmpeg render.
+  const uploadTrack = (key) => async (file) => {
+    try {
+      const dataURL = await readFileDataURL(file);
+      const duration = await probeAudioDuration(dataURL);
+      update(() => ({ [key]: { dataURL, name: file.name || key, duration: Math.round(duration * 10) / 10 } }));
+    } catch (e) {
+      setRenderErr(String(e?.message || e));
+    }
+  };
+  const removeTrack = (key) => update(() => ({ [key]: null }));
   const zoomed = scale !== 'fit';
   const zoomIdx = ZOOM_STEPS.indexOf(scale);
   const zoomOut = () => zoomIdx > 0 && setScale(ZOOM_STEPS[zoomIdx - 1]);
   const zoomIn = () => zoomIdx < ZOOM_STEPS.length - 1 && setScale(ZOOM_STEPS[zoomIdx + 1]);
 
   // Flat assembly sequence in scene order, enriched with the Action Dynamics
-  // Plan: each shot carries its rhythm block, its head/tail trim (the 20-frame
+  // Plan: each shot carries its rhythm block, its head/tail trim (the 15-frame
   // rule, or a manual override), and the transition into the next shot.
   const scenes = project.outline.map((scene, si) => {
     const block = blockForScene(project.dynamicsPlan, si + 1);
@@ -392,11 +424,16 @@ export default function Stage6({ project, update, settings }) {
     const safe = (project.title || 'storyreel').replace(/[^\w\d\- ]+/g, '').trim().replace(/\s+/g, '-') || 'storyreel';
     const outDir = (settings.comfyOutputDir || '').replace(/[\\/]+$/, '');
     const outPath = `${outDir || '.'}/${safe}-final.mp4`;
+    // Full-film music/voice-over tracks: mixed over the per-clip audio (music
+    // ducked to a bed level, voice-over at full level).
+    const audioTracks = [];
+    if (project.musicTrack?.dataURL) audioTracks.push({ dataURL: project.musicTrack.dataURL, volume: 0.35 });
+    if (project.voiceTrack?.dataURL) audioTracks.push({ dataURL: project.voiceTrack.dataURL, volume: 1.0 });
     const off = window.ffmpegBridge.onProgress((p) =>
       setRenderProg({ pct: Math.min(100, Math.round((p.sec / (p.total || 1)) * 100)) })
     );
     try {
-      const res = await window.ffmpegBridge.render({ width: w, height: h, fps: 25, segments, transitions, outPath });
+      const res = await window.ffmpegBridge.render({ width: w, height: h, fps: 25, segments, transitions, audioTracks, outPath });
       if (res?.ok) setRenderDone(res.path);
       else if (!res?.canceled) setRenderErr(res?.error || 'ffmpeg failed');
     } catch (e) {
@@ -864,6 +901,35 @@ export default function Stage6({ project, update, settings }) {
             );
           })}
         </div>
+        {/* Audio timeline: full-film music + voice-over lanes under the video track. */}
+        <div className="audio-lanes">
+          {[
+            ['musicTrack', 'music', t('s6.music')],
+            ['voiceTrack', 'voice', t('s6.voice')],
+          ].map(([key, cls, label]) => {
+            const trk = project[key];
+            const w = trk?.duration
+              ? zoomed
+                ? Math.min(total, trk.duration) * scale
+                : `${Math.min(100, (trk.duration / Math.max(0.1, total)) * 100)}%`
+              : 0;
+            return (
+              <div key={key} className="audio-lane">
+                <span className="lane-label">{label}</span>
+                {trk ? (
+                  <div className={`lane-bar ${cls}`} style={{ width: w }} title={`${trk.name} · ${Number(trk.duration || 0).toFixed(1)}s`}>
+                    <span className="lane-name">{trk.name}</span>
+                    <button type="button" className="lane-x" aria-label="remove" onClick={() => removeTrack(key)}>
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <span className="lane-empty">{t('s6.noTrack')}</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
         {showPlayhead && (
           <div
             className="nle-playhead"
@@ -938,6 +1004,35 @@ export default function Stage6({ project, update, settings }) {
         <button className="btn small" disabled={rendering} onClick={doRender}>
           <Download size={14} /> {rendering ? t('s6.rendering') : t('s6.render')}
         </button>
+        <label className="btn small file-btn" title={t('s6.upMusicTip')}>
+          <Upload size={13} /> {t('s6.upMusic')}
+          <input
+            type="file"
+            accept="audio/*"
+            hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = '';
+              if (f) uploadTrack('musicTrack')(f);
+            }}
+          />
+        </label>
+        <label className="btn small file-btn" title={t('s6.upVoiceTip')}>
+          <Upload size={13} /> {t('s6.upVoice')}
+          <input
+            type="file"
+            accept="audio/*"
+            hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = '';
+              if (f) uploadTrack('voiceTrack')(f);
+            }}
+          />
+        </label>
+        <button className="btn small" onClick={() => setShowScript(true)}>
+          {t('s6.script')}
+        </button>
         {rendering && (
           <>
             {renderProg && (
@@ -963,6 +1058,43 @@ export default function Stage6({ project, update, settings }) {
       {renderErr && <div className="note error">{renderErr}</div>}
       {renderDone && <div className="note ok-note">{t('s6.renderedTo', { p: renderDone })}</div>}
 
+      {showScript && (
+        <div className="overlay" onClick={() => setShowScript(false)}>
+          <div className="modal script-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>{t('s6.scriptTitle')}</h3>
+            <div className="script-list">
+              {(() => {
+                const rows = items
+                  .map((it, idx) => {
+                    const sp = (project.shotPrompts || {})[it.shot.id] || {};
+                    const dlg = (it.shot.dialogue || '').trim();
+                    const aud = (sp.audioPrompt || '').trim();
+                    if (!dlg && !aud) return null;
+                    const t0 = startOf(idx);
+                    const t1 = t0 + (it.shot.duration || 0);
+                    const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${(s % 60).toFixed(1).padStart(4, '0')}`;
+                    return (
+                      <div key={it.shot.id} className="script-item">
+                        <div className="script-time">
+                          {fmt(t0)}–{fmt(t1)} · {t('s4.shot', { n: idx + 1 })}
+                        </div>
+                        {dlg && <div className="script-dlg">{dlg}</div>}
+                        {aud && <pre className="script-audio">{aud}</pre>}
+                      </div>
+                    );
+                  })
+                  .filter(Boolean);
+                return rows.length ? rows : <p className="hint">{t('s6.scriptEmpty')}</p>;
+              })()}
+            </div>
+            <div className="row">
+              <button className="btn small" onClick={() => setShowScript(false)}>
+                {t('s6.close')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {cutMenu && (
         <>
           <div className="cut-menu-backdrop" onClick={() => setCutMenu(null)} />

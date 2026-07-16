@@ -1,7 +1,7 @@
 {
   "global_trim_rules": {
-    "head_trim_frames": 20,
-    "tail_trim_frames": 20,
+    "head_trim_frames": 15,
+    "tail_trim_frames": 15,
     "assumed_framerate": 25
   },
   "generation_padding_sec": 2,
