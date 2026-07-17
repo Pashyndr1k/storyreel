@@ -33,7 +33,7 @@
         "provider": "github",
         "owner": "Pashyndr1k",
         "repo": "storyreel",
-        "releaseType": "release"
+        "releaseType": "draft"
       }
     ],
     "files": [

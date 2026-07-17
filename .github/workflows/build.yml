@@ -9,10 +9,12 @@ permissions:
   contents: write
 
 jobs:
-  # Pre-create the GitHub Release before the build matrix runs. Without this,
-  # the three platform jobs race to create the same release and the losers'
-  # asset uploads are silently lost (v1.14.1 and v1.15.0 both shipped with
-  # missing mac dmgs on their first tag build because of it).
+  # Draft-then-publish. electron-builder silently SKIPS asset uploads when the
+  # release for the tag is already published (this is why v1.14.1/v1.15.0
+  # first shipped without the mac dmgs: whichever job created the release
+  # published it instantly, and the later platforms uploaded nothing while
+  # reporting success). So: put the release into DRAFT before the matrix,
+  # let every platform upload into the draft, then publish it once at the end.
   release:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
@@ -21,16 +23,19 @@ jobs:
         with:
           script: |
             const tag = context.ref.replace('refs/tags/', '');
-            try {
-              await github.rest.repos.createRelease({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                tag_name: tag,
-                name: tag.replace(/^v/, ''),
-                draft: false,
-              });
-            } catch (e) {
-              if (e.status !== 422) throw e; // 422 = already exists — fine
+            const { owner, repo } = context.repo;
+            const all = await github.paginate(github.rest.repos.listReleases, { owner, repo, per_page: 100 });
+            const matches = all.filter((r) => r.tag_name === tag);
+            if (!matches.length) {
+              await github.rest.repos.createRelease({ owner, repo, tag_name: tag, name: tag.replace(/^v/, ''), draft: true });
+              return;
+            }
+            // Keep the release holding the most assets; draft it so the
+            // builders can upload; delete stray duplicates of the same tag.
+            matches.sort((a, b) => b.assets.length - a.assets.length);
+            await github.rest.repos.updateRelease({ owner, repo, release_id: matches[0].id, tag_name: tag, draft: true });
+            for (const extra of matches.slice(1)) {
+              await github.rest.repos.deleteRelease({ owner, repo, release_id: extra.id });
             }
 
   build:
@@ -69,3 +74,21 @@ jobs:
             release/*.exe
             release/*.dmg
             release/*.zip
+
+  # Publish the draft only after every platform has uploaded its assets —
+  # the update feed goes live atomically with the complete installer set.
+  publish:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const tag = context.ref.replace('refs/tags/', '');
+            const { owner, repo } = context.repo;
+            const all = await github.paginate(github.rest.repos.listReleases, { owner, repo, per_page: 100 });
+            const rel = all.find((r) => r.tag_name === tag);
+            if (!rel) throw new Error(`No release found for ${tag}`);
+            console.log('Assets:', rel.assets.map((a) => a.name).join(', '));
+            await github.rest.repos.updateRelease({ owner, repo, release_id: rel.id, draft: false, make_latest: 'true' });
