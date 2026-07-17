@@ -2,6 +2,24 @@
 
 ## 1.15.0 — 2026-07-16
 
+- New image service option: shot images and editing at Stage 5 can run on
+  the local ComfyUI Flux.2 Klein 9B workflow instead of Gemini (Settings →
+  Generation services). It accepts up to two reference images (characters
+  take priority, then location, then assets); with a single reference the
+  second image input is bypassed automatically, and editing (Refine, final
+  frame, location reference) uses the current frame as a reference.
+- Stage 5 shot editor redesigned into split panels on one shared grid:
+  prompt management (title, duration stepper, shot-type chip, action, the
+  prompt in a deep well, an "Apply" block of pill toggle switches) on the
+  left; the generated media with its controls on the right — flush halves
+  separated by a 2px divider, icon-only secondary buttons matching the
+  primary button height, and image versions hovering over the preview with
+  an ✕ on each variant to remove it from the stack.
+- Stage 4: while the storyboard animatic plays, a live caption beside the
+  preview shows the scene title, shot number/type/location, the action and
+  the dialogue line, following the playhead from shot to shot.
+- The update notification pop-up is larger and far more visible.
+
 - Stage 5 redesigned into two halves: the left half holds the prompts and
   everything that manages them; the right half holds the generated images
   and videos with every generation control — assets in the shot, upload
