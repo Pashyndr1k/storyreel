@@ -1,17 +1,21 @@
-// Lightweight structural highlighter for generation prompts. It tints words and
-// phrases by the role they play in an image/video prompt so the writer can see a
-// prompt's structure at a glance:
+// Structural highlighter for generation prompts. The prompt is treated as a
+// SEQUENCE OF SEMANTIC BLOCKS — style description, scene description,
+// character description, and lighting/technical image parameters — and the
+// ENTIRE text is colored block by block: it is split into clauses (comma /
+// period / newline boundaries), each clause is scored against the category
+// dictionaries, and clauses without a clear signal inherit the block they sit
+// inside, so contiguous runs of text share one color:
 //   style — the visual/art-direction language (cinematic, watercolor, moody…)
 //   scene — where/when it happens (interior, rooftop, dusk, forest…)
 //   char  — the people in frame (character names + person/wardrobe words)
 //   tech  — lighting and camera/technical detail (backlit, bokeh, 35mm, 4k…)
-// This is a deliberately simple keyword pass, not NLP: it aims for a helpful,
-// subtle hint, and anything it doesn't recognize stays the default text color.
+// Deliberately a keyword heuristic, not NLP: a helpful structural hint.
 
 const KEYWORDS = {
   // Order matters only for cross-list duplicates: the first list to claim a
   // word wins (tech → char → style → scene).
   tech: [
+    'light', 'diffused', 'diffuse', 'illuminated', 'illumination',
     'lighting', 'lit', 'backlit', 'backlight', 'backlighting', 'rim light', 'rim lighting',
     'key light', 'fill light', 'side lighting', 'top lighting', 'underlighting', 'softbox',
     'soft light', 'hard light', 'diffused light', 'ambient light', 'natural light',
@@ -48,7 +52,7 @@ const KEYWORDS = {
     'arms', 'shoulders', 'posture', 'stance', 'skin', 'young', 'old', 'elderly', 'middle-aged',
   ],
   style: [
-    'cinematic', 'photorealistic', 'hyperrealistic', 'photoreal', 'realistic', 'stylized',
+    'desaturated', 'cinematic', 'photorealistic', 'hyperrealistic', 'photoreal', 'realistic', 'stylized',
     'painterly', 'illustrative', 'illustration', 'anime', 'manga', 'cartoon', 'watercolor',
     'oil painting', 'gouache', 'sketch', 'charcoal', 'line art', 'concept art', 'digital art',
     '3d render', 'cgi', 'unreal engine', 'octane render', 'film noir', 'noir', 'vintage',
@@ -123,26 +127,61 @@ function matcherFor(names) {
   return m;
 }
 
-// Tokenize `text` into [{ text, cat }] spans covering the whole string exactly;
-// `cat` is one of style/scene/char/tech, or null for unclassified text.
+// Segment `text` into [{ text, cat }] spans that cover the whole string and
+// color it as a sequence of semantic blocks. Each clause (split at commas,
+// periods, semicolons and newlines) is scored against the dictionaries and
+// takes the winning category; clauses with no signal inherit the block they
+// follow (leading ones take the first classified block), and adjacent clauses
+// of the same category merge into one contiguous colored block.
 export function highlightPromptTokens(text, names = []) {
   const src = String(text || '');
   if (!src) return [];
+  if (!src.trim()) return [{ text: src, cat: null }];
   const { re, dict } = matcherFor(names);
-  re.lastIndex = 0;
-  const tokens = [];
-  let last = 0;
-  let m;
-  while ((m = re.exec(src))) {
-    if (m.index > last) tokens.push({ text: src.slice(last, m.index), cat: null });
-    const raw = m[0];
-    const cat = isNumericTech(raw) ? 'tech' : dict.get(raw.toLowerCase()) || null;
-    tokens.push({ text: raw, cat });
-    last = m.index + raw.length;
-    if (raw.length === 0) re.lastIndex++; // guard against zero-width loops
+
+  // Clause split that keeps every character (delimiters stay attached to the
+  // clause they end).
+  const parts = src.split(/(?<=[,;.!?…\n])/).filter((p) => p.length);
+
+  const segments = parts.map((part) => {
+    const scores = { style: 0, scene: 0, char: 0, tech: 0 };
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(part))) {
+      const raw = m[0];
+      const cat = isNumericTech(raw) ? 'tech' : dict.get(raw.toLowerCase());
+      // Multi-word phrases are stronger signals than single words.
+      if (cat) scores[cat] += raw.includes(' ') ? 2 : 1;
+      if (raw.length === 0) re.lastIndex++; // guard against zero-width loops
+    }
+    let cat = null;
+    let best = 0;
+    for (const c of ['style', 'tech', 'char', 'scene']) {
+      if (scores[c] > best) {
+        best = scores[c];
+        cat = c;
+      }
+    }
+    return { text: part, cat };
+  });
+
+  // Continuity: an unclassified clause belongs to the block it sits in.
+  let prev = null;
+  for (const s of segments) {
+    if (!s.cat) s.cat = prev;
+    else prev = s.cat;
   }
-  if (last < src.length) tokens.push({ text: src.slice(last), cat: null });
-  return tokens;
+  // Leading clauses before the first classified one join that first block.
+  const first = segments.find((s) => s.cat)?.cat || 'scene';
+  for (const s of segments) if (!s.cat) s.cat = first;
+
+  // Merge adjacent clauses of the same category into one block.
+  const out = [];
+  for (const s of segments) {
+    if (out.length && out[out.length - 1].cat === s.cat) out[out.length - 1].text += s.text;
+    else out.push({ text: s.text, cat: s.cat });
+  }
+  return out;
 }
 
 export const HIGHLIGHT_CATS = ['style', 'scene', 'char', 'tech'];
