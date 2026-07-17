@@ -8,6 +8,8 @@ import { useI18n } from '../lib/i18n.js';
 import { aspectDescription } from '../lib/aspect.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import HighlightedTextarea from '../components/HighlightedTextarea.jsx';
+import PromptLegend from '../components/PromptLegend.jsx';
 import { StyleIndicator } from '../components/StyleControls.jsx';
 import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
 import { blockForScene, DYNAMICS_CONFIG } from '../lib/dynamics.js';
@@ -84,6 +86,10 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const scene = project.outline.find((s) => s.id === sceneId) || project.outline[0];
   const shots = (scene && project.sceneDetails[scene.id]?.shots) || [];
   const hasPrompts = shots.some((s) => project.shotPrompts[s.id]);
+
+  // Character names feed the prompt-structure highlighter (they're coloured as
+  // the "characters" category wherever they appear in a prompt).
+  const charNames = (project.storyline?.characters || []).map((c) => c.name).filter(Boolean);
 
   // Reference photos available for this scene.
   const charRefs = (project.storyline?.characters || [])
@@ -676,6 +682,8 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       </div>
       <ErrorNote error={error} onSettings={onSettings} />
 
+      {shots.length > 0 && <PromptLegend />}
+
       {shots.length === 0 ? (
         <div className="note warn">{t('s5.noShots')}</div>
       ) : (
@@ -716,8 +724,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     <label>{t('s5.img')}</label>
                     <CopyButton text={p.imagePrompt} />
                   </div>
-                  <AutoTextarea
+                  <HighlightedTextarea
                     minRows={4}
+                    names={charNames}
                     value={p.imagePrompt}
                     placeholder={t('s5.ph')}
                     onChange={(e) => setPrompt(shot.id, { imagePrompt: e.target.value })}
@@ -1005,8 +1014,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     <label>{t('s5.vid', { d: dur })}</label>
                     <CopyButton text={p.videoPrompt} />
                   </div>
-                  <AutoTextarea
+                  <HighlightedTextarea
                     minRows={4}
+                    names={charNames}
                     value={p.videoPrompt}
                     placeholder={t('s5.ph')}
                     onChange={(e) => setPrompt(shot.id, { videoPrompt: e.target.value })}
@@ -1064,8 +1074,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       <label>{t('s5.aud')}</label>
                       <CopyButton text={p.audioPrompt || ''} />
                     </div>
-                    <AutoTextarea
+                    <HighlightedTextarea
                       minRows={3}
+                      names={charNames}
                       value={p.audioPrompt || ''}
                       placeholder={t('s5.audPh')}
                       onChange={(e) => setPrompt(shot.id, { audioPrompt: e.target.value })}

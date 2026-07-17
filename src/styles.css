@@ -218,6 +218,83 @@ select { cursor: pointer; color-scheme: dark; }
 select option { background-color: var(--panel-2); color: var(--text); }
 label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
 
+/* ============ PROMPT STRUCTURE HIGHLIGHT ============ */
+/* Subtle role colors for prompt text (style / scene / characters / lighting &
+   technical). Kept gentle and theme-aware so the coloring hints structure
+   without shouting. */
+:root {
+  --ph-style: #c9a6ff; /* violet — art direction / style */
+  --ph-scene: #86dcb6; /* green — where/when */
+  --ph-char: #f2c98a;  /* amber — people in frame */
+  --ph-tech: #8fc2f7;  /* blue — lighting & camera */
+}
+:root[data-theme='light'] {
+  --ph-style: #7c3aed;
+  --ph-scene: #0f9d6e;
+  --ph-char: #b4791a;
+  --ph-tech: #2563eb;
+}
+.ph-style { color: var(--ph-style); }
+.ph-scene { color: var(--ph-scene); }
+.ph-char { color: var(--ph-char); }
+.ph-tech { color: var(--ph-tech); }
+
+/* Highlighted textarea: a colored mirror div sits exactly under a transparent-
+   text textarea. Both layers MUST keep identical box metrics or the glyphs
+   drift apart. */
+.ht-wrap { position: relative; width: 100%; }
+.ht-backdrop,
+.ht-wrap .ht-input {
+  margin: 0;
+  padding: 9px 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-family: inherit;
+  line-height: 1.5;
+  letter-spacing: normal;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  width: 100%;
+}
+.ht-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  color: var(--text);
+  background: var(--glass-input);
+  border-color: var(--glass-border);
+  pointer-events: none;
+  overflow: hidden;
+}
+.ht-wrap:focus-within .ht-backdrop { border-color: rgba(139, 92, 246, 0.6); }
+.ht-wrap .ht-input {
+  position: relative;
+  z-index: 1;
+  display: block; /* kill the inline-block baseline gap so height == backdrop */
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text);
+  border-color: transparent;
+}
+.ht-input::placeholder { color: var(--muted-2); -webkit-text-fill-color: var(--muted-2); }
+.ht-input::selection { background: rgba(139, 92, 246, 0.32); }
+
+/* legend key above the prompt fields */
+.prompt-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 4px 0 12px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.prompt-legend .pl-title { font-weight: 700; letter-spacing: 0.02em; }
+.prompt-legend .pl-item { display: inline-flex; align-items: center; gap: 5px; }
+.prompt-legend .pl-dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+
 /* ============ BUTTONS ============ */
 .btn, .glass-btn {
   display: inline-flex;
