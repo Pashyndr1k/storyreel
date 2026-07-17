@@ -9,7 +9,6 @@ import { aspectDescription } from '../lib/aspect.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import HighlightedTextarea from '../components/HighlightedTextarea.jsx';
-import PromptLegend from '../components/PromptLegend.jsx';
 import { StyleIndicator } from '../components/StyleControls.jsx';
 import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
 import { blockForScene, DYNAMICS_CONFIG } from '../lib/dynamics.js';
@@ -681,8 +680,6 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         </button>
       </div>
       <ErrorNote error={error} onSettings={onSettings} />
-
-      {shots.length > 0 && <PromptLegend />}
 
       {shots.length === 0 ? (
         <div className="note warn">{t('s5.noShots')}</div>

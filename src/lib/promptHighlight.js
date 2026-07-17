@@ -183,5 +183,3 @@ export function highlightPromptTokens(text, names = []) {
   }
   return out;
 }
-
-export const HIGHLIGHT_CATS = ['style', 'scene', 'char', 'tech'];
