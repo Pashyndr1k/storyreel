@@ -9,7 +9,34 @@ permissions:
   contents: write
 
 jobs:
+  # Pre-create the GitHub Release before the build matrix runs. Without this,
+  # the three platform jobs race to create the same release and the losers'
+  # asset uploads are silently lost (v1.14.1 and v1.15.0 both shipped with
+  # missing mac dmgs on their first tag build because of it).
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const tag = context.ref.replace('refs/tags/', '');
+            try {
+              await github.rest.repos.createRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag_name: tag,
+                name: tag.replace(/^v/, ''),
+                draft: false,
+              });
+            } catch (e) {
+              if (e.status !== 422) throw e; // 422 = already exists — fine
+            }
+
   build:
+    needs: [release]
+    # Manual (workflow_dispatch) runs skip the release job; still build.
+    if: ${{ !cancelled() && (needs.release.result == 'success' || needs.release.result == 'skipped') }}
     strategy:
       # Don't let one platform's failure cancel the others — each publishes
       # its own installer independently.
