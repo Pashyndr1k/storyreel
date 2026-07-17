@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage } from '../lib/gemini.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
-import { generateComfyVideo, saveToLocalOutputs } from '../lib/comfy.js';
+import { generateComfyVideo, generateComfyImage, saveToLocalOutputs } from '../lib/comfy.js';
 import { stage5Prompt, stage5VideoPrompt, stage5AudioPrompt, finalFramePrompt } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
 import { aspectDescription } from '../lib/aspect.js';
@@ -158,6 +158,20 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     }
   };
 
+  // Shot images route through the selected service: Gemini (default) or the
+  // local ComfyUI Flux.2 Klein 9B workflow (max 2 reference images).
+  const useComfyImg = settings.imageService === 'comfy';
+  const runImageGen = async ({ prompt, images, ratio, name }) => {
+    if (useComfyImg) {
+      const res = await generateComfyImage(settings, { prompt, images, aspectRatio: ratio, name });
+      saveToLocalOutputs(settings, res.filename, res.dataURL); // best-effort local copy
+      return res.dataURL;
+    }
+    return generateImage(settings, { prompt, images, aspectRatio: ratio, imageSize: '2K' });
+  };
+  // Missing image-service credentials/setup, or null when ready to generate.
+  const imageKeyError = () => (!useComfyImg && !settings.geminiKey ? 'NO_GEMINI_KEY' : null);
+
   const prefFor = (shotId) => refPrefs[shotId] || { char: true, loc: true, asset: true, palette: true };
   const setPref = (shotId, patch) =>
     setRefPrefs((prev) => ({
@@ -312,12 +326,22 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const cur = projectRef.current;
     const prompt = cur.shotPrompts[shot.id]?.imagePrompt?.trim();
     if (!prompt) return setImgErr({ id: shot.id, msg: t('img.needPrompt') });
-    if (!settings.geminiKey) return setImgErr({ id: shot.id, msg: 'NO_GEMINI_KEY' });
+    const keyMiss = imageKeyError();
+    if (keyMiss) return setImgErr({ id: shot.id, msg: keyMiss });
 
+    // Flux.2 Klein takes at most TWO reference images — budget them by
+    // priority (characters, then location, then assets) so the attached set
+    // and its description in the prompt always agree.
     const pref = prefFor(shot.id);
-    const useChar = pref.char ? charRefs : [];
-    const useLoc = pref.loc ? locRefs : [];
-    const shotAssets = pref.asset ? assetsFor(shot.id) : [];
+    let budget = useComfyImg ? 2 : Number.POSITIVE_INFINITY;
+    const take = (arr) => {
+      const out = arr.slice(0, Math.max(0, budget));
+      budget -= out.length;
+      return out;
+    };
+    const useChar = take(pref.char ? charRefs : []);
+    const useLoc = take(pref.loc ? locRefs : []);
+    const shotAssets = take(pref.asset ? assetsFor(shot.id) : []);
     const useAssets = shotAssets.map((a) => a.photos[0]);
     const images = [...useChar, ...useLoc, ...useAssets];
     const pal = paletteRef.current;
@@ -357,7 +381,12 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     setImgBusy(shot.id);
     setImgErr(null);
     try {
-      const img = await generateImage(settings, { prompt: text, images, aspectRatio: ratio, imageSize: '2K' });
+      const img = await runImageGen({
+        prompt: text,
+        images,
+        ratio,
+        name: `${(cur.title || 'project').slice(0, 24)}_sc${project.outline.indexOf(scene) + 1}_shot${shots.indexOf(shot) + 1}_frame`,
+      });
       pushVersion(shot.id, img);
     } catch (e) {
       setImgErr({ id: shot.id, msg: e.message || String(e) });
@@ -444,13 +473,19 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const cur = (project.shotImages || {})[shot.id];
     const instruction = (refineText[shot.id] || '').trim();
     if (!cur || !instruction) return;
-    if (!settings.geminiKey) return setImgErr({ id: shot.id, msg: 'NO_GEMINI_KEY' });
+    const keyMiss = imageKeyError();
+    if (keyMiss) return setImgErr({ id: shot.id, msg: keyMiss });
     const ratio = project.aspectRatio || '16:9';
     const prompt = `Edit the attached image according to this instruction: ${instruction}. Keep the subject, composition and style unchanged except for the requested change. Maintain ${ratio} aspect ratio.`;
     setImgBusy(shot.id);
     setImgErr(null);
     try {
-      const img = await generateImage(settings, { prompt, images: [cur], aspectRatio: ratio, imageSize: '2K' });
+      const img = await runImageGen({
+        prompt,
+        images: [cur],
+        ratio,
+        name: `${(project.title || 'project').slice(0, 24)}_shot${shots.indexOf(shot) + 1}_refine`,
+      });
       pushVersion(shot.id, img);
       setRefineText((v) => ({ ...v, [shot.id]: '' }));
     } catch (e) {
@@ -470,18 +505,21 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     if (!first) return;
     const keyErr = textKeyError(settings);
     if (keyErr) return setImgErr({ id: shot.id, msg: keyErr });
-    if (!settings.geminiKey) return setImgErr({ id: shot.id, msg: 'NO_GEMINI_KEY' });
+    const keyMiss = imageKeyError();
+    if (keyMiss) return setImgErr({ id: shot.id, msg: keyMiss });
     const sceneArg = { ...scene, number: project.outline.indexOf(scene) + 1 };
     setImgBusy(`${shot.id}:final`);
     setImgErr(null);
     try {
       const data = await generateJSON(settings, finalFramePrompt(project, sceneArg, shot, first, genLang));
       const wanted = (data.characters_to_add || []).map((n) => String(n).toLowerCase());
+      // Flux.2 Klein takes 2 references total; the first frame occupies one
+      // slot, leaving room for a single missing-character photo.
       const missingRefs = (project.storyline?.characters || [])
         .filter((c) => wanted.includes((c.name || '').toLowerCase()))
         .map((c) => ({ name: c.name, photo: c.photos?.[0] }))
         .filter((c) => c.photo)
-        .slice(0, 3);
+        .slice(0, useComfyImg ? 1 : 3);
 
       const ratio = project.aspectRatio || '16:9';
       let text = `${data.image_prompt}\n\nThe FIRST attached image is the shot's first frame — edit it: keep the location, environment, lighting, camera angle and framing exactly as they are, and keep every character's appearance identical.`;
@@ -490,11 +528,11 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       }
       text += `\n\nRender in ${aspectDescription(ratio)} (${ratio}) aspect ratio, matching the first frame's dimensions.`;
 
-      const img = await generateImage(settings, {
+      const img = await runImageGen({
         prompt: text,
         images: [first, ...missingRefs.map((c) => c.photo)],
-        aspectRatio: ratio,
-        imageSize: '2K',
+        ratio,
+        name: `${(project.title || 'project').slice(0, 24)}_shot${shots.indexOf(shot) + 1}_final`,
       });
       update((p) => ({ shotFinalImages: { ...(p.shotFinalImages || {}), [shot.id]: img } }));
     } catch (e) {
@@ -511,14 +549,20 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const makeLocationRef = async (shot) => {
     const first = (project.shotImages || {})[shot.id];
     if (!first) return;
-    if (!settings.geminiKey) return setImgErr({ id: shot.id, msg: 'NO_GEMINI_KEY' });
+    const keyMiss = imageKeyError();
+    if (keyMiss) return setImgErr({ id: shot.id, msg: keyMiss });
     const ratio = project.aspectRatio || '16:9';
     const prompt = `Edit the attached image into a clean LOCATION REFERENCE plate. Remove ALL people, characters, animals and creatures from the frame, realistically reconstructing the environment behind them. Keep the location itself — architecture, interior/exterior details, furniture, props, colors, lighting, atmosphere and visual style — exactly as in the original. At the same time, zoom out: extend the frame boundaries in ALL directions (top, bottom, left and right) to reveal a bit more of the surrounding space beyond the original edges, seamlessly and plausibly continuing the environment, while keeping the exact same ${ratio} aspect ratio and camera perspective. No people, no text, no watermarks.`;
     setImgBusy(`${shot.id}:loc`);
     setImgErr(null);
     setLocSaved(null);
     try {
-      const img = await generateImage(settings, { prompt, images: [first], aspectRatio: ratio, imageSize: '2K' });
+      const img = await runImageGen({
+        prompt,
+        images: [first],
+        ratio,
+        name: `${(project.title || 'project').slice(0, 24)}_shot${shots.indexOf(shot) + 1}_locref`,
+      });
       update((p) => ({
         outline: p.outline.map((s) =>
           s.id === scene.id ? { ...s, photos: [...(s.photos || []), img].slice(-3) } : s

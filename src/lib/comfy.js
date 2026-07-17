@@ -9,6 +9,7 @@
 import i2vTemplate from '../data/comfy/ltx_i2v_api.json';
 import flf2vTemplate from '../data/comfy/ltx_flf2v_api.json';
 import t2iTemplate from '../data/comfy/krea2_t2i_api.json';
+import flux2Template from '../data/comfy/flux2_klein_edit_api.json';
 
 export const DEFAULT_COMFY_URL = 'http://127.0.0.1:8000';
 export const DEFAULT_OUTPUT_DIR = 'D:\\Claude work\\ComfyUI\\Output';
@@ -258,6 +259,59 @@ export async function generateComfyVideo(
   if (!vid) throw new Error('ComfyUI finished but returned no video file.');
   const blob = await fetchOutputBlob(settings, vid);
   return { dataURL: await blobToDataURL(blob), filename: vid.filename };
+}
+
+// ---- Stage 5: shot image via Flux.2 Klein 9B --------------------------------
+// Image resolutions per aspect ratio (multiples of 16, ~1MP — Flux-friendly).
+const IMG_DIMS = {
+  '16:9': [1280, 720],
+  '4:3': [1152, 864],
+  '1:1': [1024, 1024],
+  '3:4': [864, 1152],
+  '9:16': [720, 1280],
+};
+const imageDims = (ratio) => IMG_DIMS[ratio] || IMG_DIMS['16:9'];
+
+// Text-to-image / image editing on the local ComfyUI Flux.2 Klein 9B workflow
+// (flux2_klein_edit_api.json). Takes up to TWO reference images: with one
+// reference the second LoadImage chain is bypassed (nodes removed, the guider
+// rewired to the first chain); with none, the guider runs straight off the
+// text conditioning. Returns the image as a data URL plus its filename.
+export async function generateComfyImage(settings, { prompt, images = [], aspectRatio, name }) {
+  const graph = clone(flux2Template);
+  const refs = (images || []).filter(Boolean).slice(0, 2);
+  const [w, h] = imageDims(aspectRatio);
+  const stamp = Date.now();
+
+  graph['4'].inputs.text = prompt;
+  graph['18'].inputs.width = w;
+  graph['18'].inputs.height = h;
+  graph['20'].inputs.width = w;
+  graph['20'].inputs.height = h;
+  graph['19'].inputs.noise_seed = rndSeed();
+  graph['23'].inputs.filename_prefix = `StoryReel/${sanitize(name)}`;
+
+  if (refs[0]) graph['6'].inputs.image = await uploadInput(settings, refs[0], `storyreel_${stamp}_ref1.png`);
+  if (refs[1]) graph['11'].inputs.image = await uploadInput(settings, refs[1], `storyreel_${stamp}_ref2.png`);
+  if (!refs[1]) {
+    // Bypass the second reference chain: drop its nodes and hand the guider
+    // the first chain's conditioning directly.
+    for (const id of ['11', '12', '13', '14', '15']) delete graph[id];
+    graph['16'].inputs.positive = ['9', 0];
+    graph['16'].inputs.negative = ['10', 0];
+  }
+  if (!refs[0]) {
+    // No references at all — pure text-to-image.
+    for (const id of ['6', '7', '8', '9', '10']) delete graph[id];
+    graph['16'].inputs.positive = ['4', 0];
+    graph['16'].inputs.negative = ['5', 0];
+  }
+
+  const outputs = await runGraph(settings, graph);
+  const img = collectFiles(outputs).find((f) => /\.(png|jpg|jpeg|webp)$/i.test(f.filename));
+  if (!img) throw new Error('ComfyUI finished but returned no image file.');
+  const blob = await fetchOutputBlob(settings, img);
+  return { dataURL: await blobToDataURL(blob), filename: img.filename };
 }
 
 // ---- Stage 4: storyboard frame via Krea-2 Turbo -----------------------------

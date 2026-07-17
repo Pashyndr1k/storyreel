@@ -16,6 +16,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
   const [geminiModel, setGeminiModel] = useState(settings.geminiModel || 'gemini-3-pro-image-preview');
   const [textService, setTextService] = useState(settings.textService || 'claude');
   const [storyboardService, setStoryboardService] = useState(settings.storyboardService || 'gemini');
+  const [imageService, setImageService] = useState(settings.imageService || 'gemini');
   const [videoService, setVideoService] = useState(settings.videoService || 'comfy');
   const [comfyUrl, setComfyUrl] = useState(settings.comfyUrl || 'http://127.0.0.1:8000');
   const [comfyOutputDir, setComfyOutputDir] = useState(settings.comfyOutputDir || 'D:\\Claude work\\ComfyUI\\Output');
@@ -155,6 +156,11 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
           <option value="gemini">{t('set.svcGemini')}</option>
           <option value="comfy">{t('set.svcComfySb')}</option>
         </select>
+        <label>{t('set.imageService')}</label>
+        <select value={imageService} onChange={(e) => setImageService(e.target.value)}>
+          <option value="gemini">{t('set.svcGemini')}</option>
+          <option value="comfy">{t('set.svcComfyImg')}</option>
+        </select>
         <label>{t('set.videoService')}</label>
         <select value={videoService} onChange={(e) => setVideoService(e.target.value)}>
           <option value="comfy">{t('set.svcComfyVid')}</option>
@@ -198,6 +204,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
                 geminiModel: geminiModel.trim() || 'gemini-3-pro-image-preview',
                 textService,
                 storyboardService,
+                imageService,
                 videoService,
                 comfyUrl: comfyUrl.trim() || 'http://127.0.0.1:8000',
                 comfyOutputDir: comfyOutputDir.trim() || 'D:\\Claude work\\ComfyUI\\Output',
