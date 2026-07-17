@@ -8,7 +8,6 @@ import { useI18n } from '../lib/i18n.js';
 import { aspectDescription } from '../lib/aspect.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
-import HighlightedTextarea from '../components/HighlightedTextarea.jsx';
 import { StyleIndicator } from '../components/StyleControls.jsx';
 import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
 import { blockForScene, DYNAMICS_CONFIG } from '../lib/dynamics.js';
@@ -26,6 +25,34 @@ const readFileDataURL = (file) =>
     r.onerror = () => reject(new Error('Could not read the file.'));
     r.readAsDataURL(file);
   });
+
+// Pill toggle with an animated switch knob (the Apply block).
+function SwitchPill({ on, disabled, title, label, extra, onToggle }) {
+  return (
+    <button
+      type="button"
+      className={`sw-pill ${on ? 'on' : ''}`}
+      disabled={disabled}
+      aria-pressed={on}
+      title={title}
+      onClick={onToggle}
+    >
+      <span className="sw-track">
+        <span className="sw-knob" />
+      </span>
+      <span className="sw-lbl">{label}</span>
+      {extra}
+    </button>
+  );
+}
+
+// "Create Final Frame" glyph (corner brackets + lens).
+const FinalFrameIcon = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 5V3.5A1.5 1.5 0 0 1 3.5 2H5M11 2h1.5A1.5 1.5 0 0 1 14 3.5V5M14 11v1.5a1.5 1.5 0 0 1-1.5 1.5H11M5 14H3.5A1.5 1.5 0 0 1 2 12.5V11" />
+    <circle cx="8" cy="8" r="2" />
+  </svg>
+);
 
 // Small white icon on a round semi-transparent black chip, overlaid on images.
 function IconAction({ title, disabled, onClick, children }) {
@@ -85,10 +112,6 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const scene = project.outline.find((s) => s.id === sceneId) || project.outline[0];
   const shots = (scene && project.sceneDetails[scene.id]?.shots) || [];
   const hasPrompts = shots.some((s) => project.shotPrompts[s.id]);
-
-  // Character names feed the prompt-structure highlighter (they're coloured as
-  // the "characters" category wherever they appear in a prompt).
-  const charNames = (project.storyline?.characters || []).map((c) => c.name).filter(Boolean);
 
   // Reference photos available for this scene.
   const charRefs = (project.storyline?.characters || [])
@@ -390,6 +413,14 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       const cur = (p.shotImages || {})[shotId];
       if (cur) hist[shotId] = [cur, ...(hist[shotId] || [])].slice(0, 5);
       return { shotImages: { ...p.shotImages, [shotId]: img }, shotImageHistory: hist };
+    });
+
+  // Remove one version from the shot's image history stack.
+  const deleteVersion = (shotId, idx) =>
+    update((p) => {
+      const hist = [...((p.shotImageHistory || {})[shotId] || [])];
+      hist.splice(idx, 1);
+      return { shotImageHistory: { ...(p.shotImageHistory || {}), [shotId]: hist } };
     });
 
   // Swap a history version back to current (current takes its place in history).
@@ -697,154 +728,198 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           const shotAssets = assetsFor(shot.id);
           const dur = Number(shot.duration || 4);
           return (
-            <div key={shot.id} className="shot-card">
-              <div className="shot-head">
-                <strong>{t('s4.shot', { n: i + 1 })}</strong>
-                <span className="nle-nudge s5-dur" title={t('s5.durTip')}>
-                  <button type="button" title={t('sb.shorter')} disabled={dur <= 2} onClick={() => setShotDur(shot.id, dur - 0.5)}>
-                    −
-                  </button>
-                  <i className="trim-val">{dur.toFixed(1)}s</i>
-                  <button type="button" title={t('sb.longer')} disabled={dur >= 10} onClick={() => setShotDur(shot.id, dur + 0.5)}>
-                    +
-                  </button>
-                </span>
-                <span className="timecode">{shot.shotType || '—'}</span>
-              </div>
-              <p className="shot-summary">{shot.action}</p>
-
-              {/* Block 1 — image: the prompt paired with the frame generated
-                  from it, plus every image-generation control. */}
-              <div className="s5-pair">
-                <div className="field s5-pair-prompt">
+            <div key={shot.id} className="shot-card s5e-card">
+              {/* Image section — split panels: prompt management left, image
+                  generation right (layout per the approved reference). */}
+              <div className="s5e">
+                {/* LEFT — prompt management */}
+                <div className="s5e-panel">
+                  <div className="s5e-head">
+                    <strong className="s5e-title">{t('s4.shot', { n: i + 1 })}</strong>
+                    <span className="s5e-step" title={t('s5.durTip')}>
+                      <button type="button" title={t('sb.shorter')} disabled={dur <= 2} onClick={() => setShotDur(shot.id, dur - 0.5)}>
+                        −
+                      </button>
+                      <i>{dur.toFixed(1)}s</i>
+                      <button type="button" title={t('sb.longer')} disabled={dur >= 10} onClick={() => setShotDur(shot.id, dur + 0.5)}>
+                        +
+                      </button>
+                    </span>
+                    <span className="s5e-type">{shot.shotType || '—'}</span>
+                  </div>
+                  <p className="s5e-action">{shot.action}</p>
+                  <div className="s5e-div" />
                   <div className="prompt-head">
                     <label>{t('s5.img')}</label>
                     <CopyButton text={p.imagePrompt} />
                   </div>
-                  <HighlightedTextarea
-                    minRows={4}
-                    names={charNames}
+                  <AutoTextarea
+                    minRows={8}
+                    className="s5e-prompt"
                     value={p.imagePrompt}
                     placeholder={t('s5.ph')}
                     onChange={(e) => setPrompt(shot.id, { imagePrompt: e.target.value })}
                   />
-                </div>
-                <div className="s5-pair-media">
-                  <div className="s5-media-row">
-                    <aside className="s5-apply">
-                      <span className="s5-apply-title">{t('apply.title')}</span>
-                      <button
-                        type="button"
-                        className={`check-toggle ${pref.char ? 'on' : ''}`}
+                  <div className="s5e-grow" />
+                  <div>
+                    <div className="s5e-eyebrow">{t('apply.title')}</div>
+                    <div className="s5e-applyrow">
+                      <SwitchPill
+                        on={pref.char}
                         disabled={!charRefs.length}
-                        aria-pressed={pref.char}
                         title={t('img.useChar')}
-                        onClick={() => setPref(shot.id, { char: !pref.char })}
-                      >
-                        <span className="box" />
-                        {t('apply.char')}
-                      </button>
-                      <button
-                        type="button"
-                        className={`check-toggle ${pref.loc ? 'on' : ''}`}
+                        label={t('apply.char')}
+                        onToggle={() => setPref(shot.id, { char: !pref.char })}
+                      />
+                      <SwitchPill
+                        on={pref.loc}
                         disabled={!locRefs.length}
-                        aria-pressed={pref.loc}
                         title={t('img.useLoc')}
-                        onClick={() => setPref(shot.id, { loc: !pref.loc })}
-                      >
-                        <span className="box" />
-                        {t('apply.loc')}
-                      </button>
-                      <button
-                        type="button"
-                        className={`check-toggle ${pref.asset ? 'on' : ''}`}
+                        label={t('apply.loc')}
+                        onToggle={() => setPref(shot.id, { loc: !pref.loc })}
+                      />
+                      <SwitchPill
+                        on={pref.asset}
                         disabled={!assetsFor(shot.id).length}
-                        aria-pressed={pref.asset}
                         title={t('img.useAssets')}
-                        onClick={() => setPref(shot.id, { asset: !pref.asset })}
-                      >
-                        <span className="box" />
-                        {t('apply.assets')}
-                      </button>
-                      <button
-                        type="button"
-                        className={`check-toggle ${pref.palette ? 'on' : ''}`}
+                        label={t('apply.assets')}
+                        onToggle={() => setPref(shot.id, { asset: !pref.asset })}
+                      />
+                      <SwitchPill
+                        on={pref.palette}
                         disabled={!palette || palette.src === shot.id}
-                        aria-pressed={pref.palette}
                         title={t('img.paletteTip')}
-                        onClick={() => setPref(shot.id, { palette: !pref.palette })}
-                      >
-                        <span className="box" />
-                        {t('apply.palette')}
-                      </button>
-                      {palette && (
-                        <span className="pal-swatches">
-                          {palette.colors.map((c) => (
-                            <i key={c} style={{ background: c }} />
-                          ))}
-                        </span>
-                      )}
-                    </aside>
-                    <div className="s5-media-main">
-                      {genImg ? (
-                        finalImg ? (
-                          <div className="frame-pair">
-                            <figure>
-                              <div className="img-wrap">
-                                <img src={genImg} alt="" className="zoomable" onClick={() => setLightbox(genImg)} />
-                                <div className="img-actions">
-                                  <IconAction title={t('img.download')} onClick={() => downloadImage(shot, i)}>
-                                    <Download size={14} />
-                                  </IconAction>
-                                </div>
-                              </div>
-                              <figcaption>{t('img.first')}</figcaption>
-                            </figure>
-                            <figure>
-                              <div className="img-wrap">
-                                <img src={finalImg} alt="" className="zoomable" onClick={() => setLightbox(finalImg)} />
-                                <div className="img-actions">
-                                  <IconAction title={t('img.finalRegen')} disabled={anyBusy} onClick={() => genFinalFrame(shot)}>
-                                    <RestoreIcon size={14} />
-                                  </IconAction>
-                                  <IconAction title={t('img.downloadFinal')} onClick={() => downloadImage(shot, i, true)}>
-                                    <Download size={14} />
-                                  </IconAction>
-                                  <IconAction title={t('img.finalDelete')} disabled={anyBusy} onClick={() => deleteFinalFrame(shot)}>
-                                    <Trash size={14} />
-                                  </IconAction>
-                                </div>
-                              </div>
-                              <figcaption>{t('img.final')}</figcaption>
-                            </figure>
-                          </div>
-                        ) : (
-                          <div className="img-wrap">
+                        label={t('apply.palette')}
+                        extra={
+                          palette ? (
+                            <span className="pal-swatches">
+                              {palette.colors.map((c) => (
+                                <i key={c} style={{ background: c }} />
+                              ))}
+                            </span>
+                          ) : null
+                        }
+                        onToggle={() => setPref(shot.id, { palette: !pref.palette })}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* RIGHT — image generation */}
+                <div className="s5e-panel">
+                  {genImg ? (
+                    finalImg ? (
+                      <div className="frame-pair">
+                        <figure>
+                          <div className="s5e-imgwrap">
                             <img src={genImg} alt="" className="zoomable" onClick={() => setLightbox(genImg)} />
+                            <button type="button" className="s5e-dl" title={t('img.download')} onClick={() => downloadImage(shot, i)}>
+                              <Download size={14} />
+                            </button>
+                          </div>
+                          <figcaption>{t('img.first')}</figcaption>
+                        </figure>
+                        <figure>
+                          <div className="s5e-imgwrap">
+                            <img src={finalImg} alt="" className="zoomable" onClick={() => setLightbox(finalImg)} />
                             <div className="img-actions">
-                              <IconAction title={t('img.download')} onClick={() => downloadImage(shot, i)}>
+                              <IconAction title={t('img.finalRegen')} disabled={anyBusy} onClick={() => genFinalFrame(shot)}>
+                                <RestoreIcon size={14} />
+                              </IconAction>
+                              <IconAction title={t('img.downloadFinal')} onClick={() => downloadImage(shot, i, true)}>
                                 <Download size={14} />
+                              </IconAction>
+                              <IconAction title={t('img.finalDelete')} disabled={anyBusy} onClick={() => deleteFinalFrame(shot)}>
+                                <Trash size={14} />
                               </IconAction>
                             </div>
                           </div>
-                        )
-                      ) : (
-                        <div className="s5-media-empty">{t('s5.noImg')}</div>
-                      )}
-                    </div>
-                  </div>
+                          <figcaption>{t('img.final')}</figcaption>
+                        </figure>
+                      </div>
+                    ) : (
+                      <div className="s5e-imgwrap">
+                        <img src={genImg} alt="" className="zoomable" onClick={() => setLightbox(genImg)} />
+                        <button type="button" className="s5e-dl" title={t('img.download')} onClick={() => downloadImage(shot, i)}>
+                          <Download size={14} />
+                        </button>
+                        {/* Version stack hovers over the preview; ✕ removes a variant. */}
+                        {((project.shotImageHistory || {})[shot.id] || []).length > 0 && (
+                          <div className="s5e-vers-overlay">
+                            <span>{t('ver.label')}</span>
+                            {((project.shotImageHistory || {})[shot.id] || []).map((v, vi) => (
+                              <span
+                                key={vi}
+                                className="s5e-ver"
+                                role="button"
+                                tabIndex={0}
+                                title={t('ver.restore')}
+                                onClick={() => restoreVersion(shot.id, vi)}
+                                onKeyDown={(e) => e.key === 'Enter' && restoreVersion(shot.id, vi)}
+                              >
+                                <img src={v} alt="" />
+                                <span
+                                  className="s5e-ver-x"
+                                  role="button"
+                                  title={t('ver.delete')}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    deleteVersion(shot.id, vi);
+                                  }}
+                                >
+                                  ✕
+                                </span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  ) : (
+                    <div className="s5-media-empty">{t('s5.noImg')}</div>
+                  )}
 
-                  {/* Image control block: generate/upload/final frame/location ref. */}
-                  <div className="s5-ctrl">
+                  {/* Versions under the frame pair (the small first frame has no room for an overlay). */}
+                  {genImg && finalImg && ((project.shotImageHistory || {})[shot.id] || []).length > 0 && (
+                    <div className="s5e-vers">
+                      <span>{t('ver.label')}</span>
+                      {((project.shotImageHistory || {})[shot.id] || []).map((v, vi) => (
+                        <span
+                          key={vi}
+                          className="s5e-ver"
+                          role="button"
+                          tabIndex={0}
+                          title={t('ver.restore')}
+                          onClick={() => restoreVersion(shot.id, vi)}
+                          onKeyDown={(e) => e.key === 'Enter' && restoreVersion(shot.id, vi)}
+                        >
+                          <img src={v} alt="" />
+                          <span
+                            className="s5e-ver-x"
+                            role="button"
+                            title={t('ver.delete')}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteVersion(shot.id, vi);
+                            }}
+                          >
+                            ✕
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="s5e-btnrow">
                     <button
-                      className="btn tiny primary"
+                      className="btn small primary s5e-gen"
                       disabled={anyBusy || !p.imagePrompt}
                       onClick={() => genImage(shot)}
                     >
                       {imgBusy === shot.id ? t('img.generating') : genImg ? t('img.regenerate') : t('img.generate')}
                     </button>
-                    <label className="btn tiny file-btn" title={t('img.uploadTip')}>
-                      <Upload size={13} /> {t('img.upload')}
+                    <label className="s5e-ico" title={t('img.uploadTip')} aria-label={t('img.uploadTip')}>
+                      <Upload size={16} />
                       <input
                         type="file"
                         accept="image/*"
@@ -857,52 +932,49 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       />
                     </label>
                     {genImg && !finalImg && (
-                      <button className="btn tiny" disabled={anyBusy} onClick={() => genFinalFrame(shot)}>
-                        {finalBusy ? t('img.generating') : t('img.finalCreate')}
+                      <button
+                        type="button"
+                        className="s5e-ico"
+                        title={t('img.finalCreate')}
+                        aria-label={t('img.finalCreate')}
+                        disabled={anyBusy}
+                        onClick={() => genFinalFrame(shot)}
+                      >
+                        <FinalFrameIcon />
                       </button>
                     )}
                     {genImg && (
-                      <button className="btn tiny" disabled={anyBusy} onClick={() => makeLocationRef(shot)}>
-                        <MapPin size={13} /> {locBusy ? t('img.generating') : t('img.locRef')}
+                      <button
+                        type="button"
+                        className="s5e-ico"
+                        title={t('img.locRef')}
+                        aria-label={t('img.locRef')}
+                        disabled={anyBusy}
+                        onClick={() => makeLocationRef(shot)}
+                      >
+                        <MapPin size={16} />
                       </button>
                     )}
+                    {(finalBusy || locBusy) && <span className="hint">{t('img.generating')}</span>}
                     {locSaved === shot.id && <span className="hint">{t('img.locSaved')}</span>}
                   </div>
 
-                  {genImg && (
-                    <div className="voice-row refine-row">
-                      <input
-                        value={refineText[shot.id] || ''}
-                        placeholder={t('ver.refinePh')}
-                        onChange={(e) => setRefineText((v) => ({ ...v, [shot.id]: e.target.value }))}
-                        onKeyDown={(e) => e.key === 'Enter' && refineImage(shot)}
-                      />
-                      <button
-                        className="btn small"
-                        disabled={imgBusy === shot.id || !(refineText[shot.id] || '').trim()}
-                        onClick={() => refineImage(shot)}
-                      >
-                        {imgBusy === shot.id ? t('img.generating') : t('ver.refine')}
-                      </button>
-                    </div>
-                  )}
-
-                  {((project.shotImageHistory || {})[shot.id] || []).length > 0 && (
-                    <div className="row s5-vers">
-                      <span className="hint">{t('ver.label')}:</span>
-                      {((project.shotImageHistory || {})[shot.id] || []).map((v, vi) => (
-                        <button
-                          key={vi}
-                          type="button"
-                          className="ver-thumb"
-                          title={t('ver.restore')}
-                          onClick={() => restoreVersion(shot.id, vi)}
-                        >
-                          <img src={v} alt="" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  <div className="voice-row refine-row">
+                    <input
+                      value={refineText[shot.id] || ''}
+                      placeholder={t('ver.refinePh')}
+                      disabled={!genImg}
+                      onChange={(e) => setRefineText((v) => ({ ...v, [shot.id]: e.target.value }))}
+                      onKeyDown={(e) => e.key === 'Enter' && refineImage(shot)}
+                    />
+                    <button
+                      className="btn small s5e-refine"
+                      disabled={!genImg || imgBusy === shot.id || !(refineText[shot.id] || '').trim()}
+                      onClick={() => refineImage(shot)}
+                    >
+                      {imgBusy === shot.id ? t('img.generating') : t('ver.refine')}
+                    </button>
+                  </div>
 
                   {imgErr?.id === shot.id &&
                     (imgErr.msg === 'NO_GEMINI_KEY' || imgErr.msg === 'NO_KEY' || imgErr.msg === 'COMFY_UNREACHABLE' ? (
@@ -920,10 +992,10 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       <div className="note error">{imgErr.msg}</div>
                     ))}
 
-                  {/* Reference material: shot assets and the scene's
-                      environment references side by side. */}
-                  <div className="s5-refrows">
-                    <div className="s5-refcol">
+                  <div className="s5e-grow" />
+                  <div className="s5e-div" />
+                  <div className="s5e-refgrid">
+                    <div>
                       <label className="photos-label">{t('asset.shotLabel')}</label>
                       <div className="photo-row">
                         {shotAssets.map((a) => (
@@ -957,7 +1029,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         </button>
                       </div>
                     </div>
-                    <div className="s5-refcol">
+                    <div>
                       <label className="photos-label">{t('scene.photos')}</label>
                       <div className="photo-row">
                         {(scene?.photos || []).map((ph, j) => (
@@ -1003,46 +1075,44 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                 </div>
               </div>
 
-              {/* Block 2 — video: the prompt paired with the video generated
-                  from it, plus the video-generation controls. */}
-              <div className="s5-pair">
-                <div className="field s5-pair-prompt">
+              {/* Video section — same split grid: prompt left, video right. */}
+              <div className="s5e s5e-section">
+                <div className="s5e-panel">
                   <div className="prompt-head">
                     <label>{t('s5.vid', { d: dur })}</label>
                     <CopyButton text={p.videoPrompt} />
                   </div>
-                  <HighlightedTextarea
-                    minRows={4}
-                    names={charNames}
+                  <AutoTextarea
+                    minRows={6}
+                    className="s5e-prompt"
                     value={p.videoPrompt}
                     placeholder={t('s5.ph')}
                     onChange={(e) => setPrompt(shot.id, { videoPrompt: e.target.value })}
                   />
                 </div>
-                <div className="s5-pair-media">
-                  {shotVid && (
-                    <div className="img-wrap vid-wrap">
+                <div className="s5e-panel">
+                  {shotVid ? (
+                    <div className="s5e-imgwrap vid-wrap">
                       <video src={shotVid} controls preload="metadata" />
-                      <div className="img-actions">
-                        <IconAction title={t('vid.regenerate')} disabled={anyBusy} onClick={() => genVideo(shot, i)}>
-                          <RestoreIcon size={14} />
-                        </IconAction>
-                        <IconAction title={t('vid.download')} onClick={() => downloadVideo(shot, i)}>
-                          <Download size={14} />
-                        </IconAction>
-                      </div>
+                      <button type="button" className="s5e-dl" title={t('vid.download')} onClick={() => downloadVideo(shot, i)}>
+                        <Download size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="s5-media-empty">
+                      {!genImg ? t('vid.needFrame') : finalImg ? t('vid.modeFLF') : t('vid.modeI2V')}
                     </div>
                   )}
-                  <div className="s5-ctrl">
+                  <div className="s5e-btnrow">
                     <button
-                      className="btn tiny primary"
+                      className="btn small primary s5e-gen"
                       disabled={anyBusy || !p.videoPrompt?.trim() || !genImg}
                       onClick={() => genVideo(shot, i)}
                     >
                       {vidBusy ? t('vid.generating') : shotVid ? t('vid.regenerate') : t('vid.generate')}
                     </button>
-                    <label className="btn tiny file-btn" title={t('vid.uploadTip')}>
-                      <Upload size={13} /> {t('vid.upload')}
+                    <label className="s5e-ico" title={t('vid.uploadTip')} aria-label={t('vid.uploadTip')}>
+                      <Upload size={16} />
                       <input
                         type="file"
                         accept="video/*"
@@ -1054,31 +1124,31 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         }}
                       />
                     </label>
-                    {!genImg && <span className="hint">{t('vid.needFrame')}</span>}
-                    {genImg && (
+                    {shotVid && genImg && (
                       <span className="hint">{finalImg ? t('vid.modeFLF') : t('vid.modeI2V')}</span>
                     )}
                   </div>
                 </div>
               </div>
 
-              {/* Block 3 — audio: only when the shot carries character
-                  dialogue (or an audio prompt already exists). */}
+              {/* Audio section — only when the shot carries character dialogue
+                  (or an audio prompt already exists); aligned to the same grid. */}
               {((shot.dialogue || '').trim() || (p.audioPrompt || '').trim()) && (
-                <div className="s5-pair s5-pair-audio">
-                  <div className="field s5-pair-prompt">
+                <div className="s5e s5e-section">
+                  <div className="s5e-panel">
                     <div className="prompt-head">
                       <label>{t('s5.aud')}</label>
                       <CopyButton text={p.audioPrompt || ''} />
                     </div>
-                    <HighlightedTextarea
-                      minRows={3}
-                      names={charNames}
+                    <AutoTextarea
+                      minRows={4}
+                      className="s5e-prompt s5e-prompt-sm"
                       value={p.audioPrompt || ''}
                       placeholder={t('s5.audPh')}
                       onChange={(e) => setPrompt(shot.id, { audioPrompt: e.target.value })}
                     />
                   </div>
+                  <div className="s5e-cellpad" />
                 </div>
               )}
             </div>
