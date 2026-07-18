@@ -26,6 +26,11 @@ const readFileDataURL = (file) =>
     r.readAsDataURL(file);
   });
 
+// Appended to every image-generation prompt: the described scene must fill the
+// whole canvas — no black bars / letterboxing / empty margins at any edge.
+const FULL_FRAME_RULE =
+  'CRITICAL FRAMING: the described scene must fill the ENTIRE image edge to edge and occupy 100% of the canvas. Do NOT add black bars, letterboxing, pillarboxing, borders, frames, margins or any blank/empty areas at any edge — no black areas at the edges of the image.';
+
 // Pill toggle with an animated switch knob (the Apply block).
 function SwitchPill({ on, disabled, title, label, extra, onToggle }) {
   return (
@@ -431,7 +436,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       text += `\n\nSCENE COLOR PALETTE — grade this frame to match the scene's established palette (extracted from its first frame): ${pal.colors.join(', ')}. Keep hues, color temperature and overall tone consistent with that frame, unless the shot's action explicitly changes the lighting.`;
     }
     const ratio = project.aspectRatio || '16:9';
-    text += `\n\nRender in ${aspectDescription(ratio)} (${ratio}) aspect ratio.`;
+    text += `\n\nRender in ${aspectDescription(ratio)} (${ratio}) aspect ratio.\n\n${FULL_FRAME_RULE}`;
 
     setImgBusy(shot.id);
     setImgErr(null);
@@ -531,7 +536,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const keyMiss = imageKeyError();
     if (keyMiss) return setImgErr({ id: shot.id, msg: keyMiss });
     const ratio = project.aspectRatio || '16:9';
-    const prompt = `Edit the attached image according to this instruction: ${instruction}. Keep the subject, composition and style unchanged except for the requested change. Maintain ${ratio} aspect ratio.`;
+    const prompt = `Edit the attached image according to this instruction: ${instruction}. Keep the subject, composition and style unchanged except for the requested change. Maintain ${ratio} aspect ratio.\n\n${FULL_FRAME_RULE}`;
     setImgBusy(shot.id);
     setImgErr(null);
     try {
@@ -581,7 +586,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       if (missingRefs.length) {
         text += ` The ${missingRefs.length === 1 ? 'next attached image is a reference photo' : `next ${missingRefs.length} attached images are reference photos`} of ${missingRefs.map((c) => c.name).join(', ')} — these characters appear in the final frame; reproduce their faces and appearance faithfully.`;
       }
-      text += `\n\nRender in ${aspectDescription(ratio)} (${ratio}) aspect ratio, matching the first frame's dimensions.`;
+      text += `\n\nRender in ${aspectDescription(ratio)} (${ratio}) aspect ratio, matching the first frame's dimensions.\n\n${FULL_FRAME_RULE}`;
 
       const img = await runImageGen({
         prompt: text,
@@ -607,7 +612,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const keyMiss = imageKeyError();
     if (keyMiss) return setImgErr({ id: shot.id, msg: keyMiss });
     const ratio = project.aspectRatio || '16:9';
-    const prompt = `Edit the attached image into a clean LOCATION REFERENCE plate. Remove ALL people, characters, animals and creatures from the frame, realistically reconstructing the environment behind them. Keep the location itself — architecture, interior/exterior details, furniture, props, colors, lighting, atmosphere and visual style — exactly as in the original. At the same time, zoom out: extend the frame boundaries in ALL directions (top, bottom, left and right) to reveal a bit more of the surrounding space beyond the original edges, seamlessly and plausibly continuing the environment, while keeping the exact same ${ratio} aspect ratio and camera perspective. No people, no text, no watermarks.`;
+    const prompt = `Edit the attached image into a clean LOCATION REFERENCE plate. Remove ALL people, characters, animals and creatures from the frame, realistically reconstructing the environment behind them. Keep the location itself — architecture, interior/exterior details, furniture, props, colors, lighting, atmosphere and visual style — exactly as in the original. At the same time, zoom out: extend the frame boundaries in ALL directions (top, bottom, left and right) to reveal a bit more of the surrounding space beyond the original edges, seamlessly and plausibly continuing the environment, while keeping the exact same ${ratio} aspect ratio and camera perspective. No people, no text, no watermarks.\n\n${FULL_FRAME_RULE}`;
     setImgBusy(`${shot.id}:loc`);
     setImgErr(null);
     setLocSaved(null);

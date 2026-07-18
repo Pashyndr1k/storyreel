@@ -212,7 +212,7 @@ export function stage5Prompt(project, scene, shots, lang, imageStyle) {
     : '';
   const img = (imageStyle || '').trim();
   const ratio = project.aspectRatio || '16:9';
-  const aspectNote = `\n\nASPECT RATIO — every "image_prompt" MUST explicitly state the framing as ${aspectDescription(ratio)} (${ratio}), and compose for that frame.`;
+  const aspectNote = `\n\nASPECT RATIO — every "image_prompt" MUST explicitly state the framing as ${aspectDescription(ratio)} (${ratio}), and compose for that frame. The scene must FILL the whole frame edge to edge (100% of the canvas) — never describe or imply black bars, letterboxing, borders or empty margins at the edges.`;
   const styleNote = img ? `\n\nVISUAL STYLE — bake this into EVERY "image_prompt": ${img}` : '';
   return {
     system: system(lang) + FRAME_CONTINUITY_SYSTEM,
