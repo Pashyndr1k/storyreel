@@ -404,7 +404,7 @@ export default function Stage6({ project, update, settings }) {
     setRenderErr('');
     setRenderDone(null);
     setPlaying(false);
-    const [w, h] = videoDims(project.aspectRatio || '16:9');
+    const [w, h] = videoDims(project.aspectRatio || '16:9', project.videoResolution);
     const segments = items.map((it) => {
       if (it.video)
         return {
@@ -453,7 +453,7 @@ export default function Stage6({ project, update, settings }) {
     setRenderDone(null);
     setPlaying(false);
     cancelRef.current = false;
-    const [w, h] = videoDims(project.aspectRatio || '16:9');
+    const [w, h] = videoDims(project.aspectRatio || '16:9', project.videoResolution);
     const canvas = document.createElement('canvas');
     canvas.width = w;
     canvas.height = h;

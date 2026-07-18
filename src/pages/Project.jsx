@@ -11,6 +11,7 @@ import { resolveStyleText } from '../lib/styles.js';
 import ProjectSettingsModal from '../components/ProjectSettingsModal.jsx';
 import SmartEditModal from '../components/SmartEditModal.jsx';
 import Dropdown from '../components/Dropdown.jsx';
+import ThemeToggle from '../components/ThemeToggle.jsx';
 import { ArrowLeft, Download, Sliders, Cog, PencilStar, Check, Globe } from '../components/icons.jsx';
 import { LANGS } from '../lib/i18n.js';
 
@@ -119,6 +120,7 @@ export default function Project({ project, updateProject, settings, setSettings,
             icon={<Globe size={15} />}
             title={t('set.language')}
           />
+          <ThemeToggle theme={settings.theme || 'dark'} setTheme={(th) => setSettings({ ...settings, theme: th })} />
           <button className="icon-btn h44" title={t('edit.button')} aria-label={t('edit.button')} onClick={() => setShowSmartEdit(true)}>
             <PencilStar size={18} />
           </button>

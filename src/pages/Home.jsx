@@ -109,6 +109,8 @@ export default function Home({
       onSettings={onSettings}
       lang={settings.lang || 'en'}
       setLang={(l) => setSettings({ ...settings, lang: l })}
+      theme={settings.theme || 'dark'}
+      setTheme={(th) => setSettings({ ...settings, theme: th })}
       search={{ value: query, onChange: setQuery, placeholder: t('home.search') }}
     >
       <div className="title-row">

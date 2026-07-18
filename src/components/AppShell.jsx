@@ -1,4 +1,5 @@
 import Dropdown from './Dropdown.jsx';
+import ThemeToggle from './ThemeToggle.jsx';
 import { Clapperboard, Grid, Layers, Cog, Globe, Search, User, MapPin } from './icons.jsx';
 import { LANGS, useI18n } from '../lib/i18n.js';
 
@@ -10,6 +11,8 @@ export default function AppShell({
   onSettings,
   lang,
   setLang,
+  theme,
+  setTheme,
   search,
   children,
 }) {
@@ -78,6 +81,7 @@ export default function AppShell({
                 icon={<Globe size={15} />}
                 title={t('set.language')}
               />
+              {setTheme && <ThemeToggle theme={theme} setTheme={setTheme} />}
               <button
                 type="button"
                 className="icon-btn h44"

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { STYLE_CATEGORIES, newStyle } from '../lib/styles.js';
+import { STYLE_CATEGORIES, newStyle, buildStylesExport, parseStylesFile, mergeStyles } from '../lib/styles.js';
+import { downloadText } from '../lib/exportScript.js';
 import { useI18n } from '../lib/i18n.js';
 import AutoTextarea from './AutoTextarea.jsx';
 
@@ -24,6 +25,24 @@ export default function StylesModal({ styles, setStyles, initialCat = 'script', 
   const remove = (id) => {
     if (!window.confirm(t('styles.deleteConfirm'))) return;
     setStyles((prev) => ({ ...prev, [cat]: (prev[cat] || []).filter((s) => s.id !== id) }));
+  };
+
+  // Export / import ALL style types (script + image + video) at once.
+  const exportStyles = () => downloadText('storyreel-styles.json', JSON.stringify(buildStylesExport(styles), null, 2));
+  const importStyles = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const incoming = parseStylesFile(String(reader.result));
+        setStyles((prev) => mergeStyles(prev, incoming));
+      } catch {
+        window.alert(t('styles.importInvalid'));
+      }
+    };
+    reader.readAsText(file);
   };
 
   return (
@@ -98,6 +117,16 @@ export default function StylesModal({ styles, setStyles, initialCat = 'script', 
           </>
         )}
 
+        <div className="settings-io">
+          <label>{t('styles.ioLabel')}</label>
+          <div className="row">
+            <button className="btn small" onClick={exportStyles}>{t('styles.export')}</button>
+            <label className="btn small file-btn">
+              {t('styles.import')}
+              <input type="file" accept=".json,application/json" onChange={importStyles} hidden />
+            </label>
+          </div>
+        </div>
         <div className="modal-actions">
           <button className="btn primary" onClick={onClose}>{t('styles.done')}</button>
         </div>

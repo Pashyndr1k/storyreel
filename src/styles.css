@@ -1664,6 +1664,34 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
   .update-toast { animation: none; }
 }
 
+/* video-quality segmented control (Stage 5 actions row) */
+.s5-resrow { display: inline-flex; align-items: center; gap: 8px; }
+.s5-reslabel { font-size: 12px; font-weight: 600; color: var(--muted); }
+.seg {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+}
+.seg-btn {
+  border: none;
+  background: none;
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.seg-btn.on { background: var(--primary-grad); color: #fff; }
+.seg-btn:not(.on):hover { background: var(--hover-bg); }
+
+/* theme-cycle button in the top bar */
+.theme-toggle svg { display: block; }
+
 /* ============ STAGE 5 SHOT EDITOR — split panels on a shared grid ============ */
 /* Deep prompt-well background per theme. */
 :root { --well-bg: #14112a; }

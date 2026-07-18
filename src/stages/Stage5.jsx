@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage } from '../lib/gemini.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
-import { generateComfyVideo, generateComfyImage, saveToLocalOutputs } from '../lib/comfy.js';
+import { generateComfyVideo, generateComfyImage, saveToLocalOutputs, VIDEO_RESOLUTIONS } from '../lib/comfy.js';
 import { stage5Prompt, stage5VideoPrompt, stage5AudioPrompt, finalFramePrompt } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
 import { aspectDescription } from '../lib/aspect.js';
@@ -119,6 +119,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     .filter(Boolean)
     .slice(0, 3);
   const locRefs = (scene?.photos || []).slice(0, 6);
+  const videoRes = VIDEO_RESOLUTIONS.includes(project.videoResolution) ? project.videoResolution : 'HD';
 
   // Assets attached to a shot, resolved from the global library (dropping any
   // that were deleted). Used in image generation alongside char/loc refs.
@@ -677,6 +678,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         lastFrame: last,
         durationSec: genDuration,
         aspectRatio: project.aspectRatio || '16:9',
+        resolution: cur.videoResolution || 'HD',
         name: `${(project.title || 'project').slice(0, 24)}_sc${project.outline.indexOf(scene) + 1}_shot${i + 1}`,
       });
       saveToLocalOutputs(settings, filename, dataURL); // best-effort local copy
@@ -751,7 +753,22 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
             </button>
           </>
         )}
-        <button className="btn push-right" onClick={() => setShowAssets(true)}>
+        <span className="s5-resrow push-right" title={t('s5.resTip')}>
+          <span className="s5-reslabel">{t('s5.resLabel')}</span>
+          <span className="seg">
+            {VIDEO_RESOLUTIONS.map((r) => (
+              <button
+                key={r}
+                type="button"
+                className={`seg-btn ${videoRes === r ? 'on' : ''}`}
+                onClick={() => update({ videoResolution: r })}
+              >
+                {r}
+              </button>
+            ))}
+          </span>
+        </span>
+        <button className="btn" onClick={() => setShowAssets(true)}>
           <Grid size={15} /> {t('asset.libBtn')}
         </button>
       </div>

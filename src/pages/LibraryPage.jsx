@@ -34,6 +34,8 @@ export default function LibraryPage({ kind, library, libUpsert, libDelete, setti
       onSettings={onSettings}
       lang={settings.lang || 'en'}
       setLang={(l) => setSettings({ ...settings, lang: l })}
+      theme={settings.theme || 'dark'}
+      setTheme={(th) => setSettings({ ...settings, theme: th })}
     >
       <div className="title-row">
         <div className="title-left">

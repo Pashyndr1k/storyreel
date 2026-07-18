@@ -210,6 +210,24 @@ export function resolveStyleText(styles, category, id) {
   return s ? (s.instructions || '') : '';
 }
 
+// Bundle all three style categories into one export payload (a versioned
+// envelope so imports can migrate old files forward).
+export function buildStylesExport(styles) {
+  return { kind: 'storyreel-styles', version: STYLES_VERSION, exportedAt: new Date().toISOString(), styles: normalize(styles) };
+}
+
+// Read a styles-export file back into a { script, image, video } library,
+// running migrations. Accepts the envelope above or a bare { script,… } shape.
+export function parseStylesFile(text) {
+  const data = JSON.parse(text);
+  const version = typeof data?.version === 'number' ? data.version : STYLES_VERSION;
+  const stored = data?.styles ? data.styles : data;
+  if (!stored || !STYLE_CATEGORIES.some((c) => Array.isArray(stored[c]))) {
+    throw new Error('Not a StoryReel styles file.');
+  }
+  return migrate(version, stored);
+}
+
 // Union two libraries by style id (incoming wins on conflict). Used when
 // importing a backup so a user's existing custom styles are never lost.
 export function mergeStyles(base, incoming) {

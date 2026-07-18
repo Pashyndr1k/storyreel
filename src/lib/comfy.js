@@ -23,15 +23,37 @@ function base(settings) {
   return (settings.comfyUrl || DEFAULT_COMFY_URL).replace(/\/+$/, '');
 }
 
-// Video resolutions per project aspect ratio (multiples of 8, LTX-friendly).
+// Video resolutions per aspect ratio and quality tier (LTX-friendly dims; the
+// HD row is unchanged from before). HD is the long-standing default; SD is
+// faster/cheaper, FHD is full-quality.
 const VIDEO_DIMS = {
-  '16:9': [1280, 720],
-  '4:3': [1200, 900],
-  '1:1': [960, 960],
-  '3:4': [900, 1200],
-  '9:16': [720, 1280],
+  SD: {
+    '16:9': [848, 480],
+    '4:3': [640, 480],
+    '1:1': [512, 512],
+    '3:4': [480, 640],
+    '9:16': [480, 848],
+  },
+  HD: {
+    '16:9': [1280, 720],
+    '4:3': [1200, 900],
+    '1:1': [960, 960],
+    '3:4': [900, 1200],
+    '9:16': [720, 1280],
+  },
+  FHD: {
+    '16:9': [1920, 1080],
+    '4:3': [1600, 1200],
+    '1:1': [1440, 1440],
+    '3:4': [1200, 1600],
+    '9:16': [1080, 1920],
+  },
 };
-export const videoDims = (ratio) => VIDEO_DIMS[ratio] || VIDEO_DIMS['16:9'];
+export const VIDEO_RESOLUTIONS = ['SD', 'HD', 'FHD'];
+export const videoDims = (ratio, resolution = 'HD') => {
+  const tier = VIDEO_DIMS[resolution] || VIDEO_DIMS.HD;
+  return tier[ratio] || tier['16:9'];
+};
 
 // Krea-2 ResolutionSelector combo values per aspect ratio.
 const T2I_ASPECT = {
@@ -222,10 +244,10 @@ const sanitize = (s) => (s || 'shot').replace(/[^\w\d-]+/g, '_').slice(0, 60);
 // video as a data URL plus the ComfyUI-side filename.
 export async function generateComfyVideo(
   settings,
-  { prompt, firstFrame, lastFrame, durationSec, aspectRatio, name },
+  { prompt, firstFrame, lastFrame, durationSec, aspectRatio, resolution, name },
   { onStatus } = {}
 ) {
-  const [w, h] = videoDims(aspectRatio);
+  const [w, h] = videoDims(aspectRatio, resolution);
   // Shots are 2-10s on the timeline, but generation requests carry the +2s
   // dynamics padding (head/tail get trimmed in assembly) — allow up to 12.
   const dur = Math.max(2, Math.min(12, Math.round(durationSec || 4)));

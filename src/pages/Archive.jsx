@@ -20,6 +20,8 @@ export default function Archive({ projects, updateProject, removeProject, settin
       onSettings={onSettings}
       lang={settings.lang || 'en'}
       setLang={(l) => setSettings({ ...settings, lang: l })}
+      theme={settings.theme || 'dark'}
+      setTheme={(th) => setSettings({ ...settings, theme: th })}
     >
       <div className="title-row">
         <div className="title-left">

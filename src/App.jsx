@@ -288,6 +288,7 @@ export default function App() {
           setSettings={setSettings}
           projects={projects}
           styles={styles}
+          setStyles={setStyles}
           onClose={() => setShowSettings(false)}
         />
       )}

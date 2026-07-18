@@ -1,17 +1,16 @@
 import { useState } from 'react';
 import { MODELS } from '../lib/claude.js';
 import { listImageModels } from '../lib/gemini.js';
-import { LANGS, useI18n } from '../lib/i18n.js';
+import { useI18n } from '../lib/i18n.js';
 import { saveProjects, migrateProject } from '../lib/storage.js';
-import { loadStyles, saveStyles, mergeStyles } from '../lib/styles.js';
+import { loadStyles, saveStyles, mergeStyles, buildStylesExport, parseStylesFile } from '../lib/styles.js';
 import { downloadText } from '../lib/exportScript.js';
 
-export default function SettingsModal({ settings, setSettings, projects = [], styles, onClose }) {
+export default function SettingsModal({ settings, setSettings, projects = [], styles, setStyles, onClose }) {
   const { t } = useI18n();
+  const [tab, setTab] = useState('backups');
   const [apiKey, setApiKey] = useState(settings.apiKey);
   const [model, setModel] = useState(settings.model);
-  const [lang, setLang] = useState(settings.lang || 'en');
-  const [theme, setTheme] = useState(settings.theme || 'dark');
   const [geminiKey, setGeminiKey] = useState(settings.geminiKey || '');
   const [geminiModel, setGeminiModel] = useState(settings.geminiModel || 'gemini-3-pro-image-preview');
   const [textService, setTextService] = useState(settings.textService || 'claude');
@@ -38,21 +37,32 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
     }
   };
 
-  // Backup carries both projects AND the style library. Format:
-  //   { version, exportedAt, projects: [...], styles: { script, image, video } }
-  // A plain array is still accepted (legacy projects-only backups).
-  const exportAll = () => {
-    const payload = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      projects,
-      styles: styles || loadStyles(),
-    };
-    downloadText('storyreel-backup.json', JSON.stringify(payload, null, 2));
+  const save = () => {
+    setSettings({
+      ...settings,
+      apiKey: apiKey.trim(),
+      model,
+      geminiKey: geminiKey.trim(),
+      geminiModel: geminiModel.trim() || 'gemini-3-pro-image-preview',
+      textService,
+      storyboardService,
+      imageService,
+      videoService,
+      comfyUrl: comfyUrl.trim() || 'http://127.0.0.1:8000',
+      comfyOutputDir: comfyOutputDir.trim() || 'D:\\Claude work\\ComfyUI\\Output',
+      projectsDir: projectsDir.trim() || 'D:\\Claude work\\StoryReel Projects',
+    });
+    onClose();
   };
 
-  const importAll = (e) => {
+  // ---- Backups: projects (full backup) + styles (all three types) ----------
+  const exportProjects = () => {
+    const payload = { version: 1, exportedAt: new Date().toISOString(), projects, styles: styles || loadStyles() };
+    downloadText('storyreel-backup.json', JSON.stringify(payload, null, 2));
+  };
+  const importProjects = (e) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async () => {
@@ -73,156 +83,153 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
     reader.readAsText(file);
   };
 
+  const exportStyles = () =>
+    downloadText('storyreel-styles.json', JSON.stringify(buildStylesExport(styles || loadStyles()), null, 2));
+  const importStyles = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const incoming = parseStylesFile(String(reader.result));
+        const merged = mergeStyles(styles || loadStyles(), incoming);
+        if (setStyles) setStyles(merged);
+        else saveStyles(merged);
+      } catch {
+        window.alert(t('styles.importInvalid'));
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const TABS = [
+    ['backups', t('set.tabBackups')],
+    ['api', t('set.tabApi')],
+    ['models', t('set.tabModels')],
+  ];
+
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h2>{t('set.title')}</h2>
-        <label>{t('set.apiKey')}</label>
-        <input
-          type="password"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          placeholder="sk-ant-…"
-        />
-        <p className="hint">
-          {t('set.apiKeyHint')}{' '}
-          <a href="https://console.anthropic.com/" target="_blank" rel="noreferrer">console.anthropic.com</a>.
-        </p>
-        <label>{t('set.language')}</label>
-        <select value={lang} onChange={(e) => setLang(e.target.value)}>
-          {LANGS.map((l) => (
-            <option key={l.id} value={l.id}>{l.label}</option>
-          ))}
-        </select>
-        <label>{t('set.theme')}</label>
-        <select value={theme} onChange={(e) => setTheme(e.target.value)}>
-          <option value="dark">{t('theme.dark')}</option>
-          <option value="medium">{t('theme.medium')}</option>
-          <option value="light">{t('theme.light')}</option>
-        </select>
-        <label>{t('set.model')}</label>
-        <select value={model} onChange={(e) => setModel(e.target.value)}>
-          {MODELS.map((m) => (
-            <option key={m.id} value={m.id}>{m.label}</option>
-          ))}
-        </select>
 
-        <label>{t('set.geminiKey')}</label>
-        <input
-          type="password"
-          value={geminiKey}
-          onChange={(e) => setGeminiKey(e.target.value)}
-          placeholder="AIza…"
-        />
-        <p className="hint">
-          {t('set.geminiKeyHint')}{' '}
-          <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">aistudio.google.com</a>.
-        </p>
-        <label>{t('set.geminiModel')}</label>
-        <input
-          value={geminiModel}
-          onChange={(e) => setGeminiModel(e.target.value)}
-          placeholder="gemini-3-pro-image-preview"
-        />
-        <div className="row" style={{ marginTop: 8 }}>
-          <button className="btn small" disabled={fetching} onClick={fetchModels}>
-            {fetching ? t('set.fetching') : t('set.fetchModels')}
-          </button>
+        <div className="style-tabs">
+          {TABS.map(([id, label]) => (
+            <button key={id} type="button" className={`chip ${tab === id ? 'active' : ''}`} onClick={() => setTab(id)}>
+              {label}
+            </button>
+          ))}
         </div>
-        {fetchErr && <div className="note error">{fetchErr}</div>}
-        {modelList && (
-          modelList.length ? (
-            <>
-              <label className="sub-label">{t('set.modelsFound')}</label>
-              <select value={geminiModel} onChange={(e) => setGeminiModel(e.target.value)}>
-                {!modelList.includes(geminiModel) && <option value={geminiModel}>{geminiModel}</option>}
-                {modelList.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            </>
-          ) : (
-            <div className="note warn">—</div>
-          )
+
+        {tab === 'backups' && (
+          <>
+            <div className="settings-io">
+              <label>{t('set.backupProjects')}</label>
+              <p className="hint">{t('set.backupProjectsHint')}</p>
+              <div className="row">
+                <button className="btn small" onClick={exportProjects}>{t('set.export')}</button>
+                <label className="btn small file-btn">
+                  {t('set.import')}
+                  <input type="file" accept=".json,application/json" onChange={importProjects} hidden />
+                </label>
+              </div>
+            </div>
+            <div className="settings-io">
+              <label>{t('set.backupStyles')}</label>
+              <p className="hint">{t('set.backupStylesHint')}</p>
+              <div className="row">
+                <button className="btn small" onClick={exportStyles}>{t('set.export')}</button>
+                <label className="btn small file-btn">
+                  {t('set.import')}
+                  <input type="file" accept=".json,application/json" onChange={importStyles} hidden />
+                </label>
+              </div>
+            </div>
+          </>
         )}
 
-        <h3 className="settings-section">{t('set.services')}</h3>
-        <label>{t('set.textService')}</label>
-        <select value={textService} onChange={(e) => setTextService(e.target.value)}>
-          <option value="claude">{t('set.svcClaude')}</option>
-          <option value="gemini">{t('set.svcGeminiText')}</option>
-        </select>
-        <label>{t('set.storyboardService')}</label>
-        <select value={storyboardService} onChange={(e) => setStoryboardService(e.target.value)}>
-          <option value="gemini">{t('set.svcGemini')}</option>
-          <option value="comfy">{t('set.svcComfySb')}</option>
-        </select>
-        <label>{t('set.imageService')}</label>
-        <select value={imageService} onChange={(e) => setImageService(e.target.value)}>
-          <option value="gemini">{t('set.svcGemini')}</option>
-          <option value="comfy">{t('set.svcComfyImg')}</option>
-        </select>
-        <label>{t('set.videoService')}</label>
-        <select value={videoService} onChange={(e) => setVideoService(e.target.value)}>
-          <option value="comfy">{t('set.svcComfyVid')}</option>
-        </select>
-        <label>{t('set.comfyUrl')}</label>
-        <input
-          value={comfyUrl}
-          onChange={(e) => setComfyUrl(e.target.value)}
-          placeholder="http://127.0.0.1:8000"
-        />
-        <label>{t('set.comfyOutputDir')}</label>
-        <input
-          value={comfyOutputDir}
-          onChange={(e) => setComfyOutputDir(e.target.value)}
-          placeholder="D:\Claude work\ComfyUI\Output"
-        />
-        <p className="hint">{t('set.comfyHint')}</p>
-        <label>{t('set.projectsDir')}</label>
-        <input
-          value={projectsDir}
-          onChange={(e) => setProjectsDir(e.target.value)}
-          placeholder="D:\Claude work\StoryReel Projects"
-        />
-        <p className="hint">{t('set.projectsDirHint')}</p>
+        {tab === 'api' && (
+          <>
+            <label>{t('set.apiKey')}</label>
+            <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-ant-…" />
+            <p className="hint">
+              {t('set.apiKeyHint')}{' '}
+              <a href="https://console.anthropic.com/" target="_blank" rel="noreferrer">console.anthropic.com</a>.
+            </p>
+            <label>{t('set.geminiKey')}</label>
+            <input type="password" value={geminiKey} onChange={(e) => setGeminiKey(e.target.value)} placeholder="AIza…" />
+            <p className="hint">
+              {t('set.geminiKeyHint')}{' '}
+              <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">aistudio.google.com</a>.
+            </p>
+            <label>{t('set.comfyUrl')}</label>
+            <input value={comfyUrl} onChange={(e) => setComfyUrl(e.target.value)} placeholder="http://127.0.0.1:8000" />
+            <label>{t('set.comfyOutputDir')}</label>
+            <input value={comfyOutputDir} onChange={(e) => setComfyOutputDir(e.target.value)} placeholder="D:\Claude work\ComfyUI\Output" />
+            <p className="hint">{t('set.comfyHint')}</p>
+            <label>{t('set.projectsDir')}</label>
+            <input value={projectsDir} onChange={(e) => setProjectsDir(e.target.value)} placeholder="D:\Claude work\StoryReel Projects" />
+            <p className="hint">{t('set.projectsDirHint')}</p>
+          </>
+        )}
 
-        <div className="settings-io">
-          <label>{t('set.backup')}</label>
-          <div className="row">
-            <button className="btn small" onClick={exportAll}>{t('set.export')}</button>
-            <label className="btn small file-btn">
-              {t('set.import')}
-              <input type="file" accept=".json,application/json" onChange={importAll} hidden />
-            </label>
-          </div>
-        </div>
+        {tab === 'models' && (
+          <>
+            <label>{t('set.model')}</label>
+            <select value={model} onChange={(e) => setModel(e.target.value)}>
+              {MODELS.map((m) => (
+                <option key={m.id} value={m.id}>{m.label}</option>
+              ))}
+            </select>
+            <label>{t('set.geminiModel')}</label>
+            <input value={geminiModel} onChange={(e) => setGeminiModel(e.target.value)} placeholder="gemini-3-pro-image-preview" />
+            <div className="row" style={{ marginTop: 8 }}>
+              <button className="btn small" disabled={fetching} onClick={fetchModels}>
+                {fetching ? t('set.fetching') : t('set.fetchModels')}
+              </button>
+            </div>
+            {fetchErr && <div className="note error">{fetchErr}</div>}
+            {modelList && (modelList.length ? (
+              <>
+                <label className="sub-label">{t('set.modelsFound')}</label>
+                <select value={geminiModel} onChange={(e) => setGeminiModel(e.target.value)}>
+                  {!modelList.includes(geminiModel) && <option value={geminiModel}>{geminiModel}</option>}
+                  {modelList.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </>
+            ) : (
+              <div className="note warn">—</div>
+            ))}
+
+            <h3 className="settings-section">{t('set.services')}</h3>
+            <label>{t('set.textService')}</label>
+            <select value={textService} onChange={(e) => setTextService(e.target.value)}>
+              <option value="claude">{t('set.svcClaude')}</option>
+              <option value="gemini">{t('set.svcGeminiText')}</option>
+            </select>
+            <label>{t('set.storyboardService')}</label>
+            <select value={storyboardService} onChange={(e) => setStoryboardService(e.target.value)}>
+              <option value="gemini">{t('set.svcGemini')}</option>
+              <option value="comfy">{t('set.svcComfySb')}</option>
+            </select>
+            <label>{t('set.imageService')}</label>
+            <select value={imageService} onChange={(e) => setImageService(e.target.value)}>
+              <option value="gemini">{t('set.svcGemini')}</option>
+              <option value="comfy">{t('set.svcComfyImg')}</option>
+            </select>
+            <label>{t('set.videoService')}</label>
+            <select value={videoService} onChange={(e) => setVideoService(e.target.value)}>
+              <option value="comfy">{t('set.svcComfyVid')}</option>
+            </select>
+          </>
+        )}
+
         <div className="modal-actions">
           <button className="btn" onClick={onClose}>{t('set.cancel')}</button>
-          <button
-            className="btn primary"
-            onClick={() => {
-              setSettings({
-                ...settings,
-                apiKey: apiKey.trim(),
-                model,
-                lang,
-                theme,
-                geminiKey: geminiKey.trim(),
-                geminiModel: geminiModel.trim() || 'gemini-3-pro-image-preview',
-                textService,
-                storyboardService,
-                imageService,
-                videoService,
-                comfyUrl: comfyUrl.trim() || 'http://127.0.0.1:8000',
-                comfyOutputDir: comfyOutputDir.trim() || 'D:\\Claude work\\ComfyUI\\Output',
-                projectsDir: projectsDir.trim() || 'D:\\Claude work\\StoryReel Projects',
-              });
-              onClose();
-            }}
-          >
-            {t('set.save')}
-          </button>
+          <button className="btn primary" onClick={save}>{t('set.save')}</button>
         </div>
       </div>
     </div>
