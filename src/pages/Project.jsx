@@ -5,7 +5,7 @@ import Stage3 from '../stages/Stage3.jsx';
 import Stage4 from '../stages/Stage4.jsx';
 import Stage5 from '../stages/Stage5.jsx';
 import Stage6 from '../stages/Stage6.jsx';
-import { buildProjectExport, downloadText } from '../lib/exportScript.js';
+import { exportProjectZip } from '../lib/projectFiles.js';
 import { useI18n } from '../lib/i18n.js';
 import { resolveStyleText } from '../lib/styles.js';
 import ProjectSettingsModal from '../components/ProjectSettingsModal.jsx';
@@ -43,9 +43,19 @@ export default function Project({ project, updateProject, settings, setSettings,
     setView(next);
   };
 
-  const exportScript = () => {
-    const safe = project.title.replace(/[^\w\d\- ]+/g, '').trim().replace(/\s+/g, '-') || 'script';
-    downloadText(`${safe}.md`, buildProjectExport(project, genLang));
+  // Export = one ZIP with project.md (all data, media-free) plus every image
+  // and video as a standard file; Electron prompts for the destination.
+  const [exporting, setExporting] = useState(false);
+  const exportScript = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      await exportProjectZip(project, genLang);
+    } catch (e) {
+      window.alert(e.message || String(e));
+    } finally {
+      setExporting(false);
+    }
   };
 
   // Resolve the project's selected styles into instruction text for the prompts.

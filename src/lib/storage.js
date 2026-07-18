@@ -128,6 +128,7 @@ export function loadSettings() {
     videoService: 'comfy', // shot video generation (only ComfyUI for now)
     comfyUrl: 'http://127.0.0.1:8000',
     comfyOutputDir: 'D:\\Claude work\\ComfyUI\\Output',
+    projectsDir: 'D:\\Claude work\\StoryReel Projects', // per-project folders (project.md + media files)
   };
   try {
     const s = { ...defaults, ...(JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}) };

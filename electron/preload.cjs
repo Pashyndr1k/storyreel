@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('secureStore', {
 // Save generated ComfyUI results (base64 bytes) to a local folder.
 contextBridge.exposeInMainWorld('localFiles', {
   saveOutput: (dir, filename, base64) => ipcRenderer.invoke('save-output', { dir, filename, base64 }),
+  exportZip: (defaultName, base64) => ipcRenderer.invoke('export-zip', { defaultName, base64 }),
 });
 
 // ComfyUI requests via the main process (no CORS/Origin restrictions there).

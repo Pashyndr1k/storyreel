@@ -20,6 +20,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
   const [videoService, setVideoService] = useState(settings.videoService || 'comfy');
   const [comfyUrl, setComfyUrl] = useState(settings.comfyUrl || 'http://127.0.0.1:8000');
   const [comfyOutputDir, setComfyOutputDir] = useState(settings.comfyOutputDir || 'D:\\Claude work\\ComfyUI\\Output');
+  const [projectsDir, setProjectsDir] = useState(settings.projectsDir || 'D:\\Claude work\\StoryReel Projects');
   const [modelList, setModelList] = useState(null);
   const [fetching, setFetching] = useState(false);
   const [fetchErr, setFetchErr] = useState('');
@@ -178,6 +179,13 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
           placeholder="D:\Claude work\ComfyUI\Output"
         />
         <p className="hint">{t('set.comfyHint')}</p>
+        <label>{t('set.projectsDir')}</label>
+        <input
+          value={projectsDir}
+          onChange={(e) => setProjectsDir(e.target.value)}
+          placeholder="D:\Claude work\StoryReel Projects"
+        />
+        <p className="hint">{t('set.projectsDirHint')}</p>
 
         <div className="settings-io">
           <label>{t('set.backup')}</label>
@@ -208,6 +216,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
                 videoService,
                 comfyUrl: comfyUrl.trim() || 'http://127.0.0.1:8000',
                 comfyOutputDir: comfyOutputDir.trim() || 'D:\\Claude work\\ComfyUI\\Output',
+                projectsDir: projectsDir.trim() || 'D:\\Claude work\\StoryReel Projects',
               });
               onClose();
             }}

@@ -6,6 +6,7 @@ import Dropdown from '../components/Dropdown.jsx';
 import { Upload, Plus, Clapperboard } from '../components/icons.jsx';
 import { newProject, uid, migrateProject } from '../lib/storage.js';
 import { parseProjectFile } from '../lib/exportScript.js';
+import { importProjectZip } from '../lib/projectFiles.js';
 import { useI18n } from '../lib/i18n.js';
 
 export default function Home({
@@ -63,24 +64,35 @@ export default function Home({
     setProjects((ps) => [copy, ...ps]);
   };
 
-  const importProject = (e) => {
+  const addImported = (parsed) => {
+    const p = migrateProject(parsed);
+    p.id = uid();
+    p.createdAt = Date.now();
+    p.archived = false;
+    setProjects((ps) => [p, ...ps]);
+  };
+
+  const importProject = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const parsed = parseProjectFile(String(reader.result));
+    try {
+      // ZIP export (project.md + media files) or a legacy .md/.json file.
+      if (/\.zip$/i.test(file.name)) {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        addImported(await importProjectZip(bytes));
+        return;
+      }
+      const text = await file.text();
+      const parsed = parseProjectFile(text);
       if (!parsed) {
         window.alert(t('imp.invalid'));
         return;
       }
-      const p = migrateProject(parsed);
-      p.id = uid();
-      p.createdAt = Date.now();
-      p.archived = false;
-      setProjects((ps) => [p, ...ps]);
-    };
-    reader.readAsText(file);
+      addImported(parsed);
+    } catch (err) {
+      window.alert(err.message || String(err));
+    }
   };
 
   const sortOptions = [
@@ -109,7 +121,7 @@ export default function Home({
           <label className="glass-btn file-btn">
             <Upload size={15} />
             {t('home.import')}
-            <input type="file" accept=".md,.json,text/markdown,application/json" hidden onChange={importProject} />
+            <input type="file" accept=".zip,.md,.json,application/zip,text/markdown,application/json" hidden onChange={importProject} />
           </label>
           <button className="btn primary" onClick={() => setShowNew(true)}>
             <Plus size={16} />

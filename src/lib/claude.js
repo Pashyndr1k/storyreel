@@ -7,9 +7,10 @@ export const MODELS = [
   { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (fastest)' },
 ];
 
-async function callClaude(settings, { system, user, maxTokens = 4096 }) {
+async function callClaude(settings, { system, user, maxTokens = 4096, signal }) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
+    signal,
     headers: {
       'content-type': 'application/json',
       'x-api-key': settings.apiKey,
@@ -68,13 +69,19 @@ export function textKeyError(settings) {
 }
 
 // All script/prompt generation funnels through here; the text service setting
-// picks the engine (Claude by default, Gemini as the alternative).
-export async function generateJSON(settings, spec) {
+// picks the engine (Claude by default, Gemini as the alternative). An optional
+// AbortSignal cancels the Claude request mid-flight (and stops retries).
+export async function generateJSON(settings, spec, { signal } = {}) {
   return withRetry(async () => {
+    if (signal?.aborted) {
+      const e = new Error('Aborted');
+      e.name = 'AbortError';
+      throw e;
+    }
     const text =
       (settings.textService || 'claude') === 'gemini'
         ? await generateGeminiText(settings, spec)
-        : await callClaude(settings, spec);
+        : await callClaude(settings, { ...spec, signal });
     return extractJSON(text);
   });
 }

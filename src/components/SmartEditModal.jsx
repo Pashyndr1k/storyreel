@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { generateJSON, textKeyError } from '../lib/claude.js';
 import { smartEditPrompt } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
@@ -98,6 +98,25 @@ export default function SmartEditModal({ project, update, settings, genLang, onC
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null); // number of updated fields
+  const [elapsed, setElapsed] = useState(0);
+  const abortRef = useRef(null);
+  const runRef = useRef(0); // drops results from a stopped run
+
+  // Elapsed-seconds ticker so a long edit never looks frozen.
+  useEffect(() => {
+    if (!busy) return undefined;
+    setElapsed(0);
+    const t0 = Date.now();
+    const iv = setInterval(() => setElapsed(Math.round((Date.now() - t0) / 1000)), 1000);
+    return () => clearInterval(iv);
+  }, [busy]);
+
+  const stop = () => {
+    runRef.current++;
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setBusy(false);
+  };
 
   const apply = async () => {
     const keyErr = textKeyError(settings);
@@ -105,20 +124,28 @@ export default function SmartEditModal({ project, update, settings, genLang, onC
       setError(keyErr);
       return;
     }
+    const run = ++runRef.current;
+    const controller = new AbortController();
+    abortRef.current = controller;
     setBusy(true);
     setError('');
     setResult(null);
     try {
       // Smart edit runs on the standard Sonnet 5 model, ungoverned by styles.
+      // The prompt carries ONLY the project's text (no images/videos).
       const editSettings = { ...settings, model: 'claude-sonnet-5' };
-      const data = await generateJSON(editSettings, smartEditPrompt(project, instruction.trim(), genLang));
+      const data = await generateJSON(editSettings, smartEditPrompt(project, instruction.trim(), genLang), {
+        signal: controller.signal,
+      });
+      if (run !== runRef.current) return; // stopped meanwhile — discard
       const { patch, count } = computeSmartPatch(project, data);
       if (count > 0) update(patch);
       setResult(count);
     } catch (e) {
+      if (run !== runRef.current || e?.name === 'AbortError') return; // user stopped
       setError(e.message || String(e));
     } finally {
-      setBusy(false);
+      if (run === runRef.current) setBusy(false);
     }
   };
 
@@ -158,8 +185,13 @@ export default function SmartEditModal({ project, update, settings, genLang, onC
 
         <div className="modal-actions">
           <button className="btn" onClick={onClose}>{t('set.cancel')}</button>
+          {busy && (
+            <button className="btn danger" onClick={stop}>
+              {t('edit.stop')}
+            </button>
+          )}
           <button className="btn primary" disabled={busy || !instruction.trim()} onClick={apply}>
-            {busy ? t('edit.applying') : t('edit.apply')}
+            {busy ? `${t('edit.applying')} ${elapsed}s` : t('edit.apply')}
           </button>
         </div>
       </div>

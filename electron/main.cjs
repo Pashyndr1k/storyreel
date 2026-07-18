@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, ipcMain, safeStorage, session } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, safeStorage, session, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { comfyRequest } = require('./comfyRequest.cjs');
@@ -31,6 +31,23 @@ ipcMain.handle('save-output', async (_e, { dir, filename, base64 }) => {
     const target = path.join(dir, safe);
     fs.writeFileSync(target, Buffer.from(base64, 'base64'));
     return { ok: true, path: target };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+
+// Project ZIP export: ask the user where to put the archive, then write it.
+ipcMain.handle('export-zip', async (e, { defaultName, base64 }) => {
+  try {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      title: 'Export project',
+      defaultPath: defaultName || 'project.zip',
+      filters: [{ name: 'ZIP archive', extensions: ['zip'] }],
+    });
+    if (canceled || !filePath) return { ok: false, canceled: true };
+    fs.writeFileSync(filePath, Buffer.from(base64, 'base64'));
+    return { ok: true, path: filePath };
   } catch (err) {
     return { ok: false, error: String(err) };
   }

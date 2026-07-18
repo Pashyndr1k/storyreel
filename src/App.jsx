@@ -9,6 +9,7 @@ import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { loadProjects, saveProjects, loadSettings, saveSettings } from './lib/storage.js';
 import { loadStyles, saveStyles, absorbLegacyStyles } from './lib/styles.js';
 import { checkForUpdate } from './lib/updateCheck.js';
+import { mirrorProjectToDisk } from './lib/projectFiles.js';
 import { I18nContext, createT } from './lib/i18n.js';
 
 const HISTORY_LIMIT = 50;
@@ -155,6 +156,20 @@ export default function App() {
   }, []);
 
   // Debounced persistence: at most one diffed IndexedDB write per pause.
+  // Each save also mirrors the changed projects into their on-disk folders
+  // (<projectsDir>/<title>/: project.md + media as standard files) — created
+  // the moment a new project is saved for the first time. Best-effort and
+  // Electron-only; IndexedDB remains the live source of truth.
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const mirroredRef = useRef(new Map()); // projectId -> last mirrored object
+  const mirrorChanged = (ps) => {
+    for (const p of ps) {
+      if (mirroredRef.current.get(p.id) === p) continue;
+      mirroredRef.current.set(p.id, p);
+      mirrorProjectToDisk(settingsRef.current, p, p.lang || settingsRef.current.lang);
+    }
+  };
   useEffect(() => {
     if (!loaded) return;
     pendingRef.current = projects;
@@ -162,6 +177,7 @@ export default function App() {
     saveTimer.current = setTimeout(() => {
       pendingRef.current = null;
       saveProjects(projects);
+      mirrorChanged(projects);
     }, SAVE_DEBOUNCE_MS);
     return () => clearTimeout(saveTimer.current);
   }, [projects, loaded]);
