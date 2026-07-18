@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../lib/i18n.js';
+import { uid } from '../lib/storage.js';
 import { videoDims, saveToLocalOutputs } from '../lib/comfy.js';
 import { blockForScene, defaultTrim, transitionFor, overlapSeconds } from '../lib/dynamics.js';
 import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
@@ -132,18 +133,105 @@ export default function Stage6({ project, update, settings }) {
   const scrollRef = useRef(null);
   const [showScript, setShowScript] = useState(false); // voice-over script window
 
-  // Ready-made full-film audio tracks (music / character voice-overs),
-  // uploaded once and mixed into the FFmpeg render.
-  const uploadTrack = (key) => async (file) => {
+  // ---- audio timeline (layers of clips) -------------------------------------
+  const layers = project.audioLayers || [];
+  const [selAudio, setSelAudio] = useState(null); // { layerId, clipId }
+  const audioRefs = useRef({}); // clipId -> <audio> element for preview playback
+  const setLayers = (fn) => update((p) => ({ audioLayers: fn(p.audioLayers || []) }));
+  const patchLayer = (layerId, patch) =>
+    setLayers((Ls) => Ls.map((L) => (L.id === layerId ? { ...L, ...patch } : L)));
+  const patchClip = (layerId, clipId, patch) =>
+    setLayers((Ls) =>
+      Ls.map((L) =>
+        L.id === layerId
+          ? { ...L, clips: L.clips.map((c) => (c.id === clipId ? { ...c, ...patch } : c)) }
+          : L
+      )
+    );
+  const addLayer = () =>
+    setLayers((Ls) => [...Ls, { id: uid(), name: `${t('s6.layer')} ${Ls.length + 1}`, enabled: true, volume: 1, clips: [] }]);
+  const removeLayer = (layerId) => {
+    setLayers((Ls) => Ls.filter((L) => L.id !== layerId));
+    setSelAudio((s) => (s?.layerId === layerId ? null : s));
+  };
+  const removeClip = (layerId, clipId) => {
+    setLayers((Ls) => Ls.map((L) => (L.id === layerId ? { ...L, clips: L.clips.filter((c) => c.id !== clipId) } : L)));
+    setSelAudio((s) => (s?.clipId === clipId ? null : s));
+  };
+  // New clips land at the playhead position.
+  const addClips = (layerId) => async (files) => {
     try {
-      const dataURL = await readFileDataURL(file);
-      const duration = await probeAudioDuration(dataURL);
-      update(() => ({ [key]: { dataURL, name: file.name || key, duration: Math.round(duration * 10) / 10 } }));
+      let at = Math.max(0, Math.min(elapsed, total));
+      for (const file of files) {
+        const dataURL = await readFileDataURL(file);
+        const dur = Math.round((await probeAudioDuration(dataURL)) * 10) / 10;
+        const clip = {
+          id: uid(),
+          name: (file.name || 'clip').replace(/\.[^.]+$/, '').slice(0, 30),
+          dataURL,
+          start: Math.round(at * 10) / 10,
+          offset: 0,
+          duration: dur || 1,
+          srcDuration: dur || 1,
+          fadeIn: 0,
+          fadeOut: 0,
+        };
+        setLayers((Ls) => Ls.map((L) => (L.id === layerId ? { ...L, clips: [...L.clips, clip] } : L)));
+        at += dur || 1;
+      }
     } catch (e) {
       setRenderErr(String(e?.message || e));
     }
   };
-  const removeTrack = (key) => update(() => ({ [key]: null }));
+
+  // Drag a clip body to move it, or its edges to trim (left edge shifts the
+  // source offset, right edge changes the kept duration). Same pointer-capture
+  // pattern as the video-clip trims.
+  const startClipDrag = (e, layer, clip, mode) => {
+    const pps = pxPerSec();
+    if (!pps) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setSelAudio({ layerId: layer.id, clipId: clip.id });
+    const handle = e.currentTarget;
+    const x0 = e.clientX;
+    const c0 = { ...clip };
+    try {
+      handle.setPointerCapture(e.pointerId);
+    } catch {
+      /* best-effort */
+    }
+    const move = (ev) => {
+      const d = Math.round(((ev.clientX - x0) / pps) * 10) / 10;
+      if (mode === 'move') {
+        patchClip(layer.id, clip.id, { start: Math.max(0, Math.min(Math.max(0, total - 0.2), c0.start + d)) });
+      } else if (mode === 'end') {
+        const maxDur = c0.srcDuration > 0 ? c0.srcDuration - c0.offset : Number.POSITIVE_INFINITY;
+        patchClip(layer.id, clip.id, { duration: Math.max(0.2, Math.min(maxDur, c0.duration + d)) });
+      } else {
+        // 'start' — trim the head: shift start+offset together, shrink duration
+        const delta = Math.max(-c0.offset, Math.max(-c0.start, Math.min(c0.duration - 0.2, d)));
+        patchClip(layer.id, clip.id, {
+          start: c0.start + delta,
+          offset: c0.offset + delta,
+          duration: c0.duration - delta,
+        });
+      }
+    };
+    const up = (ev) => {
+      try {
+        handle.releasePointerCapture(ev.pointerId);
+      } catch {
+        /* released */
+      }
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  };
   const zoomed = scale !== 'fit';
   const zoomIdx = ZOOM_STEPS.indexOf(scale);
   const zoomOut = () => zoomIdx > 0 && setScale(ZOOM_STEPS[zoomIdx - 1]);
@@ -294,6 +382,41 @@ export default function Stage6({ project, update, settings }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing, curShotId]);
 
+  // Preview audio: the audio-timeline layers play in sync with the realtime
+  // preview (this is what makes the music audible OUTSIDE the ffmpeg render).
+  // Every tick keeps each enabled clip's element started/paused, resyncs on
+  // drift > 0.35s (e.g. after clicking a clip mid-playback), and applies the
+  // layer volume plus the clip's fade-in/out envelope.
+  useEffect(() => {
+    for (const L of layers) {
+      const on = L.enabled !== false;
+      for (const c of L.clips || []) {
+        const el = audioRefs.current[c.id];
+        if (!el) continue;
+        const local = elapsed - c.start;
+        const active = playing && on && local >= 0 && local < c.duration;
+        if (active) {
+          const target = (c.offset || 0) + local;
+          if (Math.abs(el.currentTime - target) > 0.35) {
+            try {
+              el.currentTime = target;
+            } catch {
+              /* not seekable yet */
+            }
+          }
+          let g = 1;
+          if (c.fadeIn > 0 && local < c.fadeIn) g = local / c.fadeIn;
+          if (c.fadeOut > 0 && local > c.duration - c.fadeOut) g = Math.min(g, (c.duration - local) / c.fadeOut);
+          el.volume = Math.max(0, Math.min(1, (L.volume ?? 1) * g));
+          if (el.paused) el.play().catch(() => {});
+        } else if (!el.paused) {
+          el.pause();
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elapsed, playing, layers]);
+
   // ---- write-backs (shared source of truth with Stages 3–5) ----------------
   const moveScene = (from, to) =>
     update((p) => {
@@ -424,16 +547,28 @@ export default function Stage6({ project, update, settings }) {
     const safe = (project.title || 'storyreel').replace(/[^\w\d\- ]+/g, '').trim().replace(/\s+/g, '-') || 'storyreel';
     const outDir = (settings.comfyOutputDir || '').replace(/[\\/]+$/, '');
     const outPath = `${outDir || '.'}/${safe}-final.mp4`;
-    // Full-film music/voice-over tracks: mixed over the per-clip audio (music
-    // ducked to a bed level, voice-over at full level).
-    const audioTracks = [];
-    if (project.musicTrack?.dataURL) audioTracks.push({ dataURL: project.musicTrack.dataURL, volume: 0.35 });
-    if (project.voiceTrack?.dataURL) audioTracks.push({ dataURL: project.voiceTrack.dataURL, volume: 1.0 });
+    // Audio timeline: every clip of every ENABLED layer mixes over the
+    // per-shot clip audio (with its trims, fades and the layer volume).
+    const audioClips = (project.audioLayers || [])
+      .filter((L) => L.enabled !== false)
+      .flatMap((L) =>
+        (L.clips || [])
+          .filter((c) => c.dataURL && c.duration > 0.01)
+          .map((c) => ({
+            dataURL: c.dataURL,
+            start: c.start || 0,
+            offset: c.offset || 0,
+            duration: c.duration,
+            fadeIn: c.fadeIn || 0,
+            fadeOut: c.fadeOut || 0,
+            volume: L.volume ?? 1,
+          }))
+      );
     const off = window.ffmpegBridge.onProgress((p) =>
       setRenderProg({ pct: Math.min(100, Math.round((p.sec / (p.total || 1)) * 100)) })
     );
     try {
-      const res = await window.ffmpegBridge.render({ width: w, height: h, fps: 25, segments, transitions, audioTracks, outPath });
+      const res = await window.ffmpegBridge.render({ width: w, height: h, fps: 25, segments, transitions, audioClips, outPath });
       if (res?.ok) setRenderDone(res.path);
       else if (!res?.canceled) setRenderErr(res?.error || 'ffmpeg failed');
     } catch (e) {
@@ -901,34 +1036,100 @@ export default function Stage6({ project, update, settings }) {
             );
           })}
         </div>
-        {/* Audio timeline: full-film music + voice-over lanes under the video track. */}
+        {/* Audio timeline: layers of clips under the video track. Each layer
+            is its own lane — toggle, volume, add clips, drag to move, edge
+            trims, fades; clips play in the preview and mix into the render. */}
         <div className="audio-lanes">
-          {[
-            ['musicTrack', 'music', t('s6.music')],
-            ['voiceTrack', 'voice', t('s6.voice')],
-          ].map(([key, cls, label]) => {
-            const trk = project[key];
-            const w = trk?.duration
-              ? zoomed
-                ? Math.min(total, trk.duration) * scale
-                : `${Math.min(100, (trk.duration / Math.max(0.1, total)) * 100)}%`
-              : 0;
-            return (
-              <div key={key} className="audio-lane">
-                <span className="lane-label">{label}</span>
-                {trk ? (
-                  <div className={`lane-bar ${cls}`} style={{ width: w }} title={`${trk.name} · ${Number(trk.duration || 0).toFixed(1)}s`}>
-                    <span className="lane-name">{trk.name}</span>
-                    <button type="button" className="lane-x" aria-label="remove" onClick={() => removeTrack(key)}>
-                      ✕
-                    </button>
+          {layers.map((L, li) => (
+            <div key={L.id} className={`audio-lane ${L.enabled === false ? 'lane-off' : ''}`}>
+              <span className="lane-head">
+                <button
+                  type="button"
+                  className={`lane-eye ${L.enabled === false ? '' : 'on'}`}
+                  title={t('s6.layerToggle')}
+                  aria-label={t('s6.layerToggle')}
+                  aria-pressed={L.enabled !== false}
+                  onClick={() => patchLayer(L.id, { enabled: L.enabled === false })}
+                >
+                  ●
+                </button>
+                <input
+                  className="lane-name-in"
+                  value={L.name}
+                  onChange={(e) => patchLayer(L.id, { name: e.target.value })}
+                />
+                <input
+                  className="lane-vol"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={L.volume ?? 1}
+                  title={`${t('s6.layerVol')}: ${Math.round((L.volume ?? 1) * 100)}%`}
+                  onChange={(e) => patchLayer(L.id, { volume: Number(e.target.value) })}
+                />
+                <label className="lane-add" title={t('s6.addClip')} aria-label={t('s6.addClip')}>
+                  <Upload size={11} />
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    multiple
+                    hidden
+                    onChange={(e) => {
+                      const fs = [...(e.target.files || [])];
+                      e.target.value = '';
+                      if (fs.length) addClips(L.id)(fs);
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="lane-x"
+                  title={t('s6.removeLayer')}
+                  aria-label={t('s6.removeLayer')}
+                  onClick={() => removeLayer(L.id)}
+                >
+                  ✕
+                </button>
+              </span>
+              <div className="lane-strip">
+                {(L.clips || []).map((c) => (
+                  <div
+                    key={c.id}
+                    className={`aclip aclip-${li % 4} ${selAudio?.clipId === c.id ? 'selected' : ''}`}
+                    style={
+                      zoomed
+                        ? { left: c.start * scale, width: Math.max(10, c.duration * scale) }
+                        : {
+                            left: `${(c.start / Math.max(0.1, total)) * 100}%`,
+                            width: `${Math.max(0.8, (c.duration / Math.max(0.1, total)) * 100)}%`,
+                          }
+                    }
+                    title={`${c.name} · ${c.duration.toFixed(1)}s`}
+                    onPointerDown={(e) => startClipDrag(e, L, c, 'move')}
+                  >
+                    <span className="aclip-name">{c.name}</span>
+                    <span className="aclip-h left" onPointerDown={(e) => startClipDrag(e, L, c, 'start')} />
+                    <span className="aclip-h right" onPointerDown={(e) => startClipDrag(e, L, c, 'end')} />
+                    {/* hidden element that actually plays this clip in the preview */}
+                    <audio
+                      ref={(el) => {
+                        if (el) audioRefs.current[c.id] = el;
+                        else delete audioRefs.current[c.id];
+                      }}
+                      src={c.dataURL}
+                      preload="auto"
+                    />
                   </div>
-                ) : (
-                  <span className="lane-empty">{t('s6.noTrack')}</span>
-                )}
+                ))}
               </div>
-            );
-          })}
+            </div>
+          ))}
+          <div className="lane-actions">
+            <button type="button" className="btn tiny" onClick={addLayer}>
+              + {t('s6.addLayer')}
+            </button>
+          </div>
         </div>
         {showPlayhead && (
           <div
@@ -994,6 +1195,45 @@ export default function Stage6({ project, update, settings }) {
             </button>
           </span>
         )}
+        {(() => {
+          const L = layers.find((x) => x.id === selAudio?.layerId);
+          const c = L?.clips.find((x) => x.id === selAudio?.clipId);
+          if (!c) return null;
+          // Functional update so rapid clicks each apply their own step.
+          const step = (field, d) =>
+            setLayers((Ls) =>
+              Ls.map((L2) =>
+                L2.id === L.id
+                  ? {
+                      ...L2,
+                      clips: L2.clips.map((cc) =>
+                        cc.id === c.id
+                          ? {
+                              ...cc,
+                              [field]: Math.round(
+                                Math.max(0, Math.min(Math.min(3, cc.duration / 2), (cc[field] || 0) + d)) * 10
+                              ) / 10,
+                            }
+                          : cc
+                      ),
+                    }
+                  : L2
+              )
+            );
+          return (
+            <span className="nle-nudge" title={c.name}>
+              🎵 {t('s6.fadeIn')}
+              <button type="button" disabled={(c.fadeIn || 0) <= 0} onClick={() => step('fadeIn', -0.1)}>−</button>
+              <i className="trim-val">{(c.fadeIn || 0).toFixed(1)}s</i>
+              <button type="button" onClick={() => step('fadeIn', 0.1)}>+</button>
+              · {t('s6.fadeOut')}
+              <button type="button" disabled={(c.fadeOut || 0) <= 0} onClick={() => step('fadeOut', -0.1)}>−</button>
+              <i className="trim-val">{(c.fadeOut || 0).toFixed(1)}s</i>
+              <button type="button" onClick={() => step('fadeOut', 0.1)}>+</button>
+              <button type="button" title={t('s6.clipDel')} onClick={() => removeClip(L.id, c.id)}>✕</button>
+            </span>
+          );
+        })()}
         <span className="nle-timecode">{elapsed.toFixed(1).padStart(4, '0')} / {total.toFixed(1).padStart(4, '0')}s</span>
       </div>
 
@@ -1004,32 +1244,6 @@ export default function Stage6({ project, update, settings }) {
         <button className="btn small" disabled={rendering} onClick={doRender}>
           <Download size={14} /> {rendering ? t('s6.rendering') : t('s6.render')}
         </button>
-        <label className="btn small file-btn" title={t('s6.upMusicTip')}>
-          <Upload size={13} /> {t('s6.upMusic')}
-          <input
-            type="file"
-            accept="audio/*"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              e.target.value = '';
-              if (f) uploadTrack('musicTrack')(f);
-            }}
-          />
-        </label>
-        <label className="btn small file-btn" title={t('s6.upVoiceTip')}>
-          <Upload size={13} /> {t('s6.upVoice')}
-          <input
-            type="file"
-            accept="audio/*"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              e.target.value = '';
-              if (f) uploadTrack('voiceTrack')(f);
-            }}
-          />
-        </label>
         <button className="btn small" onClick={() => setShowScript(true)}>
           {t('s6.script')}
         </button>

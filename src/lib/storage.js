@@ -178,8 +178,11 @@ function projectDefaults() {
     dynamicsPlan: null, // Action Dynamics Plan generated at Stage 3 (see lib/dynamics.js)
     videoGenDurations: {}, // shotId -> raw seconds requested from the video model (+2s padding)
     shotTrims: {}, // shotId -> { head, tail } seconds — manual overrides of the 15-frame rule
-    musicTrack: null, // { dataURL, name, duration } — full-film music, mixed into the render
-    voiceTrack: null, // { dataURL, name, duration } — full-film voice-over, mixed into the render
+    // Multi-layer audio timeline (Stage 6). Each layer is its own track lane:
+    // { id, name, enabled, volume, clips: [{ id, name, dataURL, start, offset,
+    //   duration, srcDuration, fadeIn, fadeOut }] } — times in seconds,
+    // `start` film-absolute, `offset` the trim inside the source file.
+    audioLayers: [],
     shotTransitions: {}, // shotId -> transition_type override for the cut INTO the next shot
     storyboards: {}, // shotId -> low-res storyboard frame (data URL)
     logline: '',
@@ -277,6 +280,58 @@ export function migrateProject(raw) {
     }
   }
   p.sceneDetails = sd;
+
+  // Audio timeline: sanitize layers, and convert the legacy single
+  // musicTrack/voiceTrack pair into layers once (music keeps its old
+  // bed level so existing renders sound the same).
+  p.audioLayers = Array.isArray(p.audioLayers)
+    ? p.audioLayers
+        .filter((L) => L && typeof L === 'object')
+        .map((L) => ({
+          id: L.id || uid(),
+          name: typeof L.name === 'string' ? L.name : 'Layer',
+          enabled: L.enabled !== false,
+          volume: Number.isFinite(Number(L.volume)) ? Math.max(0, Math.min(1, Number(L.volume))) : 1,
+          clips: (Array.isArray(L.clips) ? L.clips : [])
+            .filter((c) => c && typeof c === 'object')
+            .map((c) => ({
+              id: c.id || uid(),
+              name: typeof c.name === 'string' ? c.name : 'clip',
+              dataURL: typeof c.dataURL === 'string' ? c.dataURL : '',
+              start: Math.max(0, Number(c.start) || 0),
+              offset: Math.max(0, Number(c.offset) || 0),
+              duration: Math.max(0, Number(c.duration) || 0),
+              srcDuration: Math.max(0, Number(c.srcDuration) || Number(c.duration) || 0),
+              fadeIn: Math.max(0, Number(c.fadeIn) || 0),
+              fadeOut: Math.max(0, Number(c.fadeOut) || 0),
+            })),
+        }))
+    : [];
+  if (!p.audioLayers.length && (p.musicTrack?.dataURL || p.voiceTrack?.dataURL)) {
+    const mkLayer = (trk, name, volume) =>
+      trk?.dataURL
+        ? [{
+            id: uid(),
+            name,
+            enabled: true,
+            volume,
+            clips: [{
+              id: uid(),
+              name: trk.name || name,
+              dataURL: trk.dataURL,
+              start: 0,
+              offset: 0,
+              duration: Number(trk.duration) || 0,
+              srcDuration: Number(trk.duration) || 0,
+              fadeIn: 0,
+              fadeOut: 0,
+            }],
+          }]
+        : [];
+    p.audioLayers = [...mkLayer(p.musicTrack, 'Music', 0.35), ...mkLayer(p.voiceTrack, 'Voice-over', 1)];
+  }
+  delete p.musicTrack;
+  delete p.voiceTrack;
 
   return p;
 }

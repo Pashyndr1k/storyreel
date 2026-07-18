@@ -67,6 +67,12 @@ export function splitProjectMedia(project) {
       lite[key] = { ...trk, dataURL: put(trk.dataURL, `${key === 'musicTrack' ? 'music' : 'voice'}.${extFor(trk.dataURL, 'mp3')}`) };
     }
   }
+  lite.audioLayers = (project.audioLayers || []).map((L, li) => ({
+    ...L,
+    clips: (L.clips || []).map((c) =>
+      isDataURL(c.dataURL) ? { ...c, dataURL: put(c.dataURL, `aclip_${li}_${c.id}.${extFor(c.dataURL, 'mp3')}`) } : c
+    ),
+  }));
   return { lite, files };
 }
 
@@ -102,6 +108,10 @@ export function mergeProjectMedia(lite, getDataURL) {
   for (const key of ['musicTrack', 'voiceTrack']) {
     if (p[key]?.dataURL) p[key] = { ...p[key], dataURL: get(p[key].dataURL) };
   }
+  p.audioLayers = (lite.audioLayers || []).map((L) => ({
+    ...L,
+    clips: (L.clips || []).map((c) => ({ ...c, dataURL: get(c.dataURL) })),
+  }));
   return p;
 }
 

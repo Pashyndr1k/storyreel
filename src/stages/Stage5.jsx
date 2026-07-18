@@ -3,7 +3,7 @@ import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage } from '../lib/gemini.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
 import { generateComfyVideo, generateComfyImage, generateComfyVoice, saveToLocalOutputs, VIDEO_RESOLUTIONS } from '../lib/comfy.js';
-import { stage5Prompt, stage5VideoPrompt, stage5AudioPrompt, stage5VoicePrompt, finalFramePrompt } from '../lib/prompts.js';
+import { stage5Prompt, stage5VideoPrompt, stage5AudioPrompt, stage5VoicePrompt, finalFramePrompt, tweakPromptSpec } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
 import { aspectDescription } from '../lib/aspect.js';
 import ErrorNote from '../components/ErrorNote.jsx';
@@ -98,6 +98,8 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const mediaCancel = useRef(false);
   const [palette, setPalette] = useState(null); // { src: shotId, colors: [] } for this scene
   const [lightbox, setLightbox] = useState(null); // dataURL shown in the large pop-up
+  const [tweakText, setTweakText] = useState({}); // `${shotId}:${kind}` -> adjustment draft
+  const [tweakBusy, setTweakBusy] = useState(null); // `${shotId}:${kind}` in flight
 
   // Always-fresh project reference: generation handlers (and especially the
   // scene-media queue, which runs across many state updates) must read prompts
@@ -284,6 +286,56 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         [shotId]: { imagePrompt: '', videoPrompt: '', ...p.shotPrompts[shotId], ...patch },
       },
     }));
+
+  // "Tweak this": the user types a plain-language adjustment and Claude
+  // rewrites the underlying technical prompt — no manual jargon editing.
+  const tweakPrompt = async (shot, kind) => {
+    const key = `${shot.id}:${kind}`;
+    const field = kind === 'video' ? 'videoPrompt' : 'imagePrompt';
+    const current = (projectRef.current.shotPrompts[shot.id]?.[field] || '').trim();
+    const instruction = (tweakText[key] || '').trim();
+    if (!current || !instruction) return;
+    const keyErr = textKeyError(settings);
+    if (keyErr) return setImgErr({ id: shot.id, msg: keyErr });
+    setTweakBusy(key);
+    setImgErr(null);
+    try {
+      const data = await generateJSON(settings, tweakPromptSpec(kind, current, instruction));
+      const next = typeof data.prompt === 'string' ? data.prompt.trim() : '';
+      if (!next) throw new Error('The prompt engineer returned no prompt.');
+      setPrompt(shot.id, { [field]: next });
+      setTweakText((v) => ({ ...v, [key]: '' }));
+    } catch (e) {
+      setImgErr({ id: shot.id, msg: e.message || String(e) });
+    } finally {
+      setTweakBusy(null);
+    }
+  };
+
+  // Small adjustment row rendered directly below a prompt frame.
+  const tweakRow = (shot, kind) => {
+    const key = `${shot.id}:${kind}`;
+    const field = kind === 'video' ? 'videoPrompt' : 'imagePrompt';
+    const hasPrompt = !!(project.shotPrompts[shot.id]?.[field] || '').trim();
+    return (
+      <div className="voice-row refine-row tweak-row">
+        <input
+          value={tweakText[key] || ''}
+          placeholder={t('tweak.ph')}
+          disabled={!hasPrompt}
+          onChange={(e) => setTweakText((v) => ({ ...v, [key]: e.target.value }))}
+          onKeyDown={(e) => e.key === 'Enter' && tweakPrompt(shot, kind)}
+        />
+        <button
+          className="btn small s5e-refine"
+          disabled={tweakBusy === key || !hasPrompt || !(tweakText[key] || '').trim()}
+          onClick={() => tweakPrompt(shot, kind)}
+        >
+          {tweakBusy === key ? t('tweak.busy') : t('tweak.btn')}
+        </button>
+      </div>
+    );
+  };
 
   // Per-shot timing straight from Stage 5 (same 2–10s / 0.5s-step rules as the
   // Stage 4 and Stage 6 timelines; writes into the shared sceneDetails).
@@ -889,6 +941,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     placeholder={t('s5.ph')}
                     onChange={(e) => setPrompt(shot.id, { imagePrompt: e.target.value })}
                   />
+                  {tweakRow(shot, 'image')}
                   <div className="s5e-grow" />
                   <div>
                     <div className="s5e-eyebrow">{t('apply.title')}</div>
@@ -1219,6 +1272,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     placeholder={t('s5.ph')}
                     onChange={(e) => setPrompt(shot.id, { videoPrompt: e.target.value })}
                   />
+                  {tweakRow(shot, 'video')}
                 </div>
                 <div className="s5e-panel">
                   {shotVid ? (

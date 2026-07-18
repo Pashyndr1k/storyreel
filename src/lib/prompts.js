@@ -380,6 +380,41 @@ Return exactly one entry per shot, in order.`,
   };
 }
 
+// "Tweak this": rewrite an existing generation prompt per a plain-language
+// adjustment ("make it more cinematic and moody") without the user touching
+// the technical jargon. Everything unrelated must survive verbatim.
+export function tweakPromptSpec(kind, currentPrompt, instruction) {
+  const what =
+    kind === 'video'
+      ? 'video MOTION prompt for an image-to-video model'
+      : 'image generation prompt (Nano Banana / Flux)';
+  return {
+    system: `You are a senior prompt engineer for AI ${kind === 'video' ? 'video' : 'image'} generation. You revise existing production prompts surgically.
+
+Rules:
+- Respond with VALID JSON ONLY. No markdown, no commentary.
+- The rewritten prompt stays entirely in English; character names stay in Latin letters.
+- Apply the user's adjustment CONSISTENTLY across the whole prompt (lighting, mood, color, lens language — wherever it logically reaches), translating their plain words into proper technical prompt vocabulary.
+- Preserve everything the adjustment does not touch: subjects, composition, aspect-ratio statements, verbatim directives, camera/momentum contracts, timing beats and structure.
+- Keep roughly the same length and format as the original.`,
+    maxTokens: 3000,
+    user: `Current ${what}:
+"""
+${currentPrompt}
+"""
+
+User adjustment (plain language):
+"""
+${instruction}
+"""
+
+Rewrite the prompt with the adjustment applied.
+
+JSON schema:
+{"prompt":"..."}`,
+  };
+}
+
 // Stage 5 voice generation: Claude acts as a voice director preparing the
 // input for the local Chatterbox TTS workflow (TTS Audio Suite in ComfyUI).
 // It writes the exact text to be spoken — with [Character] speaker tags and

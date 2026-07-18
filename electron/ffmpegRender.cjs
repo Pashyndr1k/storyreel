@@ -61,12 +61,15 @@ function cancelActive() {
 //   width, height, fps,
 //   segments: [{ kind:'video'|'image'|'black', file, trimStart, duration, tailSlack }],
 //   transitions: [{ xfade:'cut'|<xfade name>, dur }],   // segments.length - 1
-//   audioTracks: [{ file, volume }],  // optional full-film music/voice beds
+//   audioClips: [{ file, start, offset, duration, fadeIn, fadeOut, volume }],
+//     — the audio timeline: each clip is delayed to `start`, trimmed to its
+//       window inside the source, faded and leveled, then mixed over the
+//       per-shot clip audio.
 //   outPath,
 // }
 // Returns { args, totalSec } — the full ffmpeg argument list.
 function buildArgs(job) {
-  const { width: W, height: H, fps, segments, transitions, audioTracks, outPath } = job;
+  const { width: W, height: H, fps, segments, transitions, audioClips, outPath } = job;
   const args = ['-hide_banner', '-y'];
   const filters = [];
   const vIn = [];
@@ -141,20 +144,29 @@ function buildArgs(job) {
     aAcc = aOut;
   }
 
-  // Full-film audio tracks (music bed / voice-over): trimmed or padded to the
-  // assembly's exact length, leveled, then mixed over the per-clip audio.
-  const tracks = (audioTracks || []).filter((tr) => tr && tr.file);
-  if (tracks.length) {
-    tracks.forEach((tr, k) => {
-      args.push('-i', tr.file);
+  // Audio timeline clips: each is trimmed to its source window, faded,
+  // leveled, delayed to its film position, padded to the assembly length,
+  // then everything mixes over the per-shot clip audio.
+  const clips = (audioClips || []).filter((c) => c && c.file && (c.duration || 0) > 0.01);
+  if (clips.length) {
+    clips.forEach((c, k) => {
+      args.push('-i', c.file);
       const idx = inputIdx++;
-      const vol = Number.isFinite(tr.volume) ? tr.volume : 1;
-      filters.push(
-        `[${idx}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,volume=${vol},atrim=0:${accDur.toFixed(3)},apad=whole_dur=${accDur.toFixed(3)}[tk${k}]`
-      );
+      const off = Math.max(0, c.offset || 0);
+      const D = Math.max(0.02, c.duration);
+      const fi = Math.max(0, Math.min(c.fadeIn || 0, D / 2));
+      const fo = Math.max(0, Math.min(c.fadeOut || 0, D / 2));
+      const vol = Number.isFinite(c.volume) ? c.volume : 1;
+      const delayMs = Math.max(0, Math.round((c.start || 0) * 1000));
+      let f = `[${idx}:a]atrim=start=${off.toFixed(3)}:end=${(off + D).toFixed(3)},asetpts=PTS-STARTPTS`;
+      if (fi >= 0.01) f += `,afade=t=in:st=0:d=${fi.toFixed(3)}`;
+      if (fo >= 0.01) f += `,afade=t=out:st=${(D - fo).toFixed(3)}:d=${fo.toFixed(3)}`;
+      f += `,volume=${vol},aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo`;
+      f += `,adelay=${delayMs}|${delayMs},apad=whole_dur=${accDur.toFixed(3)},atrim=0:${accDur.toFixed(3)}[tk${k}]`;
+      filters.push(f);
     });
     filters.push(
-      `[${aAcc}]${tracks.map((_, k) => `[tk${k}]`).join('')}amix=inputs=${tracks.length + 1}:duration=first:normalize=0[amix]`
+      `[${aAcc}]${clips.map((_, k) => `[tk${k}]`).join('')}amix=inputs=${clips.length + 1}:duration=first:normalize=0[amix]`
     );
     aAcc = 'amix';
   }
@@ -184,19 +196,21 @@ async function renderJob(job, onProgress) {
       return out;
     });
 
-    const audioTracks = (job.audioTracks || [])
-      .map((tr, i) => {
-        const m = String(tr.dataURL || '').match(/^data:([^;]+);base64,(.*)$/s);
+    const audioClips = (job.audioClips || [])
+      .map((c, i) => {
+        const m = String(c.dataURL || '').match(/^data:([^;]+);base64,(.*)$/s);
         if (!m) return null;
         const ext = m[1].includes('wav') ? 'wav' : m[1].includes('ogg') ? 'ogg' : m[1].includes('aac') || m[1].includes('mp4') || m[1].includes('m4a') ? 'm4a' : 'mp3';
-        const file = path.join(tmp, `track_${i}.${ext}`);
+        const file = path.join(tmp, `aclip_${i}.${ext}`);
         fs.writeFileSync(file, Buffer.from(m[2], 'base64'));
-        return { file, volume: tr.volume };
+        const out = { ...c, file };
+        delete out.dataURL;
+        return out;
       })
       .filter(Boolean);
 
     fs.mkdirSync(path.dirname(job.outPath), { recursive: true });
-    const { args, totalSec } = buildArgs({ ...job, segments, audioTracks });
+    const { args, totalSec } = buildArgs({ ...job, segments, audioClips });
 
     return await new Promise((resolve) => {
       canceled = false;
