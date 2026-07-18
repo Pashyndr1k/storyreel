@@ -1,13 +1,11 @@
 import { useRef, useState } from 'react';
-import { Grip, Upload, Layers } from '../components/icons.jsx';
+import { Grip } from '../components/icons.jsx';
 import { useGenerate } from '../lib/useGenerate.js';
 import { stage4Prompt } from '../lib/prompts.js';
 import { uid } from '../lib/storage.js';
-import { fileToResizedDataURL } from '../lib/images.js';
 import { useI18n } from '../lib/i18n.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
-import LibraryPicker from '../components/LibraryPicker.jsx';
 import StoryboardTimeline from '../components/StoryboardTimeline.jsx';
 import { StyleIndicator } from '../components/StyleControls.jsx';
 import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
@@ -46,7 +44,6 @@ const mapShots = (rawShots, range = { min: 2, max: 10 }) =>
   }));
 
 export default function Stage4({ project, update, settings, goNext, onSettings, onProjectSettings, genLang, styles, scriptStyle, library, libUpsert }) {
-  const [pickLoc, setPickLoc] = useState(false);
   const { t } = useI18n();
   const [sceneId, setSceneId] = useState(project.outline[0]?.id || null);
   const [prog, setProg] = useState(null);
@@ -117,38 +114,6 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
       outline: p.outline.map((s) => (s.id === scene.id ? { ...s, photos } : s)),
     }));
 
-  // Auto-add scene environments to the global location library.
-  const syncLocationToLibrary = (photos) => {
-    if (!libUpsert || !photos.length) return;
-    libUpsert({
-      id: `libl_${project.id}_${scene.id}`,
-      kind: 'location',
-      name: scene.title || '',
-      type: 'other',
-      description: scene.summary || '',
-      photos,
-      projectId: project.id,
-      projectTitle: project.title,
-      createdAt: Date.now(),
-    });
-  };
-
-  const addScenePhoto = async (file) => {
-    try {
-      const dataURL = await fileToResizedDataURL(file);
-      const photos = [...(scene.photos || []), dataURL].slice(0, 3);
-      updateScenePhotos(photos);
-      syncLocationToLibrary(photos);
-    } catch (e) {
-      window.alert(e.message);
-    }
-  };
-
-  const pickLocationFromLibrary = (entry) => {
-    const photos = [...(scene.photos || []), ...entry.photos].slice(0, 3);
-    updateScenePhotos(photos);
-  };
-
   if (!project.outline.length) {
     return (
       <section className="stage">
@@ -189,46 +154,26 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
         {t('s4.startsAt', { t: fmt(sceneStart) })} · {t('s4.target', { d: scene.duration })}
         {shots.length > 0 && <> · {t('s4.current', { d: sceneTotal })}</>}
         <p>{scene.summary}</p>
-        <label className="photos-label">{t('scene.photos')}</label>
-        <div className="photo-row">
-          {(scene.photos || []).map((ph, i) => (
-            <div key={i} className="photo-thumb">
-              <img src={ph} alt="" />
-              <button
-                className="photo-x"
-                onClick={() => updateScenePhotos((scene.photos || []).filter((_, j) => j !== i))}
-              >
-                ✕
-              </button>
+        {/* Environment references are managed at Stage 5; Stage 4 only shows
+            the ones the scene already carries. */}
+        {(scene.photos || []).length > 0 && (
+          <>
+            <label className="photos-label">{t('scene.photos')}</label>
+            <div className="photo-row">
+              {(scene.photos || []).map((ph, i) => (
+                <div key={i} className="photo-thumb">
+                  <img src={ph} alt="" />
+                  <button
+                    className="photo-x"
+                    onClick={() => updateScenePhotos((scene.photos || []).filter((_, j) => j !== i))}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
             </div>
-          ))}
-          {(scene.photos || []).length < 3 && (
-            <>
-              <label className="photo-add" title={t('pick.upload')} aria-label={t('pick.upload')}>
-                <Upload size={20} />
-                <input
-                  type="file"
-                  accept="image/*"
-                  hidden
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    e.target.value = '';
-                    if (f) addScenePhoto(f);
-                  }}
-                />
-              </label>
-              <button
-                type="button"
-                className="photo-add"
-                title={t('pick.fromLib')}
-                aria-label={t('pick.fromLib')}
-                onClick={() => setPickLoc(true)}
-              >
-                <Layers size={20} />
-              </button>
-            </>
-          )}
-        </div>
+          </>
+        )}
       </div>
 
       <div className="row">
@@ -254,15 +199,6 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
           onDuration={(id, d) => updateShot(id, { duration: clamp(d, 2, 10) })}
           onFrames={(frames) => update((p) => ({ storyboards: { ...p.storyboards, ...frames } }))}
           onSettings={onSettings}
-        />
-      )}
-
-      {pickLoc && (
-        <LibraryPicker
-          kind="location"
-          library={library}
-          onPick={pickLocationFromLibrary}
-          onClose={() => setPickLoc(false)}
         />
       )}
 

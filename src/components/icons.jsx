@@ -171,6 +171,13 @@ export const StopSq = (p) => (
   </S>
 );
 
+export const Pause = (p) => (
+  <S {...p} sw={1.7}>
+    <rect x="7" y="5" width="3.5" height="14" rx="1" />
+    <rect x="13.5" y="5" width="3.5" height="14" rx="1" />
+  </S>
+);
+
 export const Dice = (p) => (
   <S {...p} sw={1.7}>
     <rect x="3" y="3" width="18" height="18" rx="3" />

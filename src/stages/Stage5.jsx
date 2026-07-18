@@ -118,7 +118,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     .map((c) => c.photos?.[0])
     .filter(Boolean)
     .slice(0, 3);
-  const locRefs = (scene?.photos || []).slice(0, 3);
+  const locRefs = (scene?.photos || []).slice(0, 6);
 
   // Assets attached to a shot, resolved from the global library (dropping any
   // that were deleted). Used in image generation alongside char/loc refs.
@@ -217,10 +217,11 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       createdAt: Date.now(),
     });
   };
-  const addScenePhoto = async (file) => {
+  const addScenePhotos = async (files) => {
     try {
-      const dataURL = await fileToResizedDataURL(file);
-      const photos = [...(scene.photos || []), dataURL].slice(0, 3);
+      const urls = [];
+      for (const f of files) urls.push(await fileToResizedDataURL(f));
+      const photos = [...(scene.photos || []), ...urls].slice(0, 6);
       updateScenePhotos(photos);
       syncLocationToLibrary(photos);
     } catch (e) {
@@ -565,7 +566,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       });
       update((p) => ({
         outline: p.outline.map((s) =>
-          s.id === scene.id ? { ...s, photos: [...(s.photos || []), img].slice(-3) } : s
+          s.id === scene.id ? { ...s, photos: [...(s.photos || []), img].slice(-6) } : s
         ),
       }));
       // Keep the global location library entry (shared with Stage 4) in sync.
@@ -576,7 +577,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           name: scene.title || '',
           type: 'other',
           description: scene.summary || '',
-          photos: [...(scene.photos || []), img].slice(-3),
+          photos: [...(scene.photos || []), img].slice(-6),
           projectId: project.id,
           projectTitle: project.title,
           createdAt: Date.now(),
@@ -1087,18 +1088,19 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                             </button>
                           </div>
                         ))}
-                        {(scene?.photos || []).length < 3 && (
+                        {(scene?.photos || []).length < 6 && (
                           <>
                             <label className="photo-add" title={t('pick.upload')} aria-label={t('pick.upload')}>
                               <Upload size={20} />
                               <input
                                 type="file"
                                 accept="image/*"
+                                multiple
                                 hidden
                                 onChange={(e) => {
-                                  const f = e.target.files?.[0];
+                                  const fs = [...(e.target.files || [])];
                                   e.target.value = '';
-                                  if (f) addScenePhoto(f);
+                                  if (fs.length) addScenePhotos(fs);
                                 }}
                               />
                             </label>
@@ -1237,7 +1239,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           kind="location"
           library={library}
           onPick={(entry) => {
-            const photos = [...(scene.photos || []), ...entry.photos].slice(0, 3);
+            const photos = [...(scene.photos || []), ...entry.photos].slice(0, 6);
             updateScenePhotos(photos);
           }}
           onClose={() => setPickLoc(false)}

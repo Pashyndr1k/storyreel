@@ -3,11 +3,11 @@ import { generateStoryboardImage } from '../lib/gemini.js';
 import { generateComfyStoryboard, saveToLocalOutputs } from '../lib/comfy.js';
 import { resizeDataURL } from '../lib/images.js';
 import { useI18n } from '../lib/i18n.js';
-import { Play, StopSq } from './icons.jsx';
+import { Play, Pause, StopSq } from './icons.jsx';
 
 // Local prompt for a cheap, rough frame — no Claude call needed.
 function framePrompt(shot, scene) {
-  return `Rough cinematic storyboard frame, ${shot.shotType || 'medium'} shot, simple loose sketch-style composition, muted colors: ${shot.action || scene.summary || ''}. Setting: ${shot.location || scene.title || ''}. No text, no labels, no captions.`;
+  return `Rough cinematic storyboard frame, ${shot.shotType || 'medium'} shot, simple loose sketch-style composition, muted colors: ${shot.action || scene.summary || ''}. Setting: ${shot.location || scene.title || ''}. No text, no labels, no captions. Don't render text in the preview frames.`;
 }
 
 // NLE-style animatic timeline (design 3a): black surface with a per-second time
@@ -189,7 +189,7 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
         <strong>{t('sb.title')}</strong>
       </div>
 
-      {playing && (
+      {(playing || elapsed > 0) && (
         <div className="sb-preview-row">
           <div className="sb-preview">
             {sb[current?.id] ? (
@@ -198,16 +198,9 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
               <div className="sb-preview-empty">{t('s4.shot', { n: shots.indexOf(current) + 1 })}</div>
             )}
           </div>
-          {/* Live caption: what the animatic is showing right now. */}
+          {/* Live caption: only the current shot's action text. */}
           <div className="sb-caption">
-            <strong>{scene.title || ''}</strong>
-            <span className="sb-cap-meta">
-              {t('s4.shot', { n: shots.indexOf(current) + 1 })}
-              {current?.shotType ? ` · ${current.shotType}` : ''}
-              {current?.location ? ` · ${current.location}` : ''}
-            </span>
-            <p>{current?.action || scene.summary || ''}</p>
-            {current?.dialogue && <p className="sb-cap-dlg">{current.dialogue}</p>}
+            <p>{current?.action || ''}</p>
           </div>
         </div>
       )}
@@ -317,7 +310,17 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
           disabled={busy || total <= 0}
           onClick={() => setPlaying((v) => !v)}
         >
-          {playing ? <><StopSq size={14} /> {t('sb.stop')}</> : <><Play size={14} /> {t('sb.play')}</>}
+          {playing ? <><Pause size={14} /> {t('sb.pause')}</> : <><Play size={14} /> {t('sb.play')}</>}
+        </button>
+        <button
+          className="btn small"
+          disabled={busy || (!playing && elapsed === 0)}
+          onClick={() => {
+            setPlaying(false);
+            setElapsed(0);
+          }}
+        >
+          <StopSq size={14} /> {t('sb.stop')}
         </button>
         {prog && <span className="total-badge">{t('sb.progress', { a: prog.a, b: prog.b })}</span>}
       </div>
