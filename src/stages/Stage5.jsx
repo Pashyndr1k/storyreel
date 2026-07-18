@@ -833,22 +833,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
             </button>
           </>
         )}
-        <span className="s5-resrow push-right" title={t('s5.resTip')}>
-          <span className="s5-reslabel">{t('s5.resLabel')}</span>
-          <span className="seg">
-            {VIDEO_RESOLUTIONS.map((r) => (
-              <button
-                key={r}
-                type="button"
-                className={`seg-btn ${videoRes === r ? 'on' : ''}`}
-                onClick={() => update({ videoResolution: r })}
-              >
-                {r}
-              </button>
-            ))}
-          </span>
-        </span>
-        <button className="btn" onClick={() => setShowAssets(true)}>
+        <button className="btn push-right" onClick={() => setShowAssets(true)}>
           <Grid size={15} /> {t('asset.libBtn')}
         </button>
       </div>
@@ -1269,6 +1254,18 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         }}
                       />
                     </label>
+                    <span className="seg seg-tall" title={t('s5.resTip')}>
+                      {VIDEO_RESOLUTIONS.map((r) => (
+                        <button
+                          key={r}
+                          type="button"
+                          className={`seg-btn ${videoRes === r ? 'on' : ''}`}
+                          onClick={() => update({ videoResolution: r })}
+                        >
+                          {r}
+                        </button>
+                      ))}
+                    </span>
                     {shotVid && genImg && (
                       <span className="hint">{finalImg ? t('vid.modeFLF') : t('vid.modeI2V')}</span>
                     )}

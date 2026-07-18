@@ -1710,6 +1710,9 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 }
 .seg-btn.on { background: var(--primary-grad); color: #fff; }
 .seg-btn:not(.on):hover { background: var(--hover-bg); }
+/* matches the 38px height of the icon/upload buttons in the video control row */
+.seg.seg-tall { height: 38px; align-items: center; box-sizing: border-box; }
+.seg.seg-tall .seg-btn { padding: 0 12px; align-self: stretch; display: inline-flex; align-items: center; }
 
 /* theme-cycle button in the top bar */
 .theme-toggle svg { display: block; }
