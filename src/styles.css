@@ -2125,3 +2125,45 @@ textarea.s5e-prompt-sm { min-height: 110px; }
 .modal .sub-label { font-weight: 400; color: var(--text-2); margin-top: 10px; font-size: 12.5px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
 .settings-io { margin-top: 6px; }
+
+/* ============ SETTINGS — tabbed layout ============ */
+.set-modal { width: 560px; max-width: 100%; }
+.set-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 14px 0 0;
+  border-bottom: 1px solid var(--glass-border);
+}
+.set-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px; /* overlap the track border */
+  padding: 10px 14px;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  border-radius: 8px 8px 0 0;
+}
+.set-tab svg { opacity: 0.85; }
+.set-tab:hover { color: var(--text-2); background: var(--hover-bg); }
+.set-tab.active {
+  color: var(--violet-text);
+  border-bottom-color: var(--accent);
+  background: rgba(139, 92, 246, 0.08);
+}
+.set-tab.active svg { opacity: 1; }
+/* fixed height so switching tabs never resizes the dialog */
+.set-panel {
+  height: min(58vh, 440px);
+  overflow-y: auto;
+  padding: 16px 2px 2px;
+}
+.set-panel > label:first-child { margin-top: 0; }
+.set-panel .settings-io + .settings-io { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--glass-border-soft); }

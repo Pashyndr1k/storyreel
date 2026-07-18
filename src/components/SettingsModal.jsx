@@ -5,6 +5,7 @@ import { useI18n } from '../lib/i18n.js';
 import { saveProjects, migrateProject } from '../lib/storage.js';
 import { loadStyles, saveStyles, mergeStyles, buildStylesExport, parseStylesFile } from '../lib/styles.js';
 import { downloadText } from '../lib/exportScript.js';
+import { Archive, Key, Cpu } from './icons.jsx';
 
 export default function SettingsModal({ settings, setSettings, projects = [], styles, setStyles, onClose }) {
   const { t } = useI18n();
@@ -104,24 +105,33 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
   };
 
   const TABS = [
-    ['backups', t('set.tabBackups')],
-    ['api', t('set.tabApi')],
-    ['models', t('set.tabModels')],
+    ['backups', t('set.tabBackups'), Archive],
+    ['api', t('set.tabApi'), Key],
+    ['models', t('set.tabModels'), Cpu],
   ];
 
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal set-modal" onClick={(e) => e.stopPropagation()}>
         <h2>{t('set.title')}</h2>
 
-        <div className="style-tabs">
-          {TABS.map(([id, label]) => (
-            <button key={id} type="button" className={`chip ${tab === id ? 'active' : ''}`} onClick={() => setTab(id)}>
-              {label}
+        <div className="set-tabs" role="tablist">
+          {TABS.map(([id, label, Icon]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              className={`set-tab ${tab === id ? 'active' : ''}`}
+              onClick={() => setTab(id)}
+            >
+              <Icon size={16} />
+              <span>{label}</span>
             </button>
           ))}
         </div>
 
+        <div className="set-panel">
         {tab === 'backups' && (
           <>
             <div className="settings-io">
@@ -226,6 +236,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
             </select>
           </>
         )}
+        </div>
 
         <div className="modal-actions">
           <button className="btn" onClick={onClose}>{t('set.cancel')}</button>

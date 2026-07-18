@@ -235,6 +235,20 @@ export const Cog = (p) => (
   </S>
 );
 
+export const Key = (p) => (
+  <S {...p}>
+    <circle cx="8" cy="15" r="4" />
+    <path d="M10.8 12.2L20 3M17 6l2 2M15 8l1.5 1.5" />
+  </S>
+);
+export const Cpu = (p) => (
+  <S {...p}>
+    <rect x="6" y="6" width="12" height="12" rx="2" />
+    <path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2" />
+    <rect x="9.5" y="9.5" width="5" height="5" rx="1" />
+  </S>
+);
+
 // Theme-scheme icons: dark = moon, medium = half-filled circle, light = sun.
 export const Moon = (p) => (
   <S {...p}>
