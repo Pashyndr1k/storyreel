@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.16.1 — 2026-07-18
+
+- Stage 5 shots are now one compact frame each: a header with the shot
+  number, duration stepper, shot type and action, and below it three
+  tabs — Image, Video, Audio — each holding the same split layout as
+  before (prompt and its tools left, playback and generation tools
+  right, divided by the vertical line). The audio tab appears only for
+  shots with character dialogue; a green dot marks tabs whose media is
+  already generated, and errors surface above the tabs so they're
+  visible from any tab.
+- Stage 6 audio became a full multi-layer timeline: layers with
+  enable/disable, volume and rename; clips can be uploaded in bulk
+  (placed at the playhead), dragged, trimmed from either edge and given
+  fade-in/out; everything plays live in the preview (music is now
+  audible outside the render) and mixes identically into the FFmpeg
+  render. Existing music/voice uploads migrate automatically.
+- "Tweak this" under the image and video prompts: type a plain-language
+  adjustment and Claude rewrites the technical prompt in place.
+- The video resolution selector moved into each shot's video controls.
+
 ## 1.16.0 — 2026-07-17
 
 - Voice generation for shots (Stage 5): a "Generate sound" button in the

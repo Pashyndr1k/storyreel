@@ -100,6 +100,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const [lightbox, setLightbox] = useState(null); // dataURL shown in the large pop-up
   const [tweakText, setTweakText] = useState({}); // `${shotId}:${kind}` -> adjustment draft
   const [tweakBusy, setTweakBusy] = useState(null); // `${shotId}:${kind}` in flight
+  const [shotTab, setShotTab] = useState({}); // shotId -> 'image' | 'video' | 'audio'
 
   // Always-fresh project reference: generation handlers (and especially the
   // scene-media queue, which runs across many state updates) must read prompts
@@ -908,28 +909,75 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           const shotAud = (project.shotAudios || {})[shot.id];
           const shotAssets = assetsFor(shot.id);
           const dur = Number(shot.duration || 4);
+          // One compact frame per shot: header + three generation tabs. The
+          // audio tab exists only when the shot carries dialogue (or already
+          // has audio material).
+          const hasAudioTab = !!(
+            (shot.dialogue || '').trim() ||
+            (p.audioPrompt || '').trim() ||
+            (p.voicePrompt || '').trim() ||
+            shotAud
+          );
+          const tabList = ['image', 'video', ...(hasAudioTab ? ['audio'] : [])];
+          const tab = tabList.includes(shotTab[shot.id]) ? shotTab[shot.id] : 'image';
+          const tabHasMedia = { image: !!genImg, video: !!shotVid, audio: !!shotAud };
           return (
             <div key={shot.id} className="shot-card s5e-card">
-              {/* Image section — split panels: prompt management left, image
-                  generation right (layout per the approved reference). */}
+              {/* Card header: shot identity, timing, type and action. */}
+              <div className="s5e-head s5e-cardhead">
+                <strong className="s5e-title">{t('s4.shot', { n: i + 1 })}</strong>
+                <span className="s5e-step" title={t('s5.durTip')}>
+                  <button type="button" title={t('sb.shorter')} disabled={dur <= 2} onClick={() => setShotDur(shot.id, dur - 0.5)}>
+                    −
+                  </button>
+                  <i>{dur.toFixed(1)}s</i>
+                  <button type="button" title={t('sb.longer')} disabled={dur >= 10} onClick={() => setShotDur(shot.id, dur + 0.5)}>
+                    +
+                  </button>
+                </span>
+                <span className="s5e-type">{shot.shotType || '—'}</span>
+              </div>
+              <p className="s5e-action">{shot.action}</p>
+
+              {/* Generation tabs: image / video / audio in one frame. */}
+              <div className="s5e-tabs" role="tablist">
+                {tabList.map((tb) => (
+                  <button
+                    key={tb}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === tb}
+                    className={`s5e-tab ${tab === tb ? 'active' : ''}`}
+                    onClick={() => setShotTab((v) => ({ ...v, [shot.id]: tb }))}
+                  >
+                    {t(`s5.tab_${tb}`)}
+                    {tabHasMedia[tb] && <span className="s5e-tabdot" />}
+                  </button>
+                ))}
+              </div>
+
+              {/* Errors surface above the tab content so they're visible from
+                  any tab (image/video/audio failures all report here). */}
+              {imgErr?.id === shot.id &&
+                (imgErr.msg === 'NO_GEMINI_KEY' || imgErr.msg === 'NO_KEY' || imgErr.msg === 'COMFY_UNREACHABLE' ? (
+                  <div className="note warn">
+                    {t(
+                      imgErr.msg === 'NO_KEY'
+                        ? 'err.noKey'
+                        : imgErr.msg === 'COMFY_UNREACHABLE'
+                          ? 'err.comfyDown'
+                          : 'err.noGeminiKey'
+                    )}{' '}
+                    <button className="btn small" onClick={onSettings}>{t('err.openSettings')}</button>
+                  </div>
+                ) : (
+                  <div className="note error">{imgErr.msg}</div>
+                ))}
+
+              {tab === 'image' && (
               <div className="s5e">
                 {/* LEFT — prompt management */}
                 <div className="s5e-panel">
-                  <div className="s5e-head">
-                    <strong className="s5e-title">{t('s4.shot', { n: i + 1 })}</strong>
-                    <span className="s5e-step" title={t('s5.durTip')}>
-                      <button type="button" title={t('sb.shorter')} disabled={dur <= 2} onClick={() => setShotDur(shot.id, dur - 0.5)}>
-                        −
-                      </button>
-                      <i>{dur.toFixed(1)}s</i>
-                      <button type="button" title={t('sb.longer')} disabled={dur >= 10} onClick={() => setShotDur(shot.id, dur + 0.5)}>
-                        +
-                      </button>
-                    </span>
-                    <span className="s5e-type">{shot.shotType || '—'}</span>
-                  </div>
-                  <p className="s5e-action">{shot.action}</p>
-                  <div className="s5e-div" />
                   <div className="prompt-head">
                     <label>{t('s5.img')}</label>
                     <CopyButton text={p.imagePrompt} />
@@ -1158,22 +1206,6 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     </button>
                   </div>
 
-                  {imgErr?.id === shot.id &&
-                    (imgErr.msg === 'NO_GEMINI_KEY' || imgErr.msg === 'NO_KEY' || imgErr.msg === 'COMFY_UNREACHABLE' ? (
-                      <div className="note warn">
-                        {t(
-                          imgErr.msg === 'NO_KEY'
-                            ? 'err.noKey'
-                            : imgErr.msg === 'COMFY_UNREACHABLE'
-                              ? 'err.comfyDown'
-                              : 'err.noGeminiKey'
-                        )}{' '}
-                        <button className="btn small" onClick={onSettings}>{t('err.openSettings')}</button>
-                      </div>
-                    ) : (
-                      <div className="note error">{imgErr.msg}</div>
-                    ))}
-
                   <div className="s5e-grow" />
                   <div className="s5e-div" />
                   <div className="s5e-refgrid">
@@ -1258,8 +1290,11 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                 </div>
               </div>
 
-              {/* Video section — same split grid: prompt left, video right. */}
-              <div className="s5e s5e-section">
+              )}
+
+              {/* Video tab — same split grid: prompt left, video right. */}
+              {tab === 'video' && (
+              <div className="s5e">
                 <div className="s5e-panel">
                   <div className="prompt-head">
                     <label>{t('s5.vid', { d: dur })}</label>
@@ -1327,10 +1362,11 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                 </div>
               </div>
 
-              {/* Audio section — only when the shot carries character dialogue
-                  (or an audio prompt already exists); aligned to the same grid. */}
-              {((shot.dialogue || '').trim() || (p.audioPrompt || '').trim()) && (
-                <div className="s5e s5e-section">
+              )}
+
+              {/* Audio tab — prompt left, voice generation right. */}
+              {tab === 'audio' && (
+                <div className="s5e">
                   <div className="s5e-panel">
                     <div className="prompt-head">
                       <label>{t('s5.aud')}</label>

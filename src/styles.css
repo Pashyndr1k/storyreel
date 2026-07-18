@@ -1741,6 +1741,39 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
   align-items: stretch;
 }
 .s5e-section { margin-top: 24px; }
+.s5e-cardhead { margin-bottom: 2px; }
+.s5e-card > .s5e-action { margin: 6px 0 12px; }
+/* per-shot generation tabs (image / video / audio) */
+.s5e-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 16px;
+  border-bottom: 1px solid var(--glass-border);
+}
+.s5e-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  padding: 9px 14px;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  border-radius: 8px 8px 0 0;
+}
+.s5e-tab:hover { color: var(--text-2); background: var(--hover-bg); }
+.s5e-tab.active {
+  color: var(--violet-text);
+  border-bottom-color: var(--accent);
+  background: rgba(139, 92, 246, 0.08);
+}
+.s5e-tabdot { width: 6px; height: 6px; border-radius: 50%; background: #34d399; flex: none; }
 /* facing edges: flatten the corners and draw the 2px separator */
 .s5e-panel:has(+ .s5e-panel) {
   border-top-right-radius: 0;
