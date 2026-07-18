@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { MODELS } from '../lib/claude.js';
 import { listImageModels } from '../lib/gemini.js';
 import { useI18n } from '../lib/i18n.js';
@@ -110,58 +110,52 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
     ['models', t('set.tabModels'), Cpu],
   ];
 
-  return (
-    <div className="overlay" onClick={onClose}>
-      <div className="modal set-modal" onClick={(e) => e.stopPropagation()}>
-        <h2>{t('set.title')}</h2>
+  // Auto-size the panel to the TALLEST tab so no tab ever scrolls internally.
+  // All three bodies stay mounted (inactive ones positioned off-flow but
+  // measurable); the panel height tracks the max of their content heights.
+  const panelRef = useRef(null);
+  const pageRefs = { backups: useRef(null), api: useRef(null), models: useRef(null) };
+  const [panelH, setPanelH] = useState(null);
+  useLayoutEffect(() => {
+    const heights = Object.values(pageRefs).map((r) => r.current?.scrollHeight || 0);
+    const max = Math.max(0, ...heights);
+    if (!max) return;
+    const cs = panelRef.current ? getComputedStyle(panelRef.current) : null;
+    const pad = cs ? parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) : 18;
+    setPanelH(max + pad);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelList, fetchErr, fetching, tab]);
 
-        <div className="set-tabs" role="tablist">
-          {TABS.map(([id, label, Icon]) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={tab === id}
-              className={`set-tab ${tab === id ? 'active' : ''}`}
-              onClick={() => setTab(id)}
-            >
-              <Icon size={16} />
-              <span>{label}</span>
-            </button>
-          ))}
+  const backupsBody = (
+    <>
+      <div className="settings-io">
+        <label>{t('set.backupProjects')}</label>
+        <p className="hint">{t('set.backupProjectsHint')}</p>
+        <div className="row">
+          <button className="btn small" onClick={exportProjects}>{t('set.export')}</button>
+          <label className="btn small file-btn">
+            {t('set.import')}
+            <input type="file" accept=".json,application/json" onChange={importProjects} hidden />
+          </label>
         </div>
+      </div>
+      <div className="settings-io">
+        <label>{t('set.backupStyles')}</label>
+        <p className="hint">{t('set.backupStylesHint')}</p>
+        <div className="row">
+          <button className="btn small" onClick={exportStyles}>{t('set.export')}</button>
+          <label className="btn small file-btn">
+            {t('set.import')}
+            <input type="file" accept=".json,application/json" onChange={importStyles} hidden />
+          </label>
+        </div>
+      </div>
+    </>
+  );
 
-        <div className="set-panel">
-        {tab === 'backups' && (
-          <>
-            <div className="settings-io">
-              <label>{t('set.backupProjects')}</label>
-              <p className="hint">{t('set.backupProjectsHint')}</p>
-              <div className="row">
-                <button className="btn small" onClick={exportProjects}>{t('set.export')}</button>
-                <label className="btn small file-btn">
-                  {t('set.import')}
-                  <input type="file" accept=".json,application/json" onChange={importProjects} hidden />
-                </label>
-              </div>
-            </div>
-            <div className="settings-io">
-              <label>{t('set.backupStyles')}</label>
-              <p className="hint">{t('set.backupStylesHint')}</p>
-              <div className="row">
-                <button className="btn small" onClick={exportStyles}>{t('set.export')}</button>
-                <label className="btn small file-btn">
-                  {t('set.import')}
-                  <input type="file" accept=".json,application/json" onChange={importStyles} hidden />
-                </label>
-              </div>
-            </div>
-          </>
-        )}
-
-        {tab === 'api' && (
-          <>
-            <label>{t('set.apiKey')}</label>
+  const apiBody = (
+    <>
+      <label>{t('set.apiKey')}</label>
             <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-ant-…" />
             <p className="hint">
               {t('set.apiKeyHint')}{' '}
@@ -178,15 +172,15 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
             <label>{t('set.comfyOutputDir')}</label>
             <input value={comfyOutputDir} onChange={(e) => setComfyOutputDir(e.target.value)} placeholder="D:\Claude work\ComfyUI\Output" />
             <p className="hint">{t('set.comfyHint')}</p>
-            <label>{t('set.projectsDir')}</label>
-            <input value={projectsDir} onChange={(e) => setProjectsDir(e.target.value)} placeholder="D:\Claude work\StoryReel Projects" />
-            <p className="hint">{t('set.projectsDirHint')}</p>
-          </>
-        )}
+      <label>{t('set.projectsDir')}</label>
+      <input value={projectsDir} onChange={(e) => setProjectsDir(e.target.value)} placeholder="D:\Claude work\StoryReel Projects" />
+      <p className="hint">{t('set.projectsDirHint')}</p>
+    </>
+  );
 
-        {tab === 'models' && (
-          <>
-            <label>{t('set.model')}</label>
+  const modelsBody = (
+    <>
+      <label>{t('set.model')}</label>
             <select value={model} onChange={(e) => setModel(e.target.value)}>
               {MODELS.map((m) => (
                 <option key={m.id} value={m.id}>{m.label}</option>
@@ -230,12 +224,44 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
               <option value="gemini">{t('set.svcGemini')}</option>
               <option value="comfy">{t('set.svcComfyImg')}</option>
             </select>
-            <label>{t('set.videoService')}</label>
-            <select value={videoService} onChange={(e) => setVideoService(e.target.value)}>
-              <option value="comfy">{t('set.svcComfyVid')}</option>
-            </select>
-          </>
-        )}
+      <label>{t('set.videoService')}</label>
+      <select value={videoService} onChange={(e) => setVideoService(e.target.value)}>
+        <option value="comfy">{t('set.svcComfyVid')}</option>
+      </select>
+    </>
+  );
+
+  const bodies = { backups: backupsBody, api: apiBody, models: modelsBody };
+
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="modal set-modal" onClick={(e) => e.stopPropagation()}>
+        <h2>{t('set.title')}</h2>
+
+        <div className="set-tabs" role="tablist">
+          {TABS.map(([id, label, Icon]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              className={`set-tab ${tab === id ? 'active' : ''}`}
+              onClick={() => setTab(id)}
+            >
+              <Icon size={16} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* All three bodies stay mounted for measurement; the panel is sized to
+            the tallest so no tab scrolls. Inactive bodies sit off-flow. */}
+        <div className="set-panel" ref={panelRef} style={panelH ? { height: `${panelH}px` } : undefined}>
+          {TABS.map(([id]) => (
+            <div key={id} ref={pageRefs[id]} className={`set-page ${tab === id ? 'on' : 'off'}`}>
+              {bodies[id]}
+            </div>
+          ))}
         </div>
 
         <div className="modal-actions">
