@@ -312,16 +312,18 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
         >
           {playing ? <><Pause size={14} /> {t('sb.pause')}</> : <><Play size={14} /> {t('sb.play')}</>}
         </button>
-        <button
-          className="btn small"
-          disabled={busy || (!playing && elapsed === 0)}
-          onClick={() => {
-            setPlaying(false);
-            setElapsed(0);
-          }}
-        >
-          <StopSq size={14} /> {t('sb.stop')}
-        </button>
+        {playing && (
+          <button
+            className="btn small"
+            disabled={busy}
+            onClick={() => {
+              setPlaying(false);
+              setElapsed(0);
+            }}
+          >
+            <StopSq size={14} /> {t('sb.stop')}
+          </button>
+        )}
         {prog && <span className="total-badge">{t('sb.progress', { a: prog.a, b: prog.b })}</span>}
       </div>
       {err === 'NO_GEMINI_KEY' ? (
