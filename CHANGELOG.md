@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.16.0 — 2026-07-17
+
+- Voice generation for shots (Stage 5): a "Generate sound" button in the
+  audio section (shown only when the shot's description contains character
+  lines) speaks the dialogue on the local ComfyUI Chatterbox TTS workflow.
+  A voice-director step first drafts the Chatterbox input — [Character]
+  speaker tags, [pause:…] conversational beats, punctuation-driven
+  intonation, exaggeration/pacing/temperature parameters and a narrator
+  voice matched to the dominant speaker's gender and personality — from the
+  scene context, with the Action Dynamics block as the emotional fallback,
+  and budgets speech + pauses to the shot's duration. The drafted voice
+  text is editable and re-usable; audio gets an inline player, download,
+  regenerate, a local-outputs copy, and travels with project folders,
+  ZIP exports and backups.
+- Project saving rework: every project mirrors continuously into its own
+  folder (project.md with all data except media + images/videos/audio as
+  standard files); export bundles the project into a single ZIP with a
+  destination prompt; import accepts those ZIPs.
+- Smart Edit: a Stop button interrupts the request mid-flight, an elapsed
+  timer shows progress, and the request itself was confirmed media-free.
+- Stage 5: SD/HD/FHD video resolution selector (carried through to the
+  final render); up to 6 environment references with multi-file upload;
+  environment references moved fully to Stage 5.
+- Styles: export/import all three style types in one file.
+- Color scheme switching moved to the top bar as a three-state cycling
+  button (moon/half/sun); Settings reorganized into Backups / API setup /
+  Model selection tabs that auto-size to the tallest tab.
+- Stage 4 storyboard preview: action-only caption at 20px beside the
+  frame, Pause and Stop controls, and a "no text in frames" restriction
+  in the storyboard prompt.
+- Theme-aware violet scrollbars everywhere.
+
 ## 1.15.0 — 2026-07-16
 
 - New image service option: shot images and editing at Stage 5 can run on

@@ -1908,6 +1908,10 @@ textarea.s5e-prompt-sm { min-height: 110px; }
 }
 .zoomable { cursor: zoom-in; }
 
+/* voice audio (Chatterbox) */
+.s5e-audio { width: 100%; height: 40px; display: block; }
+.s5e-audio-empty { min-height: 64px; }
+
 /* aligned control rows: primary + equal-height icon-only squares */
 .s5e-btnrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .s5e-btnrow .btn.small { height: 38px; border-radius: 12px; }

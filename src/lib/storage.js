@@ -173,6 +173,7 @@ function projectDefaults() {
     shotImageHistory: {}, // shotId -> older versions, newest first (max 5)
     shotFinalImages: {}, // shotId -> generated FINAL frame (data URL), paired with shotImages
     shotVideos: {}, // shotId -> generated shot video (data URL, ComfyUI LTX-2)
+    shotAudios: {}, // shotId -> generated voice audio (data URL, ComfyUI Chatterbox TTS)
     shotAssets: {}, // shotId -> [assetId] referencing the global asset library
     dynamicsPlan: null, // Action Dynamics Plan generated at Stage 3 (see lib/dynamics.js)
     videoGenDurations: {}, // shotId -> raw seconds requested from the video model (+2s padding)

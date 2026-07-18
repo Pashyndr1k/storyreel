@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage } from '../lib/gemini.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
-import { generateComfyVideo, generateComfyImage, saveToLocalOutputs, VIDEO_RESOLUTIONS } from '../lib/comfy.js';
-import { stage5Prompt, stage5VideoPrompt, stage5AudioPrompt, finalFramePrompt } from '../lib/prompts.js';
+import { generateComfyVideo, generateComfyImage, generateComfyVoice, saveToLocalOutputs, VIDEO_RESOLUTIONS } from '../lib/comfy.js';
+import { stage5Prompt, stage5VideoPrompt, stage5AudioPrompt, stage5VoicePrompt, finalFramePrompt } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
 import { aspectDescription } from '../lib/aspect.js';
 import ErrorNote from '../components/ErrorNote.jsx';
@@ -16,7 +16,7 @@ import LibraryPicker from '../components/LibraryPicker.jsx';
 import { newLibraryEntry } from '../lib/library.js';
 import { fileToResizedDataURL, resizeDataURL } from '../lib/images.js';
 import { extractPalette } from '../lib/palette.js';
-import { Download, RestoreIcon, MapPin, Upload, Layers, Grid, Trash } from '../components/icons.jsx';
+import { Download, RestoreIcon, MapPin, Upload, Layers, Grid, Trash, Wand } from '../components/icons.jsx';
 
 const readFileDataURL = (file) =>
   new Promise((resolve, reject) => {
@@ -693,6 +693,86 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     }
   };
 
+  // Voice audio via the local Chatterbox TTS workflow. First run: Claude (the
+  // "voice director") drafts the Chatterbox input — speaker tags, [pause:…]
+  // beats, engine parameters, a gender-matched narrator voice — from the SCENE
+  // CONTEXT (Action Dynamics block as the emotional fallback). The text is
+  // saved as an editable voice prompt; later runs speak the current text.
+  const draftVoicePrompt = async (shot) => {
+    const cur = projectRef.current;
+    const sceneArg = { ...scene, number: cur.outline.indexOf(scene) + 1 };
+    const blockArg = blockForScene(cur.dynamicsPlan, sceneArg.number);
+    const data = await generateJSON(settings, stage5VoicePrompt(cur, sceneArg, shot, blockArg, genLang));
+    const text = String(data.tts_text || '').trim();
+    if (!text) throw new Error('The voice director returned no speakable text.');
+    const params = {
+      exaggeration: data.exaggeration,
+      temperature: data.temperature,
+      cfgWeight: data.cfg_weight,
+      narratorVoice: data.narrator_voice,
+    };
+    setPrompt(shot.id, { voicePrompt: text, voiceParams: params });
+    return { text, ...params };
+  };
+
+  const redraftVoice = async (shot) => {
+    const keyErr = textKeyError(settings);
+    if (keyErr) return setImgErr({ id: shot.id, msg: keyErr });
+    setImgBusy(`${shot.id}:audp`);
+    setImgErr(null);
+    try {
+      await draftVoicePrompt(shot);
+    } catch (e) {
+      setImgErr({ id: shot.id, msg: e.message || String(e) });
+    } finally {
+      setImgBusy(null);
+    }
+  };
+
+  const genVoice = async (shot, i) => {
+    const cur = projectRef.current;
+    const sp = cur.shotPrompts[shot.id] || {};
+    let voice = (sp.voicePrompt || '').trim()
+      ? { text: sp.voicePrompt.trim(), ...(sp.voiceParams || {}) }
+      : null;
+    if (!voice) {
+      const keyErr = textKeyError(settings);
+      if (keyErr) return setImgErr({ id: shot.id, msg: keyErr });
+    }
+    setImgBusy(`${shot.id}:aud`);
+    setImgErr(null);
+    try {
+      if (!voice) voice = await draftVoicePrompt(shot);
+      const { dataURL, filename } = await generateComfyVoice(settings, {
+        text: voice.text,
+        lang: genLang,
+        exaggeration: voice.exaggeration,
+        temperature: voice.temperature,
+        cfgWeight: voice.cfgWeight,
+        narratorVoice: voice.narratorVoice,
+        name: `${(cur.title || 'project').slice(0, 24)}_sc${cur.outline.indexOf(scene) + 1}_shot${i + 1}_voice`,
+      });
+      saveToLocalOutputs(settings, filename, dataURL); // best-effort local copy
+      update((p) => ({ shotAudios: { ...(p.shotAudios || {}), [shot.id]: dataURL } }));
+    } catch (e) {
+      setImgErr({ id: shot.id, msg: e.message === 'COMFY_UNREACHABLE' ? 'COMFY_UNREACHABLE' : e.message || String(e) });
+    } finally {
+      setImgBusy(null);
+    }
+  };
+
+  const downloadAudio = (shot, i) => {
+    const aud = (project.shotAudios || {})[shot.id];
+    if (!aud) return;
+    const safe = (project.title || 'shot').replace(/[^\w\d]+/g, '-');
+    const a = document.createElement('a');
+    a.href = aud;
+    a.download = `${safe}-scene${project.outline.indexOf(scene) + 1}-shot${i + 1}-voice.mp3`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
   if (!project.outline.length) {
     return (
       <section className="stage">
@@ -785,8 +865,10 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           const finalBusy = imgBusy === `${shot.id}:final`;
           const locBusy = imgBusy === `${shot.id}:loc`;
           const vidBusy = imgBusy === `${shot.id}:vid`;
-          const anyBusy = imgBusy === shot.id || finalBusy || locBusy || vidBusy;
+          const audBusy = imgBusy === `${shot.id}:aud` || imgBusy === `${shot.id}:audp`;
+          const anyBusy = imgBusy === shot.id || finalBusy || locBusy || vidBusy || audBusy;
           const shotVid = (project.shotVideos || {})[shot.id];
+          const shotAud = (project.shotAudios || {})[shot.id];
           const shotAssets = assetsFor(shot.id);
           const dur = Number(shot.duration || 4);
           return (
@@ -1211,7 +1293,60 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       onChange={(e) => setPrompt(shot.id, { audioPrompt: e.target.value })}
                     />
                   </div>
-                  <div className="s5e-cellpad" />
+
+                  {/* Voice generation (Chatterbox TTS): player, the editable
+                      voice text drafted by the voice director, controls. */}
+                  <div className="s5e-panel">
+                    {shotAud ? (
+                      <audio className="s5e-audio" controls src={shotAud} />
+                    ) : (
+                      <div className="s5-media-empty s5e-audio-empty">{t('aud.none')}</div>
+                    )}
+                    {(p.voicePrompt || '').trim() !== '' && (
+                      <>
+                        <div className="prompt-head">
+                          <label>{t('aud.voiceText')}</label>
+                          <CopyButton text={p.voicePrompt} />
+                        </div>
+                        <AutoTextarea
+                          minRows={3}
+                          className="s5e-prompt s5e-prompt-sm"
+                          value={p.voicePrompt}
+                          onChange={(e) => setPrompt(shot.id, { voicePrompt: e.target.value })}
+                        />
+                      </>
+                    )}
+                    <div className="s5e-btnrow">
+                      <button
+                        className="btn small primary s5e-gen"
+                        disabled={anyBusy || (!(shot.dialogue || '').trim() && !(p.voicePrompt || '').trim())}
+                        onClick={() => genVoice(shot, i)}
+                      >
+                        {audBusy ? t('aud.generating') : shotAud ? t('aud.regenerate') : t('aud.generate')}
+                      </button>
+                      <button
+                        type="button"
+                        className="s5e-ico"
+                        title={t('aud.redraft')}
+                        aria-label={t('aud.redraft')}
+                        disabled={anyBusy || !(shot.dialogue || '').trim()}
+                        onClick={() => redraftVoice(shot)}
+                      >
+                        <Wand size={16} />
+                      </button>
+                      {shotAud && (
+                        <button
+                          type="button"
+                          className="s5e-ico"
+                          title={t('aud.download')}
+                          aria-label={t('aud.download')}
+                          onClick={() => downloadAudio(shot, i)}
+                        >
+                          <Download size={16} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
