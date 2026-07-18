@@ -70,10 +70,11 @@ export default function Stage3({ project, update, settings, goNext, onSettings, 
 
   return (
     <section className="stage">
-      <h2>{t('s3.title')}</h2>
-      <p className="stage-desc">{t('s3.desc')}</p>
+      <div className="stage-head-row">
+        <h2 className="stage-h2" data-tip={t('s3.desc')}>{t('s3.title')}</h2>
+        <DynamicsVisualizer plan={project.dynamicsPlan} />
+      </div>
       <StyleIndicator project={project} styles={styles} cats={['script']} onClick={onProjectSettings} />
-      <DynamicsVisualizer plan={project.dynamicsPlan} defaultOpen />
 
       <div className="row">
         <button className="btn primary" disabled={busy} onClick={generate}>

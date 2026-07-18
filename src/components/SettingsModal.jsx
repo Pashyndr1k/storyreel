@@ -5,7 +5,7 @@ import { useI18n } from '../lib/i18n.js';
 import { saveProjects, migrateProject } from '../lib/storage.js';
 import { loadStyles, saveStyles, mergeStyles, buildStylesExport, parseStylesFile } from '../lib/styles.js';
 import { downloadText } from '../lib/exportScript.js';
-import { Archive, Key, Cpu } from './icons.jsx';
+import { Archive, Key, Cpu, Sliders } from './icons.jsx';
 
 export default function SettingsModal({ settings, setSettings, projects = [], styles, setStyles, onClose }) {
   const { t } = useI18n();
@@ -21,6 +21,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
   const [comfyUrl, setComfyUrl] = useState(settings.comfyUrl || 'http://127.0.0.1:8000');
   const [comfyOutputDir, setComfyOutputDir] = useState(settings.comfyOutputDir || 'D:\\Claude work\\ComfyUI\\Output');
   const [projectsDir, setProjectsDir] = useState(settings.projectsDir || 'D:\\Claude work\\StoryReel Projects');
+  const [hideStaleToast, setHideStaleToast] = useState(!!settings.hideStaleToast);
   const [modelList, setModelList] = useState(null);
   const [fetching, setFetching] = useState(false);
   const [fetchErr, setFetchErr] = useState('');
@@ -52,6 +53,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
       comfyUrl: comfyUrl.trim() || 'http://127.0.0.1:8000',
       comfyOutputDir: comfyOutputDir.trim() || 'D:\\Claude work\\ComfyUI\\Output',
       projectsDir: projectsDir.trim() || 'D:\\Claude work\\StoryReel Projects',
+      hideStaleToast,
     });
     onClose();
   };
@@ -108,13 +110,14 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
     ['backups', t('set.tabBackups'), Archive],
     ['api', t('set.tabApi'), Key],
     ['models', t('set.tabModels'), Cpu],
+    ['ui', t('set.tabUI'), Sliders],
   ];
 
   // Auto-size the panel to the TALLEST tab so no tab ever scrolls internally.
   // All three bodies stay mounted (inactive ones positioned off-flow but
   // measurable); the panel height tracks the max of their content heights.
   const panelRef = useRef(null);
-  const pageRefs = { backups: useRef(null), api: useRef(null), models: useRef(null) };
+  const pageRefs = { backups: useRef(null), api: useRef(null), models: useRef(null), ui: useRef(null) };
   const [panelH, setPanelH] = useState(null);
   useLayoutEffect(() => {
     const heights = Object.values(pageRefs).map((r) => r.current?.scrollHeight || 0);
@@ -231,7 +234,22 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
     </>
   );
 
-  const bodies = { backups: backupsBody, api: apiBody, models: modelsBody };
+  const uiBody = (
+    <>
+      <label>{t('set.staleToast')}</label>
+      <p className="hint">{t('set.staleToastHint')}</p>
+      <label className="check-row">
+        <input
+          type="checkbox"
+          checked={!hideStaleToast}
+          onChange={(e) => setHideStaleToast(!e.target.checked)}
+        />
+        <span>{t('set.staleToastShow')}</span>
+      </label>
+    </>
+  );
+
+  const bodies = { backups: backupsBody, api: apiBody, models: modelsBody, ui: uiBody };
 
   return (
     <div className="overlay" onClick={onClose}>

@@ -210,8 +210,7 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
 
   return (
     <section className="stage">
-      <h2>{t('s2.title')}</h2>
-      <p className="stage-desc">{t('s2.desc')}</p>
+      <h2 className="stage-h2" data-tip={t('s2.desc')}>{t('s2.title')}</h2>
 
       <details className="context-box">
         <summary>{t('s2.approvedPlot')}</summary>

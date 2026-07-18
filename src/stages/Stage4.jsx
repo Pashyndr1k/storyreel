@@ -7,8 +7,9 @@ import { useI18n } from '../lib/i18n.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import StoryboardTimeline from '../components/StoryboardTimeline.jsx';
-import { StyleIndicator } from '../components/StyleControls.jsx';
+import { StyleChip } from '../components/StyleControls.jsx';
 import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
+import SceneNav from '../components/SceneNav.jsx';
 import { blockForScene, densityRange } from '../lib/dynamics.js';
 
 export function fmt(sec) {
@@ -129,25 +130,22 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
 
   return (
     <section className="stage">
-      <h2>{t('s4.title')}</h2>
-      <p className="stage-desc">
-        {t('s4.desc')}{' '}
-        <strong>{t('s4.progress', { a: doneCount, b: project.outline.length })}</strong>
-      </p>
-      <StyleIndicator project={project} styles={styles} cats={['script']} onClick={onProjectSettings} />
-      <DynamicsVisualizer plan={project.dynamicsPlan} />
-
-      <div className="scene-chips">
-        {project.outline.map((s, i) => (
-          <button
-            key={s.id}
-            className={`chip ${s.id === scene.id ? 'active' : ''} ${project.sceneDetails[s.id]?.shots?.length ? 'done' : ''}`}
-            onClick={() => setSceneId(s.id)}
-          >
-            {project.sceneDetails[s.id]?.shots?.length ? '✓ ' : ''}{i + 1}. {s.title || t('s4.untitled')}
-          </button>
-        ))}
+      <div className="stage-head-row">
+        <h2
+          className="stage-h2"
+          data-tip={`${t('s4.desc')} ${t('s4.progress', { a: doneCount, b: project.outline.length })}`}
+        >
+          {t('s4.title')}
+        </h2>
+        <DynamicsVisualizer plan={project.dynamicsPlan} />
       </div>
+
+      <SceneNav
+        outline={project.outline}
+        currentId={scene.id}
+        isDone={(s) => !!project.sceneDetails[s.id]?.shots?.length}
+        onSelect={setSceneId}
+      />
 
       <div className="context-box static">
         <strong>{t('s4.scene')} {project.outline.indexOf(scene) + 1}: {scene.title}</strong> ·{' '}
@@ -225,6 +223,7 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
             <div className="shot-head">
               <strong>{t('s4.shot', { n: i + 1 })}</strong>
               <span className="timecode">{fmt(start)} – {fmt(cursor)}</span>
+              <StyleChip project={project} styles={styles} cat="script" onClick={onProjectSettings} />
               <div className="scene-tools">
                 <span
                   className="drag-handle"

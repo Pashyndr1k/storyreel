@@ -3,20 +3,21 @@ import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage } from '../lib/gemini.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
 import { generateComfyVideo, generateComfyImage, generateComfyVoice, saveToLocalOutputs, VIDEO_RESOLUTIONS } from '../lib/comfy.js';
-import { stage5Prompt, stage5VideoPrompt, stage5AudioPrompt, stage5VoicePrompt, finalFramePrompt, tweakPromptSpec } from '../lib/prompts.js';
+import { stage5Prompt, stage5VideoPrompt, stage5VoicePrompt, finalFramePrompt, tweakPromptSpec } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
 import { aspectDescription } from '../lib/aspect.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
-import { StyleIndicator } from '../components/StyleControls.jsx';
+import { StyleChip } from '../components/StyleControls.jsx';
 import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
+import SceneNav from '../components/SceneNav.jsx';
 import { blockForScene, DYNAMICS_CONFIG } from '../lib/dynamics.js';
 import AssetsModal from '../components/AssetsModal.jsx';
 import LibraryPicker from '../components/LibraryPicker.jsx';
 import { newLibraryEntry } from '../lib/library.js';
 import { fileToResizedDataURL, resizeDataURL } from '../lib/images.js';
 import { extractPalette } from '../lib/palette.js';
-import { Download, RestoreIcon, MapPin, Upload, Layers, Grid, Trash, Wand } from '../components/icons.jsx';
+import { Download, RestoreIcon, MapPin, Upload, Layers, Grid, Trash, Wand, Zap } from '../components/icons.jsx';
 
 const readFileDataURL = (file) =>
   new Promise((resolve, reject) => {
@@ -357,26 +358,6 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         },
       },
     }));
-  };
-
-  // Audio prompts for the whole scene: character phrases verbatim with precise
-  // in-shot timing, for an external audio-generation model.
-  const applyAudio = (targetScene, data) =>
-    update((p) => {
-      const sceneShots = p.sceneDetails[targetScene.id]?.shots || [];
-      const next = { ...p.shotPrompts };
-      (data.prompts || []).forEach((pr) => {
-        const sh = sceneShots[(Number(pr.shot) || 1) - 1];
-        if (!sh) return;
-        next[sh.id] = { imagePrompt: '', videoPrompt: '', ...next[sh.id], audioPrompt: pr.audio_prompt || '' };
-      });
-      return { shotPrompts: next };
-    });
-
-  const generateAudio = () => {
-    const sceneArg = { ...scene, number: project.outline.indexOf(scene) + 1 };
-    const block = blockForScene(project.dynamicsPlan, sceneArg.number);
-    runMany([stage5AudioPrompt(project, sceneArg, shots, block)], (data) => applyAudio(scene, data));
   };
 
   // Generate the shot image via Gemini, attaching reference photos per the
@@ -843,27 +824,19 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   return (
     <section className="stage">
       <div className="stage-head-row">
-        <h2>{t('s5.title')}</h2>
-        <StyleIndicator project={project} styles={styles} cats={['image', 'video']} onClick={onProjectSettings} />
+        <h2 className="stage-h2" data-tip={t('s5.desc')}>{t('s5.title')}</h2>
+        <DynamicsVisualizer plan={project.dynamicsPlan} />
       </div>
-      <p className="stage-desc">{t('s5.desc')}</p>
-      <DynamicsVisualizer plan={project.dynamicsPlan} />
 
-      <div className="scene-chips">
-        {project.outline.map((s, i) => {
+      <SceneNav
+        outline={project.outline}
+        currentId={scene.id}
+        isDone={(s) => {
           const sShots = project.sceneDetails[s.id]?.shots || [];
-          const done = sShots.length > 0 && sShots.every((sh) => project.shotPrompts[sh.id]);
-          return (
-            <button
-              key={s.id}
-              className={`chip ${s.id === scene.id ? 'active' : ''} ${done ? 'done' : ''}`}
-              onClick={() => setSceneId(s.id)}
-            >
-              {done ? '✓ ' : ''}{i + 1}. {s.title || t('s4.untitled')}
-            </button>
-          );
-        })}
-      </div>
+          return sShots.length > 0 && sShots.every((sh) => project.shotPrompts[sh.id]);
+        }}
+        onSelect={setSceneId}
+      />
 
       <div className="row">
         {shots.length > 0 && (
@@ -872,16 +845,6 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           </button>
         )}
         <button className="btn" disabled={busy} onClick={processAll}>{t('batch.run5')}</button>
-        {shots.length > 0 && (
-          <button className="btn" disabled={busy || !!mediaProg || !!imgBusy} onClick={processSceneMedia}>
-            {t('s5.genMedia')}
-          </button>
-        )}
-        {shots.length > 0 && (
-          <button className="btn" disabled={busy} onClick={generateAudio}>
-            {t('s5.audioGen')}
-          </button>
-        )}
         {prog && <span className="total-badge">{t('batch.progress', { a: prog.a, b: prog.b })}</span>}
         {mediaProg && (
           <>
@@ -891,8 +854,26 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
             </button>
           </>
         )}
-        <button className="btn push-right" onClick={() => setShowAssets(true)}>
-          <Grid size={15} /> {t('asset.libBtn')}
+        {shots.length > 0 && (
+          <button
+            type="button"
+            className="icon-btn sq42 push-right"
+            title={t('s5.genMedia')}
+            aria-label={t('s5.genMedia')}
+            disabled={busy || !!mediaProg || !!imgBusy}
+            onClick={processSceneMedia}
+          >
+            <Zap size={18} />
+          </button>
+        )}
+        <button
+          type="button"
+          className={`icon-btn sq42 ${shots.length ? '' : 'push-right'}`}
+          title={t('asset.libBtn')}
+          aria-label={t('asset.libBtn')}
+          onClick={() => setShowAssets(true)}
+        >
+          <Grid size={18} />
         </button>
       </div>
       <ErrorNote error={error} onSettings={onSettings} />
@@ -940,7 +921,8 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     +
                   </button>
                 </span>
-                <span className="s5e-type">{shot.shotType || '—'}</span>
+                <StyleChip project={project} styles={styles} cat="image" onClick={onProjectSettings} />
+                <StyleChip project={project} styles={styles} cat="video" onClick={onProjectSettings} />
               </div>
               <p className="s5e-action">{shot.action}</p>
 
@@ -1145,6 +1127,24 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     </div>
                   )}
 
+                  {/* Image tweak: sits directly beneath the image frame, full width. */}
+                  <div className="voice-row refine-row">
+                    <input
+                      value={refineText[shot.id] || ''}
+                      placeholder={t('ver.refinePh')}
+                      disabled={!genImg}
+                      onChange={(e) => setRefineText((v) => ({ ...v, [shot.id]: e.target.value }))}
+                      onKeyDown={(e) => e.key === 'Enter' && refineImage(shot)}
+                    />
+                    <button
+                      className="btn small s5e-refine"
+                      disabled={!genImg || imgBusy === shot.id || !(refineText[shot.id] || '').trim()}
+                      onClick={() => refineImage(shot)}
+                    >
+                      {imgBusy === shot.id ? t('img.generating') : t('ver.refine')}
+                    </button>
+                  </div>
+
                   <div className="s5e-btnrow">
                     <button
                       className="btn small primary s5e-gen"
@@ -1192,23 +1192,6 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     )}
                     {(finalBusy || locBusy) && <span className="hint">{t('img.generating')}</span>}
                     {locSaved === shot.id && <span className="hint">{t('img.locSaved')}</span>}
-                  </div>
-
-                  <div className="voice-row refine-row">
-                    <input
-                      value={refineText[shot.id] || ''}
-                      placeholder={t('ver.refinePh')}
-                      disabled={!genImg}
-                      onChange={(e) => setRefineText((v) => ({ ...v, [shot.id]: e.target.value }))}
-                      onKeyDown={(e) => e.key === 'Enter' && refineImage(shot)}
-                    />
-                    <button
-                      className="btn small s5e-refine"
-                      disabled={!genImg || imgBusy === shot.id || !(refineText[shot.id] || '').trim()}
-                      onClick={() => refineImage(shot)}
-                    >
-                      {imgBusy === shot.id ? t('img.generating') : t('ver.refine')}
-                    </button>
                   </div>
 
                   <div className="s5e-grow" />

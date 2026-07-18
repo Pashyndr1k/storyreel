@@ -35,6 +35,18 @@ export function StylePicker({ project, update, styles }) {
   );
 }
 
+// Compact style chip for shot-card headers (stages 4/5): category + selected
+// style name in one standardized pill; clicking opens the project settings.
+export function StyleChip({ project, styles, cat, onClick }) {
+  const { t } = useI18n();
+  return (
+    <button type="button" className="style-chip" title={t('stind.open')} onClick={onClick}>
+      <span className="style-chip-cat">{t(`stind.${cat}`)}</span>
+      <span className="style-chip-name">{styleNameOf(styles, cat, project[ID_FIELD[cat]], t)}</span>
+    </button>
+  );
+}
+
 // Read-only chips showing the currently selected style(s); clicking opens the
 // project settings so the choice can be changed in place.
 export function StyleIndicator({ project, styles, cats, onClick }) {

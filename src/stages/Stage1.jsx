@@ -32,8 +32,7 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
 
   return (
     <section className="stage">
-      <h2>{t('s1.title')}</h2>
-      <p className="stage-desc">{t('s1.desc')}</p>
+      <h2 className="stage-h2" data-tip={t('s1.desc')}>{t('s1.title')}</h2>
 
       <label>{t('s1.loglineLabel')}</label>
       <div className="voice-row">

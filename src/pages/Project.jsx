@@ -183,7 +183,7 @@ export default function Project({ project, updateProject, settings, setSettings,
       {view === 5 && <Stage5 {...stageProps} />}
       {view === 6 && <Stage6 {...stageProps} />}
 
-      {staleFrom !== null && staleFrom < project.stage && (
+      {staleFrom !== null && staleFrom < project.stage && !settings.hideStaleToast && (
         <div className="stale-toast">
           <p>{t('stale.msg', { n: staleFrom })}</p>
           <div className="row">

@@ -35,6 +35,19 @@ export const Grid = (p) => (
   </S>
 );
 
+export const ChartLine = (p) => (
+  <S {...p}>
+    <path d="M3 3v16a2 2 0 0 0 2 2h16" />
+    <path d="m7 15 4-5 3.5 3L19 7" />
+  </S>
+);
+
+export const Zap = (p) => (
+  <S {...p}>
+    <path d="M13 2 4.6 12.6a1 1 0 0 0 .78 1.62H11l-1 7.8 8.4-10.6a1 1 0 0 0-.78-1.62H13l1-7.8z" />
+  </S>
+);
+
 export const Search = (p) => (
   <S {...p} sw={1.8}>
     <circle cx="11" cy="11" r="7" />

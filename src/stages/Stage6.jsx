@@ -868,9 +868,10 @@ export default function Stage6({ project, update, settings }) {
 
   return (
     <section className="stage">
-      <h2>{t('s6.title')}</h2>
-      <p className="stage-desc">{t('s6.desc')}</p>
-      <DynamicsVisualizer plan={project.dynamicsPlan} playhead={playing || elapsed > 0 ? elapsed : null} defaultOpen />
+      <div className="stage-head-row">
+        <h2 className="stage-h2" data-tip={t('s6.desc')}>{t('s6.title')}</h2>
+        <DynamicsVisualizer plan={project.dynamicsPlan} playhead={playing || elapsed > 0 ? elapsed : null} />
+      </div>
 
       <div className="asm-preview">
         {cur?.video && !videoEnded ? (
