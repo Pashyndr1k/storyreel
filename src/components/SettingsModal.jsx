@@ -18,6 +18,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
   const [storyboardService, setStoryboardService] = useState(settings.storyboardService || 'gemini');
   const [imageService, setImageService] = useState(settings.imageService || 'gemini');
   const [videoService, setVideoService] = useState(settings.videoService || 'comfy');
+  const [voiceService, setVoiceService] = useState(settings.voiceService || 'comfy');
   const [comfyUrl, setComfyUrl] = useState(settings.comfyUrl || 'http://127.0.0.1:8000');
   const [comfyOutputDir, setComfyOutputDir] = useState(settings.comfyOutputDir || 'D:\\Claude work\\ComfyUI\\Output');
   const [projectsDir, setProjectsDir] = useState(settings.projectsDir || 'D:\\Claude work\\StoryReel Projects');
@@ -50,6 +51,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
       storyboardService,
       imageService,
       videoService,
+      voiceService,
       comfyUrl: comfyUrl.trim() || 'http://127.0.0.1:8000',
       comfyOutputDir: comfyOutputDir.trim() || 'D:\\Claude work\\ComfyUI\\Output',
       projectsDir: projectsDir.trim() || 'D:\\Claude work\\StoryReel Projects',
@@ -230,6 +232,11 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
       <label>{t('set.videoService')}</label>
       <select value={videoService} onChange={(e) => setVideoService(e.target.value)}>
         <option value="comfy">{t('set.svcComfyVid')}</option>
+      </select>
+      <label>{t('set.voiceService')}</label>
+      <select value={voiceService} onChange={(e) => setVoiceService(e.target.value)}>
+        <option value="comfy">{t('set.svcOmniVoice')}</option>
+        <option value="gemini">{t('set.svcGeminiTts')}</option>
       </select>
     </>
   );

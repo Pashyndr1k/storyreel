@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
-import { generateImage } from '../lib/gemini.js';
+import { generateImage, generateGeminiVoice, GEMINI_VOICES } from '../lib/gemini.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
 import { generateComfyVideo, generateComfyImage, generateComfyVoice, saveToLocalOutputs, VIDEO_RESOLUTIONS, OMNI_VOICE_TAGS, OMNI_VOICE_SLOTS, OMNI_LANGUAGES, VOICE_LIBRARY } from '../lib/comfy.js';
-import { stage5Prompt, stage5VideoPrompt, stage5AudioPrompt, stage5VoicePrompt, finalFramePrompt, tweakPromptSpec } from '../lib/prompts.js';
+import { stage5Prompt, stage5VideoPrompt, stage5AudioPrompt, stage5VoicePrompt, stage5GeminiVoicePrompt, finalFramePrompt, tweakPromptSpec } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
 import { aspectDescription } from '../lib/aspect.js';
 import ErrorNote from '../components/ErrorNote.jsx';
@@ -233,6 +233,8 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   // Shot images route through the selected service: Gemini (default) or the
   // local ComfyUI Flux.2 Klein 9B workflow (max 2 reference images).
   const useComfyImg = settings.imageService === 'comfy';
+  // Shot voices: local OmniVoice (default) or the Gemini TTS cloud models.
+  const useGeminiVoice = settings.voiceService === 'gemini';
   const runImageGen = async ({ prompt, images, ratio, name }) => {
     if (useComfyImg) {
       const res = await generateComfyImage(settings, { prompt, images, aspectRatio: ratio, name });
@@ -823,13 +825,29 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const cur = projectRef.current;
     const sceneArg = { ...scene, number: cur.outline.indexOf(scene) + 1 };
     const blockArg = blockForScene(cur.dynamicsPlan, sceneArg.number);
+    const prev = cur.shotPrompts[shot.id]?.voiceParams || {};
+
+    if (useGeminiVoice) {
+      // Gemini TTS: one controllable prompt (director's notes + tagged
+      // transcript) and a cast of 1-2 prebuilt voices.
+      const data = await generateJSON(settings, stage5GeminiVoicePrompt(cur, sceneArg, shot, blockArg, genLang));
+      const text = String(data.tts_prompt || '').trim();
+      if (!text) throw new Error('The voice director returned no TTS prompt.');
+      const speakers = (Array.isArray(data.speakers) ? data.speakers : [])
+        .map((s) => ({ speaker: String(s.speaker || '').trim(), voiceName: String(s.voice || s.voiceName || '').trim() }))
+        .filter((s) => s.voiceName)
+        .slice(0, 2);
+      const params = { ...prev, speakers };
+      setPrompt(shot.id, { voicePrompt: text, voiceParams: params });
+      return { text, ...params };
+    }
+
     const data = await generateJSON(settings, stage5VoicePrompt(cur, sceneArg, shot, blockArg, genLang));
     const text = String(data.srt_text || '').trim();
     if (!text) throw new Error('The voice director returned no speakable text.');
     // Manually selected voice/design survive the automatic first-run draft
     // (keepInstruct); the explicit redraft button lets Claude re-cast them.
     // The language selection is the user's and is never overwritten.
-    const prev = cur.shotPrompts[shot.id]?.voiceParams || {};
     const manualInstruct = keepInstruct ? String(prev.instruct || '').trim() : '';
     const manualNarrator = keepInstruct ? String(prev.narrator || '').trim() : '';
     const params = {
@@ -858,28 +876,48 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const genVoice = async (shot, i) => {
     const cur = projectRef.current;
     const sp = cur.shotPrompts[shot.id] || {};
-    // Reuse the saved prompt only if it was drafted for OmniVoice (has an
-    // instruct); voice prompts from the old Chatterbox engine are redrafted.
-    let voice = (sp.voicePrompt || '').trim() && (sp.voiceParams?.instruct || '').trim()
+    // Reuse the saved prompt only if it was drafted for the CURRENT service
+    // (Gemini prompts carry a speakers cast, OmniVoice ones an instruct);
+    // prompts from another engine are redrafted.
+    const draftedForService = useGeminiVoice
+      ? (sp.voiceParams?.speakers || []).length > 0
+      : !!(sp.voiceParams?.instruct || '').trim();
+    let voice = (sp.voicePrompt || '').trim() && draftedForService
       ? { text: sp.voicePrompt.trim(), ...(sp.voiceParams || {}) }
       : null;
     if (!voice) {
       const keyErr = textKeyError(settings);
       if (keyErr) return setImgErr({ id: shot.id, msg: keyErr });
     }
+    if (useGeminiVoice && !settings.geminiKey) return setImgErr({ id: shot.id, msg: 'NO_GEMINI_KEY' });
     setImgBusy(`${shot.id}:aud`);
     setImgErr(null);
     try {
       if (!voice) voice = await draftVoicePrompt(shot, { keepInstruct: true });
-      const { dataURL, filename } = await generateComfyVoice(settings, {
-        srt: voice.text,
-        instruct: voice.instruct,
-        narrator: voice.narrator || '',
-        lang: genLang,
-        language: voice.language || '',
-        name: `${(cur.title || 'project').slice(0, 24)}_sc${cur.outline.indexOf(scene) + 1}_shot${i + 1}_voice`,
-      });
-      saveToLocalOutputs(settings, filename, dataURL); // best-effort local copy
+      const name = `${(cur.title || 'project').slice(0, 24)}_sc${cur.outline.indexOf(scene) + 1}_shot${i + 1}_voice`;
+      let dataURL;
+      if (useGeminiVoice) {
+        // A manually selected voice overrides the (dominant) first speaker.
+        let speakers = (voice.speakers || []).slice(0, 2);
+        if (voice.geminiVoice) {
+          speakers = speakers.length
+            ? [{ ...speakers[0], voiceName: voice.geminiVoice }, ...speakers.slice(1)]
+            : [{ speaker: 'Narrator', voiceName: voice.geminiVoice }];
+        }
+        dataURL = await generateGeminiVoice(settings, { prompt: voice.text, speakers });
+        saveToLocalOutputs(settings, `${name}.wav`, dataURL); // best-effort local copy
+      } else {
+        const res = await generateComfyVoice(settings, {
+          srt: voice.text,
+          instruct: voice.instruct,
+          narrator: voice.narrator || '',
+          lang: genLang,
+          language: voice.language || '',
+          name,
+        });
+        dataURL = res.dataURL;
+        saveToLocalOutputs(settings, res.filename, dataURL); // best-effort local copy
+      }
       update((p) => ({ shotAudios: { ...(p.shotAudios || {}), [shot.id]: dataURL } }));
     } catch (e) {
       setImgErr({ id: shot.id, msg: e.message === 'COMFY_UNREACHABLE' ? 'COMFY_UNREACHABLE' : e.message || String(e) });
@@ -1488,9 +1526,47 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       </>
                     )}
 
-                    {/* Manual voice character (OmniVoice design tags) and voice
-                        language. Set before generating or adjust afterwards;
-                        the auto-draft never overrides a manual choice. */}
+                    {/* Manual voice character and voice language. Set before
+                        generating or adjust afterwards; the auto-draft never
+                        overrides a manual choice. Gemini TTS shows its own
+                        prebuilt-voice menu (language is auto-detected from
+                        the transcript); OmniVoice shows the cloned-voice
+                        library plus the design tags. */}
+                    {useGeminiVoice ? (
+                      <div>
+                        <div className="s5e-eyebrow">{t('aud.voiceDesign')}</div>
+                        <div className="s5e-voicegrid">
+                          <div className="s5e-vsel">
+                            <label>{t('aud.vs_voice')}</label>
+                            <select
+                              value={p.voiceParams?.geminiVoice || ''}
+                              onChange={(e) =>
+                                setPrompt(shot.id, {
+                                  voiceParams: { ...(p.voiceParams || {}), geminiVoice: e.target.value },
+                                })
+                              }
+                            >
+                              <option value="">{t('aud.vs_autoCast')}</option>
+                              {GEMINI_VOICES.map((v) => (
+                                <option key={v.name} value={v.name}>
+                                  {v.name} — {v.gender}, {v.style}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          {(p.voiceParams?.speakers || []).length > 0 && (
+                            <div className="s5e-vsel s5e-cast">
+                              <label>{t('aud.castLabel')}</label>
+                              <span className="s5e-castnames">
+                                {(p.voiceParams.speakers || [])
+                                  .map((s) => `${s.speaker || '—'}: ${s.voiceName}`)
+                                  .join(' · ')}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
                     <div>
                       <div className="s5e-eyebrow">{t('aud.voiceDesign')}</div>
                       <div className="s5e-voicegrid">
@@ -1553,6 +1629,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         </div>
                       </div>
                     </div>
+                    )}
                     <div className="s5e-btnrow">
                       <button
                         className="btn small primary s5e-gen"

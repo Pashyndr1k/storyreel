@@ -500,6 +500,63 @@ JSON schema:
   };
 }
 
+// Stage 5 voice generation, Gemini TTS variant: Claude writes ONE controllable
+// TTS prompt following Google's official prompting guide — an Audio Profile /
+// Scene / Director's Notes header (layered style adjectives, a specific
+// regional accent when it fits, explicit pacing) followed by the transcript
+// with inline English audio tags — and CASTS 1-2 prebuilt Gemini voices.
+// Keep the voice menu in sync with GEMINI_VOICES in gemini.js.
+const GEMINI_VOICE_MENU = `Prebuilt Gemini voices (name — gender, documented style):
+Zephyr — female, bright · Puck — male, upbeat · Charon — male, informative · Kore — female, firm · Fenrir — male, excitable · Leda — female, youthful · Orus — male, firm · Aoede — female, breezy · Callirrhoe — female, easy-going · Autonoe — female, bright · Enceladus — male, breathy · Iapetus — male, clear · Umbriel — male, easy-going · Algieba — male, smooth · Despina — female, smooth · Erinome — female, clear · Algenib — male, gravelly · Rasalgethi — male, informative · Laomedeia — female, upbeat · Achernar — female, soft · Alnilam — male, firm · Schedar — male, even · Gacrux — female, mature · Pulcherrima — female, forward · Achird — male, friendly · Zubenelgenubi — male, casual · Vindemiatrix — female, gentle · Sadachbia — male, lively · Sadaltager — male, knowledgeable · Sulafat — female, warm`;
+
+export function stage5GeminiVoicePrompt(project, scene, shot, block, lang) {
+  const chars = (project.storyline?.characters || [])
+    .map((c) => `${c.name}${c.role ? ` (${c.role})` : ''}: ${c.description || ''}`)
+    .join('\n');
+  const shots = project.sceneDetails[scene.id]?.shots || [];
+  const idx = shots.findIndex((s) => s.id === shot.id);
+  const neighbor = (s) => (s ? `action: ${s.action}${s.dialogue ? ` | dialogue: ${s.dialogue}` : ''}` : '—');
+  const dynNote = block
+    ? `\nAction Dynamics block (FALLBACK emotion source when the scene context is ambiguous): kinetic energy ${block.kinetic_energy_level}/10, dialogue volume ${block.dialogue_volume}/10, camera momentum "${block.required_camera_momentum.replace(/_/g, ' ')}". High energy → brisk delivery; low energy → restraint, unhurried pauses.`
+    : '';
+  return {
+    system: `You are a film voice director preparing the input for Gemini TTS (a controllable text-to-speech model). Your output drives a real TTS engine: the transcript WILL BE SPOKEN ALOUD exactly as written, and the model follows your directorial framing.
+
+"speakers" — CAST 1 or 2 voices (never more) for the characters who speak:
+${GEMINI_VOICE_MENU}
+Match each speaking character's gender, age and personality to a voice's gender and style. CONSISTENCY IS CRITICAL: the same character must get the SAME voice in every shot of the film — derive the choice from the character, never from the shot. "speaker" is the character's name in Latin letters.
+
+"tts_prompt" — ONE coherent prompt, structured per the Gemini TTS prompting guide:
+1. A short header before the transcript, in English:
+   - Audio Profile: who is speaking — name, role, archetype (one line per speaker).
+   - Scene: the physical space and emotional atmosphere in one or two lines.
+   - Director's Notes: layered, DESCRIPTIVE style direction (e.g. "quiet steel under exhaustion, a vocal smile breaking through" — richer adjectives beat generic ones); a SPECIFIC regional accent only when the character or setting truly calls for it; explicit pacing that must fit the whole performance inside about the shot's duration (budget the words — roughly 2.5 words per second, plus the pauses you direct).
+2. Then "Transcript:" followed by the speech:
+   - Every spoken line VERBATIM from the script's dialogue, in its ORIGINAL language — never translate, shorten or paraphrase.
+   - With TWO speakers, format each turn as "Name: line" using exactly the names from "speakers".
+   - Shape delivery with inline audio tags in square brackets — ALWAYS IN ENGLISH regardless of the transcript language: emotions ([amazed], [tired], [sarcastic], [determined]…), non-verbal sounds ([sighs], [gasp], [laughs], [cough]…), intensity ([whispers], [shouting]), tempo ([very fast], [very slow]), and pauses ([short pause], [long pause]) placed where the scene's rhythm breathes.
+   - Use tags purposefully (a few well-placed tags, not on every word), and keep punctuation doing the intonation work: ellipses for hesitation, exclamation for energy, question marks for the natural rise.
+3. Keep the WHOLE prompt coherent: who speaks, what is said and how it is directed must agree with the scene's emotion. Emotions come from the SCENE CONTEXT first; the dynamics block is the fallback.
+
+Respond with VALID JSON ONLY. No markdown, no commentary.`,
+    maxTokens: 2000,
+    user: `Characters:
+${chars || '—'}
+
+Scene ${scene.number}: "${scene.title}" — ${scene.summary}${dynNote}
+
+Previous shot: ${neighbor(shots[idx - 1])}
+THIS SHOT (duration ${shot.duration}s): action: ${shot.action}
+Dialogue to speak (verbatim source): ${shot.dialogue}
+Next shot: ${neighbor(shots[idx + 1])}
+
+Write the Gemini TTS input for THIS shot's dialogue. The performance must fit ~${shot.duration} seconds.
+
+JSON schema:
+{"tts_prompt":"Audio Profile: …\\nScene: …\\nDirector's Notes: …\\nTranscript:\\n[tag] Line…","speakers":[{"speaker":"Anna","voice":"Kore"}]}`,
+  };
+}
+
 // FLF (first→last frame): looks at the shot's generated FIRST frame plus the
 // shot's plot description and writes an image-EDIT prompt that turns that frame
 // into the shot's FINAL frame (the end state of the action). Also reports which

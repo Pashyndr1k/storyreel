@@ -290,6 +290,159 @@ export async function groomText(settings, text, _retried) {
     .trim();
 }
 
+// ---- Speech generation (Gemini TTS) ----------------------------------------
+// Native TTS models return raw 16-bit mono PCM at 24 kHz inside inlineData;
+// the preview ids churn, so a 404 falls through the known model list.
+export const GEMINI_TTS_MODELS = [
+  'gemini-3.1-flash-tts-preview',
+  'gemini-2.5-flash-preview-tts',
+  'gemini-2.5-pro-preview-tts',
+];
+
+// The 30 prebuilt Gemini voices with their documented style (and the gender
+// shown for each voice in Google AI Studio) — the casting menu for the voice
+// director and the manual selector in the audio tab.
+export const GEMINI_VOICES = [
+  { name: 'Zephyr', gender: 'female', style: 'bright' },
+  { name: 'Puck', gender: 'male', style: 'upbeat' },
+  { name: 'Charon', gender: 'male', style: 'informative' },
+  { name: 'Kore', gender: 'female', style: 'firm' },
+  { name: 'Fenrir', gender: 'male', style: 'excitable' },
+  { name: 'Leda', gender: 'female', style: 'youthful' },
+  { name: 'Orus', gender: 'male', style: 'firm' },
+  { name: 'Aoede', gender: 'female', style: 'breezy' },
+  { name: 'Callirrhoe', gender: 'female', style: 'easy-going' },
+  { name: 'Autonoe', gender: 'female', style: 'bright' },
+  { name: 'Enceladus', gender: 'male', style: 'breathy' },
+  { name: 'Iapetus', gender: 'male', style: 'clear' },
+  { name: 'Umbriel', gender: 'male', style: 'easy-going' },
+  { name: 'Algieba', gender: 'male', style: 'smooth' },
+  { name: 'Despina', gender: 'female', style: 'smooth' },
+  { name: 'Erinome', gender: 'female', style: 'clear' },
+  { name: 'Algenib', gender: 'male', style: 'gravelly' },
+  { name: 'Rasalgethi', gender: 'male', style: 'informative' },
+  { name: 'Laomedeia', gender: 'female', style: 'upbeat' },
+  { name: 'Achernar', gender: 'female', style: 'soft' },
+  { name: 'Alnilam', gender: 'male', style: 'firm' },
+  { name: 'Schedar', gender: 'male', style: 'even' },
+  { name: 'Gacrux', gender: 'female', style: 'mature' },
+  { name: 'Pulcherrima', gender: 'female', style: 'forward' },
+  { name: 'Achird', gender: 'male', style: 'friendly' },
+  { name: 'Zubenelgenubi', gender: 'male', style: 'casual' },
+  { name: 'Vindemiatrix', gender: 'female', style: 'gentle' },
+  { name: 'Sadachbia', gender: 'male', style: 'lively' },
+  { name: 'Sadaltager', gender: 'male', style: 'knowledgeable' },
+  { name: 'Sulafat', gender: 'female', style: 'warm' },
+];
+const GEMINI_VOICE_NAMES = new Set(GEMINI_VOICES.map((v) => v.name));
+
+// Wrap raw PCM (base64) in a WAV header so <audio>, ffmpeg and ComfyUI can
+// all read it. Rate/channels come from the part's mimeType when present
+// (e.g. "audio/L16;codec=pcm;rate=24000").
+function pcmToWavDataURL(base64, mime) {
+  const rate = Number(mime?.match(/rate=(\d+)/)?.[1]) || 24000;
+  const channels = 1;
+  const bytes = atob(base64);
+  const dataLen = bytes.length;
+  const header = new ArrayBuffer(44);
+  const dv = new DataView(header);
+  const wstr = (off, s) => {
+    for (let i = 0; i < s.length; i++) dv.setUint8(off + i, s.charCodeAt(i));
+  };
+  wstr(0, 'RIFF');
+  dv.setUint32(4, 36 + dataLen, true);
+  wstr(8, 'WAVE');
+  wstr(12, 'fmt ');
+  dv.setUint32(16, 16, true);
+  dv.setUint16(20, 1, true); // PCM
+  dv.setUint16(22, channels, true);
+  dv.setUint32(24, rate, true);
+  dv.setUint32(28, rate * channels * 2, true);
+  dv.setUint16(32, channels * 2, true);
+  dv.setUint16(34, 16, true);
+  wstr(36, 'data');
+  dv.setUint32(40, dataLen, true);
+  let bin = '';
+  const hb = new Uint8Array(header);
+  for (let i = 0; i < hb.length; i++) bin += String.fromCharCode(hb[i]);
+  return `data:audio/wav;base64,${btoa(bin + bytes)}`;
+}
+
+// Speak `prompt` (style direction + transcript, per the Gemini TTS prompting
+// guide) with 1-2 speakers: [{ speaker, voiceName }]. A single entry uses the
+// plain voiceConfig; two entries use multiSpeakerVoiceConfig and the prompt's
+// "Name: line" turns. Returns a WAV data URL.
+export async function generateGeminiVoice(settings, { prompt, speakers }, _modelIdx = 0) {
+  const key = settings.geminiKey;
+  if (!key) throw new Error('NO_GEMINI_KEY');
+  const wanted = (settings.geminiTtsModel || '').trim();
+  const model = _modelIdx === 0 && wanted ? wanted : GEMINI_TTS_MODELS[Math.min(_modelIdx, GEMINI_TTS_MODELS.length - 1)];
+
+  const cast = (Array.isArray(speakers) ? speakers : [])
+    .map((s) => ({
+      speaker: String(s.speaker || '').trim(),
+      voiceName: GEMINI_VOICE_NAMES.has(s.voiceName) ? s.voiceName : 'Kore',
+    }))
+    .slice(0, 2);
+  if (!cast.length) cast.push({ speaker: 'Narrator', voiceName: 'Kore' });
+
+  const speechConfig =
+    cast.length === 2
+      ? {
+          multiSpeakerVoiceConfig: {
+            speakerVoiceConfigs: cast.map((s) => ({
+              speaker: s.speaker,
+              voiceConfig: { prebuiltVoiceConfig: { voiceName: s.voiceName } },
+            })),
+          },
+        }
+      : { voiceConfig: { prebuiltVoiceConfig: { voiceName: cast[0].voiceName } } };
+
+  try {
+    return await withRetry(async () => {
+      const res = await fetch(`${ENDPOINT}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { responseModalities: ['AUDIO'], speechConfig },
+        }),
+      });
+      if (!res.ok) {
+        let detail = `HTTP ${res.status}`;
+        try {
+          const err = await res.json();
+          detail = err?.error?.message || detail;
+        } catch {
+          /* keep status */
+        }
+        const err = new Error(detail);
+        err.status = res.status;
+        throw err;
+      }
+      const data = await res.json();
+      for (const p of data?.candidates?.[0]?.content?.parts || []) {
+        const inline = p.inlineData || p.inline_data;
+        if (inline?.data) {
+          const mime = inline.mimeType || inline.mime_type || '';
+          if (/wav|mpeg|mp3|ogg/.test(mime)) return `data:${mime};base64,${inline.data}`;
+          return pcmToWavDataURL(inline.data, mime);
+        }
+      }
+      const block = data?.promptFeedback?.blockReason;
+      throw new Error(block ? `Request was blocked by Gemini (${block}).` : 'Gemini returned no audio.');
+    });
+  } catch (e) {
+    // Preview ids churn / plan gaps: fall through the known TTS model list.
+    const gone = e.status === 404 || /not found|not supported/i.test(String(e.message));
+    const planBlocked = e.status === 429 && /\blimit:\s*0\b/i.test(String(e.message));
+    if ((gone || planBlocked) && _modelIdx < GEMINI_TTS_MODELS.length - 1) {
+      return generateGeminiVoice(settings, { prompt, speakers }, _modelIdx + 1);
+    }
+    throw e;
+  }
+}
+
 // ---- Text generation (optional alternative to Claude) ----------------------
 // Discovered from the key's model list, preferring the strongest text models.
 const TEXTGEN_PREFERENCES = [

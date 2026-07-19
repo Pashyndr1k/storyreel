@@ -264,7 +264,10 @@ export async function generateComfyVideo(
     // the audio sync), so assembly plays it as-is.
     graph = clone(si2vTemplate);
     graph['269'].inputs.image = await uploadInput(settings, firstFrame, `storyreel_${stamp}_first.png`);
-    graph['276'].inputs.audio = await uploadInput(settings, audio, `storyreel_${stamp}_voice.mp3`);
+    // Voice audio arrives as mp3 (OmniVoice) or wav (Gemini TTS) — name the
+    // upload by its actual container so ComfyUI decodes it correctly.
+    const audExt = /^data:audio\/wav/i.test(audio) ? 'wav' : 'mp3';
+    graph['276'].inputs.audio = await uploadInput(settings, audio, `storyreel_${stamp}_voice.${audExt}`);
     graph['340:319'].inputs.value = prompt;
     graph['340:331'].inputs.value = Math.max(2, Math.min(12, durationSec || 4));
     graph['340:330'].inputs.value = w;
