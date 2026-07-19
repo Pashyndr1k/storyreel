@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage } from '../lib/gemini.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
-import { generateComfyVideo, generateComfyImage, generateComfyVoice, saveToLocalOutputs, VIDEO_RESOLUTIONS, OMNI_VOICE_TAGS, OMNI_VOICE_SLOTS, OMNI_LANGUAGES } from '../lib/comfy.js';
+import { generateComfyVideo, generateComfyImage, generateComfyVoice, saveToLocalOutputs, VIDEO_RESOLUTIONS, OMNI_VOICE_TAGS, OMNI_VOICE_SLOTS, OMNI_LANGUAGES, VOICE_LIBRARY } from '../lib/comfy.js';
 import { stage5Prompt, stage5VideoPrompt, stage5AudioPrompt, stage5VoicePrompt, finalFramePrompt, tweakPromptSpec } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
 import { aspectDescription } from '../lib/aspect.js';
@@ -798,12 +798,17 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const data = await generateJSON(settings, stage5VoicePrompt(cur, sceneArg, shot, blockArg, genLang));
     const text = String(data.srt_text || '').trim();
     if (!text) throw new Error('The voice director returned no speakable text.');
-    // A manually selected voice design survives the automatic first-run draft
-    // (keepInstruct); the explicit redraft button lets Claude re-pick it. The
-    // language selection is the user's and is never overwritten.
+    // Manually selected voice/design survive the automatic first-run draft
+    // (keepInstruct); the explicit redraft button lets Claude re-cast them.
+    // The language selection is the user's and is never overwritten.
     const prev = cur.shotPrompts[shot.id]?.voiceParams || {};
-    const manual = keepInstruct ? String(prev.instruct || '').trim() : '';
-    const params = { ...prev, instruct: manual || String(data.voice_instruct || '').trim() };
+    const manualInstruct = keepInstruct ? String(prev.instruct || '').trim() : '';
+    const manualNarrator = keepInstruct ? String(prev.narrator || '').trim() : '';
+    const params = {
+      ...prev,
+      instruct: manualInstruct || String(data.voice_instruct || '').trim(),
+      narrator: manualNarrator || String(data.narrator_voice || '').trim(),
+    };
     setPrompt(shot.id, { voicePrompt: text, voiceParams: params });
     return { text, ...params };
   };
@@ -841,6 +846,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       const { dataURL, filename } = await generateComfyVoice(settings, {
         srt: voice.text,
         instruct: voice.instruct,
+        narrator: voice.narrator || '',
         lang: genLang,
         language: voice.language || '',
         name: `${(cur.title || 'project').slice(0, 24)}_sc${cur.outline.indexOf(scene) + 1}_shot${i + 1}_voice`,
@@ -1460,6 +1466,25 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     <div>
                       <div className="s5e-eyebrow">{t('aud.voiceDesign')}</div>
                       <div className="s5e-voicegrid">
+                        {/* Cloned voice from the real library — the most stable
+                            character voice; the design tags then act as light
+                            guidance. "Designed" builds the voice from tags only. */}
+                        <div className="s5e-vsel">
+                          <label>{t('aud.vs_voice')}</label>
+                          <select
+                            value={p.voiceParams?.narrator || ''}
+                            onChange={(e) =>
+                              setPrompt(shot.id, {
+                                voiceParams: { ...(p.voiceParams || {}), narrator: e.target.value },
+                              })
+                            }
+                          >
+                            <option value="">{t('aud.vs_designed')}</option>
+                            {VOICE_LIBRARY.map((v) => (
+                              <option key={v.file} value={v.file}>{v.label}</option>
+                            ))}
+                          </select>
+                        </div>
                         {OMNI_VOICE_SLOTS.map((slot) => {
                           const tags = parseInstruct(p.voiceParams?.instruct);
                           return (

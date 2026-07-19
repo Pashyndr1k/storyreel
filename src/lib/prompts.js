@@ -434,6 +434,20 @@ Example: "female, young adult, moderate pitch, british accent"`;
 
 const OMNIVOICE_NONVERBAL = `Non-verbal tags allowed INLINE in the subtitle text (angle brackets, exactly these): <laughter> <sigh> <confirmation-en> <question-en> <question-ah> <question-oh> <question-ei> <question-yi> <surprise-ah> <surprise-oh> <surprise-wa> <surprise-yo> <dissatisfaction-hnn>. Use at most one or two, and only where the emotion truly calls for it.`;
 
+// Real cloned-voice library (voices_examples with reference transcripts):
+// cloning one of these gives a far more stable, natural character voice than
+// tag design alone. Keep tag/file strings in sync with VOICE_LIBRARY in
+// comfy.js.
+const OMNIVOICE_LIBRARY_MENU = `Voice LIBRARY (real voices the engine can CLONE — preferred over pure design):
+- file "voices_examples/Clint_Eastwood CC3 (enhanced2).wav", tag [Clint_Eastwood CC3 (enhanced2)] — elderly male, dry, gravelly, weathered
+- file "voices_examples/David_Attenborough CC3.wav", tag [David_Attenborough CC3] — elderly male, refined, gentle, documentary narrator
+- file "voices_examples/Morgan_Freeman CC3.wav", tag [Morgan_Freeman CC3] — mature male, deep, warm, calm authority
+- file "voices_examples/Sophie_Anderson CC3.wav", tag [Sophie_Anderson CC3] — adult female, warm, expressive
+- file "voices_examples/female/female_01.wav", tag [female_01] — adult female, neutral, clear
+- file "voices_examples/female/female_02.wav", tag [female_02] — young female, bright, energetic
+- file "voices_examples/male/male_01.wav", tag [male_01] — adult male, neutral, even
+- file "voices_examples/male/male_02.wav", tag [male_02] — adult male, deeper, firm`;
+
 export function stage5VoicePrompt(project, scene, shot, block, lang) {
   const chars = (project.storyline?.characters || [])
     .map((c) => `${c.name}${c.role ? ` (${c.role})` : ''}: ${c.description || ''}`)
@@ -447,9 +461,14 @@ export function stage5VoicePrompt(project, scene, shot, block, lang) {
   return {
     system: `You are a film voice director preparing the input for OmniVoice TTS (TTS Audio Suite running in ComfyUI). Your output drives a real text-to-speech engine: every word in the SRT text WILL BE SPOKEN ALOUD, and every timestamp WILL BE HIT — the engine natively targets each subtitle's duration.
 
-"voice_instruct" — design the voice to MATCH THE SPEAKING CHARACTER:
+"narrator_voice" — CAST the speaking character from the voice library:
+${OMNIVOICE_LIBRARY_MENU}
+Pick the library voice whose gender, age and character best match the SPEAKING character's description and personality. CONSISTENCY IS CRITICAL: the same character must get the SAME library voice in every shot of the film — derive the choice from the character, never from the shot. Use "none" only when no library voice fits at all (then the design tags below fully define the voice).
+If SEVERAL characters speak in the shot: set "narrator_voice" to the dominant speaker's voice, and prefix each SRT block spoken by ANOTHER character with that character's voice tag from the menu (e.g. "[male_01] Line…") — tagged blocks switch to that cloned voice, untagged blocks use the narrator.
+
+"voice_instruct" — design tags that refine the voice (with a cloned narrator they act as light guidance; with "none" they fully define the voice):
 ${OMNIVOICE_DESIGN_MENU}
-Derive gender and age from the character's description; derive pitch and style from their personality and the scene's emotional state (e.g. a hardened commander → low pitch; a frightened child → high pitch; an intimate or secretive moment → add "whisper"). If several characters speak in the shot, design for the DOMINANT speaker.
+Derive gender and age from the character's description; derive pitch and style from their personality and the scene's emotional state (e.g. a hardened commander → low pitch; a frightened child → high pitch; an intimate or secretive moment → add "whisper").
 
 "srt_text" — the speech, as VALID SRT:
 - Numbered blocks: index line, then "HH:MM:SS,mmm --> HH:MM:SS,mmm", then the text line(s), separated by blank lines.
@@ -458,7 +477,7 @@ Derive gender and age from the character's description; derive pitch and style f
 - Silence between blocks IS the pause — shape the rhythm with the gaps, do not write pause markers.
 - Include ONLY words the characters actually speak, verbatim from the script's dialogue, in its original language — never scene descriptions or stage directions.
 - ${OMNIVOICE_NONVERBAL}
-- Do NOT use square brackets [] anywhere in the text — no [Character] tags, no [pause] markers; the voice identity comes from "voice_instruct".
+- Square brackets [] are RESERVED for the library voice tags shown above — use them ONLY as a block's leading speaker tag in multi-speaker shots, with the exact tag strings from the menu. Never invent other bracketed tags (no [CharacterName], no [pause] markers).
 - Shape intonation with punctuation: ellipses … for hesitation, exclamation marks for energy, commas for breath, question marks for the natural rise.
 
 Respond with VALID JSON ONLY. No markdown, no commentary.`,
@@ -476,7 +495,7 @@ Next shot: ${neighbor(shots[idx + 1])}
 Write the OmniVoice input for THIS shot's dialogue. All SRT timestamps must stay inside 0–${shot.duration} seconds, timed to the action's beats.
 
 JSON schema:
-{"srt_text":"1\\n00:00:00,400 --> 00:00:02,600\\nLine…\\n\\n2\\n…","voice_instruct":"female, young adult, moderate pitch"}`,
+{"srt_text":"1\\n00:00:00,400 --> 00:00:02,600\\nLine…\\n\\n2\\n…","narrator_voice":"voices_examples/female/female_01.wav","voice_instruct":"female, young adult, moderate pitch"}`,
   };
 }
 
