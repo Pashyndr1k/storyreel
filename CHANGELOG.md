@@ -1,56 +1,100 @@
 # Changelog
 
-## 1.16.1 — 2026-07-18
+## 1.17.0 — 2026-07-19
 
-- Stage 5 shots are now one compact frame each: a header with the shot
-  number, duration stepper, shot type and action, and below it three
-  tabs — Image, Video, Audio — each holding the same split layout as
-  before (prompt and its tools left, playback and generation tools
-  right, divided by the vertical line). The audio tab appears only for
-  shots with character dialogue; a green dot marks tabs whose media is
-  already generated, and errors surface above the tabs so they're
-  visible from any tab.
-- Stage 6 audio became a full multi-layer timeline: layers with
-  enable/disable, volume and rename; clips can be uploaded in bulk
-  (placed at the playhead), dragged, trimmed from either edge and given
-  fade-in/out; everything plays live in the preview (music is now
-  audible outside the render) and mixes identically into the FFmpeg
-  render. Existing music/voice uploads migrate automatically.
-- "Tweak this" under the image and video prompts: type a plain-language
-  adjustment and Claude rewrites the technical prompt in place.
-- The video resolution selector moved into each shot's video controls.
-
-## 1.16.0 — 2026-07-17
+Voice and dialogue
 
 - Voice generation for shots (Stage 5): a "Generate sound" button in the
-  audio section (shown only when the shot's description contains character
-  lines) speaks the dialogue on the local ComfyUI Chatterbox TTS workflow.
-  A voice-director step first drafts the Chatterbox input — [Character]
-  speaker tags, [pause:…] conversational beats, punctuation-driven
-  intonation, exaggeration/pacing/temperature parameters and a narrator
-  voice matched to the dominant speaker's gender and personality — from the
-  scene context, with the Action Dynamics block as the emotional fallback,
-  and budgets speech + pauses to the shot's duration. The drafted voice
-  text is editable and re-usable; audio gets an inline player, download,
-  regenerate, a local-outputs copy, and travels with project folders,
-  ZIP exports and backups.
+  audio tab (shown only for shots whose description contains character
+  lines) speaks the dialogue. It runs on the local ComfyUI OmniVoice TTS
+  workflow by default, or on the Gemini TTS cloud models — selectable in
+  Settings → Model selection → Voice generation.
+- A voice-director step drafts the input from the scene context (with the
+  Action Dynamics block as the emotional fallback) and budgets the
+  performance to the shot's duration. On OmniVoice it writes SRT blocks
+  whose timestamps the engine hits natively, so each line lands on its
+  beat; on Gemini TTS it writes a directed prompt (audio profile, scene,
+  director's notes) with inline expression tags. The drafted text stays
+  editable and re-usable.
+- Character voices: OmniVoice casts from the real voice library (the
+  reference-transcript voices in voices_examples) and clones them, so a
+  character keeps the same voice across the whole film; multi-speaker
+  shots switch voices per line. Gemini TTS casts from its 30 prebuilt
+  voices, with up to two speakers per shot. Both can be overridden by
+  hand in the audio tab, alongside voice-design tags (gender, age, pitch,
+  whisper, accent) and a voice language selector.
+- A shot's dialogue is now always carried into its audio prompt verbatim,
+  even if the model omits it.
+- Audio gets an inline player, download, regenerate and a local-outputs
+  copy, and travels with project folders, ZIP exports and backups.
+
+Video generation
+
+- Dialogue shots render as talking video: with a generated voice, the
+  shot goes through the LTX-2 sound+image-to-video workflow, which reads
+  emotion, lip sync and pacing from the audio and first frame. These
+  shots render at the exact shot duration so speech never gets trimmed,
+  and their prompts stay deliberately brief. Silent shots keep the
+  existing image-to-video / first-and-final-frame paths.
+- SD/HD/FHD video resolution selector, carried through to the final
+  render.
+
+Stage 5
+
+- Each shot is one compact frame: a header (shot number, duration
+  stepper, image and video style chips, action) above three tabs —
+  Image, Video, Audio — each holding the prompt and its tools on the
+  left and playback with generation controls on the right. The audio tab
+  appears only for shots with dialogue; a dot marks tabs whose media
+  exists, and errors surface above the tabs.
+- "Tweak" under the image and video prompts: type a plain-language
+  adjustment and Claude rewrites the technical prompt in place.
+- "Regenerate prompts for this scene" now also regenerates audio prompts.
+- Generating scene media asks for confirmation first, stating how many
+  images and videos it will produce.
+- Generated videos open in a large pop-up, matching the image preview.
+- Image prompts now require the scene to fill the frame edge to edge —
+  no black bars or empty margins.
+- Up to 6 environment references with multi-file upload; environment
+  references moved fully to Stage 5.
+
+Stage 6
+
+- Audio is a full multi-layer timeline: layers with enable/disable,
+  volume and rename; clips uploaded in bulk (placed at the playhead),
+  dragged, trimmed from either edge and given fade-in/out. Everything
+  plays live in the preview and mixes identically into the render.
+  Existing music/voice uploads migrate automatically.
+- Individual shots can be muted, in both the preview and the render.
+- The timeline gained compact track heads (V1, A1, A2 …) with per-track
+  options in a menu, and the video and audio strips now start at exactly
+  the same point.
+- Fixed shots that appeared frozen during preview, and a final shot that
+  rendered as the previous shot's last frame: clips shorter than their
+  slot now hold their own last frame in both preview and render.
+
+Project, settings and navigation
+
 - Project saving rework: every project mirrors continuously into its own
-  folder (project.md with all data except media + images/videos/audio as
-  standard files); export bundles the project into a single ZIP with a
-  destination prompt; import accepts those ZIPs.
-- Smart Edit: a Stop button interrupts the request mid-flight, an elapsed
-  timer shows progress, and the request itself was confirmed media-free.
-- Stage 5: SD/HD/FHD video resolution selector (carried through to the
-  final render); up to 6 environment references with multi-file upload;
-  environment references moved fully to Stage 5.
+  folder (project.md with all data except media, plus images, videos and
+  audio as standard files); export bundles a project into a single ZIP
+  with a destination prompt, and import accepts those ZIPs.
+- Smart Edit: a Stop button interrupts the request mid-flight and an
+  elapsed timer shows progress.
 - Styles: export/import all three style types in one file.
-- Color scheme switching moved to the top bar as a three-state cycling
-  button (moon/half/sun); Settings reorganized into Backups / API setup /
-  Model selection tabs that auto-size to the tallest tab.
+- Color scheme moved to the top bar as a three-state cycling button;
+  Settings reorganized into Backups / API setup / Model selection /
+  Interface tabs that auto-size to the tallest tab. The reminder about
+  changes affecting later stages can now be switched off.
+- Scene navigation on Stages 4 and 5 redesigned as wrapping rectangular
+  buttons matching the stage bar; the Action Dynamics plan moved into a
+  pop-up behind a chart button, and stage descriptions became tooltips
+  on the stage header.
 - Stage 4 storyboard preview: action-only caption at 20px beside the
   frame, Pause and Stop controls, and a "no text in frames" restriction
   in the storyboard prompt.
-- Theme-aware violet scrollbars everywhere.
+- Theme-aware violet scrollbars everywhere; copy buttons now work in the
+  packaged app.
 
 ## 1.15.0 — 2026-07-16
 
