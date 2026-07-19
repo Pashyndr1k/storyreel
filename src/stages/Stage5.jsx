@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage } from '../lib/gemini.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
-import { generateComfyVideo, generateComfyImage, generateComfyVoice, saveToLocalOutputs, VIDEO_RESOLUTIONS } from '../lib/comfy.js';
+import { generateComfyVideo, generateComfyImage, generateComfyVoice, saveToLocalOutputs, VIDEO_RESOLUTIONS, OMNI_VOICE_TAGS, OMNI_VOICE_SLOTS, OMNI_LANGUAGES } from '../lib/comfy.js';
 import { stage5Prompt, stage5VideoPrompt, stage5AudioPrompt, stage5VoicePrompt, finalFramePrompt, tweakPromptSpec } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
 import { aspectDescription } from '../lib/aspect.js';
@@ -26,6 +26,19 @@ const readFileDataURL = (file) =>
     r.onerror = () => reject(new Error('Could not read the file.'));
     r.readAsDataURL(file);
   });
+
+// Split an OmniVoice design string ("female, young adult, low pitch") into
+// its tag slots, and rebuild it in canonical slot order.
+const parseInstruct = (instruct) => {
+  const parts = String(instruct || '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  const out = {};
+  for (const slot of OMNI_VOICE_SLOTS) out[slot] = OMNI_VOICE_TAGS[slot].find((o) => parts.includes(o)) || '';
+  return out;
+};
+const buildInstruct = (tags) => OMNI_VOICE_SLOTS.map((k) => tags[k]).filter(Boolean).join(', ');
 
 // Appended to every image-generation prompt: the described scene must fill the
 // whole canvas — no black bars / letterboxing / empty margins at any edge.
@@ -778,14 +791,19 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   // subtitle blocks timed to the shot's events — from the SCENE CONTEXT
   // (Action Dynamics block as the emotional fallback). The SRT is saved as an
   // editable voice prompt; later runs speak the current text.
-  const draftVoicePrompt = async (shot) => {
+  const draftVoicePrompt = async (shot, { keepInstruct = false } = {}) => {
     const cur = projectRef.current;
     const sceneArg = { ...scene, number: cur.outline.indexOf(scene) + 1 };
     const blockArg = blockForScene(cur.dynamicsPlan, sceneArg.number);
     const data = await generateJSON(settings, stage5VoicePrompt(cur, sceneArg, shot, blockArg, genLang));
     const text = String(data.srt_text || '').trim();
     if (!text) throw new Error('The voice director returned no speakable text.');
-    const params = { instruct: String(data.voice_instruct || '').trim() };
+    // A manually selected voice design survives the automatic first-run draft
+    // (keepInstruct); the explicit redraft button lets Claude re-pick it. The
+    // language selection is the user's and is never overwritten.
+    const prev = cur.shotPrompts[shot.id]?.voiceParams || {};
+    const manual = keepInstruct ? String(prev.instruct || '').trim() : '';
+    const params = { ...prev, instruct: manual || String(data.voice_instruct || '').trim() };
     setPrompt(shot.id, { voicePrompt: text, voiceParams: params });
     return { text, ...params };
   };
@@ -819,11 +837,12 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     setImgBusy(`${shot.id}:aud`);
     setImgErr(null);
     try {
-      if (!voice) voice = await draftVoicePrompt(shot);
+      if (!voice) voice = await draftVoicePrompt(shot, { keepInstruct: true });
       const { dataURL, filename } = await generateComfyVoice(settings, {
         srt: voice.text,
         instruct: voice.instruct,
         lang: genLang,
+        language: voice.language || '',
         name: `${(cur.title || 'project').slice(0, 24)}_sc${cur.outline.indexOf(scene) + 1}_shot${i + 1}_voice`,
       });
       saveToLocalOutputs(settings, filename, dataURL); // best-effort local copy
@@ -1432,19 +1451,55 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                           value={p.voicePrompt}
                           onChange={(e) => setPrompt(shot.id, { voicePrompt: e.target.value })}
                         />
-                        {/* OmniVoice voice-design tags (gender, age, pitch, style, accent). */}
-                        <div className="prompt-head">
-                          <label>{t('aud.voiceDesign')}</label>
-                        </div>
-                        <input
-                          value={p.voiceParams?.instruct || ''}
-                          placeholder={t('aud.voiceDesignPh')}
-                          onChange={(e) =>
-                            setPrompt(shot.id, { voiceParams: { ...(p.voiceParams || {}), instruct: e.target.value } })
-                          }
-                        />
                       </>
                     )}
+
+                    {/* Manual voice character (OmniVoice design tags) and voice
+                        language. Set before generating or adjust afterwards;
+                        the auto-draft never overrides a manual choice. */}
+                    <div>
+                      <div className="s5e-eyebrow">{t('aud.voiceDesign')}</div>
+                      <div className="s5e-voicegrid">
+                        {OMNI_VOICE_SLOTS.map((slot) => {
+                          const tags = parseInstruct(p.voiceParams?.instruct);
+                          return (
+                            <div className="s5e-vsel" key={slot}>
+                              <label>{t(`aud.vs_${slot}`)}</label>
+                              <select
+                                value={tags[slot]}
+                                onChange={(e) => {
+                                  const next = { ...tags, [slot]: e.target.value };
+                                  setPrompt(shot.id, {
+                                    voiceParams: { ...(p.voiceParams || {}), instruct: buildInstruct(next) },
+                                  });
+                                }}
+                              >
+                                <option value="">—</option>
+                                {OMNI_VOICE_TAGS[slot].map((v) => (
+                                  <option key={v} value={v}>{v}</option>
+                                ))}
+                              </select>
+                            </div>
+                          );
+                        })}
+                        <div className="s5e-vsel">
+                          <label>{t('aud.vs_lang')}</label>
+                          <select
+                            value={p.voiceParams?.language || ''}
+                            onChange={(e) =>
+                              setPrompt(shot.id, {
+                                voiceParams: { ...(p.voiceParams || {}), language: e.target.value },
+                              })
+                            }
+                          >
+                            <option value="">{t('aud.vs_scriptLang')}</option>
+                            {OMNI_LANGUAGES.map((l) => (
+                              <option key={l} value={l}>{l === 'Auto' ? t('aud.vs_auto') : l}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
                     <div className="s5e-btnrow">
                       <button
                         className="btn small primary s5e-gen"

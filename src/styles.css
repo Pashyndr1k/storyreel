@@ -2065,6 +2065,10 @@ textarea.s5e-prompt-sm { min-height: 110px; }
 
 /* voice audio (Chatterbox) */
 .s5e-audio { width: 100%; height: 40px; display: block; }
+/* voice character (OmniVoice design tags) + language selectors */
+.s5e-voicegrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 10px; }
+.s5e-vsel label { margin: 0 0 4px; font-size: 10.5px; }
+.s5e-vsel select { width: 100%; height: 34px; padding: 0 10px; font-size: 12.5px; }
 .s5e-audio-empty { min-height: 64px; }
 
 /* aligned control rows: primary + equal-height icon-only squares */

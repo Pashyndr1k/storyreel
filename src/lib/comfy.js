@@ -360,13 +360,52 @@ export async function generateComfyImage(settings, { prompt, images = [], aspect
 // voice director times lines to the shot's events and the engine hits them.
 const OMNI_LANG = { en: 'English', ru: 'Russian', uk: 'Ukrainian' };
 
+// OmniVoice voice-design vocabulary (the model rejects unknown instruction
+// tags, so the UI offers exactly these) and the engine-language menu shown in
+// the audio tab. The design string joins the chosen tags in this slot order.
+export const OMNI_VOICE_TAGS = {
+  gender: ['male', 'female'],
+  age: ['child', 'teenager', 'young adult', 'middle-aged', 'elderly'],
+  pitch: ['very low pitch', 'low pitch', 'moderate pitch', 'high pitch', 'very high pitch'],
+  style: ['whisper'],
+  accent: [
+    'american accent',
+    'british accent',
+    'australian accent',
+    'canadian accent',
+    'indian accent',
+    'chinese accent',
+    'korean accent',
+    'japanese accent',
+    'portuguese accent',
+    'russian accent',
+  ],
+};
+export const OMNI_VOICE_SLOTS = ['gender', 'age', 'pitch', 'style', 'accent'];
+export const OMNI_LANGUAGES = [
+  'Auto',
+  'English',
+  'Russian',
+  'Ukrainian',
+  'German',
+  'French',
+  'Spanish',
+  'Italian',
+  'Portuguese',
+  'Polish',
+  'Chinese',
+  'Japanese',
+  'Korean',
+];
+
 // Speak a shot's dialogue on the local OmniVoice TTS workflow. `srt` is
 // standard SRT text (timestamps inside the shot's duration; angle non-verbal
 // tags like <sigh> allowed); `instruct` is the OmniVoice voice-design string.
-// Returns the audio as a data URL plus its ComfyUI-side filename.
-export async function generateComfyVoice(settings, { srt, instruct, lang, name }) {
+// An explicit `language` (from the audio tab's selector) overrides the
+// script-language default. Returns the audio as a data URL plus filename.
+export async function generateComfyVoice(settings, { srt, instruct, lang, language, name }) {
   const graph = clone(ttsTemplate);
-  graph['1'].inputs.language = OMNI_LANG[lang] || 'Auto';
+  graph['1'].inputs.language = language || OMNI_LANG[lang] || 'Auto';
   graph['1'].inputs.instruct = String(instruct || '').trim();
   graph['2'].inputs.srt_content = srt;
   graph['2'].inputs.seed = Math.floor(Math.random() * 4294967295);
