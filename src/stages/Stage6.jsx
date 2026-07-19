@@ -94,6 +94,11 @@ const SCALES = [10, 20, 40, 80, 160]; // px per second
 const ZOOM_STEPS = ['fit', ...SCALES];
 const MIN_CLIP_PX = 48; // a shot narrower than this is hard to grab
 
+// Fixed width of the track-head gutter on the left of every timeline row
+// (ruler spacer, V1 video head, A-n audio heads) — keeps the video and audio
+// strips starting at the exact same timeline zero. Mirrors --nle-gut in CSS.
+const NLE_GUT = 92;
+
 // Below 13 shots the fit view stays comfortable; past that, auto-zoom to a
 // scale that keeps even the shortest shot at least MIN_CLIP_PX wide.
 function defaultScale(project) {
@@ -257,6 +262,7 @@ export default function Stage6({ project, update, settings }) {
           raw,
           trim,
           image: (project.shotImages || {})[shot.id] || null,
+          muted: !!(project.shotMutes || {})[shot.id],
         };
       }),
     };
@@ -275,6 +281,9 @@ export default function Stage6({ project, update, settings }) {
 
   // Transition picker: clicking a cut badge opens a menu with every technique.
   const [cutMenu, setCutMenu] = useState(null); // { idx, x, y }
+  // Per-lane options popover (name, volume, add clips, delete) — the lane
+  // head itself stays compact like an NLE track header.
+  const [laneMenu, setLaneMenu] = useState(null); // { layerId, x, y }
   const openCutMenu = (idx, e) => {
     const r = e.currentTarget.getBoundingClientRect();
     setCutMenu({ idx, x: Math.min(r.left, window.innerWidth - 230), y: r.bottom + 6 });
@@ -371,6 +380,7 @@ export default function Stage6({ project, update, settings }) {
           });
         }
       };
+      v.muted = !!cur.muted; // per-shot audio mute
       if (v.readyState >= 1) seekPlay();
       else v.addEventListener('loadedmetadata', seekPlay, { once: true });
       // Watchdogs: if the clip still isn't running shortly after (slow
@@ -398,6 +408,12 @@ export default function Stage6({ project, update, settings }) {
     v.pause();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing, curShotId]);
+
+  // Mute toggled while the clip is already on screen applies immediately.
+  useEffect(() => {
+    if (pvRef.current) pvRef.current.muted = !!cur?.muted;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cur?.muted, curShotId]);
 
   // Preview audio: the audio-timeline layers play in sync with the realtime
   // preview (this is what makes the music audible OUTSIDE the ffmpeg render).
@@ -521,7 +537,7 @@ export default function Stage6({ project, update, settings }) {
   useEffect(() => {
     if (!zoomed || !scrollRef.current) return;
     const el = scrollRef.current;
-    const x = elapsed * scale;
+    const x = NLE_GUT + elapsed * scale;
     if (x < el.scrollLeft + 40 || x > el.scrollLeft + el.clientWidth - 60) {
       el.scrollLeft = Math.max(0, x - el.clientWidth / 2);
     }
@@ -553,6 +569,7 @@ export default function Stage6({ project, update, settings }) {
           trimStart: it.trim?.head || 0,
           duration: it.shot.duration || 0,
           tailSlack: it.trim?.tail || 0,
+          muted: !!it.muted,
         };
       if (it.image) return { kind: 'image', dataURL: it.image, trimStart: 0, duration: it.shot.duration || 0, tailSlack: 0 };
       return { kind: 'black', trimStart: 0, duration: it.shot.duration || 0, tailSlack: 0 };
@@ -881,7 +898,7 @@ export default function Stage6({ project, update, settings }) {
     : seconds > 120 ? 10 : seconds > 40 ? 5 : 1;
   const showPlayhead = total > 0 && (playing || elapsed > 0);
   const selected = items.find((x) => x.shot.id === selectedId);
-  const innerWidth = zoomed ? seconds * scale : undefined; // px in zoom mode
+  const innerWidth = zoomed ? NLE_GUT + seconds * scale : undefined; // px in zoom mode
 
   return (
     <section className="stage">
@@ -908,11 +925,19 @@ export default function Stage6({ project, update, settings }) {
        <div className={`nle-scroll ${zoomed ? 'zoomed' : ''}`} ref={scrollRef}>
         <div className="nle-inner" style={zoomed ? { width: innerWidth } : undefined}>
         <div className="nle-ruler">
+          <span className="nle-gut nle-gut-ruler" />
           {Array.from({ length: seconds }, (_, i) => (
             <div key={i} className="nle-cell" style={zoomed ? { flex: 'none', width: scale } : undefined}><span>{i % labelEvery === 0 ? `${i}s` : ''}</span></div>
           ))}
         </div>
-        <div className="nle-track asm-track" ref={trackRef}>
+        {/* Every row carries the same fixed-width head gutter so the video
+            and audio strips start at the exact same timeline zero. */}
+        <div className="nle-track asm-track">
+          <span className="nle-gut track-head">
+            <i className="trk-tag">V1</i>
+            <span className="trk-name">{t('s6.trackVideo')}</span>
+          </span>
+          <div className="asm-scenes" ref={trackRef}>
           {scenes.map((g, gi) => {
             const sceneDur = g.shots.reduce((a, it) => a + (it.shot.duration || 0), 0);
             return (
@@ -1005,6 +1030,9 @@ export default function Stage6({ project, update, settings }) {
                         <span className="nle-clip-num">{globalIdx + 1}</span>
                       )}
                       <span className="nle-dur">{Number(it.shot.duration || 0).toFixed(1)}s</span>
+                      {it.muted && it.video && (
+                        <span className="clip-mute" title={t('s6.mutedBadge')}>🔇</span>
+                      )}
                       <span
                         className="nle-trim"
                         title={t('sb.trim')}
@@ -1051,6 +1079,7 @@ export default function Stage6({ project, update, settings }) {
             </div>
             );
           })}
+          </div>
         </div>
         {/* Audio timeline: layers of clips under the video track. Each layer
             is its own lane — toggle, volume, add clips, drag to move, edge
@@ -1058,7 +1087,9 @@ export default function Stage6({ project, update, settings }) {
         <div className="audio-lanes">
           {layers.map((L, li) => (
             <div key={L.id} className={`audio-lane ${L.enabled === false ? 'lane-off' : ''}`}>
-              <span className="lane-head">
+              {/* Compact head: track tag + enable + everything else in a ⋯ menu. */}
+              <span className="nle-gut lane-head" title={L.name}>
+                <i className="trk-tag">A{li + 1}</i>
                 <button
                   type="button"
                   className={`lane-eye ${L.enabled === false ? '' : 'on'}`}
@@ -1069,43 +1100,19 @@ export default function Stage6({ project, update, settings }) {
                 >
                   ●
                 </button>
-                <input
-                  className="lane-name-in"
-                  value={L.name}
-                  onChange={(e) => patchLayer(L.id, { name: e.target.value })}
-                />
-                <input
-                  className="lane-vol"
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={L.volume ?? 1}
-                  title={`${t('s6.layerVol')}: ${Math.round((L.volume ?? 1) * 100)}%`}
-                  onChange={(e) => patchLayer(L.id, { volume: Number(e.target.value) })}
-                />
-                <label className="lane-add" title={t('s6.addClip')} aria-label={t('s6.addClip')}>
-                  <Upload size={11} />
-                  <input
-                    type="file"
-                    accept="audio/*"
-                    multiple
-                    hidden
-                    onChange={(e) => {
-                      const fs = [...(e.target.files || [])];
-                      e.target.value = '';
-                      if (fs.length) addClips(L.id)(fs);
-                    }}
-                  />
-                </label>
                 <button
                   type="button"
-                  className="lane-x"
-                  title={t('s6.removeLayer')}
-                  aria-label={t('s6.removeLayer')}
-                  onClick={() => removeLayer(L.id)}
+                  className="lane-more"
+                  title={t('s6.laneOpts')}
+                  aria-label={t('s6.laneOpts')}
+                  onClick={(e) => {
+                    const r = e.currentTarget.getBoundingClientRect();
+                    setLaneMenu((m) =>
+                      m?.layerId === L.id ? null : { layerId: L.id, x: Math.min(r.left, window.innerWidth - 250), y: r.bottom + 6 }
+                    );
+                  }}
                 >
-                  ✕
+                  ⋯
                 </button>
               </span>
               <div className="lane-strip">
@@ -1147,10 +1154,70 @@ export default function Stage6({ project, update, settings }) {
             </button>
           </div>
         </div>
+        {laneMenu && (() => {
+          const L = layers.find((x) => x.id === laneMenu.layerId);
+          if (!L) return null;
+          return (
+            <>
+              <div className="cut-menu-backdrop" onClick={() => setLaneMenu(null)} />
+              <div className="lane-menu" style={{ left: laneMenu.x, top: laneMenu.y }}>
+                <label className="lane-menu-lbl">{t('s6.layerName')}</label>
+                <input
+                  className="lane-menu-name"
+                  value={L.name}
+                  onChange={(e) => patchLayer(L.id, { name: e.target.value })}
+                />
+                <label className="lane-menu-lbl">
+                  {t('s6.layerVol')}: {Math.round((L.volume ?? 1) * 100)}%
+                </label>
+                <input
+                  className="lane-vol"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={L.volume ?? 1}
+                  onChange={(e) => patchLayer(L.id, { volume: Number(e.target.value) })}
+                />
+                <div className="lane-menu-row">
+                  <label className="btn tiny file-btn">
+                    {t('s6.addClip')}
+                    <input
+                      type="file"
+                      accept="audio/*"
+                      multiple
+                      hidden
+                      onChange={(e) => {
+                        const fs = [...(e.target.files || [])];
+                        e.target.value = '';
+                        if (fs.length) addClips(L.id)(fs);
+                        setLaneMenu(null);
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="btn tiny danger"
+                    onClick={() => {
+                      removeLayer(L.id);
+                      setLaneMenu(null);
+                    }}
+                  >
+                    {t('s6.removeLayer')}
+                  </button>
+                </div>
+              </div>
+            </>
+          );
+        })()}
         {showPlayhead && (
           <div
             className="nle-playhead"
-            style={zoomed ? { left: elapsed * scale } : { left: `${Math.min(100, (elapsed / total) * 100)}%` }}
+            style={
+              zoomed
+                ? { left: NLE_GUT + elapsed * scale }
+                : { left: `calc(${NLE_GUT}px + (100% - ${NLE_GUT}px) * ${Math.min(1, elapsed / Math.max(0.1, total))})` }
+            }
           >
             <span className="nle-playhead-cap" />
           </div>
@@ -1160,7 +1227,6 @@ export default function Stage6({ project, update, settings }) {
       </div>
 
       <div className="nle-footer">
-        <span>{t('s6.caption', { s: scenes.length, n: items.length })}</span>
         <span className="nle-nudge nle-scale" title={zoomed ? t('s6.scrollHint') : ''}>
           {t('s6.scale')}
           <button type="button" title={t('s6.zoomOut')} aria-label={t('s6.zoomOut')} disabled={zoomIdx === 0} onClick={zoomOut}>
@@ -1189,6 +1255,20 @@ export default function Stage6({ project, update, settings }) {
             <button type="button" title={t('sb.longer')} disabled={(selected.shot.duration || 0) >= 10} onClick={() => nudge(0.5)}>
               +0.5s
             </button>
+            {selected.video && (
+              <button
+                type="button"
+                className={selected.muted ? 'mute-on' : ''}
+                title={selected.muted ? t('s6.unmute') : t('s6.mute')}
+                onClick={() =>
+                  update((p) => ({
+                    shotMutes: { ...(p.shotMutes || {}), [selected.shot.id]: !(p.shotMutes || {})[selected.shot.id] },
+                  }))
+                }
+              >
+                {selected.muted ? '🔇' : '🔊'}
+              </button>
+            )}
           </span>
         )}
         {selected && selected.video && selected.raw > (selected.shot.duration || 0) + 0.2 && (
@@ -1284,7 +1364,6 @@ export default function Stage6({ project, update, settings }) {
           </>
         )}
       </div>
-      <p className="hint">{t(window.ffmpegBridge ? 's6.hintFfmpeg' : 's6.hint')}</p>
       {renderErr && <div className="note error">{renderErr}</div>}
       {renderDone && <div className="note ok-note">{t('s6.renderedTo', { p: renderDone })}</div>}
 

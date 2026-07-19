@@ -202,7 +202,8 @@ async function renderJob(job, onProgress) {
       fs.writeFileSync(file, Buffer.from(m[2], 'base64'));
       const out = { ...seg, file };
       delete out.dataURL;
-      if (seg.kind === 'video') out.audio = hasAudio(file);
+      // A muted shot renders with a silent bed instead of its baked audio.
+      if (seg.kind === 'video') out.audio = seg.muted ? false : hasAudio(file);
       return out;
     });
 
