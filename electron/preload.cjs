@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('secureStore', {
 contextBridge.exposeInMainWorld('localFiles', {
   saveOutput: (dir, filename, base64) => ipcRenderer.invoke('save-output', { dir, filename, base64 }),
   exportZip: (defaultName, base64) => ipcRenderer.invoke('export-zip', { defaultName, base64 }),
+  clipboardWrite: (text) => ipcRenderer.invoke('clipboard-write', text),
 });
 
 // ComfyUI requests via the main process (no CORS/Origin restrictions there).

@@ -3,7 +3,7 @@ import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage } from '../lib/gemini.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
 import { generateComfyVideo, generateComfyImage, generateComfyVoice, saveToLocalOutputs, VIDEO_RESOLUTIONS } from '../lib/comfy.js';
-import { stage5Prompt, stage5VideoPrompt, stage5VoicePrompt, finalFramePrompt, tweakPromptSpec } from '../lib/prompts.js';
+import { stage5Prompt, stage5VideoPrompt, stage5AudioPrompt, stage5VoicePrompt, finalFramePrompt, tweakPromptSpec } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
 import { aspectDescription } from '../lib/aspect.js';
 import ErrorNote from '../components/ErrorNote.jsx';
@@ -17,7 +17,7 @@ import LibraryPicker from '../components/LibraryPicker.jsx';
 import { newLibraryEntry } from '../lib/library.js';
 import { fileToResizedDataURL, resizeDataURL } from '../lib/images.js';
 import { extractPalette } from '../lib/palette.js';
-import { Download, RestoreIcon, MapPin, Upload, Layers, Grid, Trash, Wand, Zap } from '../components/icons.jsx';
+import { Download, RestoreIcon, MapPin, Upload, Layers, Grid, Trash, Wand, Zap, Expand } from '../components/icons.jsx';
 
 const readFileDataURL = (file) =>
   new Promise((resolve, reject) => {
@@ -73,12 +73,37 @@ function CopyButton({ text }) {
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   const copy = async () => {
+    // In the packaged app the main-process clipboard is the only reliable
+    // path (navigator.clipboard is focus/permission-sensitive and rejects;
+    // window.prompt does not exist in Electron). Browser builds fall back to
+    // navigator.clipboard, then to a hidden textarea + execCommand.
+    let ok = false;
     try {
-      await navigator.clipboard.writeText(text);
+      if (window.localFiles?.clipboardWrite) {
+        await window.localFiles.clipboardWrite(text);
+        ok = true;
+      } else {
+        await navigator.clipboard.writeText(text);
+        ok = true;
+      }
+    } catch {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        ok = document.execCommand('copy');
+        ta.remove();
+      } catch {
+        ok = false;
+      }
+    }
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {
-      window.prompt('Copy:', text);
     }
   };
   return (
@@ -103,7 +128,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const [mediaProg, setMediaProg] = useState(null); // { a, b } scene-media queue
   const mediaCancel = useRef(false);
   const [palette, setPalette] = useState(null); // { src: shotId, colors: [] } for this scene
-  const [lightbox, setLightbox] = useState(null); // dataURL shown in the large pop-up
+  const [lightbox, setLightbox] = useState(null); // { kind: 'img' | 'vid', src } shown in the large pop-up
   const [tweakText, setTweakText] = useState({}); // `${shotId}:${kind}` -> adjustment draft
   const [tweakBusy, setTweakBusy] = useState(null); // `${shotId}:${kind}` in flight
   const [shotTab, setShotTab] = useState({}); // shotId -> 'image' | 'video' | 'audio'
@@ -239,9 +264,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     }
   };
 
-  // Each generation is two calls (image prompts, then video prompts), each
-  // returning only its own field — so merge into the existing entry, never
-  // overwrite the other field.
+  // Each generation is up to three calls (image, video, then audio prompts for
+  // scenes with dialogue), each returning only its own field — so merge into
+  // the existing entry, never overwrite the other fields.
   const applyPrompts = (targetScene, data) =>
     update((p) => {
       const sceneShots = p.sceneDetails[targetScene.id]?.shots || [];
@@ -254,6 +279,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           ...cur,
           imagePrompt: pr.image_prompt != null ? pr.image_prompt : cur.imagePrompt || '',
           videoPrompt: pr.video_prompt != null ? pr.video_prompt : cur.videoPrompt || '',
+          ...(pr.audio_prompt != null ? { audioPrompt: pr.audio_prompt } : {}),
         };
       });
       return { shotPrompts: next };
@@ -263,10 +289,14 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const sceneArg = { ...s, number: project.outline.indexOf(s) + 1 };
     const sceneShots = project.sceneDetails[s.id]?.shots || [];
     const block = blockForScene(project.dynamicsPlan, sceneArg.number);
-    return [
+    const specs = [
       stage5Prompt(project, sceneArg, sceneShots, genLang, imageStyle),
       stage5VideoPrompt(project, sceneArg, sceneShots, videoStyle, block),
     ];
+    if (sceneShots.some((sh) => (sh.dialogue || '').trim())) {
+      specs.push(stage5AudioPrompt(project, sceneArg, sceneShots, block));
+    }
+    return specs;
   };
 
   const generate = () => {
@@ -642,6 +672,8 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       list.filter((s) => !(projectRef.current.shotImages || {})[s.id] && projectRef.current.shotPrompts[s.id]?.imagePrompt?.trim()).length +
       list.filter((s) => !(projectRef.current.shotVideos || {})[s.id] && projectRef.current.shotPrompts[s.id]?.videoPrompt?.trim()).length;
     if (!planned) return;
+    // Each job occupies the GPU for minutes — never start the queue silently.
+    if (!window.confirm(t('s5.genMediaConfirm', { n: planned }))) return;
     let done = 0;
     setMediaProg({ a: 0, b: planned });
     for (const shot of list) {
@@ -1032,7 +1064,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       <div className="frame-pair">
                         <figure>
                           <div className="s5e-imgwrap">
-                            <img src={genImg} alt="" className="zoomable" onClick={() => setLightbox(genImg)} />
+                            <img src={genImg} alt="" className="zoomable" onClick={() => setLightbox({ kind: 'img', src: genImg })} />
                             <button type="button" className="s5e-dl" title={t('img.download')} onClick={() => downloadImage(shot, i)}>
                               <Download size={14} />
                             </button>
@@ -1041,7 +1073,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         </figure>
                         <figure>
                           <div className="s5e-imgwrap">
-                            <img src={finalImg} alt="" className="zoomable" onClick={() => setLightbox(finalImg)} />
+                            <img src={finalImg} alt="" className="zoomable" onClick={() => setLightbox({ kind: 'img', src: finalImg })} />
                             <div className="img-actions">
                               <IconAction title={t('img.finalRegen')} disabled={anyBusy} onClick={() => genFinalFrame(shot)}>
                                 <RestoreIcon size={14} />
@@ -1059,7 +1091,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       </div>
                     ) : (
                       <div className="s5e-imgwrap">
-                        <img src={genImg} alt="" className="zoomable" onClick={() => setLightbox(genImg)} />
+                        <img src={genImg} alt="" className="zoomable" onClick={() => setLightbox({ kind: 'img', src: genImg })} />
                         <button type="button" className="s5e-dl" title={t('img.download')} onClick={() => downloadImage(shot, i)}>
                           <Download size={14} />
                         </button>
@@ -1304,6 +1336,14 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                   {shotVid ? (
                     <div className="s5e-imgwrap vid-wrap">
                       <video src={shotVid} controls preload="metadata" />
+                      <button
+                        type="button"
+                        className="s5e-dl s5e-dl2"
+                        title={t('vid.expand')}
+                        onClick={() => setLightbox({ kind: 'vid', src: shotVid })}
+                      >
+                        <Expand size={14} />
+                      </button>
                       <button type="button" className="s5e-dl" title={t('vid.download')} onClick={() => downloadVideo(shot, i)}>
                         <Download size={14} />
                       </button>
@@ -1453,7 +1493,11 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
 
       {lightbox && (
         <div className="lightbox" onClick={() => setLightbox(null)}>
-          <img src={lightbox} alt="" onClick={(e) => e.stopPropagation()} />
+          {lightbox.kind === 'vid' ? (
+            <video src={lightbox.src} controls autoPlay onClick={(e) => e.stopPropagation()} />
+          ) : (
+            <img src={lightbox.src} alt="" onClick={(e) => e.stopPropagation()} />
+          )}
           <button type="button" className="lightbox-x" aria-label="close" onClick={() => setLightbox(null)}>
             ✕
           </button>

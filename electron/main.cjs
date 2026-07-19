@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, ipcMain, safeStorage, session, dialog } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, safeStorage, session, dialog, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { comfyRequest } = require('./comfyRequest.cjs');
@@ -10,6 +10,13 @@ ipcMain.handle('comfy-request', (_e, opts) => comfyRequest(opts));
 
 // FFmpeg assembly engine: renders the Stage-6 timeline into an H.264 mp4 in
 // the main process (native binary), streaming progress back to the renderer.
+// Renderer clipboard APIs are focus/permission-sensitive; the main-process
+// clipboard always works, so the Copy buttons route through here in the app.
+ipcMain.handle('clipboard-write', (_e, text) => {
+  clipboard.writeText(String(text ?? ''));
+  return true;
+});
+
 ipcMain.handle('ffmpeg-check', () => ({ version: ffmpegVersion() }));
 ipcMain.handle('ffmpeg-cancel', () => cancelActive());
 ipcMain.handle('ffmpeg-render', (e, job) =>

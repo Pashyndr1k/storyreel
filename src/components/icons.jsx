@@ -35,6 +35,15 @@ export const Grid = (p) => (
   </S>
 );
 
+export const Expand = (p) => (
+  <S {...p}>
+    <path d="M15 3h6v6" />
+    <path d="m21 3-7 7" />
+    <path d="M9 21H3v-6" />
+    <path d="m3 21 7-7" />
+  </S>
+);
+
 export const ChartLine = (p) => (
   <S {...p}>
     <path d="M3 3v16a2 2 0 0 0 2 2h16" />
