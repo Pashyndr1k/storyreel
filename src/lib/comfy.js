@@ -11,6 +11,7 @@ import flf2vTemplate from '../data/comfy/ltx_flf2v_api.json';
 import t2iTemplate from '../data/comfy/krea2_t2i_api.json';
 import flux2Template from '../data/comfy/flux2_klein_edit_api.json';
 import ttsTemplate from '../data/comfy/omnivoice_tts_api.json';
+import si2vTemplate from '../data/comfy/ltx_si2v_api.json';
 
 export const DEFAULT_COMFY_URL = 'http://127.0.0.1:8000';
 export const DEFAULT_OUTPUT_DIR = 'D:\\Claude work\\ComfyUI\\Output';
@@ -241,11 +242,13 @@ const clone = (o) => JSON.parse(JSON.stringify(o));
 const sanitize = (s) => (s || 'shot').replace(/[^\w\d-]+/g, '_').slice(0, 60);
 
 // ---- Stage 5: shot video ---------------------------------------------------
-// First frame only → ltx_i2v; first + last frame → ltx_flf2v. Returns the
+// Voice audio + first frame → ltx_si2v (talking video: the model reads mood,
+// lip sync and pacing from the audio and image, so the prompt stays brief);
+// first frame only → ltx_i2v; first + last frame → ltx_flf2v. Returns the
 // video as a data URL plus the ComfyUI-side filename.
 export async function generateComfyVideo(
   settings,
-  { prompt, firstFrame, lastFrame, durationSec, aspectRatio, resolution, name },
+  { prompt, firstFrame, lastFrame, audio, durationSec, aspectRatio, resolution, name },
   { onStatus } = {}
 ) {
   const [w, h] = videoDims(aspectRatio, resolution);
@@ -255,7 +258,20 @@ export async function generateComfyVideo(
   const stamp = Date.now();
   let graph;
 
-  if (lastFrame) {
+  if (audio) {
+    // Dialogue shot: the generated video carries the voice track and is
+    // rendered at the EXACT shot duration (no padding — trimming would break
+    // the audio sync), so assembly plays it as-is.
+    graph = clone(si2vTemplate);
+    graph['269'].inputs.image = await uploadInput(settings, firstFrame, `storyreel_${stamp}_first.png`);
+    graph['276'].inputs.audio = await uploadInput(settings, audio, `storyreel_${stamp}_voice.mp3`);
+    graph['340:319'].inputs.value = prompt;
+    graph['340:331'].inputs.value = Math.max(2, Math.min(12, durationSec || 4));
+    graph['340:330'].inputs.value = w;
+    graph['340:324'].inputs.value = h;
+    graph['340:286'].inputs.noise_seed = rndSeed();
+    graph['341'].inputs.filename_prefix = `StoryReel/${sanitize(name)}`;
+  } else if (lastFrame) {
     graph = clone(flf2vTemplate);
     graph['31'].inputs.image = await uploadInput(settings, firstFrame, `storyreel_${stamp}_first.png`);
     graph['39'].inputs.image = await uploadInput(settings, lastFrame, `storyreel_${stamp}_last.png`);

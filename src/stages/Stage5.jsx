@@ -693,10 +693,13 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     a.remove();
   };
 
-  // Generate the shot video on the local ComfyUI: first frame + video prompt
-  // through LTX-2 image-to-video, or first + final frame through the
-  // first/last-frame workflow when a final frame exists. The result plays
-  // inline and a copy lands in the local outputs folder.
+  // Generate the shot video on the local ComfyUI. Dialogue shots with a
+  // generated voice go through the LTX-2 sound+image workflow (talking video
+  // with the voice track baked in, rendered at the EXACT shot duration so
+  // assembly never trims into synced speech); otherwise first frame + prompt
+  // through image-to-video, or first + final frame through the first/last-
+  // frame workflow. The result plays inline and a copy lands in the local
+  // outputs folder.
   const genVideo = async (shot, i) => {
     // Read through projectRef: the prompt/frames must be the LATEST state at
     // call time (fixes regeneration using a stale video prompt after edits).
@@ -705,16 +708,21 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const vPrompt = (cur.shotPrompts[shot.id]?.videoPrompt || '').trim();
     if (!first || !vPrompt) return;
     const last = (cur.shotFinalImages || {})[shot.id] || null;
+    const voiceAud = (cur.shotAudios || {})[shot.id] || null;
     setImgBusy(`${shot.id}:vid`);
     setImgErr(null);
-    // +2s padding rule: generate longer than the timeline needs; Stage 6 trims
-    // 15 frames from head and tail to mask AI ramp-up and tail degradation.
-    const genDuration = Math.round(shot.duration || 4) + DYNAMICS_CONFIG.generation_padding_sec;
+    // +2s padding rule (silent shots only): generate longer than the timeline
+    // needs; Stage 6 trims 15 frames from head and tail to mask AI ramp-up
+    // and tail degradation. Voice-synced shots render at the exact duration.
+    const genDuration = voiceAud
+      ? Number(shot.duration || 4)
+      : Math.round(shot.duration || 4) + DYNAMICS_CONFIG.generation_padding_sec;
     try {
       const { dataURL, filename } = await generateComfyVideo(settings, {
         prompt: vPrompt,
         firstFrame: first,
         lastFrame: last,
+        audio: voiceAud,
         durationSec: genDuration,
         aspectRatio: project.aspectRatio || '16:9',
         resolution: cur.videoResolution || 'HD',
@@ -1302,7 +1310,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     </div>
                   ) : (
                     <div className="s5-media-empty">
-                      {!genImg ? t('vid.needFrame') : finalImg ? t('vid.modeFLF') : t('vid.modeI2V')}
+                      {!genImg ? t('vid.needFrame') : shotAud ? t('vid.modeSI2V') : finalImg ? t('vid.modeFLF') : t('vid.modeI2V')}
                     </div>
                   )}
                   <div className="s5e-btnrow">
@@ -1339,7 +1347,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       ))}
                     </span>
                     {shotVid && genImg && (
-                      <span className="hint">{finalImg ? t('vid.modeFLF') : t('vid.modeI2V')}</span>
+                      <span className="hint">{shotAud ? t('vid.modeSI2V') : finalImg ? t('vid.modeFLF') : t('vid.modeI2V')}</span>
                     )}
                   </div>
                 </div>
