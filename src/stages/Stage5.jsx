@@ -732,24 +732,20 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     }
   };
 
-  // Voice audio via the local Chatterbox TTS workflow. First run: Claude (the
-  // "voice director") drafts the Chatterbox input — speaker tags, [pause:…]
-  // beats, engine parameters, a gender-matched narrator voice — from the SCENE
-  // CONTEXT (Action Dynamics block as the emotional fallback). The text is
-  // saved as an editable voice prompt; later runs speak the current text.
+  // Voice audio via the local OmniVoice TTS workflow. First run: Claude (the
+  // "voice director") drafts the OmniVoice input — a voice-design instruction
+  // matched to the speaking character's gender/age/personality, plus SRT
+  // subtitle blocks timed to the shot's events — from the SCENE CONTEXT
+  // (Action Dynamics block as the emotional fallback). The SRT is saved as an
+  // editable voice prompt; later runs speak the current text.
   const draftVoicePrompt = async (shot) => {
     const cur = projectRef.current;
     const sceneArg = { ...scene, number: cur.outline.indexOf(scene) + 1 };
     const blockArg = blockForScene(cur.dynamicsPlan, sceneArg.number);
     const data = await generateJSON(settings, stage5VoicePrompt(cur, sceneArg, shot, blockArg, genLang));
-    const text = String(data.tts_text || '').trim();
+    const text = String(data.srt_text || '').trim();
     if (!text) throw new Error('The voice director returned no speakable text.');
-    const params = {
-      exaggeration: data.exaggeration,
-      temperature: data.temperature,
-      cfgWeight: data.cfg_weight,
-      narratorVoice: data.narrator_voice,
-    };
+    const params = { instruct: String(data.voice_instruct || '').trim() };
     setPrompt(shot.id, { voicePrompt: text, voiceParams: params });
     return { text, ...params };
   };
@@ -771,7 +767,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const genVoice = async (shot, i) => {
     const cur = projectRef.current;
     const sp = cur.shotPrompts[shot.id] || {};
-    let voice = (sp.voicePrompt || '').trim()
+    // Reuse the saved prompt only if it was drafted for OmniVoice (has an
+    // instruct); voice prompts from the old Chatterbox engine are redrafted.
+    let voice = (sp.voicePrompt || '').trim() && (sp.voiceParams?.instruct || '').trim()
       ? { text: sp.voicePrompt.trim(), ...(sp.voiceParams || {}) }
       : null;
     if (!voice) {
@@ -783,12 +781,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     try {
       if (!voice) voice = await draftVoicePrompt(shot);
       const { dataURL, filename } = await generateComfyVoice(settings, {
-        text: voice.text,
+        srt: voice.text,
+        instruct: voice.instruct,
         lang: genLang,
-        exaggeration: voice.exaggeration,
-        temperature: voice.temperature,
-        cfgWeight: voice.cfgWeight,
-        narratorVoice: voice.narratorVoice,
         name: `${(cur.title || 'project').slice(0, 24)}_sc${cur.outline.indexOf(scene) + 1}_shot${i + 1}_voice`,
       });
       saveToLocalOutputs(settings, filename, dataURL); // best-effort local copy
@@ -1388,6 +1383,17 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                           className="s5e-prompt s5e-prompt-sm"
                           value={p.voicePrompt}
                           onChange={(e) => setPrompt(shot.id, { voicePrompt: e.target.value })}
+                        />
+                        {/* OmniVoice voice-design tags (gender, age, pitch, style, accent). */}
+                        <div className="prompt-head">
+                          <label>{t('aud.voiceDesign')}</label>
+                        </div>
+                        <input
+                          value={p.voiceParams?.instruct || ''}
+                          placeholder={t('aud.voiceDesignPh')}
+                          onChange={(e) =>
+                            setPrompt(shot.id, { voiceParams: { ...(p.voiceParams || {}), instruct: e.target.value } })
+                          }
                         />
                       </>
                     )}

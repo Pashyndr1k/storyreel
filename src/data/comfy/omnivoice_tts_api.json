@@ -1,0 +1,51 @@
+{
+  "1": {
+    "class_type": "OmniVoiceEngineNode",
+    "inputs": {
+      "model_variant": "OmniVoice",
+      "device": "auto",
+      "language": "Auto",
+      "num_step": 32,
+      "guidance_scale": 2.0,
+      "t_shift": 0.1,
+      "speed": 1.0,
+      "duration": 0.0,
+      "dtype": "auto",
+      "instruct": "",
+      "layer_penalty_factor": 5.0,
+      "position_temperature": 5.0,
+      "class_temperature": 0.0,
+      "denoise": true,
+      "preprocess_prompt": true,
+      "postprocess_output": true,
+      "audio_chunk_duration": 15.0,
+      "audio_chunk_threshold": 30.0
+    }
+  },
+  "2": {
+    "class_type": "UnifiedTTSSRTNode",
+    "inputs": {
+      "TTS_engine": ["1", 0],
+      "srt_content": "",
+      "narrator_voice": "none",
+      "seed": 1,
+      "timing_mode": "stretch_to_fit",
+      "enable_audio_cache": true,
+      "fade_for_StretchToFit": 0.01,
+      "max_stretch_ratio": 1.0,
+      "min_stretch_ratio": 0.5,
+      "timing_tolerance": 2.0,
+      "batch_size": 0,
+      "use_native_duration_targeting": true
+    }
+  },
+  "3": {
+    "class_type": "SaveAudioAdvanced",
+    "inputs": {
+      "audio": ["2", 0],
+      "filename_prefix": "StoryReel/voice",
+      "format": "mp3",
+      "format.quality": "128k"
+    }
+  }
+}

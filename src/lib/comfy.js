@@ -10,7 +10,7 @@ import i2vTemplate from '../data/comfy/ltx_i2v_api.json';
 import flf2vTemplate from '../data/comfy/ltx_flf2v_api.json';
 import t2iTemplate from '../data/comfy/krea2_t2i_api.json';
 import flux2Template from '../data/comfy/flux2_klein_edit_api.json';
-import ttsTemplate from '../data/comfy/chatterbox_tts_api.json';
+import ttsTemplate from '../data/comfy/omnivoice_tts_api.json';
 
 export const DEFAULT_COMFY_URL = 'http://127.0.0.1:8000';
 export const DEFAULT_OUTPUT_DIR = 'D:\\Claude work\\ComfyUI\\Output';
@@ -337,42 +337,22 @@ export async function generateComfyImage(settings, { prompt, images = [], aspect
   return { dataURL: await blobToDataURL(blob), filename: img.filename };
 }
 
-// ---- Stage 5: shot voice audio via Chatterbox TTS ---------------------------
-// Bundled voice references of the TTS Audio Suite (narrator fallback voices).
-export const TTS_VOICES = [
-  'voices_examples/Clint_Eastwood CC3 (enhanced2).wav',
-  'voices_examples/David_Attenborough CC3.wav',
-  'voices_examples/Morgan_Freeman CC3.wav',
-  'voices_examples/Sophie_Anderson CC3.wav',
-  'voices_examples/female/female_01.wav',
-  'voices_examples/female/female_02.wav',
-];
-export const DEFAULT_TTS_VOICE = 'voices_examples/female/female_01.wav';
+// ---- Stage 5: shot voice audio via OmniVoice TTS ----------------------------
+// OmniVoice (TTS Audio Suite) designs the voice reference-free from a tag
+// instruction ("female, young adult, moderate pitch, british accent") and
+// speaks SRT subtitle blocks, natively targeting each block's duration — the
+// voice director times lines to the shot's events and the engine hits them.
+const OMNI_LANG = { en: 'English', ru: 'Russian', uk: 'Ukrainian' };
 
-// Chatterbox language models installed on the local server. Ukrainian has no
-// dedicated model — the local multilingual Russian model is the closest fit.
-const TTS_LANG = { en: 'local:English', ru: 'local:Russian', uk: 'local:Russian' };
-
-const clampNum = (v, lo, hi, dflt) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : dflt;
-};
-
-// Speak a shot's dialogue on the local Chatterbox TTS workflow. `text` uses
-// the TTS Audio Suite syntax: [Character] speaker tags (unknown names fall
-// back to the narrator voice) and [pause:0.6]/[pause:600ms] pauses. Returns
-// the audio as a data URL plus its ComfyUI-side filename.
-export async function generateComfyVoice(
-  settings,
-  { text, lang, exaggeration, temperature, cfgWeight, narratorVoice, name }
-) {
+// Speak a shot's dialogue on the local OmniVoice TTS workflow. `srt` is
+// standard SRT text (timestamps inside the shot's duration; angle non-verbal
+// tags like <sigh> allowed); `instruct` is the OmniVoice voice-design string.
+// Returns the audio as a data URL plus its ComfyUI-side filename.
+export async function generateComfyVoice(settings, { srt, instruct, lang, name }) {
   const graph = clone(ttsTemplate);
-  graph['1'].inputs.language = TTS_LANG[lang] || 'local:English';
-  graph['1'].inputs.exaggeration = clampNum(exaggeration, 0.25, 2, 0.5);
-  graph['1'].inputs.temperature = clampNum(temperature, 0.05, 5, 0.8);
-  graph['1'].inputs.cfg_weight = clampNum(cfgWeight, 0, 1, 0.5);
-  graph['2'].inputs.text = text;
-  graph['2'].inputs.narrator_voice = TTS_VOICES.includes(narratorVoice) ? narratorVoice : DEFAULT_TTS_VOICE;
+  graph['1'].inputs.language = OMNI_LANG[lang] || 'Auto';
+  graph['1'].inputs.instruct = String(instruct || '').trim();
+  graph['2'].inputs.srt_content = srt;
   graph['2'].inputs.seed = Math.floor(Math.random() * 4294967295);
   graph['3'].inputs.filename_prefix = `StoryReel/${sanitize(name)}`;
 

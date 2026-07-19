@@ -416,19 +416,22 @@ JSON schema:
 }
 
 // Stage 5 voice generation: Claude acts as a voice director preparing the
-// input for the local Chatterbox TTS workflow (TTS Audio Suite in ComfyUI).
-// It writes the exact text to be spoken — with [Character] speaker tags and
-// [pause:…] beats — and picks the engine parameters (exaggeration /
-// temperature / cfg_weight) plus a narrator voice matched to the dominant
-// speaker's gender and age. Emotions come from the SCENE CONTEXT first; the
-// Action Dynamics block is the fallback when the context is ambiguous.
-const TTS_VOICE_MENU = `Available narrator voices (pick EXACTLY one string):
-- "voices_examples/Clint_Eastwood CC3 (enhanced2).wav" — older male, dry, gravelly, weathered
-- "voices_examples/David_Attenborough CC3.wav" — older male, refined, gentle, narratorial
-- "voices_examples/Morgan_Freeman CC3.wav" — mature male, deep, warm, calm authority
-- "voices_examples/Sophie_Anderson CC3.wav" — adult female, warm, expressive
-- "voices_examples/female/female_01.wav" — adult female, neutral, clear
-- "voices_examples/female/female_02.wav" — young female, bright, energetic`;
+// input for the local OmniVoice TTS workflow (TTS Audio Suite in ComfyUI).
+// OmniVoice designs the voice reference-free from a tag instruction (gender,
+// age, pitch, style, accent — matched to the speaking character), and the
+// speech is delivered as SRT subtitle blocks whose timestamps the engine hits
+// natively — so line placement inside the shot is frame-accurate and can be
+// synced to the action's beats. Emotions come from the SCENE CONTEXT first;
+// the Action Dynamics block is the fallback when the context is ambiguous.
+const OMNIVOICE_DESIGN_MENU = `Voice-design tags (pick ONE value per slot; join the chosen values with ", " IN THIS ORDER into "voice_instruct"):
+- gender: "male" | "female"
+- age: "child" | "teenager" | "young adult" | "middle-aged" | "elderly"
+- pitch: "very low pitch" | "low pitch" | "moderate pitch" | "high pitch" | "very high pitch"
+- style (OPTIONAL — include only when the scene demands it): "whisper"
+- accent (OPTIONAL — only when it fits the character or setting): "american accent" | "british accent" | "australian accent" | "canadian accent" | "indian accent" | "chinese accent" | "korean accent" | "japanese accent" | "portuguese accent" | "russian accent"
+Example: "female, young adult, moderate pitch, british accent"`;
+
+const OMNIVOICE_NONVERBAL = `Non-verbal tags allowed INLINE in the subtitle text (angle brackets, exactly these): <laughter> <sigh> <confirmation-en> <question-en> <question-ah> <question-oh> <question-ei> <question-yi> <surprise-ah> <surprise-oh> <surprise-wa> <surprise-yo> <dissatisfaction-hnn>. Use at most one or two, and only where the emotion truly calls for it.`;
 
 export function stage5VoicePrompt(project, scene, shot, block, lang) {
   const chars = (project.storyline?.characters || [])
@@ -438,24 +441,24 @@ export function stage5VoicePrompt(project, scene, shot, block, lang) {
   const idx = shots.findIndex((s) => s.id === shot.id);
   const neighbor = (s) => (s ? `action: ${s.action}${s.dialogue ? ` | dialogue: ${s.dialogue}` : ''}` : '—');
   const dynNote = block
-    ? `\nAction Dynamics block (FALLBACK emotion source when the scene context is ambiguous): kinetic energy ${block.kinetic_energy_level}/10, dialogue volume ${block.dialogue_volume}/10, camera momentum "${block.required_camera_momentum.replace(/_/g, ' ')}". High energy → more exaggeration and pace, fewer/shorter pauses; low energy → restraint, longer pauses.`
+    ? `\nAction Dynamics block (FALLBACK emotion source when the scene context is ambiguous): kinetic energy ${block.kinetic_energy_level}/10, dialogue volume ${block.dialogue_volume}/10, camera momentum "${block.required_camera_momentum.replace(/_/g, ' ')}". High energy → brisk delivery, lines packed closer; low energy → restraint, longer silences between lines.`
     : '';
   return {
-    system: `You are a film voice director preparing the input for Chatterbox TTS (TTS Audio Suite running in ComfyUI). Your output drives a real text-to-speech engine, so every word you put in "tts_text" WILL BE SPOKEN ALOUD.
+    system: `You are a film voice director preparing the input for OmniVoice TTS (TTS Audio Suite running in ComfyUI). Your output drives a real text-to-speech engine: every word in the SRT text WILL BE SPOKEN ALOUD, and every timestamp WILL BE HIT — the engine natively targets each subtitle's duration.
 
-Rules for "tts_text":
-- Include ONLY the words the characters actually speak — never scene descriptions, camera notes or stage directions.
-- Start each speaker's lines with a [CharacterName] tag on its own segment (names in Latin letters, e.g. [Anna] …). Characters without a matching voice file fall back to the narrator voice — keep the tags anyway, they document who speaks.
-- Insert conversational pauses with [pause:0.6] (seconds) or [pause:600ms] between replies, before hesitations, and where the scene's rhythm breathes. Fit the TOTAL of speech + pauses inside the shot's duration.
-- Shape intonation with punctuation: ellipses … for hesitation, exclamation marks for energy, commas for breath, a question mark's natural rise. Use CAPS very sparingly for a single stressed word.
-- Keep the dialogue's original language and wording from the script; you may add small spoken interjections (sighs written as words are NOT allowed — only real words and pauses).
+"voice_instruct" — design the voice to MATCH THE SPEAKING CHARACTER:
+${OMNIVOICE_DESIGN_MENU}
+Derive gender and age from the character's description; derive pitch and style from their personality and the scene's emotional state (e.g. a hardened commander → low pitch; a frightened child → high pitch; an intimate or secretive moment → add "whisper"). If several characters speak in the shot, design for the DOMINANT speaker.
 
-Engine parameters (choose from the scene's emotion; use the dynamics block only as a fallback):
-- "exaggeration" 0.25–2.0 — emotional intensity: 0.3–0.45 calm/intimate, 0.5 neutral, 0.7–1.0 agitated/excited, 1.2+ only for extreme outbursts.
-- "cfg_weight" 0.0–1.0 — pacing: ~0.3 slow and deliberate delivery, 0.5 natural, ~0.7 quick and snappy.
-- "temperature" 0.05–5.0 — variability: 0.6–1.0 is the organic range; stay near 0.8 unless the read should be very controlled (lower) or loose (slightly higher).
-- "narrator_voice" — match the DOMINANT speaker's gender, age and personality.
-${TTS_VOICE_MENU}
+"srt_text" — the speech, as VALID SRT:
+- Numbered blocks: index line, then "HH:MM:SS,mmm --> HH:MM:SS,mmm", then the text line(s), separated by blank lines.
+- ALL timestamps must fit inside the shot's duration. Start the first line no earlier than 00:00:00,300 and end the last one at least 0.2s before the shot ends.
+- TIME EACH LINE TO THE SHOT'S EVENTS: read the action description and place every line at the exact moment it should be heard (a line answered after a beat starts later; words spoken mid-movement sit where the movement happens). Give each block a realistic duration for its word count — roughly 2.5 words per second; never cram.
+- Silence between blocks IS the pause — shape the rhythm with the gaps, do not write pause markers.
+- Include ONLY words the characters actually speak, verbatim from the script's dialogue, in its original language — never scene descriptions or stage directions.
+- ${OMNIVOICE_NONVERBAL}
+- Do NOT use square brackets [] anywhere in the text — no [Character] tags, no [pause] markers; the voice identity comes from "voice_instruct".
+- Shape intonation with punctuation: ellipses … for hesitation, exclamation marks for energy, commas for breath, question marks for the natural rise.
 
 Respond with VALID JSON ONLY. No markdown, no commentary.`,
     maxTokens: 2000,
@@ -469,10 +472,10 @@ THIS SHOT (duration ${shot.duration}s): action: ${shot.action}
 Dialogue to speak (verbatim source): ${shot.dialogue}
 Next shot: ${neighbor(shots[idx + 1])}
 
-Write the Chatterbox input for THIS shot's dialogue. Time budget: speech plus pauses must fit ~${shot.duration} seconds.
+Write the OmniVoice input for THIS shot's dialogue. All SRT timestamps must stay inside 0–${shot.duration} seconds, timed to the action's beats.
 
 JSON schema:
-{"tts_text":"[Name] line [pause:0.5] …","exaggeration":0.5,"temperature":0.8,"cfg_weight":0.5,"narrator_voice":"voices_examples/…"}`,
+{"srt_text":"1\\n00:00:00,400 --> 00:00:02,600\\nLine…\\n\\n2\\n…","voice_instruct":"female, young adult, moderate pitch"}`,
   };
 }
 
