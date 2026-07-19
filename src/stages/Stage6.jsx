@@ -110,14 +110,13 @@ function defaultScale(project) {
 // drag & drop and shot durations trimmed — all edits write back into the
 // same outline/sceneDetails data the other stages use. The preview window
 // above the timeline plays the assembly in real time, and "Render" records
-// it to a .webm file (extra time beyond a clip's video stays black — frames
-// are never stretched).
+// it to a file (extra time beyond a clip's video holds the clip's last
+// frame, matching the ffmpeg render — frames are never stretched).
 export default function Stage6({ project, update, settings }) {
   const { t } = useI18n();
   const [playing, setPlaying] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [selectedId, setSelectedId] = useState(null);
-  const [videoEnded, setVideoEnded] = useState(false);
   const [rendering, setRendering] = useState(false);
   const [renderProg, setRenderProg] = useState(null);
   const [renderErr, setRenderErr] = useState('');
@@ -336,20 +335,28 @@ export default function Stage6({ project, update, settings }) {
   }, [playing, total]);
 
   // Preview video element follows the playhead: (re)start it when the current
-  // clip changes; a video shorter than its clip goes black via onEnded.
+  // clip changes. A video shorter than its clip simply HOLDS ITS LAST FRAME
+  // for the remainder (matching the ffmpeg render, which clones the last
+  // frame — never a black gap, never the previous shot's frame).
   // The element remounts per clip (key), so the seek must wait for metadata —
   // seeking/playing a not-yet-loaded element is what froze playback on the
-  // first frame when clips changed mid-sequence.
+  // first frame when clips changed mid-sequence. Large data-URL videos can
+  // take a while to load; the seek target is computed at SEEK time from the
+  // live playhead so a late start lands in sync instead of at frame 0.
   const curShotId = cur?.shot.id;
+  const playposRef = useRef({ start: 0, head: 0 });
+  playposRef.current = { start: startOf(curIdx), head: cur?.trim?.head || 0 };
+  const elapsedRef = useRef(elapsed);
+  elapsedRef.current = elapsed;
   useEffect(() => {
-    setVideoEnded(false);
     const v = pvRef.current;
     if (!v) return;
     if (playing && cur?.video) {
-      const target = (cur.trim?.head || 0) + Math.max(0, curOffset);
+      const targetNow = () =>
+        playposRef.current.head + Math.max(0, elapsedRef.current - playposRef.current.start);
       const seekPlay = () => {
         try {
-          v.currentTime = target;
+          v.currentTime = targetNow();
         } catch {
           /* not seekable */
         }
@@ -366,16 +373,26 @@ export default function Stage6({ project, update, settings }) {
       };
       if (v.readyState >= 1) seekPlay();
       else v.addEventListener('loadedmetadata', seekPlay, { once: true });
-      // Watchdog: if the clip still isn't running shortly after, force it.
-      const dog = setTimeout(() => {
-        if (v.paused || v.currentTime <= target + 0.05) {
+      // Watchdogs: if the clip still isn't running shortly after (slow
+      // data-URL load / stalled decode), retry — resynced to the playhead.
+      const kick = () => {
+        if (v.ended) return; // short clip finished — holding last frame is correct
+        if (v.paused || Math.abs(v.currentTime - targetNow()) > 0.6) {
+          try {
+            v.currentTime = targetNow();
+          } catch {
+            /* not seekable yet */
+          }
           v.muted = v.muted || v.paused;
           v.play().catch(() => {});
         }
-      }, 700);
+      };
+      const dog1 = setTimeout(kick, 700);
+      const dog2 = setTimeout(kick, 2000);
       return () => {
         v.removeEventListener('loadedmetadata', seekPlay);
-        clearTimeout(dog);
+        clearTimeout(dog1);
+        clearTimeout(dog2);
       };
     }
     v.pause();
@@ -874,10 +891,8 @@ export default function Stage6({ project, update, settings }) {
       </div>
 
       <div className="asm-preview">
-        {cur?.video && !videoEnded ? (
-          <video key={cur.shot.id} ref={pvRef} src={cur.video} preload="auto" onEnded={() => setVideoEnded(true)} playsInline />
-        ) : cur?.video && videoEnded && playing ? (
-          <div className="asm-blank" />
+        {cur?.video ? (
+          <video key={cur.shot.id} ref={pvRef} src={cur.video} preload="auto" playsInline />
         ) : cur?.image ? (
           <img src={cur.image} alt="" />
         ) : (

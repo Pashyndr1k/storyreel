@@ -114,10 +114,20 @@ function buildArgs(job) {
       aIn[i] = inputIdx;
       inputIdx++;
     }
+    // Media can be SHORTER than its slot (sound+image dialogue clips follow
+    // the voice audio's length): freeze the last frame and pad the audio with
+    // silence to the exact extract length, then hard-trim. Without this a
+    // short segment ends the video track early (players hold the previous
+    // frame — the "last shot frozen on the previous shot" bug) and shifts all
+    // later audio earlier.
     filters.push(
-      `[${vIn[i]}:v]scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:color=black,fps=${fps},setsar=1,format=yuv420p,settb=AVTB[v${i}]`
+      `[${vIn[i]}:v]scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:color=black,fps=${fps},setsar=1,format=yuv420p,` +
+        `tpad=stop_mode=clone:stop_duration=${extract.toFixed(3)},trim=duration=${extract.toFixed(3)},settb=AVTB[v${i}]`
     );
-    filters.push(`[${aIn[i]}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,asetpts=N/SR/TB[a${i}]`);
+    filters.push(
+      `[${aIn[i]}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,asetpts=N/SR/TB,` +
+        `apad=whole_dur=${extract.toFixed(3)},atrim=0:${extract.toFixed(3)}[a${i}]`
+    );
   });
 
   // Chain: xfade/acrossfade for smooth boundaries, concat for hard cuts.
