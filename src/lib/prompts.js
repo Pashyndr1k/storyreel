@@ -358,6 +358,7 @@ export function stage5AudioPrompt(project, scene, shots, block) {
 Rules:
 - Respond with VALID JSON ONLY. No markdown, no code fences, no commentary outside the JSON.
 - Every "audio_prompt" is written in English, EXCEPT the characters' spoken lines, which are kept VERBATIM in their original language inside double quotes.
+- MANDATORY: for every shot whose "dialogue" field is non-empty, the "audio_prompt" MUST reproduce each spoken line WORD FOR WORD (verbatim, in its original language) inside double quotes. Never omit, shorten, paraphrase, translate or merely summarise a spoken line — the exact words must appear.
 - Map each shot's audio chronologically with precise timings inside the shot (start–end in seconds, e.g. 0.4s–2.1s): every spoken line (speaker name, the exact line, delivery/tone), meaningful pauses, and essential ambient sound or effects.
 - Voice directions must be concrete: approximate age, gender, energy, emotional tone, pacing.
 - Timings must fit within the shot's duration and follow the action's chronology.

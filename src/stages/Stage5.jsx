@@ -40,6 +40,30 @@ const parseInstruct = (instruct) => {
 };
 const buildInstruct = (tags) => OMNI_VOICE_SLOTS.map((k) => tags[k]).filter(Boolean).join(', ');
 
+// A Stage-4 shot's dialogue must always survive into its Stage-5 audio prompt.
+// Split the dialogue into spoken lines (dropping an optional "NAME:" label) and
+// compare against the model's audio prompt with case/punctuation ignored; any
+// spoken line the model dropped is appended verbatim so the dialogue is never
+// lost even if the LLM omits it.
+const spokenLines = (dialogue) =>
+  String(dialogue || '')
+    .split(/\r?\n+/)
+    .map((l) => l.replace(/^\s*[^:]{1,40}:\s*/, '').trim()) // strip a leading "NAME:" label
+    .filter(Boolean);
+const normWords = (s) => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+const ensureDialogueInAudioPrompt = (audioPrompt, dialogue) => {
+  const lines = spokenLines(dialogue);
+  if (!lines.length) return audioPrompt;
+  const haystack = normWords(audioPrompt);
+  const missing = lines.filter((l) => {
+    const n = normWords(l);
+    return n && !haystack.includes(n);
+  });
+  if (!missing.length) return audioPrompt;
+  const quoted = missing.map((l) => `"${l}"`).join(' ');
+  return `${(audioPrompt || '').trim()}\n\nRequired dialogue (verbatim): ${quoted}`.trim();
+};
+
 // Appended to every image-generation prompt: the described scene must fill the
 // whole canvas — no black bars / letterboxing / empty margins at any edge.
 const FULL_FRAME_RULE =
@@ -288,11 +312,15 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         const shot = sceneShots[(Number(pr.shot) || 1) - 1];
         if (!shot) return;
         const cur = next[shot.id] || {};
+        // A shot's dialogue is always guaranteed into its audio prompt, even if
+        // the model drops it (deterministic safety net over the prompt rule).
+        const audioPrompt =
+          pr.audio_prompt != null ? ensureDialogueInAudioPrompt(pr.audio_prompt, shot.dialogue) : null;
         next[shot.id] = {
           ...cur,
           imagePrompt: pr.image_prompt != null ? pr.image_prompt : cur.imagePrompt || '',
           videoPrompt: pr.video_prompt != null ? pr.video_prompt : cur.videoPrompt || '',
-          ...(pr.audio_prompt != null ? { audioPrompt: pr.audio_prompt } : {}),
+          ...(audioPrompt != null ? { audioPrompt } : {}),
         };
       });
       return { shotPrompts: next };
