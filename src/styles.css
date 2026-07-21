@@ -1425,6 +1425,9 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
   to { transform: none; opacity: 1; }
 }
 
+/* Stage 6 control row sits 30px lower, clear of the timeline footer */
+.row.s6-controls { margin-top: 42px; }
+
 /* background music modal */
 .music-modal { width: min(560px, 94vw); }
 .music-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 4px; }

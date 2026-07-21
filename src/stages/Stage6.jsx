@@ -1616,7 +1616,7 @@ export default function Stage6({ project, update, settings }) {
         <span className="nle-timecode">{elapsed.toFixed(1).padStart(4, '0')} / {total.toFixed(1).padStart(4, '0')}s</span>
       </div>
 
-      <div className="row">
+      <div className="row s6-controls">
         <button className="btn small primary fixedw" disabled={rendering || total <= 0} onClick={() => setPlaying((v) => !v)}>
           {playing ? <><StopSq size={14} /> {t('sb.stop')}</> : <><Play size={14} /> {t('sb.play')}</>}
         </button>
