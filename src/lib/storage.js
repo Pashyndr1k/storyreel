@@ -304,6 +304,7 @@ export function migrateProject(raw) {
               srcDuration: Math.max(0, Number(c.srcDuration) || Number(c.duration) || 0),
               fadeIn: Math.max(0, Number(c.fadeIn) || 0),
               fadeOut: Math.max(0, Number(c.fadeOut) || 0),
+              muted: c.muted === true,
             })),
         }))
     : [];

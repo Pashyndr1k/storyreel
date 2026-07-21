@@ -35,6 +35,24 @@ export const Grid = (p) => (
   </S>
 );
 
+export const Scissors = (p) => (
+  <S {...p}>
+    <circle cx="6" cy="6" r="2.6" />
+    <circle cx="6" cy="18" r="2.6" />
+    <path d="M8.2 7.6 20 19" />
+    <path d="M14.5 10.9 20 5" />
+    <path d="M8.2 16.4 12 12.7" />
+  </S>
+);
+
+export const TransitionIcon = (p) => (
+  <S {...p}>
+    <rect x="2" y="6" width="10" height="12" rx="1.6" />
+    <rect x="12" y="6" width="10" height="12" rx="1.6" />
+    <path d="M12 6v12" strokeWidth="2.4" />
+  </S>
+);
+
 export const Expand = (p) => (
   <S {...p}>
     <path d="M15 3h6v6" />

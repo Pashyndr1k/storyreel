@@ -314,6 +314,11 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 /* square icon button matching the 42px height of regular .btn rows */
 .icon-btn.sq42 { width: 42px; height: 42px; border-radius: var(--r-btn); }
 .icon-btn.sq42:disabled { opacity: 0.45; cursor: not-allowed; }
+/* square icon button matching the 36px height of .btn.small rows */
+.icon-btn.sq36 { width: 36px; height: 36px; border-radius: 12px; }
+.icon-btn.sq36:disabled { opacity: 0.45; cursor: not-allowed; }
+.icon-btn.sq36.danger { color: var(--danger); border-color: rgba(255, 107, 138, 0.35); background: transparent; }
+.icon-btn.sq36.danger:hover { background: rgba(255, 107, 138, 0.12); }
 
 /* text-only copy action above prompt fields */
 .copy-link {
@@ -1357,6 +1362,31 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 .cut-name { font-weight: 600; color: var(--text); white-space: nowrap; }
 .cut-desc { color: var(--text-2); line-height: 1.5; }
 .cut-eff { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--muted-2); white-space: nowrap; }
+
+/* transient toast — the only notification surface on Stage 6 */
+.s6-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 70;
+  max-width: 420px;
+  background: linear-gradient(160deg, var(--panel-2), var(--panel));
+  border: 1px solid rgba(139, 92, 246, 0.5);
+  border-radius: 14px;
+  padding: 12px 16px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-2);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  animation: toast-in 0.18s ease-out;
+}
+.s6-toast.err { border-color: rgba(255, 107, 138, 0.6); color: var(--danger); }
+@keyframes toast-in {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
 
 /* smart cut modal */
 .smartcut-modal { width: min(620px, 94vw); }
@@ -2414,11 +2444,31 @@ textarea.s5e-prompt-sm { min-height: 110px; }
   touch-action: none;
 }
 .aclip-0 { background: linear-gradient(90deg, #7c5cff, #a855f7); }
-.aclip-1 { background: linear-gradient(90deg, #d946ef, #f472b6); }
+.aclip-1 { background: linear-gradient(90deg, #1e3a8a, #2f5cb8); }
 .aclip-2 { background: linear-gradient(90deg, #0ea5b7, #38bdf8); }
 .aclip-3 { background: linear-gradient(90deg, #d97706, #f59e0b); }
 .aclip.selected { box-shadow: 0 0 0 2px #fff inset, 0 0 8px rgba(168, 85, 247, 0.7); }
 .aclip-name { overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.aclip.aclip-muted { opacity: 0.45; }
+/* compact in-clip controls (mute / delete), right-aligned inside the box */
+.aclip-tools { margin-left: auto; display: inline-flex; gap: 2px; flex: none; padding-left: 4px; }
+.aclip-btn {
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 8.5px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.aclip-btn:hover { background: rgba(0, 0, 0, 0.6); }
+.aclip-btn.on { background: rgba(200, 40, 70, 0.75); }
 .aclip-h {
   position: absolute;
   top: 0;

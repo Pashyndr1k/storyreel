@@ -7,7 +7,7 @@ import { generateJSON, textKeyError } from '../lib/claude.js';
 import { stage6SmartCutPrompt } from '../lib/prompts.js';
 import { decodeMediaAudio, audioBufferToWavDataURL } from '../lib/audio.js';
 import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
-import { Play, StopSq, Grip, Download, Upload, Wand } from '../components/icons.jsx';
+import { Play, StopSq, Grip, Download, Upload, Wand, Trash, Scissors, TransitionIcon } from '../components/icons.jsx';
 
 const readFileDataURL = (file) =>
   new Promise((resolve, reject) => {
@@ -128,8 +128,6 @@ export default function Stage6({ project, update, settings }) {
   const [selectedId, setSelectedId] = useState(null);
   const [rendering, setRendering] = useState(false);
   const [renderProg, setRenderProg] = useState(null);
-  const [renderErr, setRenderErr] = useState('');
-  const [renderDone, setRenderDone] = useState(null); // output file path (ffmpeg)
   const trackRef = useRef(null);
   const [trimId, setTrimId] = useState(null);
   const dragScene = useRef(null);
@@ -139,11 +137,20 @@ export default function Stage6({ project, update, settings }) {
   const cancelRef = useRef(false);
   const [scale, setScale] = useState(() => defaultScale(project));
   const scrollRef = useRef(null);
-  const [showScript, setShowScript] = useState(false); // voice-over script window
   const [showCuts, setShowCuts] = useState(false); // transitions reference table
   const [splitBusy, setSplitBusy] = useState(false);
-  const [splitNote, setSplitNote] = useState('');
   const [smartCut, setSmartCut] = useState(null); // { text, busy, err, result } | null
+
+  // Transient toast pop-up — the ONLY notification surface on this stage
+  // (nothing renders as a permanent note/frame). Errors linger longer.
+  const [toast, setToast] = useState(null); // { msg, kind: 'info'|'error' }
+  const toastTimer = useRef(null);
+  const showToast = (msg, kind = 'info') => {
+    clearTimeout(toastTimer.current);
+    setToast({ msg, kind });
+    toastTimer.current = setTimeout(() => setToast(null), kind === 'error' ? 12000 : 6000);
+  };
+  useEffect(() => () => clearTimeout(toastTimer.current), []);
 
   // ---- audio timeline (layers of clips) -------------------------------------
   const layers = project.audioLayers || [];
@@ -192,7 +199,7 @@ export default function Stage6({ project, update, settings }) {
         at += dur || 1;
       }
     } catch (e) {
-      setRenderErr(String(e?.message || e));
+      showToast(String(e?.message || e), 'error');
     }
   };
 
@@ -455,8 +462,8 @@ export default function Stage6({ project, update, settings }) {
               /* not seekable yet */
             }
           }
-          let g = 1;
-          if (c.fadeIn > 0 && local < c.fadeIn) g = local / c.fadeIn;
+          let g = c.muted ? 0 : 1;
+          if (c.fadeIn > 0 && local < c.fadeIn) g = Math.min(g, local / c.fadeIn);
           if (c.fadeOut > 0 && local > c.duration - c.fadeOut) g = Math.min(g, (c.duration - local) / c.fadeOut);
           el.volume = Math.max(0, Math.min(1, (L.volume ?? 1) * g));
           if (el.paused) el.play().catch(() => {});
@@ -558,7 +565,6 @@ export default function Stage6({ project, update, settings }) {
   const splitAV = async () => {
     if (splitBusy) return;
     setSplitBusy(true);
-    setSplitNote('');
     try {
       const laneId = 'avsplit';
       const existing = layers.find((L) => L.id === laneId);
@@ -590,7 +596,7 @@ export default function Stage6({ project, update, settings }) {
         muteIds.push(it.shot.id);
       }
       if (!newClips.length) {
-        setSplitNote(t('s6.splitNone', { m: skipped }));
+        showToast(t('s6.splitNone', { m: skipped }));
         return;
       }
       update((p) => {
@@ -602,7 +608,7 @@ export default function Stage6({ project, update, settings }) {
         for (const id of muteIds) mutes[id] = true;
         return { audioLayers: Ls, shotMutes: mutes };
       });
-      setSplitNote(t('s6.splitDone', { n: newClips.length }));
+      showToast(t('s6.splitDone', { n: newClips.length }));
     } finally {
       setSplitBusy(false);
     }
@@ -722,8 +728,6 @@ export default function Stage6({ project, update, settings }) {
   const doRenderFfmpeg = async () => {
     if (rendering || total <= 0) return;
     setRendering(true);
-    setRenderErr('');
-    setRenderDone(null);
     setPlaying(false);
     const [w, h] = videoDims(project.aspectRatio || '16:9', project.videoResolution);
     const segments = items.map((it) => {
@@ -752,7 +756,7 @@ export default function Stage6({ project, update, settings }) {
       .filter((L) => L.enabled !== false)
       .flatMap((L) =>
         (L.clips || [])
-          .filter((c) => c.dataURL && c.duration > 0.01)
+          .filter((c) => c.dataURL && c.duration > 0.01 && !c.muted)
           .map((c) => ({
             dataURL: c.dataURL,
             start: c.start || 0,
@@ -768,10 +772,10 @@ export default function Stage6({ project, update, settings }) {
     );
     try {
       const res = await window.ffmpegBridge.render({ width: w, height: h, fps: 25, segments, transitions, audioClips, outPath });
-      if (res?.ok) setRenderDone(res.path);
-      else if (!res?.canceled) setRenderErr(res?.error || 'ffmpeg failed');
+      if (res?.ok) showToast(t('s6.renderedTo', { p: res.path }));
+      else if (!res?.canceled) showToast(res?.error || 'ffmpeg failed', 'error');
     } catch (e) {
-      setRenderErr(String(e?.message || e));
+      showToast(String(e?.message || e), 'error');
     } finally {
       off?.();
       setRendering(false);
@@ -783,8 +787,6 @@ export default function Stage6({ project, update, settings }) {
     if (window.ffmpegBridge?.render) return doRenderFfmpeg();
     if (rendering || total <= 0) return;
     setRendering(true);
-    setRenderErr('');
-    setRenderDone(null);
     setPlaying(false);
     cancelRef.current = false;
     const [w, h] = videoDims(project.aspectRatio || '16:9', project.videoResolution);
@@ -831,7 +833,7 @@ export default function Stage6({ project, update, settings }) {
     try {
       rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
     } catch (e) {
-      setRenderErr(String(e.message || e));
+      showToast(String(e.message || e), 'error');
       setRendering(false);
       return;
     }
@@ -1284,7 +1286,7 @@ export default function Stage6({ project, update, settings }) {
                 {(L.clips || []).map((c) => (
                   <div
                     key={c.id}
-                    className={`aclip aclip-${li % 4} ${selAudio?.clipId === c.id ? 'selected' : ''}`}
+                    className={`aclip aclip-${li % 4} ${selAudio?.clipId === c.id ? 'selected' : ''} ${c.muted ? 'aclip-muted' : ''}`}
                     style={
                       zoomed
                         ? { left: c.start * scale, width: Math.max(10, c.duration * scale) }
@@ -1296,7 +1298,36 @@ export default function Stage6({ project, update, settings }) {
                     title={`${c.name} · ${c.duration.toFixed(1)}s`}
                     onPointerDown={(e) => startClipDrag(e, L, c, 'move')}
                   >
-                    <span className="aclip-name">{c.name}</span>
+    <span className="aclip-name">{c.name}</span>
+                    {/* compact in-clip controls: mute + delete (drag-safe) */}
+                    <span className="aclip-tools">
+                      <button
+                        type="button"
+                        className={`aclip-btn ${c.muted ? 'on' : ''}`}
+                        title={c.muted ? t('s6.clipUnmute') : t('s6.clipMute')}
+                        aria-label={c.muted ? t('s6.clipUnmute') : t('s6.clipMute')}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          patchClip(L.id, c.id, { muted: !c.muted });
+                        }}
+                      >
+                        {c.muted ? '🔇' : '🔊'}
+                      </button>
+                      <button
+                        type="button"
+                        className="aclip-btn"
+                        title={t('s6.clipDel')}
+                        aria-label={t('s6.clipDel')}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeClip(L.id, c.id);
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </span>
                     <span className="aclip-h left" onPointerDown={(e) => startClipDrag(e, L, c, 'start')} />
                     <span className="aclip-h right" onPointerDown={(e) => startClipDrag(e, L, c, 'end')} />
                     {/* hidden element that actually plays this clip in the preview */}
@@ -1345,8 +1376,8 @@ export default function Stage6({ project, update, settings }) {
                   onChange={(e) => patchLayer(L.id, { volume: Number(e.target.value) })}
                 />
                 <div className="lane-menu-row">
-                  <label className="btn tiny file-btn">
-                    {t('s6.addClip')}
+                  <label className="icon-btn sq36" title={t('s6.addClip')} aria-label={t('s6.addClip')}>
+                    <Upload size={15} />
                     <input
                       type="file"
                       accept="audio/*"
@@ -1362,13 +1393,15 @@ export default function Stage6({ project, update, settings }) {
                   </label>
                   <button
                     type="button"
-                    className="btn tiny danger"
+                    className="icon-btn sq36 danger"
+                    title={t('s6.removeLayer')}
+                    aria-label={t('s6.removeLayer')}
                     onClick={() => {
                       removeLayer(L.id);
                       setLaneMenu(null);
                     }}
                   >
-                    {t('s6.removeLayer')}
+                    <Trash size={15} />
                   </button>
                 </div>
               </div>
@@ -1505,19 +1538,35 @@ export default function Stage6({ project, update, settings }) {
         <button className="btn small" disabled={rendering} onClick={doRender}>
           <Download size={14} /> {rendering ? t('s6.rendering') : t('s6.render')}
         </button>
-        <button className="btn small" onClick={() => setShowScript(true)}>
-          {t('s6.script')}
+        <button
+          type="button"
+          className="icon-btn sq36"
+          title={t('s6.smartCut')}
+          aria-label={t('s6.smartCut')}
+          disabled={total <= 0}
+          onClick={() => setSmartCut({ text: '', busy: false, err: '', result: null })}
+        >
+          <Wand size={16} />
         </button>
-        <button className="btn small" disabled={total <= 0} onClick={() => setSmartCut({ text: '', busy: false, err: '', result: null })}>
-          <Wand size={14} /> {t('s6.smartCut')}
+        <button
+          type="button"
+          className={`icon-btn sq36 ${splitBusy ? 'busy' : ''}`}
+          title={splitBusy ? t('s6.splitting') : t('s6.splitAV')}
+          aria-label={t('s6.splitAV')}
+          disabled={splitBusy || total <= 0}
+          onClick={splitAV}
+        >
+          <Scissors size={16} />
         </button>
-        <button className="btn small" disabled={splitBusy || total <= 0} onClick={splitAV}>
-          {splitBusy ? t('s6.splitting') : t('s6.splitAV')}
+        <button
+          type="button"
+          className="icon-btn sq36"
+          title={t('s6.cutsTable')}
+          aria-label={t('s6.cutsTable')}
+          onClick={() => setShowCuts(true)}
+        >
+          <TransitionIcon size={16} />
         </button>
-        <button className="btn small" onClick={() => setShowCuts(true)}>
-          {t('s6.cutsTable')}
-        </button>
-        {splitNote && <span className="total-badge">{splitNote}</span>}
         {rendering && (
           <>
             {renderProg && (
@@ -1539,8 +1588,6 @@ export default function Stage6({ project, update, settings }) {
           </>
         )}
       </div>
-      {renderErr && <div className="note error">{renderErr}</div>}
-      {renderDone && <div className="note ok-note">{t('s6.renderedTo', { p: renderDone })}</div>}
 
       {/* Transitions reference: what each cut does, with checkboxes to trim
           the list — disabled types leave the auto-picker and the cut menu. */}
@@ -1648,41 +1695,9 @@ export default function Stage6({ project, update, settings }) {
         </div>
       )}
 
-      {showScript && (
-        <div className="overlay" onClick={() => setShowScript(false)}>
-          <div className="modal script-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>{t('s6.scriptTitle')}</h3>
-            <div className="script-list">
-              {(() => {
-                const rows = items
-                  .map((it, idx) => {
-                    const sp = (project.shotPrompts || {})[it.shot.id] || {};
-                    const dlg = (it.shot.dialogue || '').trim();
-                    const aud = (sp.audioPrompt || '').trim();
-                    if (!dlg && !aud) return null;
-                    const t0 = startOf(idx);
-                    const t1 = t0 + (it.shot.duration || 0);
-                    const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${(s % 60).toFixed(1).padStart(4, '0')}`;
-                    return (
-                      <div key={it.shot.id} className="script-item">
-                        <div className="script-time">
-                          {fmt(t0)}–{fmt(t1)} · {t('s4.shot', { n: idx + 1 })}
-                        </div>
-                        {dlg && <div className="script-dlg">{dlg}</div>}
-                        {aud && <pre className="script-audio">{aud}</pre>}
-                      </div>
-                    );
-                  })
-                  .filter(Boolean);
-                return rows.length ? rows : <p className="hint">{t('s6.scriptEmpty')}</p>;
-              })()}
-            </div>
-            <div className="row">
-              <button className="btn small" onClick={() => setShowScript(false)}>
-                {t('s6.close')}
-              </button>
-            </div>
-          </div>
+      {toast && (
+        <div className={`s6-toast ${toast.kind === 'error' ? 'err' : ''}`} onClick={() => setToast(null)}>
+          {toast.msg}
         </div>
       )}
       {cutMenu && (
