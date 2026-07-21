@@ -2482,15 +2482,35 @@ textarea.s5e-prompt-sm { min-height: 110px; }
   align-items: center;
   padding: 0 10px;
   font-size: 10px;
-  color: #fff;
+  color: var(--ac-text);
   white-space: nowrap;
   user-select: none;
   touch-action: none;
 }
-.aclip-0 { background: linear-gradient(90deg, #7c5cff, #a855f7); }
-.aclip-1 { background: linear-gradient(90deg, #1e3a8a, #2f5cb8); }
-.aclip-2 { background: linear-gradient(90deg, #0ea5b7, #38bdf8); }
-.aclip-3 { background: linear-gradient(90deg, #d97706, #f59e0b); }
+/* audio clip colors follow the selected color scheme */
+:root {
+  --ac0a: #7c5cff; --ac0b: #a855f7;
+  --ac1a: #1e3a8a; --ac1b: #2f5cb8;
+  --ac2a: #0ea5b7; --ac2b: #38bdf8;
+  --ac3a: #d97706; --ac3b: #f59e0b;
+  --ac-text: #fff;
+}
+:root[data-theme='medium'] {
+  --ac0a: #8a6df5; --ac0b: #b06cf2;
+  --ac1a: #2c4a9e; --ac1b: #4370c4;
+  --ac2a: #1fa9bb; --ac2b: #4fc3ea;
+  --ac3a: #dd8615; --ac3b: #f0a83a;
+}
+:root[data-theme='light'] {
+  --ac0a: #8f77dd; --ac0b: #ab8ae0;
+  --ac1a: #48619e; --ac1b: #6b86bd;
+  --ac2a: #3d9fb0; --ac2b: #6bb9cc;
+  --ac3a: #cf933f; --ac3b: #dcab63;
+}
+.aclip-0 { background: linear-gradient(90deg, var(--ac0a), var(--ac0b)); }
+.aclip-1 { background: linear-gradient(90deg, var(--ac1a), var(--ac1b)); }
+.aclip-2 { background: linear-gradient(90deg, var(--ac2a), var(--ac2b)); }
+.aclip-3 { background: linear-gradient(90deg, var(--ac3a), var(--ac3b)); }
 .aclip.selected { box-shadow: 0 0 0 2px #fff inset, 0 0 8px rgba(168, 85, 247, 0.7); }
 .aclip-name { overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
 .aclip.aclip-muted { opacity: 0.45; }

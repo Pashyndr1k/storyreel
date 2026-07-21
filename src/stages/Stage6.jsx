@@ -200,10 +200,12 @@ export default function Stage6({ project, update, settings }) {
           : L
       )
     );
-  // New layers slot in ABOVE the background-music lane, which is pinned to
-  // the very bottom of the timeline.
+  // Background-music lanes ('bgmusic' legacy id or 'bgm_*') form a group
+  // pinned to the very bottom of the timeline; ordinary new layers slot in
+  // ABOVE that group.
+  const isMusicLane = (L) => L.id === 'bgmusic' || String(L.id).startsWith('bgm_');
   const insertAboveMusic = (Ls, L) => {
-    const mi = Ls.findIndex((x) => x.id === 'bgmusic');
+    const mi = Ls.findIndex(isMusicLane);
     return mi >= 0 ? [...Ls.slice(0, mi), L, ...Ls.slice(mi)] : [...Ls, L];
   };
   const addLayer = () =>
@@ -774,16 +776,18 @@ export default function Stage6({ project, update, settings }) {
         fadeIn: 0,
         fadeOut: 0,
       };
+      // Every generated melody gets its OWN track, appended below all the
+      // previous music tracks at the bottom of the timeline.
       update((p) => {
         const Ls = [...(p.audioLayers || [])];
-        const idx = Ls.findIndex((L) => L.id === 'bgmusic');
-        if (idx >= 0) {
-          const L = { ...Ls[idx], clips: [...Ls[idx].clips, clip] };
-          Ls.splice(idx, 1);
-          Ls.push(L); // keep the music lane at the very bottom
-        } else {
-          Ls.push({ id: 'bgmusic', name: t('s6.musicLane'), enabled: true, volume: 0.35, clips: [clip] });
-        }
+        const n = Ls.filter(isMusicLane).length;
+        Ls.push({
+          id: `bgm_${uid()}`,
+          name: `${t('s6.musicLane')} ${n + 1}`,
+          enabled: true,
+          volume: 0.35,
+          clips: [clip],
+        });
         return { audioLayers: Ls };
       });
       setMusic(null);
