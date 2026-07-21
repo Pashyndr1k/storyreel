@@ -1,7 +1,7 @@
 // Action Dynamics Plan engine. The plan is generated at Stage 3 alongside the
 // scene outline, then trickles down: Stage 4 constrains shot durations by the
 // block's shot_density, Stage 5 cites the block's parameters in generation
-// payloads (with the +2s padding rule), and Stage 6 uses it as the source of
+// payloads (with the +3s padding rule), and Stage 6 uses it as the source of
 // truth for trims and transitions.
 import config from '../data/dynamics_config.json';
 
@@ -61,7 +61,7 @@ export function densityRange(block) {
 export const energyClass = (level) => (level >= config.energy_high_threshold ? 'high' : 'low');
 
 // ---- generation payload (Stage 5) -------------------------------------------
-// Matches shot_generation_payload.json: the +2s rule and dynamics parameters.
+// Matches shot_generation_payload.json: the +3s rule and dynamics parameters.
 export function buildShotPayload(shot, block) {
   const target = Number(shot.duration) || 4;
   const genDuration = Math.round(target) + config.generation_padding_sec;
@@ -107,7 +107,7 @@ export function trimSeconds() {
 
 // Default trim for a shot's raw video: apply the 15-frame rule only when the
 // raw generation is actually longer than the timeline target (old footage
-// generated without the +2s padding is used untrimmed).
+// generated without the +3s padding is used untrimmed).
 export function defaultTrim(targetSec, rawSec) {
   if (!rawSec || rawSec <= targetSec + 0.2) return { head: 0, tail: 0 };
   const t = trimSeconds();

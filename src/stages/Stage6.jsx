@@ -3,8 +3,11 @@ import { useI18n } from '../lib/i18n.js';
 import { uid } from '../lib/storage.js';
 import { videoDims, saveToLocalOutputs } from '../lib/comfy.js';
 import { blockForScene, defaultTrim, transitionFor, overlapSeconds } from '../lib/dynamics.js';
+import { generateJSON, textKeyError } from '../lib/claude.js';
+import { stage6SmartCutPrompt } from '../lib/prompts.js';
+import { decodeMediaAudio, audioBufferToWavDataURL } from '../lib/audio.js';
 import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
-import { Play, StopSq, Grip, Download, Upload } from '../components/icons.jsx';
+import { Play, StopSq, Grip, Download, Upload, Wand } from '../components/icons.jsx';
 
 const readFileDataURL = (file) =>
   new Promise((resolve, reject) => {
@@ -70,6 +73,7 @@ const CUT_ABBR = {
   circle_open: 'CO',
   whip_pan: 'WH',
 };
+const REAL_CUTS = CUT_TYPES.filter((ty) => ty !== 'auto');
 // ffmpeg xfade mapping ('cut' = frame-exact concat).
 const CUT_FFMPEG = {
   smash_cut: { xfade: 'cut' },
@@ -118,7 +122,7 @@ function defaultScale(project) {
 // it to a file (extra time beyond a clip's video holds the clip's last
 // frame, matching the ffmpeg render — frames are never stretched).
 export default function Stage6({ project, update, settings }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [playing, setPlaying] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [selectedId, setSelectedId] = useState(null);
@@ -136,6 +140,10 @@ export default function Stage6({ project, update, settings }) {
   const [scale, setScale] = useState(() => defaultScale(project));
   const scrollRef = useRef(null);
   const [showScript, setShowScript] = useState(false); // voice-over script window
+  const [showCuts, setShowCuts] = useState(false); // transitions reference table
+  const [splitBusy, setSplitBusy] = useState(false);
+  const [splitNote, setSplitNote] = useState('');
+  const [smartCut, setSmartCut] = useState(null); // { text, busy, err, result } | null
 
   // ---- audio timeline (layers of clips) -------------------------------------
   const layers = project.audioLayers || [];
@@ -269,6 +277,12 @@ export default function Stage6({ project, update, settings }) {
   });
   const items = scenes.flatMap((g) => g.shots.map((it) => ({ ...it, sceneId: g.scene.id })));
 
+  // Transition types the user has kept in the trimmed list (all by default).
+  // Explicit per-boundary overrides are always honored; the automatic picker
+  // degrades a disabled pick to a plain match-action cut.
+  const disabledCuts = new Set(project.disabledTransitions || []);
+  const enabledCuts = REAL_CUTS.filter((ty) => !disabledCuts.has(ty));
+
   // Transition INTO the next item, per item index (last item has none).
   const cutFor = (idx) => {
     if (idx >= items.length - 1) return null;
@@ -276,7 +290,11 @@ export default function Stage6({ project, update, settings }) {
     if (override && override !== 'auto' && CUT_ACTIONS[override]) {
       return { ...CUT_ACTIONS[override], overridden: true };
     }
-    return { ...transitionFor(items[idx].block, items[idx + 1].block), overridden: false };
+    const auto = transitionFor(items[idx].block, items[idx + 1].block);
+    if (disabledCuts.has(auto.transition_type)) {
+      return { transition_type: 'match_action_cut', audio_bridge: 'none', overlap_frames: 0, overridden: false };
+    }
+    return { ...auto, overridden: false };
   };
 
   // Transition picker: clicking a cut badge opens a menu with every technique.
@@ -531,6 +549,153 @@ export default function Stage6({ project, update, settings }) {
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
+  };
+
+  // Auto-split A/V: detach the audio track of every timeline video (generated
+  // or uploaded) into clips on a dedicated audio lane — aligned to each shot's
+  // slot and trim — and mute the video's own sound, exactly like unlinking
+  // audio in a traditional NLE. Idempotent: already-split shots are skipped.
+  const splitAV = async () => {
+    if (splitBusy) return;
+    setSplitBusy(true);
+    setSplitNote('');
+    try {
+      const laneId = 'avsplit';
+      const existing = layers.find((L) => L.id === laneId);
+      const have = new Set((existing?.clips || []).map((c) => c.id));
+      const newClips = [];
+      const muteIds = [];
+      let skipped = 0;
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        if (!it.video) continue;
+        const clipId = `av_${it.shot.id}`;
+        if (have.has(clipId)) {
+          skipped++;
+          continue;
+        }
+        const buf = await decodeMediaAudio(it.video);
+        if (!buf) continue; // no audio track in this video
+        newClips.push({
+          id: clipId,
+          name: `${t('s4.shot', { n: i + 1 })}`,
+          dataURL: audioBufferToWavDataURL(buf),
+          start: startOf(i),
+          offset: it.trim?.head || 0,
+          duration: Math.min(it.shot.duration || 0, Math.max(0.1, buf.duration - (it.trim?.head || 0))),
+          srcDuration: buf.duration,
+          fadeIn: 0,
+          fadeOut: 0,
+        });
+        muteIds.push(it.shot.id);
+      }
+      if (!newClips.length) {
+        setSplitNote(t('s6.splitNone', { m: skipped }));
+        return;
+      }
+      update((p) => {
+        const Ls = [...(p.audioLayers || [])];
+        const idx = Ls.findIndex((L) => L.id === laneId);
+        if (idx >= 0) Ls[idx] = { ...Ls[idx], clips: [...Ls[idx].clips, ...newClips] };
+        else Ls.push({ id: laneId, name: t('s6.splitLane'), enabled: true, volume: 1, clips: newClips });
+        const mutes = { ...(p.shotMutes || {}) };
+        for (const id of muteIds) mutes[id] = true;
+        return { audioLayers: Ls, shotMutes: mutes };
+      });
+      setSplitNote(t('s6.splitDone', { n: newClips.length }));
+    } finally {
+      setSplitBusy(false);
+    }
+  };
+
+  // Smart cut: Claude re-cuts the timeline per a plain-language instruction —
+  // shot durations and transitions change (video content does not), voice-
+  // locked shots keep their length, and shots that now need more footage than
+  // was generated come back as regeneration warnings.
+  const runSmartCut = async () => {
+    const instruction = (smartCut?.text || '').trim();
+    if (!instruction || smartCut?.busy) return;
+    const keyErr = textKeyError(settings);
+    if (keyErr) {
+      setSmartCut((s) => ({ ...s, err: t('err.noKey') }));
+      return;
+    }
+    setSmartCut((s) => ({ ...s, busy: true, err: '', result: null }));
+    try {
+      const rows = items.map((it, i) => {
+        const sceneIdx = project.outline.findIndex((sc) => sc.id === it.sceneId);
+        return {
+          shot: i + 1,
+          scene: sceneIdx + 1,
+          scene_title: project.outline[sceneIdx]?.title || '',
+          duration_sec: it.shot.duration || 0,
+          material_sec: it.video ? Math.round((it.raw || it.shot.duration || 0) * 10) / 10 : null,
+          voice_locked: !!(project.shotAudios || {})[it.shot.id],
+          dialogue: !!(it.shot.dialogue || '').trim(),
+          energy: it.block?.kinetic_energy_level ?? null,
+          transition_to_next: i < items.length - 1 ? cutFor(i).transition_type : null,
+          action: (it.shot.action || '').slice(0, 140),
+        };
+      });
+      const data = await generateJSON(
+        settings,
+        stage6SmartCutPrompt(project, rows, instruction, [...enabledCuts], lang)
+      );
+      // Apply: durations (clamped, voice-locked shots protected app-side too)
+      // and transitions (validated against the enabled list).
+      const byIdx = new Map();
+      for (const ch of data.shots || []) {
+        const idx = (Number(ch.shot) || 0) - 1;
+        if (idx >= 0 && idx < items.length) byIdx.set(idx, ch);
+      }
+      let durs = 0;
+      let cuts = 0;
+      update((p) => {
+        const details = { ...p.sceneDetails };
+        const trans = { ...(p.shotTransitions || {}) };
+        byIdx.forEach((ch, idx) => {
+          const it = items[idx];
+          const locked = !!(p.shotAudios || {})[it.shot.id];
+          const d = Number(ch.duration);
+          if (!locked && Number.isFinite(d)) {
+            const dur = Math.max(2, Math.min(10, Math.round(d * 10) / 10));
+            if (dur !== (it.shot.duration || 0)) {
+              details[it.sceneId] = {
+                shots: (details[it.sceneId]?.shots || []).map((s) =>
+                  s.id === it.shot.id ? { ...s, duration: dur } : s
+                ),
+              };
+              durs++;
+            }
+          }
+          const ty = String(ch.transition || '');
+          if (ty === 'auto') {
+            if (trans[it.shot.id]) {
+              delete trans[it.shot.id];
+              cuts++;
+            }
+          } else if (enabledCuts.includes(ty) && trans[it.shot.id] !== ty) {
+            trans[it.shot.id] = ty;
+            cuts++;
+          }
+        });
+        return { sceneDetails: details, shotTransitions: trans };
+      });
+      const regen = (data.regenerate || [])
+        .map((r) => ({
+          shot: Number(r.shot) || 0,
+          needed: Number(r.needed_sec) || null,
+          reason: String(r.reason || ''),
+        }))
+        .filter((r) => r.shot >= 1 && r.shot <= items.length);
+      setSmartCut((s) => ({
+        ...s,
+        busy: false,
+        result: { durs, cuts, notes: String(data.notes || ''), regen },
+      }));
+    } catch (e) {
+      setSmartCut((s) => ({ ...s, busy: false, err: e.message || String(e) }));
+    }
   };
 
   // While playing a zoomed timeline, scroll to keep the playhead in view.
@@ -1343,6 +1508,16 @@ export default function Stage6({ project, update, settings }) {
         <button className="btn small" onClick={() => setShowScript(true)}>
           {t('s6.script')}
         </button>
+        <button className="btn small" disabled={total <= 0} onClick={() => setSmartCut({ text: '', busy: false, err: '', result: null })}>
+          <Wand size={14} /> {t('s6.smartCut')}
+        </button>
+        <button className="btn small" disabled={splitBusy || total <= 0} onClick={splitAV}>
+          {splitBusy ? t('s6.splitting') : t('s6.splitAV')}
+        </button>
+        <button className="btn small" onClick={() => setShowCuts(true)}>
+          {t('s6.cutsTable')}
+        </button>
+        {splitNote && <span className="total-badge">{splitNote}</span>}
         {rendering && (
           <>
             {renderProg && (
@@ -1366,6 +1541,112 @@ export default function Stage6({ project, update, settings }) {
       </div>
       {renderErr && <div className="note error">{renderErr}</div>}
       {renderDone && <div className="note ok-note">{t('s6.renderedTo', { p: renderDone })}</div>}
+
+      {/* Transitions reference: what each cut does, with checkboxes to trim
+          the list — disabled types leave the auto-picker and the cut menu. */}
+      {showCuts && (
+        <div className="overlay" onClick={() => setShowCuts(false)}>
+          <div className="modal cuts-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>{t('s6.cutsTitle')}</h3>
+            <p className="hint">{t('s6.cutsHint')}</p>
+            <table className="cuts-table">
+              <thead>
+                <tr>
+                  <th />
+                  <th />
+                  <th>{t('s6.cutsName')}</th>
+                  <th>{t('s6.cutsDesc')}</th>
+                  <th>{t('s6.cutsEffect')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {REAL_CUTS.map((ty) => {
+                  const ff = CUT_FFMPEG[ty] || { xfade: 'cut' };
+                  const bridge = CUT_ACTIONS[ty]?.audio_bridge;
+                  return (
+                    <tr key={ty} className={disabledCuts.has(ty) ? 'cut-off' : ''}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={!disabledCuts.has(ty)}
+                          onChange={(e) =>
+                            update((p) => {
+                              const cur = new Set(p.disabledTransitions || []);
+                              if (e.target.checked) cur.delete(ty);
+                              else cur.add(ty);
+                              return { disabledTransitions: [...cur] };
+                            })
+                          }
+                        />
+                      </td>
+                      <td><b className="cut-abbr">{CUT_ABBR[ty]}</b></td>
+                      <td className="cut-name">{t(`cut.${ty}`)}</td>
+                      <td className="cut-desc">{t(`cutd.${ty}`)}</td>
+                      <td className="cut-eff">
+                        {ff.xfade === 'cut' ? t('s6.cutsHard') : `${ff.xfade} · ${ff.dur}s`}
+                        {bridge && bridge !== 'none' ? ` · ${bridge.replace('_', '-')}` : ''}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <div className="row">
+              <button className="btn small" onClick={() => setShowCuts(false)}>{t('s6.close')}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Smart cut: prompt-driven re-cut of the whole timeline. */}
+      {smartCut && (
+        <div className="overlay" onClick={() => !smartCut.busy && setSmartCut(null)}>
+          <div className="modal smartcut-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>{t('s6.smartCutTitle')}</h3>
+            <p className="hint">{t('s6.smartCutHint')}</p>
+            <textarea
+              rows={3}
+              value={smartCut.text}
+              placeholder={t('s6.smartCutPh')}
+              disabled={smartCut.busy}
+              onChange={(e) => setSmartCut((s) => ({ ...s, text: e.target.value }))}
+            />
+            {smartCut.err && <div className="note error">{smartCut.err}</div>}
+            {smartCut.result && (
+              <div className="note ok-note">
+                {t('s6.smartCutDone', { d: smartCut.result.durs, c: smartCut.result.cuts })}
+                {smartCut.result.notes && <p className="smartcut-notes">{smartCut.result.notes}</p>}
+              </div>
+            )}
+            {smartCut.result?.regen?.length > 0 && (
+              <div className="note warn">
+                {t('s6.smartCutRegen')}
+                <ul className="smartcut-regen">
+                  {smartCut.result.regen.map((r) => (
+                    <li key={r.shot}>
+                      {t('s4.shot', { n: r.shot })}
+                      {r.needed ? ` — ≥${r.needed}s` : ''}
+                      {r.reason ? ` · ${r.reason}` : ''}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className="row">
+              <button
+                className="btn small primary"
+                disabled={smartCut.busy || !smartCut.text.trim()}
+                onClick={runSmartCut}
+              >
+                {smartCut.busy ? t('s6.smartCutBusy') : t('s6.smartCutRun')}
+              </button>
+              <button className="btn small" disabled={smartCut.busy} onClick={() => setSmartCut(null)}>
+                {t('s6.close')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showScript && (
         <div className="overlay" onClick={() => setShowScript(false)}>
@@ -1408,7 +1689,10 @@ export default function Stage6({ project, update, settings }) {
         <>
           <div className="cut-menu-backdrop" onClick={() => setCutMenu(null)} />
           <div className="cut-menu" style={{ left: cutMenu.x, top: cutMenu.y }}>
-            {CUT_TYPES.map((ty) => {
+            {CUT_TYPES.filter((ty) => {
+              const cur = (project.shotTransitions || {})[items[cutMenu.idx]?.shot.id] || 'auto';
+              return ty === 'auto' || ty === cur || !disabledCuts.has(ty);
+            }).map((ty) => {
               const cur = (project.shotTransitions || {})[items[cutMenu.idx]?.shot.id] || 'auto';
               return (
                 <button

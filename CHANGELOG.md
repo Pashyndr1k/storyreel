@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.18.0 — 2026-07-21
+
+- Smart cut (Stage 6): describe the edit in plain words — "more dynamic",
+  "slow down scene 2", "punchier cuts in the finale" — and Claude re-cuts
+  the timeline: shot durations and the transitions between shots change to
+  match the requested pacing, for the whole film or only the scenes you
+  name. The total runtime may change freely. Shots with generated voice
+  keep their length (their speech is timed to the shot), and shots whose
+  new duration needs more footage than was generated are listed with the
+  seconds required, so you can regenerate them at Stage 5.
+- Auto-split A/V (Stage 6): one click detaches the audio track of every
+  generated or uploaded video on the timeline into clips on a dedicated
+  "Shot audio" lane — aligned to each shot's slot and trim, editable like
+  any audio clip — and mutes the videos' own sound, exactly like unlinking
+  audio in a traditional editor. Already-split shots are skipped.
+- Transitions table (Stage 6): a reference of every transition between
+  shots — what it does, how it renders, its audio bridge — with checkboxes
+  to trim the list. Untick a transition and the automatic picker and the
+  cut menu stop offering it (a disabled automatic pick falls back to a
+  plain match-action cut; explicit choices on the timeline are kept).
+- Video generation now pads each silent shot by +3 seconds instead of +2,
+  leaving more spare footage for trims, transitions and re-cuts.
+
 ## 1.17.0 — 2026-07-19
 
 Voice and dialogue

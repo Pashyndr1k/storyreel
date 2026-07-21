@@ -4,7 +4,7 @@
     "tail_trim_frames": 15,
     "assumed_framerate": 25
   },
-  "generation_padding_sec": 2,
+  "generation_padding_sec": 3,
   "shot_density_duration_map": {
     "low": { "min_sec": 5, "max_sec": 10 },
     "medium": { "min_sec": 3.5, "max_sec": 6 },

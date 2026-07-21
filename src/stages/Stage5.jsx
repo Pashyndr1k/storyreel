@@ -786,7 +786,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const voiceAud = (cur.shotAudios || {})[shot.id] || null;
     setImgBusy(`${shot.id}:vid`);
     setImgErr(null);
-    // +2s padding rule (silent shots only): generate longer than the timeline
+    // +3s padding rule (silent shots only): generate longer than the timeline
     // needs; Stage 6 trims 15 frames from head and tail to mask AI ramp-up
     // and tail degradation. Voice-synced shots render at the exact duration.
     const genDuration = voiceAud

@@ -382,6 +382,43 @@ Return exactly one entry per shot, in order.`,
   };
 }
 
+// Stage 6 "Smart cut": Claude acts as a film editor re-cutting the assembled
+// timeline per a plain-language instruction ("more dynamic", "slow down
+// scene 2"). It may change shot durations and the transitions between shots;
+// the total runtime is free to change. Shots whose voice audio is already
+// generated are duration-locked (their speech is timed to the shot), and
+// shots whose new duration would exceed the generated material are reported
+// for regeneration instead of silently degrading.
+export function stage6SmartCutPrompt(project, rows, instruction, allowedTransitions, lang) {
+  return {
+    system: `You are a professional film editor re-cutting an assembled timeline. You adjust PACING and RHYTHM by changing per-shot durations and the transitions between shots.
+
+Editing rules:
+- Durations are seconds between 2 and 10, at most one decimal. Shorter shots and harder cuts read faster and more dynamic; longer shots and softer transitions read calmer. Vary rhythm — do not set every shot to the same length.
+- Respect each shot's "material_sec" (the generated footage available): a duration may exceed it only when the pacing truly demands it — then ALSO list that shot in "regenerate" with the seconds needed, so the user can regenerate longer footage.
+- NEVER change the duration of shots marked "voice_locked": their speech is timed to the shot. You may still change their transitions.
+- "transition" must be one of: ${allowedTransitions.join(', ')}, or "auto" (let the dynamics matrix decide). Hard cuts (smash_cut, match_action_cut) accelerate; dissolves and dips slow down and breathe.
+- Follow the user's SCOPE: if they name specific scenes or shots, change ONLY those; otherwise treat the whole film. The total runtime may change freely.
+- Only include shots you actually change. Keep the edit purposeful — a rhythm, not noise.
+- "notes": 1-3 short sentences (${lang === 'ru' ? 'in Russian' : lang === 'uk' ? 'in Ukrainian' : 'in English'}) explaining the editorial intent of your cut.
+
+Respond with VALID JSON ONLY. No markdown, no commentary.`,
+    maxTokens: 4000,
+    user: `Film: "${project.title}"
+
+Timeline (in order):
+${JSON.stringify(rows, null, 2)}
+
+User instruction:
+"""
+${instruction}
+"""
+
+JSON schema:
+{"shots":[{"shot":3,"duration":4.5,"transition":"smash_cut"}],"regenerate":[{"shot":5,"needed_sec":7,"reason":"..."}],"notes":"..."}`,
+  };
+}
+
 // "Tweak this": rewrite an existing generation prompt per a plain-language
 // adjustment ("make it more cinematic and moody") without the user touching
 // the technical jargon. Everything unrelated must survive verbatim.

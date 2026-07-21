@@ -1330,6 +1330,41 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
   padding: 0;
 }
 .lane-more:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
+/* transitions reference table */
+.cuts-modal { width: min(860px, 94vw); }
+.cuts-table { width: 100%; border-collapse: collapse; margin: 8px 0 4px; }
+.cuts-table th {
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--glass-border);
+}
+.cuts-table td { padding: 8px 10px; border-bottom: 1px solid var(--glass-border-soft); font-size: 12.5px; vertical-align: top; }
+.cuts-table tr.cut-off td { opacity: 0.4; }
+.cuts-table input[type='checkbox'] { width: 15px; height: 15px; margin: 0; accent-color: #7c5cff; cursor: pointer; }
+.cut-abbr {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  background: rgba(139, 92, 246, 0.16);
+  color: var(--violet-text);
+  border-radius: 4px;
+  padding: 2px 5px;
+}
+.cut-name { font-weight: 600; color: var(--text); white-space: nowrap; }
+.cut-desc { color: var(--text-2); line-height: 1.5; }
+.cut-eff { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--muted-2); white-space: nowrap; }
+
+/* smart cut modal */
+.smartcut-modal { width: min(620px, 94vw); }
+.smartcut-modal textarea { width: 100%; margin-top: 4px; }
+.smartcut-notes { margin: 6px 0 0; font-style: italic; }
+.smartcut-regen { margin: 6px 0 0; padding-left: 18px; }
+.smartcut-regen li { margin: 2px 0; font-size: 12.5px; }
+
 /* lane options popover (name, volume, add clips, delete) */
 .lane-menu {
   position: fixed;
