@@ -1273,7 +1273,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
 
                   <div className="s5e-btnrow">
                     <button
-                      className="btn small primary s5e-gen"
+                      className="btn small primary s5e-gen fixedw-lg"
                       disabled={anyBusy || !p.imagePrompt}
                       onClick={() => genImage(shot)}
                     >
@@ -1446,7 +1446,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                   )}
                   <div className="s5e-btnrow">
                     <button
-                      className="btn small primary s5e-gen"
+                      className="btn small primary s5e-gen fixedw-lg"
                       disabled={anyBusy || !p.videoPrompt?.trim() || !genImg}
                       onClick={() => genVideo(shot, i)}
                     >
@@ -1632,7 +1632,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     )}
                     <div className="s5e-btnrow">
                       <button
-                        className="btn small primary s5e-gen"
+                        className="btn small primary s5e-gen fixedw-lg"
                         disabled={anyBusy || (!(shot.dialogue || '').trim() && !(p.voicePrompt || '').trim())}
                         onClick={() => genVoice(shot, i)}
                       >

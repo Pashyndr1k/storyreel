@@ -12,6 +12,7 @@ import t2iTemplate from '../data/comfy/krea2_t2i_api.json';
 import flux2Template from '../data/comfy/flux2_klein_edit_api.json';
 import ttsTemplate from '../data/comfy/omnivoice_tts_api.json';
 import si2vTemplate from '../data/comfy/ltx_si2v_api.json';
+import aceTemplate from '../data/comfy/ace_step_api.json';
 
 export const DEFAULT_COMFY_URL = 'http://127.0.0.1:8000';
 export const DEFAULT_OUTPUT_DIR = 'D:\\Claude work\\ComfyUI\\Output';
@@ -434,6 +435,31 @@ export async function generateComfyVoice(settings, { srt, instruct, narrator, la
   graph['3'].inputs.filename_prefix = `StoryReel/${sanitize(name)}`;
 
   const outputs = await runGraph(settings, graph, { timeoutMs: 10 * 60 * 1000 });
+  const aud = collectFiles(outputs).find((f) => /\.(mp3|flac|wav|ogg|opus)$/i.test(f.filename));
+  if (!aud) throw new Error('ComfyUI finished but returned no audio file.');
+  const blob = await fetchOutputBlob(settings, aud);
+  return { dataURL: await blobToDataURL(blob), filename: aud.filename };
+}
+
+// ---- Stage 6: background music via ACE-Step 1.5 XL Turbo --------------------
+// Instrumental-only score for the film: `tags` is the ACE caption (style,
+// instruments, emotion, texture — comma-separated dimensions per the ACE-Step
+// guide), the lyrics track is pinned to "[Instrumental]" so no vocals ever
+// appear, and bpm/seconds set the tempo and length. Returns an mp3 data URL.
+export async function generateComfyMusic(settings, { tags, bpm, seconds, name }, { onStatus } = {}) {
+  const graph = clone(aceTemplate);
+  const dur = Math.max(5, Math.min(600, Math.round(seconds || 60)));
+  const seed = rndSeed();
+  graph['4'].inputs.tags = tags;
+  graph['4'].inputs.lyrics = '[Instrumental]';
+  graph['4'].inputs.bpm = Math.max(30, Math.min(300, Math.round(bpm || 120)));
+  graph['4'].inputs.duration = dur;
+  graph['4'].inputs.seed = seed;
+  graph['6'].inputs.seconds = dur;
+  graph['7'].inputs.seed = seed;
+  graph['10'].inputs.filename_prefix = `StoryReel/${sanitize(name)}`;
+
+  const outputs = await runGraph(settings, graph, { timeoutMs: 15 * 60 * 1000, onStatus });
   const aud = collectFiles(outputs).find((f) => /\.(mp3|flac|wav|ogg|opus)$/i.test(f.filename));
   if (!aud) throw new Error('ComfyUI finished but returned no audio file.');
   const blob = await fetchOutputBlob(settings, aud);

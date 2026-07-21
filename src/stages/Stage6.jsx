@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../lib/i18n.js';
 import { uid } from '../lib/storage.js';
-import { videoDims, saveToLocalOutputs } from '../lib/comfy.js';
+import { videoDims, saveToLocalOutputs, generateComfyMusic } from '../lib/comfy.js';
 import { blockForScene, defaultTrim, transitionFor, overlapSeconds } from '../lib/dynamics.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
 import { stage6SmartCutPrompt } from '../lib/prompts.js';
 import { decodeMediaAudio, audioBufferToWavDataURL } from '../lib/audio.js';
 import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
-import { Play, StopSq, Grip, Download, Upload, Wand, Trash, Scissors, TransitionIcon } from '../components/icons.jsx';
+import { Play, StopSq, Grip, Download, Upload, Wand, Trash, Scissors, TransitionIcon, Plus } from '../components/icons.jsx';
 
 const readFileDataURL = (file) =>
   new Promise((resolve, reject) => {
@@ -74,6 +74,38 @@ const CUT_ABBR = {
   whip_pan: 'WH',
 };
 const REAL_CUTS = CUT_TYPES.filter((ty) => ty !== 'auto');
+
+// Background-music options → ACE-Step captions. Per the ACE-Step guide, a
+// good caption combines several dimensions (genre + instruments + texture);
+// the mood adds emotion/atmosphere words and the tempo sets bpm + a pace
+// word. Lyrics stay "[Instrumental]" — vocals never appear.
+const MUSIC_GENRES = [
+  ['cinematic', 'Cinematic orchestral score, sweeping strings, soft piano, French horns, film soundtrack'],
+  ['ambient', 'Ambient soundscape, lush synth pads, airy textures, slow evolving drones, spacious reverb'],
+  ['electronic', 'Electronic, pulsing synths, deep bass, crisp drum machine, modern production'],
+  ['lofi', 'Lo-fi hip-hop beat, dusty vinyl texture, mellow Rhodes piano, soft drums, relaxed groove'],
+  ['rock', 'Instrumental rock, electric guitars, driving drums, punchy bass, raw energy'],
+  ['jazz', 'Smooth jazz trio, brushed drums, upright bass, warm piano, intimate club atmosphere'],
+  ['folk', 'Acoustic folk, fingerpicked guitar, warm strings, gentle percussion, organic texture'],
+  ['synthwave', '80s synthwave, retro analog synths, gated reverb drums, neon atmosphere, driving arpeggios'],
+  ['classical', 'Solo classical piano, expressive dynamics, intimate recording, rich sustain'],
+  ['epic', 'Epic trailer music, massive percussion, brass hits, choir-like pads, huge cinematic build'],
+];
+const MUSIC_MOODS = [
+  ['uplifting', 'uplifting, hopeful, bright, warm'],
+  ['melancholic', 'melancholic, nostalgic, bittersweet, tender'],
+  ['tense', 'tense, suspenseful, dark undertones, restrained'],
+  ['dreamy', 'dreamy, ethereal, floating, soft-focus'],
+  ['dark', 'dark, brooding, ominous, heavy atmosphere'],
+  ['epic', 'heroic, triumphant, soaring, powerful'],
+  ['calm', 'calm, peaceful, gentle, soothing'],
+  ['playful', 'playful, quirky, lighthearted, bouncy'],
+];
+const MUSIC_TEMPOS = [
+  ['slow', 70, 'slow tempo, laid-back'],
+  ['medium', 100, 'mid-tempo, steady groove'],
+  ['fast', 130, 'fast-paced, driving rhythm'],
+];
 // ffmpeg xfade mapping ('cut' = frame-exact concat).
 const CUT_FFMPEG = {
   smash_cut: { xfade: 'cut' },
@@ -140,6 +172,7 @@ export default function Stage6({ project, update, settings }) {
   const [showCuts, setShowCuts] = useState(false); // transitions reference table
   const [splitBusy, setSplitBusy] = useState(false);
   const [smartCut, setSmartCut] = useState(null); // { text, busy, err, result } | null
+  const [music, setMusic] = useState(null); // { genre, tempo, mood, busy } | null
 
   // Transient toast pop-up — the ONLY notification surface on this stage
   // (nothing renders as a permanent note/frame). Errors linger longer.
@@ -167,8 +200,14 @@ export default function Stage6({ project, update, settings }) {
           : L
       )
     );
+  // New layers slot in ABOVE the background-music lane, which is pinned to
+  // the very bottom of the timeline.
+  const insertAboveMusic = (Ls, L) => {
+    const mi = Ls.findIndex((x) => x.id === 'bgmusic');
+    return mi >= 0 ? [...Ls.slice(0, mi), L, ...Ls.slice(mi)] : [...Ls, L];
+  };
   const addLayer = () =>
-    setLayers((Ls) => [...Ls, { id: uid(), name: `${t('s6.layer')} ${Ls.length + 1}`, enabled: true, volume: 1, clips: [] }]);
+    setLayers((Ls) => insertAboveMusic(Ls, { id: uid(), name: `${t('s6.layer')} ${Ls.length + 1}`, enabled: true, volume: 1, clips: [] }));
   const removeLayer = (layerId) => {
     setLayers((Ls) => Ls.filter((L) => L.id !== layerId));
     setSelAudio((s) => (s?.layerId === layerId ? null : s));
@@ -600,10 +639,10 @@ export default function Stage6({ project, update, settings }) {
         return;
       }
       update((p) => {
-        const Ls = [...(p.audioLayers || [])];
+        let Ls = [...(p.audioLayers || [])];
         const idx = Ls.findIndex((L) => L.id === laneId);
         if (idx >= 0) Ls[idx] = { ...Ls[idx], clips: [...Ls[idx].clips, ...newClips] };
-        else Ls.push({ id: laneId, name: t('s6.splitLane'), enabled: true, volume: 1, clips: newClips });
+        else Ls = insertAboveMusic(Ls, { id: laneId, name: t('s6.splitLane'), enabled: true, volume: 1, clips: newClips });
         const mutes = { ...(p.shotMutes || {}) };
         for (const id of muteIds) mutes[id] = true;
         return { audioLayers: Ls, shotMutes: mutes };
@@ -701,6 +740,57 @@ export default function Stage6({ project, update, settings }) {
       }));
     } catch (e) {
       setSmartCut((s) => ({ ...s, busy: false, err: e.message || String(e) }));
+    }
+  };
+
+  // Background music via the local ACE-Step workflow: instrumental-only score
+  // from genre + tempo + mood, as long as the film, dropped onto a dedicated
+  // lane pinned to the BOTTOM of the audio timeline.
+  const runMusic = async () => {
+    if (!music || music.busy) return;
+    const genre = MUSIC_GENRES.find(([id]) => id === music.genre) || MUSIC_GENRES[0];
+    const tempo = MUSIC_TEMPOS.find(([id]) => id === music.tempo) || MUSIC_TEMPOS[1];
+    const mood = MUSIC_MOODS.find(([id]) => id === music.mood) || MUSIC_MOODS[0];
+    const tags = `${genre[1]}, ${mood[1]}, ${tempo[2]}, instrumental, no vocals`;
+    const seconds = Math.max(10, Math.ceil(total || 60));
+    setMusic((m) => ({ ...m, busy: true }));
+    try {
+      const { dataURL, filename } = await generateComfyMusic(settings, {
+        tags,
+        bpm: tempo[1],
+        seconds,
+        name: `${(project.title || 'project').slice(0, 24)}_music_${genre[0]}`,
+      });
+      saveToLocalOutputs(settings, filename, dataURL); // best-effort local copy
+      const dur = await probeAudioDuration(dataURL);
+      const clip = {
+        id: uid(),
+        name: `${t(`s6.mg_${genre[0]}`)} · ${t(`s6.mm_${mood[0]}`)}`,
+        dataURL,
+        start: 0,
+        offset: 0,
+        duration: dur || seconds,
+        srcDuration: dur || seconds,
+        fadeIn: 0,
+        fadeOut: 0,
+      };
+      update((p) => {
+        const Ls = [...(p.audioLayers || [])];
+        const idx = Ls.findIndex((L) => L.id === 'bgmusic');
+        if (idx >= 0) {
+          const L = { ...Ls[idx], clips: [...Ls[idx].clips, clip] };
+          Ls.splice(idx, 1);
+          Ls.push(L); // keep the music lane at the very bottom
+        } else {
+          Ls.push({ id: 'bgmusic', name: t('s6.musicLane'), enabled: true, volume: 0.35, clips: [clip] });
+        }
+        return { audioLayers: Ls };
+      });
+      setMusic(null);
+      showToast(t('s6.musicDone'));
+    } catch (e) {
+      setMusic((m) => (m ? { ...m, busy: false } : m));
+      showToast(e.message === 'COMFY_UNREACHABLE' ? t('err.comfyDown') : e.message || String(e), 'error');
     }
   };
 
@@ -1344,11 +1434,6 @@ export default function Stage6({ project, update, settings }) {
               </div>
             </div>
           ))}
-          <div className="lane-actions">
-            <button type="button" className="btn tiny" onClick={addLayer}>
-              + {t('s6.addLayer')}
-            </button>
-          </div>
         </div>
         {laneMenu && (() => {
           const L = layers.find((x) => x.id === laneMenu.layerId);
@@ -1532,11 +1617,18 @@ export default function Stage6({ project, update, settings }) {
       </div>
 
       <div className="row">
-        <button className="btn small primary" disabled={rendering || total <= 0} onClick={() => setPlaying((v) => !v)}>
+        <button className="btn small primary fixedw" disabled={rendering || total <= 0} onClick={() => setPlaying((v) => !v)}>
           {playing ? <><StopSq size={14} /> {t('sb.stop')}</> : <><Play size={14} /> {t('sb.play')}</>}
         </button>
-        <button className="btn small" disabled={rendering} onClick={doRender}>
+        <button className="btn small fixedw" disabled={rendering} onClick={doRender}>
           <Download size={14} /> {rendering ? t('s6.rendering') : t('s6.render')}
+        </button>
+        <button
+          className="btn small"
+          disabled={total <= 0}
+          onClick={() => setMusic({ genre: 'cinematic', tempo: 'medium', mood: 'uplifting', busy: false })}
+        >
+          🎵 {t('s6.musicBtn')}
         </button>
         <button
           type="button"
@@ -1566,6 +1658,15 @@ export default function Stage6({ project, update, settings }) {
           onClick={() => setShowCuts(true)}
         >
           <TransitionIcon size={16} />
+        </button>
+        <button
+          type="button"
+          className="icon-btn sq36"
+          title={t('s6.addLayer')}
+          aria-label={t('s6.addLayer')}
+          onClick={addLayer}
+        >
+          <Plus size={16} />
         </button>
         {rendering && (
           <>
@@ -1640,6 +1741,50 @@ export default function Stage6({ project, update, settings }) {
             </table>
             <div className="row">
               <button className="btn small" onClick={() => setShowCuts(false)}>{t('s6.close')}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Background music: simplified ACE-Step options (instrumental only). */}
+      {music && (
+        <div className="overlay" onClick={() => !music.busy && setMusic(null)}>
+          <div className="modal music-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>{t('s6.musicTitle')}</h3>
+            <p className="hint">{t('s6.musicHint', { s: Math.max(10, Math.ceil(total || 60)) })}</p>
+            <div className="music-grid">
+              <div className="s5e-vsel">
+                <label>{t('s6.musicGenre')}</label>
+                <select value={music.genre} disabled={music.busy} onChange={(e) => setMusic((m) => ({ ...m, genre: e.target.value }))}>
+                  {MUSIC_GENRES.map(([id]) => (
+                    <option key={id} value={id}>{t(`s6.mg_${id}`)}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="s5e-vsel">
+                <label>{t('s6.musicTempo')}</label>
+                <select value={music.tempo} disabled={music.busy} onChange={(e) => setMusic((m) => ({ ...m, tempo: e.target.value }))}>
+                  {MUSIC_TEMPOS.map(([id, bpm]) => (
+                    <option key={id} value={id}>{t(`s6.mt_${id}`)} · {bpm} BPM</option>
+                  ))}
+                </select>
+              </div>
+              <div className="s5e-vsel">
+                <label>{t('s6.musicMood')}</label>
+                <select value={music.mood} disabled={music.busy} onChange={(e) => setMusic((m) => ({ ...m, mood: e.target.value }))}>
+                  {MUSIC_MOODS.map(([id]) => (
+                    <option key={id} value={id}>{t(`s6.mm_${id}`)}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="row">
+              <button className="btn small primary fixedw" disabled={music.busy} onClick={runMusic}>
+                {music.busy ? t('s6.musicBusy') : t('s6.musicRun')}
+              </button>
+              <button className="btn small" disabled={music.busy} onClick={() => setMusic(null)}>
+                {t('s6.close')}
+              </button>
             </div>
           </div>
         </div>
