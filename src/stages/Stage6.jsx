@@ -75,36 +75,39 @@ const CUT_ABBR = {
 };
 const REAL_CUTS = CUT_TYPES.filter((ty) => ty !== 'auto');
 
-// Background-music options → ACE-Step captions. Per the ACE-Step guide, a
-// good caption combines several dimensions (genre + instruments + texture);
-// the mood adds emotion/atmosphere words and the tempo sets bpm + a pace
-// word. Lyrics stay "[Instrumental]" — vocals never appear.
+// Background-music options → ACE-Step captions, written in the standardized
+// caption style the model was trained on (see text2music_captions_by_genre:
+// full descriptive sentences — genre + core instruments, then production /
+// texture / atmosphere details — not bare tag lists). Each genre entry is an
+// instrumentalized version of a reference caption; the mood appends an
+// emotion/atmosphere sentence, the tempo sets bpm plus a pace phrase, and
+// lyrics stay "[Instrumental]" so vocals never appear.
 const MUSIC_GENRES = [
-  ['cinematic', 'Cinematic orchestral score, sweeping strings, soft piano, French horns, film soundtrack'],
-  ['ambient', 'Ambient soundscape, lush synth pads, airy textures, slow evolving drones, spacious reverb'],
-  ['electronic', 'Electronic, pulsing synths, deep bass, crisp drum machine, modern production'],
-  ['lofi', 'Lo-fi hip-hop beat, dusty vinyl texture, mellow Rhodes piano, soft drums, relaxed groove'],
-  ['rock', 'Instrumental rock, electric guitars, driving drums, punchy bass, raw energy'],
-  ['jazz', 'Smooth jazz trio, brushed drums, upright bass, warm piano, intimate club atmosphere'],
-  ['folk', 'Acoustic folk, fingerpicked guitar, warm strings, gentle percussion, organic texture'],
-  ['synthwave', '80s synthwave, retro analog synths, gated reverb drums, neon atmosphere, driving arpeggios'],
-  ['classical', 'Solo classical piano, expressive dynamics, intimate recording, rich sustain'],
-  ['epic', 'Epic trailer music, massive percussion, brass hits, choir-like pads, huge cinematic build'],
+  ['cinematic', 'A cinematic orchestral piece with sweeping strings, French horns, and epic percussion. The arrangement builds from a delicate piano motif to a full orchestra climax with a film-soundtrack feel.'],
+  ['ambient', 'A chilled ambient electronic instrumental with evolving pad textures, gentle arpeggios, and airy drones. Features field recordings, granular textures, and a meditative, spacious atmosphere.'],
+  ['electronic', 'A modern electronic instrumental driven by a pulsing synth bassline, crisp drum machine grooves, and sharp synth stabs over atmospheric pads. Features dynamic builds, sidechained textures, and polished production.'],
+  ['lofi', 'A chill lo-fi hip-hop instrumental with dusty vinyl crackle, mellow Rhodes piano, and laid-back boom-bap drums. Features jazzy chord progressions, subtle warm bass, and a relaxed late-night vibe.'],
+  ['rock', 'An energetic instrumental rock track driven by a catchy electric guitar riff and a punchy drum and bass groove. A melodic lead guitar carries the theme with expressive bends over rhythmic power chords.'],
+  ['jazz', 'A smooth jazz lounge instrumental with brushed drums, walking upright bass, and a mellow saxophone lead. Features sophisticated piano voicings, subtle vibraphone accents, and a relaxed swing feel of a late-night cocktail bar.'],
+  ['folk', 'A warm acoustic folk instrumental with fingerpicked guitar, gentle cello, and soft brushed percussion. The sparse, organic arrangement features subtle harmonium drones and an intimate, earthy texture.'],
+  ['synthwave', 'An 80s synthwave instrumental with retro analog synthesizers, pulsing arpeggios, and gated reverb drums. Features neon-soaked pads, a driving bassline, and nostalgic analog warmth.'],
+  ['classical', 'A solo classical piano piece with expressive dynamics, delicate phrasing, and rich sustain. The intimate recording captures every nuance, from soft contemplative passages to flowing melodic runs.'],
+  ['epic', 'An epic cinematic trailer instrumental with massive percussion hits, powerful brass, and driving ostinato strings. The arrangement builds relentlessly through dramatic swells to an explosive, triumphant climax.'],
 ];
 const MUSIC_MOODS = [
-  ['uplifting', 'uplifting, hopeful, bright, warm'],
-  ['melancholic', 'melancholic, nostalgic, bittersweet, tender'],
-  ['tense', 'tense, suspenseful, dark undertones, restrained'],
-  ['dreamy', 'dreamy, ethereal, floating, soft-focus'],
-  ['dark', 'dark, brooding, ominous, heavy atmosphere'],
-  ['epic', 'heroic, triumphant, soaring, powerful'],
-  ['calm', 'calm, peaceful, gentle, soothing'],
-  ['playful', 'playful, quirky, lighthearted, bouncy'],
+  ['uplifting', 'The mood is uplifting and hopeful — bright, warm, and quietly triumphant.'],
+  ['melancholic', 'The mood is melancholic and nostalgic — bittersweet, tender, and wistful.'],
+  ['tense', 'The mood is tense and suspenseful — restrained, with dark undertones and a sense of unease.'],
+  ['dreamy', 'The mood is dreamy and ethereal — floating, soft-focus, and weightless.'],
+  ['dark', 'The mood is dark and brooding — ominous, heavy, and shadowed.'],
+  ['epic', 'The mood is heroic and triumphant — soaring, powerful, and grand.'],
+  ['calm', 'The mood is calm and peaceful — gentle, soothing, and unhurried.'],
+  ['playful', 'The mood is playful and lighthearted — quirky, bouncy, and full of charm.'],
 ];
 const MUSIC_TEMPOS = [
-  ['slow', 70, 'slow tempo, laid-back'],
-  ['medium', 100, 'mid-tempo, steady groove'],
-  ['fast', 130, 'fast-paced, driving rhythm'],
+  ['slow', 70, 'Slow tempo with a laid-back, patient pace.'],
+  ['medium', 100, 'Mid-tempo with a steady, comfortable groove.'],
+  ['fast', 130, 'Fast-paced with a driving, energetic rhythm.'],
 ];
 // ffmpeg xfade mapping ('cut' = frame-exact concat).
 const CUT_FFMPEG = {
@@ -753,7 +756,7 @@ export default function Stage6({ project, update, settings }) {
     const genre = MUSIC_GENRES.find(([id]) => id === music.genre) || MUSIC_GENRES[0];
     const tempo = MUSIC_TEMPOS.find(([id]) => id === music.tempo) || MUSIC_TEMPOS[1];
     const mood = MUSIC_MOODS.find(([id]) => id === music.mood) || MUSIC_MOODS[0];
-    const tags = `${genre[1]}, ${mood[1]}, ${tempo[2]}, instrumental, no vocals`;
+    const tags = `${genre[1]} ${mood[1]} ${tempo[2]} Pure instrumental — no vocals, no singing.`;
     const seconds = Math.max(10, Math.ceil(total || 60));
     setMusic((m) => ({ ...m, busy: true }));
     try {
