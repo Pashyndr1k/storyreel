@@ -682,6 +682,31 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 .prompt-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; }
 .prompt-head label { margin-bottom: 4px; }
 .prompt-head .copy-link { margin-bottom: 6px; }
+/* regenerate + copy tools in a prompt frame's header */
+.prompt-tools { display: inline-flex; align-items: center; gap: 8px; }
+.prompt-tools .copy-link { margin-bottom: 6px; }
+.prompt-regen {
+  width: 22px;
+  height: 22px;
+  margin-bottom: 3px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s, color 0.15s;
+}
+.prompt-regen:hover:not(:disabled) { background: var(--hover-bg); color: var(--violet-text); }
+.prompt-regen:disabled { opacity: 0.45; cursor: not-allowed; }
+.prompt-regen.busy svg { animation: regen-spin 1s linear infinite; }
+@keyframes regen-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 
 /* photo references */
 .photos-label { margin: 10px 0 4px; font-size: 12px; }

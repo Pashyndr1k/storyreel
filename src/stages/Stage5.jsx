@@ -168,6 +168,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const [lightbox, setLightbox] = useState(null); // { kind: 'img' | 'vid', src } shown in the large pop-up
   const [tweakText, setTweakText] = useState({}); // `${shotId}:${kind}` -> adjustment draft
   const [tweakBusy, setTweakBusy] = useState(null); // `${shotId}:${kind}` in flight
+  const [regenBusy, setRegenBusy] = useState(null); // `${shotId}:${kind}` single-prompt regen in flight
   const [shotTab, setShotTab] = useState({}); // shotId -> 'image' | 'video' | 'audio'
 
   // Always-fresh project reference: generation handlers (and especially the
@@ -366,6 +367,57 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         [shotId]: { imagePrompt: '', videoPrompt: '', ...p.shotPrompts[shotId], ...patch },
       },
     }));
+
+  // Regenerate ONE prompt (image / video / audio) of ONE shot. The scene-level
+  // spec runs so video prompts keep their cross-shot momentum context and the
+  // audio prompt sees the whole scene's chronology — but only the target
+  // shot's field is applied from the response; everything else is untouched.
+  const regenPrompt = async (shot, kind) => {
+    if (regenBusy) return;
+    const keyErr = textKeyError(settings);
+    if (keyErr) return setImgErr({ id: shot.id, msg: keyErr });
+    const cur = projectRef.current;
+    const sceneArg = { ...scene, number: cur.outline.indexOf(scene) + 1 };
+    const sceneShots = cur.sceneDetails[scene.id]?.shots || [];
+    const block = blockForScene(cur.dynamicsPlan, sceneArg.number);
+    const spec =
+      kind === 'image'
+        ? stage5Prompt(cur, sceneArg, sceneShots, genLang, imageStyle)
+        : kind === 'video'
+          ? stage5VideoPrompt(cur, sceneArg, sceneShots, videoStyle, block)
+          : stage5AudioPrompt(cur, sceneArg, sceneShots, block);
+    setRegenBusy(`${shot.id}:${kind}`);
+    setImgErr(null);
+    try {
+      const data = await generateJSON(settings, spec);
+      const idx = sceneShots.findIndex((s) => s.id === shot.id);
+      const pr = (data.prompts || []).find((x) => (Number(x.shot) || 0) === idx + 1);
+      const text = kind === 'image' ? pr?.image_prompt : kind === 'video' ? pr?.video_prompt : pr?.audio_prompt;
+      if (typeof text !== 'string' || !text.trim()) throw new Error('The response held no prompt for this shot.');
+      setPrompt(shot.id, {
+        [kind === 'image' ? 'imagePrompt' : kind === 'video' ? 'videoPrompt' : 'audioPrompt']:
+          kind === 'audio' ? ensureDialogueInAudioPrompt(text, shot.dialogue) : text,
+      });
+    } catch (e) {
+      setImgErr({ id: shot.id, msg: e.message || String(e) });
+    } finally {
+      setRegenBusy(null);
+    }
+  };
+
+  // Regenerate icon shown in a prompt frame's header, next to Copy.
+  const regenBtn = (shot, kind) => (
+    <button
+      type="button"
+      className={`prompt-regen ${regenBusy === `${shot.id}:${kind}` ? 'busy' : ''}`}
+      title={t('s5.regenOne')}
+      aria-label={t('s5.regenOne')}
+      disabled={!!regenBusy}
+      onClick={() => regenPrompt(shot, kind)}
+    >
+      <RestoreIcon size={13} />
+    </button>
+  );
 
   // "Tweak this": the user types a plain-language adjustment and Claude
   // rewrites the underlying technical prompt — no manual jargon editing.
@@ -1093,7 +1145,10 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                 <div className="s5e-panel">
                   <div className="prompt-head">
                     <label>{t('s5.img')}</label>
-                    <CopyButton text={p.imagePrompt} />
+                    <span className="prompt-tools">
+                      {regenBtn(shot, 'image')}
+                      <CopyButton text={p.imagePrompt} />
+                    </span>
                   </div>
                   <AutoTextarea
                     minRows={8}
@@ -1412,7 +1467,10 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                 <div className="s5e-panel">
                   <div className="prompt-head">
                     <label>{t('s5.vid', { d: dur })}</label>
-                    <CopyButton text={p.videoPrompt} />
+                    <span className="prompt-tools">
+                      {regenBtn(shot, 'video')}
+                      <CopyButton text={p.videoPrompt} />
+                    </span>
                   </div>
                   <AutoTextarea
                     minRows={6}
@@ -1492,7 +1550,10 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                   <div className="s5e-panel">
                     <div className="prompt-head">
                       <label>{t('s5.aud')}</label>
-                      <CopyButton text={p.audioPrompt || ''} />
+                      <span className="prompt-tools">
+                        {regenBtn(shot, 'audio')}
+                        <CopyButton text={p.audioPrompt || ''} />
+                      </span>
                     </div>
                     <AutoTextarea
                       minRows={4}
