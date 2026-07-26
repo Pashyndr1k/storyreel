@@ -244,38 +244,39 @@ Return exactly one entry per shot, in order.` + aspectNote + styleNote + envNote
 // Default directorial style substituted into {{VIDEO_STYLE_INJECTION}} when the
 // project has no video style selected (or the user clears it).
 export const DEFAULT_VIDEO_MOTION_STYLE =
-  'Naturalistic cinematic motion: smooth, motivated camera movement (subtle push-ins, gentle pans, stable handheld only when the action calls for it), grounded physical acting with realistic weight and restrained gestures, conversational speech delivered at a natural pace, and organic pauses where the emotional beat requires them.';
+  'Naturalistic cinematic motion: smooth, motivated camera movement (subtle push-ins, gentle pans, stable handheld only when the action calls for it), grounded physical acting with realistic weight and restrained gestures, organic beats of stillness where the emotion requires them, and quiet natural ambience.';
 
 // Video Motion Prompt System Instruction (verbatim). {{VIDEO_STYLE_INJECTION}}
 // receives the selected video style's instructions (or DEFAULT_VIDEO_MOTION_STYLE);
 // {{PREVIOUS_SHOT_MOMENTUM}} receives the continuity source description — all
 // shots of a scene are written in one call, so each shot chains to the one
 // directly above it in the list.
-const VIDEO_MOTION_SYSTEM = `You are an expert AI cinematic director translating a scene outline into precise image-to-video motion prompts.
+const VIDEO_MOTION_SYSTEM = `You are an expert AI cinematic director writing image-to-video motion prompts for the LTX-2 model. The model receives an exact starting frame — your prompt tells it only WHAT HAPPENS NEXT. Write like a cinematographer describing a shot, not like a poet describing a feeling.
 
-CRITICAL RULE 1 (STATIC AVOIDANCE): The video generation model will be provided with an exact starting frame. DO NOT describe any static visual elements. Never describe character appearances, wardrobe, lighting, or the background environment. Repeating static details causes the video model to morph, hallucinate, or lose character consistency.
+CRITICAL RULE 1 (THE FRAME ALREADY EXISTS): Never describe static visual elements — no character descriptions (no appearance, age, wardrobe, hair, features), no lighting, no environment, no color or scene-setting. The starting frame provides all of that; repeating it makes the model morph, hallucinate, or drift. Refer to people ONLY by neutral visual handles ("the woman", "the taller man", "the soldier on the left") — never by name and never with appearance detail. Describe only the transition from stillness to motion.
 
-CRITICAL RULE 2 (DIRECTORIAL STYLE): You must strictly apply the following camera physics, actor kinetics, and speech dynamics to the scene: "{{VIDEO_STYLE_INJECTION}}". Use this to dictate the exact framerate, camera stability, physical acting style, and pause durations.
+CRITICAL RULE 2 (DIRECTORIAL STYLE): Express the following camera physics, motion texture and pacing throughout the prompt: "{{VIDEO_STYLE_INJECTION}}". Translate it into concrete on-screen motion — never quote style words as abstract labels.
 
-CRITICAL RULE 3 (CONTINUITY & STATE TRACKING): This shot is part of a continuous, real-time scene. You must strictly maintain the physical momentum, velocity, and posture established in the previous shot: "{{PREVIOUS_SHOT_MOMENTUM}}".
-- The Inertia Law: If a character is walking, running, or falling in the previous shot, they MUST continue doing so in this shot unless the script explicitly dictates they stop.
-- "Match on Action": Start the new motion prompt by explicitly establishing the carried-over motion (e.g., "Continuing their brisk walk...", "Still sprinting...").
-- Do not let characters return to a "neutral standing pose" between cuts unless commanded.
+CRITICAL RULE 3 (CONTINUITY & STATE TRACKING): This shot is part of a continuous, real-time scene. Strictly maintain the physical momentum, velocity, and posture established in the previous shot: "{{PREVIOUS_SHOT_MOMENTUM}}".
+- The Inertia Law: if a character is walking, running, or falling in the previous shot, they MUST continue doing so in this shot unless the script explicitly stops them.
+- "Match on Action": open the motion by carrying over the established movement (e.g., "Continuing her brisk walk...", "Still sprinting...").
+- Never reset characters to a neutral standing pose between cuts unless commanded.
 
-Your ONLY job is to describe how the static frame changes over time: camera trajectory, character motion, dialogue pacing, and sound.
+STRUCTURE — write ONE flowing paragraph, in present tense, in this order:
+1. MAIN ACTION first: a single opening sentence stating the primary action of the shot. This anchors the generation before anything else competes for attention.
+2. MOTION DETAIL: unfold the action chronologically, in the exact order it appears on screen, using progressive language ("begins", "then", "as"). Be literal and physical — describe weight shifts, gestures, head turns, posture; never internal states ("nervous") — show them through the body ("her fingers drum against her thigh").
+3. CAMERA: one primary camera behavior, described relative to the subject in plain cinematographic language ("the camera pushes in slowly", "handheld tracking from behind", "static frame"). It may evolve once across the shot, never two behaviors at the same time.
+4. AUDIO last: one short sentence of ambient sound and effects that belong to the action ("Audio: wind over the field, distant thunder, boots on gravel."). No speech — these shots carry no dialogue.
 
-When writing the motion prompt, strictly follow these constraints:
-1. Camera Dynamics: Define the exact camera movement first, directly applying the camera behavior from the injected style.
-2. Actor Kinetics: Describe character movement, physical weight, and gestures strictly matching the acting style specified (e.g., naturalistic, theatrical, jerky, frenetic). Anchor the start of the shot with the Continuity Vocabulary — continuous gerunds that carry over the established motion (e.g., "Walking into frame", "Continuing to turn", "Still holding the glass").
-3. Chronological Timing & Pauses: Map actions sequentially across the shot. You MUST apply the specific pause dynamics from the style injection (e.g., deadpan 2-second pauses, fast-paced zero pauses, lingering uncomfortable holds).
-4. Audio & Speech Delivery: Include spoken phrases and sound effects, formatting the dialogue delivery exactly as the style dictates (e.g., stumbling, projected, rapid-fire, breathless).
+HARD CONSTRAINTS:
+- Match density to length: about one main action per 2–3 seconds of video. Short shots get ONE action; only long shots earn two or three, in sequence. But do not underwrite a long shot — a starved prompt makes the model rush or drift.
+- Under 150 words. Every word must be renderable — a movement, a direction, a material, a sound.
+- No numbers: no timestamps, no seconds, no framerates, no angles, no counts. Use natural beats instead ("a long pause", "after a beat").
+- No conflicting signals: one subject focus, one speed (never fast action AND slow motion), one camera logic.
+- Never mention readable text, signs or logos; avoid chaotic multi-object physics (throws, juggling, shattering).
 
-Output the prompt using the following strict syntax, ensuring it is highly concise:
-
-[Camera Dynamics] + [Actor Kinetics & Chronological Action] + [Speech Delivery, Pauses & Audio]
-
-Example Output (assuming a 'Dramatic Film' style injection):
-"Smooth lateral dolly track keeping pace, 24fps motion blur. Continuing their brisk walk down the corridor, the character maintains a heavy, purposeful stride, jaw tight, never breaking pace. At 0:02, still walking, they glance sideways and deliver in a measured, low voice: 'I never forgot,' followed by a 2-second pause carried on unbroken footsteps. Audio: rhythmic footfalls on concrete, low ambient room tone."`;
+Example output (assuming a 'Dramatic Film' style injection):
+"The woman rises from the trench floor and takes two slow steps toward the parapet, her weight heavy against the wind. Continuing the turn begun as she stands, she lifts her chin, and her gaze settles on the smoke line at the horizon; a long pregnant pause holds while her hand closes around the strap across her chest. The camera pushes in slowly from behind her shoulder, keeping her centered as the movement ends. Audio: low wind, distant artillery rumble, cloth flapping softly."`;
 
 // All shots of a scene are written in one request, so the "previous shot" for
 // continuity is the preceding entry in the same list — the model chains its
@@ -299,7 +300,7 @@ export function stage5VideoPrompt(project, scene, shots, videoStyle, block) {
     };
   });
   const dynNote = block
-    ? `\n- This scene's rhythm block is "${block.block_id}" (kinetic energy ${block.kinetic_energy_level}/10, dialogue volume ${block.dialogue_volume}/10, camera momentum "${block.required_camera_momentum.replace(/_/g, ' ')}"). Every video_prompt MUST directly cite these dynamics: motion intensity matching the kinetic energy, speech pacing matching the dialogue volume, and the camera momentum contract.`
+    ? `\n- This scene's rhythm block is "${block.block_id}" (kinetic energy ${block.kinetic_energy_level}/10, camera momentum "${block.required_camera_momentum.replace(/_/g, ' ')}"). EXPRESS these dynamics through the described motion itself — the intensity and speed of physical action matching the kinetic energy, and camera behavior honoring the momentum contract — without ever quoting the numbers or labels in the prompt text.`
     : '';
   return {
     system:
@@ -321,10 +322,11 @@ ${JSON.stringify(shotList, null, 2)}
 For EVERY shot above, write one "video_prompt" motion prompt following your system instruction. The starting frame of each shot already exists — describe only how it changes over the shot's duration. Write the prompts in order, carrying each shot's ending momentum into the next per CRITICAL RULE 3.
 
 Additional rules:
-- DIALOGUE SHOTS ARE THE EXCEPTION — this rule OVERRIDES all rules below it. When a shot's "dialogue" is non-empty, its video is generated by a sound+image model that derives the emotion, lip sync, pacing and detail from the shot's voice audio and first frame, so its "video_prompt" must be CONCISE: one or two short sentences that only name the character's core action (including that they are speaking) and the camera movement. Format: "Core Actions: <who does what, speaking>. The camera <movement>." No dynamics citations, no generation_directive text, no long visual detail for these shots.
-- When a shot has a "generation_directive", begin its "video_prompt" with that text VERBATIM, then continue with the motion description.
+- DIALOGUE SHOTS ARE THE EXCEPTION — this rule OVERRIDES all rules below it. When a shot's "dialogue" is non-empty, its video is generated by a sound+image model that derives the emotion, lip sync, pacing and detail from the shot's voice audio and first frame, so its "video_prompt" must be CONCISE: one or two short sentences that only name the subject's core action (including that they are speaking) and the camera movement, using a neutral handle ("the woman", "the old man") — never a name, never appearance detail. Format: "Core Actions: <subject does what, speaking>. The camera <movement>." No dynamics citations, no generation_directive text, no long visual detail for these shots.
+- When a shot has a "generation_directive", TRANSLATE its energy level and camera-momentum contract into concrete on-screen motion and camera language woven through the prompt — never paste the directive text itself; every sentence must describe something the camera physically sees.
 - Let the shot's core action land in the middle of the clip — never at the very first or very last second.
-- NEVER state the clip's total duration in seconds inside a "video_prompt", and never mention trimming, padding, final cuts or any editing mechanics — the video model must only see the motion itself.${dynNote}
+- NEVER state the clip's total duration in seconds inside a "video_prompt", and never mention trimming, padding, final cuts or any editing mechanics — the video model must only see the motion itself.
+- FINAL CHECK per prompt: no character descriptions or names, no static scene description, chronological order, one camera logic, ambient audio sentence at the end.${dynNote}
 
 JSON schema:
 {"prompts":[{"shot":1,"video_prompt":"..."}]}

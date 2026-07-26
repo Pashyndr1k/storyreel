@@ -14,7 +14,7 @@ import videoMotionPresets from '../data/video_motion_presets.json';
 
 const STYLES_KEY = 'storyreel.styles.v1';
 const STYLES_BACKUP_KEY = 'storyreel.styles.corrupt'; // last unreadable value, for recovery
-export const STYLES_VERSION = 3;
+export const STYLES_VERSION = 4;
 export const STYLE_CATEGORIES = ['script', 'image', 'video'];
 
 // v2 built-ins, imported from text_styles.pdf (script) and visual styles.pdf
@@ -77,6 +77,44 @@ const RETIRED_V3_VIDEO = {
   'bi.video.handheld': 'Naturalistic handheld camera: subtle breathing movement, quick reframes, imperfect follow focus, vérité energy — motivated and unshowy.',
   'bi.video.epic': 'Sweeping cinematic motion: slow dollies, cranes and orbits, deliberate push-ins on emotional beats, smooth stabilised moves, grand scale.',
   'bi.video.static': 'Locked-off static compositions or very slow pushes; stillness and negative space — let the action move within a fixed frame.',
+};
+
+// v4: the Video Motion preset texts were rewritten for the official LTX-2.3
+// prompting rules (no framerate/second numerics, no speech direction — the
+// dialogue shots run through the sound+image workflow — camera + motion +
+// pacing + ambience only). The v3 factory texts are frozen here so the
+// migration upgrades a preset ONLY if the user never edited it.
+const V3_FACTORY_VIDEO_TEXTS = {
+  'bi3.video.motion_01':
+    "Ultra-smooth robotic camera arm movement. Actors move with practiced, perfect posture and exaggerated enthusiasm. Crisp, perfectly enunciated speech with zero hesitation. Micro-pauses used strictly for product emphasis. Fluid and deliberate pacing.",
+  'bi3.video.motion_02':
+    "Static camera lock-off with sudden comedic snap-zooms. Sharp physical comedy and exaggerated facial reactions. Rapid, fast-paced dialogue punctuated by sudden, deadpan 2-second pauses. Complete stillness between actions.",
+  'bi3.video.motion_03':
+    "Smooth bezier-curve camera movement. Exaggerated squash-and-stretch physics with bouncy character motion. Highly expressive facial morphs and broad theatrical gestures. Energetic, melodic speech. Pauses filled with micro-actions like blinks and ear twitches.",
+  'bi3.video.motion_04':
+    "Smooth dolly track push-in with cinematic 24fps motion blur. Restrained naturalistic acting with subtle micro-expressions. Slow and measured speech carrying heavy subtext. Long 3-to-4-second pregnant pauses. Grounded gravity and heavy physical weight.",
+  'bi3.video.motion_05':
+    "Multi-cam setup feel with static wide lock-offs and slow mechanical panning. Staged theatrical blocking. Actors project loudly and distinctly. Fast-paced setup-and-punchline dialogue followed by artificial 3-second pauses holding for imaginary audience laughter.",
+  'bi3.video.motion_06':
+    "Slow dramatic zoom-in on faces. Rigid posture, melodramatic gasps, and slow, dramatic head turns. Breathy, intense speech with slightly delayed character reactions. Unnaturally long pauses maintaining uncomfortable eye contact.",
+  'bi3.video.motion_07':
+    "Chaotic handheld camera with rapid whip pans and sudden speed-ramping. Characters exhibit high-energy frenetic movement, constant pacing, and fidgeting. Overlapping, chaotic dialogue spoken rapidly. Zero pauses; actors frequently break the fourth wall.",
+  'bi3.video.motion_08':
+    "Shaky handheld camera with occasional autofocus hunting. Unchoreographed raw motion. Actors look slightly off-camera. Naturalistic, stumbling speech filled with 'ums', hesitations, and false starts. Awkward, organic pauses and reactive panning.",
+  'bi3.video.motion_09':
+    "First-person action camera movement with high-frequency vibration and aggressive body-mounted physics. Athletic, urgent character motion. Sparse, breathless dialogue yelled over ambient noise. Constant physical exertion with no conversational pauses.",
+  'bi3.video.motion_10':
+    "Continuous flying FPV drone movement, banking turns, and sweeping rolls. Actors perform broad, continuous stunts or running. Distant or shouted speech. Continuous action flow with no dialogue pauses and smooth aerodynamic trajectories.",
+  'bi3.video.motion_11':
+    "Kinetic camera sweeps with zero digital motion blur. Dramatic held poses followed by high-speed bursts of action. Fast, minimal mouth flaps. Highly intense yelled dialogue or whispered inner monologues. Tense 2-second silent stand-offs.",
+  'bi3.video.motion_12':
+    "Stop-motion frame rate with 12fps timing and tactile displacement. Jerky physical movement and charmingly stiff actor gestures. Slightly desynced dialogue. Charmingly clunky pacing with brief, stuttering pauses between distinct physical actions.",
+  'bi3.video.motion_13':
+    "Dynamic weight shifting and fluid character action smears. Highly expressive, perfectly lip-synced speech. Flowing continuous motion without rigid stops. Theatrical momentum and energetic character tracking.",
+  'bi3.video.motion_14':
+    "Locked-down static tripod camera. 18fps over-cranked, jerky motion. Exaggerated physical pantomime and fast walking speeds. Frantic mouthing of dialogue with zero audible speech. Highly expressive full-body acting with zero audio pauses.",
+  'bi3.video.motion_15':
+    "Slow mechanical motorized panning from a fixed high-angle perspective. Low framerate stutter. Subjects are entirely unaware of the camera. Completely mundane, unchoreographed actions. Distant, muffled, or inaudible speech with slow real-time pacing and no narrative cuts."
 };
 
 function addMissingBuiltins(styles, additions) {
@@ -144,6 +182,20 @@ function migrate(fromVersion, styles) {
       ),
     };
     s = addMissingBuiltins(s, BUILTINS_V3);
+  }
+  if (fromVersion < 4) {
+    // v4: swap in the LTX-2.3-aligned preset texts, preserving user edits.
+    const fresh = new Map(BUILTINS_V3.video.map((st) => [st.id, st.instructions]));
+    s = {
+      ...s,
+      video: (s.video || []).map((st) =>
+        st.id in V3_FACTORY_VIDEO_TEXTS &&
+        (st.instructions || '') === V3_FACTORY_VIDEO_TEXTS[st.id] &&
+        fresh.has(st.id)
+          ? { ...st, instructions: fresh.get(st.id) }
+          : st
+      ),
+    };
   }
   return s;
 }

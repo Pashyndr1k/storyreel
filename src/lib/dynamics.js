@@ -79,11 +79,12 @@ export function buildShotPayload(shot, block) {
           momentum_carryover: block.required_camera_momentum,
         }
       : null,
-    // The directive carries only the shot's dynamics — never the clip's total
-    // duration or any mention of trimming/editing mechanics (those confused
-    // the video model and leaked into the output).
+    // The directive carries only the shot's dynamics as plain guidance for
+    // the prompt-writing model (which translates it into concrete on-screen
+    // motion) — never numbers, duration, or editing mechanics, and it is
+    // never pasted verbatim into the video prompt.
     prompt_injection_string: block
-      ? `The action must be ${energy === 'high' ? 'highly kinetic' : 'restrained and deliberate'} (kinetic energy ${block.kinetic_energy_level}/10). Dialogue rhythm: ${dialogueRhythm(block.dialogue_volume)}. Camera must mimic ${block.required_camera_momentum.replace(/_/g, ' ')}.`
+      ? `Kinetic energy: ${energy === 'high' ? 'high — fast, forceful physical movement' : 'low — restrained, deliberate physical movement'}. Camera momentum: ${block.required_camera_momentum.replace(/_/g, ' ')}.`
       : '',
   };
 }
