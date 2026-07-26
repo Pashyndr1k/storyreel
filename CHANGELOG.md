@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.18.1 — 2026-07-26
+
+- Stage 5: upload a ready-made final frame for a shot — a new corner-brackets
+  upload button next to "Create final frame" in the image controls. The
+  uploaded frame replaces a generated one if present, and video generation
+  automatically switches to the first/last-frame workflow.
+- Per-shot prompt regeneration: a regenerate icon in each prompt frame's
+  header (image, video and audio tabs) redoes just that one prompt with full
+  scene context; nothing else changes.
+- Video prompt engine rewritten to the official LTX-2/2.3 prompting rules:
+  main action first, chronological literal motion, one camera behavior,
+  ambient audio last; no character descriptions or names (the starting frame
+  carries identity), no timestamps/framerates/second-counts. All 15 video
+  motion presets updated to match (your edited or custom styles are kept).
+
 ## 1.18.0 — 2026-07-21
 
 - Smart cut (Stage 6): describe the edit in plain words — "more dynamic",

@@ -97,6 +97,14 @@ const FinalFrameIcon = ({ size = 16 }) => (
   </svg>
 );
 
+// "Upload Final Frame" glyph (corner brackets + up arrow).
+const FinalFrameUploadIcon = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 5V3.5A1.5 1.5 0 0 1 3.5 2H5M11 2h1.5A1.5 1.5 0 0 1 14 3.5V5M14 11v1.5a1.5 1.5 0 0 1-1.5 1.5H11M5 14H3.5A1.5 1.5 0 0 1 2 12.5V11" />
+    <path d="M8 11V5.4M5.8 7.4 8 5.2l2.2 2.2" />
+  </svg>
+);
+
 // Small white icon on a round semi-transparent black chip, overlaid on images.
 function IconAction({ title, disabled, onClick, children }) {
   return (
@@ -567,6 +575,18 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       const raw = await readFileDataURL(file);
       const img = await resizeDataURL(raw, Number.POSITIVE_INFINITY, 0.92);
       pushVersion(shot.id, img);
+    } catch (e) {
+      setImgErr({ id: shot.id, msg: e.message || String(e) });
+    }
+  };
+
+  // Upload a ready-made FINAL frame (replaces a generated one if present) —
+  // video generation then takes the first/last-frame path automatically.
+  const uploadShotFinalImage = async (shot, file) => {
+    try {
+      const raw = await readFileDataURL(file);
+      const img = await resizeDataURL(raw, Number.POSITIVE_INFINITY, 0.92);
+      update((p) => ({ shotFinalImages: { ...(p.shotFinalImages || {}), [shot.id]: img } }));
     } catch (e) {
       setImgErr({ id: shot.id, msg: e.message || String(e) });
     }
@@ -1358,6 +1378,21 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       >
                         <FinalFrameIcon />
                       </button>
+                    )}
+                    {genImg && (
+                      <label className="s5e-ico" title={t('img.finalUploadTip')} aria-label={t('img.finalUploadTip')}>
+                        <FinalFrameUploadIcon />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          hidden
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            e.target.value = '';
+                            if (f) uploadShotFinalImage(shot, f);
+                          }}
+                        />
+                      </label>
                     )}
                     {genImg && (
                       <button
