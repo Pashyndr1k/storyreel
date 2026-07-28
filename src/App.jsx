@@ -3,6 +3,7 @@ import Home from './pages/Home.jsx';
 import Archive from './pages/Archive.jsx';
 import Project from './pages/Project.jsx';
 import LibraryPage from './pages/LibraryPage.jsx';
+import StylesPage from './pages/StylesPage.jsx';
 import { loadLibrary, persistLibraryEntry, deleteLibraryEntry } from './lib/library.js';
 import SettingsModal from './components/SettingsModal.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
@@ -260,6 +261,16 @@ export default function App() {
           library={library}
           libUpsert={libUpsert}
           libDelete={libDelete}
+          settings={settings}
+          setSettings={setSettings}
+          onNav={onNav}
+          onSettings={() => setShowSettings(true)}
+        />
+      )}
+      {loaded && route.name === 'styles' && (
+        <StylesPage
+          styles={styles}
+          setStyles={setStyles}
           settings={settings}
           setSettings={setSettings}
           onNav={onNav}

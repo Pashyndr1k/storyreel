@@ -132,11 +132,26 @@ export function buildProjectMd(project, lite, lang) {
 // files are written only when their byte length changed since the last write
 // this session (they are immutable blobs in practice).
 const mirrored = new Map(); // projectId -> Map<fileName, dataURL.length>
+const mirrorQueue = new Map(); // projectId -> promise chain (folder renames must not interleave)
 
-export async function mirrorProjectToDisk(settings, project, lang) {
-  if (!window.localFiles?.saveOutput || !project?.id) return null;
+export function mirrorProjectToDisk(settings, project, lang) {
+  if (!window.localFiles?.saveOutput || !project?.id) return Promise.resolve(null);
+  const prev = mirrorQueue.get(project.id) || Promise.resolve();
+  const next = prev.then(() => mirrorOnce(settings, project, lang)).catch(() => null);
+  mirrorQueue.set(project.id, next);
+  return next;
+}
+
+async function mirrorOnce(settings, project, lang) {
   const root = (settings.projectsDir || DEFAULT_PROJECTS_DIR).replace(/[\\/]+$/, '');
-  const dir = `${root}\\${sanitizeFolder(project.title, project.id)}`;
+  const folder = sanitizeFolder(project.title, project.id);
+  // One folder per project id: the main process renames the existing folder when
+  // the title changes, so typing a new name can't leave partial-name copies.
+  let dir = `${root}\\${folder}`;
+  if (window.localFiles.resolveProjectDir) {
+    const res = await window.localFiles.resolveProjectDir(root, project.id, folder);
+    if (res?.ok && res.dir) dir = res.dir;
+  }
   const { lite, files } = splitProjectMedia(project);
   const seen = mirrored.get(project.id) || new Map();
   try {

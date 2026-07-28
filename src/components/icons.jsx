@@ -199,6 +199,16 @@ export const MapPin = (p) => (
   </S>
 );
 
+export const Palette = (p) => (
+  <S {...p} sw={1.7}>
+    <path d="M12 3a9 9 0 1 0 0 18c1.3 0 2-.8 2-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.1 0-1 .8-1.7 1.8-1.7H16a5 5 0 0 0 5-5c0-3.9-4-7.3-9-7.3z" />
+    <circle cx="7.5" cy="12" r="1.1" />
+    <circle cx="9.8" cy="8" r="1.1" />
+    <circle cx="14.4" cy="7.6" r="1.1" />
+    <circle cx="17.4" cy="11" r="1.1" />
+  </S>
+);
+
 export const Play = (p) => (
   <S {...p} sw={1.7}>
     <path d="M7 5v14l12-7z" />

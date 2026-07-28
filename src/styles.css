@@ -1954,6 +1954,39 @@ label { display: block; margin: 14px 0 6px; font-size: 12.5px; font-weight: 600;
 .style-item-actions { display: flex; gap: 6px; flex: none; }
 .style-editor { display: flex; flex-direction: column; margin: 6px 0 12px; }
 
+/* styles library page (rail → Styles) */
+.page-tabs { margin: 2px 0 6px; flex-wrap: wrap; }
+.page-tabs .chip-count {
+  margin-left: 7px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+.style-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+.style-card { display: flex; flex-direction: column; }
+.style-card .sr-body { flex: 1; }
+.style-card .sr-title { margin-bottom: 6px; }
+.style-card-text {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* folder path + browse buttons (settings) */
+.dir-row { display: flex; gap: 8px; align-items: center; }
+.dir-row input { flex: 1; min-width: 0; }
+.dir-row .btn { flex: none; }
+
 /* drag & drop reorder */
 .drag-handle {
   display: flex;

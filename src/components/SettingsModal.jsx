@@ -4,6 +4,7 @@ import { listImageModels } from '../lib/gemini.js';
 import { useI18n } from '../lib/i18n.js';
 import { saveProjects, migrateProject } from '../lib/storage.js';
 import { loadStyles, saveStyles, mergeStyles, buildStylesExport, parseStylesFile } from '../lib/styles.js';
+import { sanitizeFolder } from '../lib/projectFiles.js';
 import { downloadText } from '../lib/exportScript.js';
 import { Archive, Key, Cpu, Sliders } from './icons.jsx';
 
@@ -26,6 +27,43 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
   const [modelList, setModelList] = useState(null);
   const [fetching, setFetching] = useState(false);
   const [fetchErr, setFetchErr] = useState('');
+  const [cleanMsg, setCleanMsg] = useState('');
+  const [cleaning, setCleaning] = useState(false);
+
+  const hasFolderIO = !!window.localFiles?.pickDirectory;
+  const pickDir = async (current, setter, title) => {
+    const res = await window.localFiles?.pickDirectory?.(current, title);
+    if (res?.ok && res.dir) setter(res.dir);
+  };
+
+  // Folders left behind by the old rename behavior: one per keystroke of a
+  // renamed title, each a full copy of the same project. Found by project id,
+  // listed with their size, and only removed after an explicit confirmation.
+  const cleanupStrayDirs = async () => {
+    const root = projectsDir.trim() || 'D:\\Claude work\\StoryReel Projects';
+    setCleaning(true);
+    setCleanMsg('');
+    try {
+      const live = projects.map((p) => ({ id: p.id, folderName: sanitizeFolder(p.title, p.id) }));
+      const res = await window.localFiles.listStrayProjectDirs(root, live);
+      const dirs = res?.dirs || [];
+      if (!dirs.length) {
+        setCleanMsg(t('set.cleanupNone'));
+        return;
+      }
+      const mb = dirs.reduce((n, d) => n + d.size, 0) / (1024 * 1024);
+      const list = dirs
+        .map((d) => `  ${d.name}  (${(d.size / (1024 * 1024)).toFixed(1)} MB)  →  ${t('set.cleanupKeeps', { name: d.keeps })}`)
+        .join('\n');
+      if (!window.confirm(`${t('set.cleanupConfirm', { n: dirs.length, mb: mb.toFixed(1) })}\n\n${list}`)) return;
+      const del = await window.localFiles.deleteProjectDirs(root, dirs.map((d) => d.name));
+      setCleanMsg(t('set.cleanupDone', { n: del?.removed ?? 0 }));
+    } catch (e) {
+      setCleanMsg(String(e.message || e));
+    } finally {
+      setCleaning(false);
+    }
+  };
 
   const fetchModels = async () => {
     setFetching(true);
@@ -155,6 +193,38 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
           </label>
         </div>
       </div>
+      <div className="settings-io">
+        <label>{t('set.projectsDir')}</label>
+        <p className="hint">{t('set.projectsDirHint')}</p>
+        <div className="dir-row">
+          <input
+            value={projectsDir}
+            onChange={(e) => setProjectsDir(e.target.value)}
+            placeholder="D:\Claude work\StoryReel Projects"
+          />
+          {hasFolderIO && (
+            <>
+              <button
+                className="btn small"
+                onClick={() => pickDir(projectsDir, setProjectsDir, t('set.projectsDir'))}
+              >
+                {t('set.browse')}
+              </button>
+              <button className="btn small" onClick={() => window.localFiles.openDirectory(projectsDir)}>
+                {t('set.openFolder')}
+              </button>
+            </>
+          )}
+        </div>
+        {hasFolderIO && (
+          <div className="row" style={{ marginTop: 10 }}>
+            <button className="btn small" disabled={cleaning} onClick={cleanupStrayDirs}>
+              {cleaning ? t('set.cleanupBusy') : t('set.cleanupDirs')}
+            </button>
+            {cleanMsg && <span className="hint" style={{ margin: 0 }}>{cleanMsg}</span>}
+          </div>
+        )}
+      </div>
     </>
   );
 
@@ -175,11 +245,18 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
             <label>{t('set.comfyUrl')}</label>
             <input value={comfyUrl} onChange={(e) => setComfyUrl(e.target.value)} placeholder="http://127.0.0.1:8000" />
             <label>{t('set.comfyOutputDir')}</label>
-            <input value={comfyOutputDir} onChange={(e) => setComfyOutputDir(e.target.value)} placeholder="D:\Claude work\ComfyUI\Output" />
+            <div className="dir-row">
+              <input value={comfyOutputDir} onChange={(e) => setComfyOutputDir(e.target.value)} placeholder="D:\Claude work\ComfyUI\Output" />
+              {hasFolderIO && (
+                <button
+                  className="btn small"
+                  onClick={() => pickDir(comfyOutputDir, setComfyOutputDir, t('set.comfyOutputDir'))}
+                >
+                  {t('set.browse')}
+                </button>
+              )}
+            </div>
             <p className="hint">{t('set.comfyHint')}</p>
-      <label>{t('set.projectsDir')}</label>
-      <input value={projectsDir} onChange={(e) => setProjectsDir(e.target.value)} placeholder="D:\Claude work\StoryReel Projects" />
-      <p className="hint">{t('set.projectsDirHint')}</p>
     </>
   );
 

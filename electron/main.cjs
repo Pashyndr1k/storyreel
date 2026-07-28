@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { comfyRequest } = require('./comfyRequest.cjs');
 const { ffmpegVersion, renderJob, cancelActive } = require('./ffmpegRender.cjs');
+const { resolveProjectDir, listStrayDirs, deleteDirs } = require('./projectDirs.cjs');
 
 // All ComfyUI traffic goes through the main process — renderer fetches carry
 // an Origin header that ComfyUI rejects with HTTP 403.
@@ -38,6 +39,57 @@ ipcMain.handle('save-output', async (_e, { dir, filename, base64 }) => {
     const target = path.join(dir, safe);
     fs.writeFileSync(target, Buffer.from(base64, 'base64'));
     return { ok: true, path: target };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+
+// One folder per project id (see projectDirs.cjs): renaming a project renames
+// its folder instead of leaving a trail of partial-name copies, because the
+// mirror runs once per pause while the title is being typed.
+ipcMain.handle('resolve-project-dir', async (_e, { root, projectId, folderName }) => {
+  try {
+    return { ok: true, dir: resolveProjectDir(root, projectId, folderName) };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+
+ipcMain.handle('list-stray-project-dirs', async (_e, { root, projects }) => {
+  try {
+    return { ok: true, dirs: listStrayDirs(root, projects) };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+
+ipcMain.handle('delete-project-dirs', async (_e, { root, names }) => ({
+  ok: true,
+  removed: deleteDirs(root, names),
+}));
+
+// Folder picker for the projects / outputs directory settings.
+ipcMain.handle('pick-directory', async (e, { current, title } = {}) => {
+  try {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: title || 'Choose folder',
+      defaultPath: current && fs.existsSync(current) ? current : undefined,
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    if (canceled || !filePaths?.length) return { ok: false, canceled: true };
+    return { ok: true, dir: filePaths[0] };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+
+// Reveal a folder in Explorer/Finder (creating it first if needed).
+ipcMain.handle('open-directory', async (_e, dir) => {
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    await shell.openPath(dir);
+    return { ok: true };
   } catch (err) {
     return { ok: false, error: String(err) };
   }

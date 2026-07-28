@@ -13,6 +13,12 @@ contextBridge.exposeInMainWorld('localFiles', {
   saveOutput: (dir, filename, base64) => ipcRenderer.invoke('save-output', { dir, filename, base64 }),
   exportZip: (defaultName, base64) => ipcRenderer.invoke('export-zip', { defaultName, base64 }),
   clipboardWrite: (text) => ipcRenderer.invoke('clipboard-write', text),
+  resolveProjectDir: (root, projectId, folderName) =>
+    ipcRenderer.invoke('resolve-project-dir', { root, projectId, folderName }),
+  listStrayProjectDirs: (root, projects) => ipcRenderer.invoke('list-stray-project-dirs', { root, projects }),
+  deleteProjectDirs: (root, names) => ipcRenderer.invoke('delete-project-dirs', { root, names }),
+  pickDirectory: (current, title) => ipcRenderer.invoke('pick-directory', { current, title }),
+  openDirectory: (dir) => ipcRenderer.invoke('open-directory', dir),
 });
 
 // ComfyUI requests via the main process (no CORS/Origin restrictions there).
