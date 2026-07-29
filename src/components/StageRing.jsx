@@ -1,5 +1,6 @@
 // Circular stage-progress ring rendered with SVG for crisp edges.
-export default function StageRing({ stage, total = 6, size = 52 }) {
+// `color` carries the project's stage tint (see stageTint in stageColor.js).
+export default function StageRing({ stage, total = 6, size = 52, color = '#a855f7' }) {
   const clamped = Math.max(0, Math.min(stage, total));
   const stroke = 4;
   const r = (size - stroke) / 2;
@@ -22,7 +23,7 @@ export default function StageRing({ stage, total = 6, size = 52 }) {
           cy={size / 2}
           r={r}
           fill="none"
-          stroke="#a855f7"
+          stroke={color}
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={c}
@@ -30,7 +31,7 @@ export default function StageRing({ stage, total = 6, size = 52 }) {
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
         />
       </svg>
-      <span className="stage-ring-label">{clamped}/{total}</span>
+      <span className="stage-ring-label" style={{ color }}>{clamped}/{total}</span>
     </div>
   );
 }

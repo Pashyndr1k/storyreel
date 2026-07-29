@@ -1,14 +1,7 @@
 import { useI18n, localeOf } from '../lib/i18n.js';
 import StageRing from './StageRing.jsx';
+import { stageTint, rgbOf } from '../lib/stageColor.js';
 import { Copy, Archive as ArchiveIcon, Trash, RestoreIcon } from './icons.jsx';
-
-const TINTS = ['#f4805e', '#60a5fa', '#ec6ead', '#8b5cf6'];
-
-function tintOf(id) {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return TINTS[h % TINTS.length];
-}
 
 // Prefer the generated cover; fall back to the first reference photo.
 function posterOf(project) {
@@ -19,11 +12,6 @@ function posterOf(project) {
   return charPhoto || null;
 }
 
-function hexToRgb(hex) {
-  const n = parseInt(hex.slice(1), 16);
-  return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
-}
-
 export default function ProjectCard({ project, onOpen, onArchive, onRestore, onDuplicate, onDelete }) {
   const { t, lang } = useI18n();
   const date = new Date(project.createdAt).toLocaleDateString(localeOf(lang), {
@@ -31,8 +19,11 @@ export default function ProjectCard({ project, onOpen, onArchive, onRestore, onD
     day: 'numeric',
   });
   const poster = posterOf(project);
-  const tint = tintOf(project.id);
-  const rgb = hexToRgb(tint);
+  // The card's accent tracks how far the project has come, so the board reads
+  // as a progress map at a glance.
+  const stage = Math.min(project.stage || 1, 6);
+  const tint = stageTint(stage);
+  const rgb = rgbOf(tint);
 
   const posterStyle = poster
     ? { backgroundImage: `url(${poster})`, backgroundSize: 'cover', backgroundPosition: 'center' }
@@ -41,7 +32,7 @@ export default function ProjectCard({ project, onOpen, onArchive, onRestore, onD
       };
 
   return (
-    <div className="sr-card">
+    <div className="sr-card stage-tinted" style={{ '--stage-tint': tint, '--stage-rgb': rgb }}>
       <div className="sr-poster" style={posterStyle} onClick={onOpen}>
         {!poster && (
           <span className="sr-poster-label" style={{ color: `rgba(${rgb},0.8)` }}>
@@ -61,7 +52,7 @@ export default function ProjectCard({ project, onOpen, onArchive, onRestore, onD
             {!project.genres.length && <span className="sr-tag muted">{t('card.noGenre')}</span>}
           </div>
         </div>
-        <StageRing stage={Math.min(project.stage, 6)} total={6} />
+        <StageRing stage={stage} total={6} color={tint} />
       </div>
 
       <div className="sr-actions">

@@ -136,6 +136,9 @@ ipcMain.on('secure-decrypt', (e, b64) => {
 });
 
 function createWindow() {
+  // Packaged builds take the icon from electron-builder; unpackaged runs
+  // (npm run app) pick it up from build/, which ships only in the repo.
+  const devIcon = path.join(__dirname, '..', 'build', 'icon.png');
   const win = new BrowserWindow({
     width: 1320,
     height: 880,
@@ -143,6 +146,7 @@ function createWindow() {
     minHeight: 600,
     autoHideMenuBar: true,
     backgroundColor: '#0f1115',
+    ...(fs.existsSync(devIcon) ? { icon: devIcon } : {}),
     webPreferences: {
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.cjs'),

@@ -3,7 +3,8 @@ import ProjectCard from '../components/ProjectCard.jsx';
 import NewProjectModal from '../components/NewProjectModal.jsx';
 import AppShell from '../components/AppShell.jsx';
 import Dropdown from '../components/Dropdown.jsx';
-import { Upload, Plus, Clapperboard } from '../components/icons.jsx';
+import { Upload, Plus } from '../components/icons.jsx';
+import Logo from '../components/Logo.jsx';
 import { newProject, uid, migrateProject } from '../lib/storage.js';
 import { parseProjectFile } from '../lib/exportScript.js';
 import { importProjectZip } from '../lib/projectFiles.js';
@@ -134,7 +135,7 @@ export default function Home({
 
       {sorted.length === 0 ? (
         <div className="empty">
-          <div className="empty-tile"><Clapperboard size={30} /></div>
+          <div className="empty-tile"><Logo size={38} /></div>
           {active.length === 0 ? (
             <>
               <p>{t('home.noProjects')}</p>

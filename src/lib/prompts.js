@@ -751,3 +751,71 @@ JSON schema:
     user: withPhotos(character.photos || [], text),
   };
 }
+
+// ---- style assistant --------------------------------------------------------
+// Turns a plain-language wish ("moody 70s thriller", "как в рекламе духов")
+// into a library style for one of the three categories. Each category feeds a
+// different engine, so the rules below mirror how the style text is actually
+// used: script styles are appended to the writing instructions (stages 1–4),
+// image styles are pasted into the image prompt, video styles are substituted
+// into {{VIDEO_STYLE_INJECTION}} of the LTX motion system prompt.
+const STYLE_RULES = {
+  script: `SCRIPT STYLE — appended to the screenwriting instructions for stages 1–4 (ideas, synopsis, scene outline, shot breakdown).
+- Write 2–4 imperative sentences addressed to the writer: "Write as…", "Focus on…", "Keep dialogue…".
+- Cover the narrative voice, what the dialogue does, where the tension lives, and what to avoid.
+- Finish with a "Shot dynamics:" clause naming pacing and camera behaviour (e.g. "Shot dynamics: slow pacing, lingering close-ups, static lock-offs").
+- Never name a specific project, character or plot — the style must fit any story.`,
+  image: `IMAGE STYLE — pasted into every image-generation prompt (Flux / Nano Banana), so it must read as prompt vocabulary, not prose.
+- Write ONE comma-separated line of visual and technical descriptors: medium or film stock, lens and depth of field, lighting, colour grading, texture/grain, and an era or director reference when it sharpens the look.
+- Finish with "Avoid: " followed by comma-separated negatives that would break the look.
+- Describe only the LOOK. No subjects, no characters, no story, no camera movement.`,
+  video: `VIDEO STYLE — substituted into the LTX-2 motion prompt, which describes only how a still frame comes to life.
+- Write 2–4 present-tense sentences in this order: camera behaviour, subject motion texture, pacing and beats, ambient sound.
+- The starting frame already carries appearance, lighting, colour and environment — never describe any of them, and never describe a character.
+- No numbers of any kind: no seconds, no framerates, no shot counts.
+- No speech, dialogue or lip-sync direction.`,
+};
+
+export function styleAssistantPrompt(category, idea, lang, current, refinement) {
+  const langName = LANG_NAMES[lang] || 'English';
+  const rules = STYLE_RULES[category] || STYLE_RULES.script;
+  const refining = !!(current && refinement);
+  return {
+    system: `You are a film-craft specialist who writes reusable STYLE PRESETS for an AI short-film studio. You translate a director's rough wish into a precise, reusable style that works across any project.
+
+Rules:
+- Respond with VALID JSON ONLY. No markdown, no commentary.
+- "instructions" must be written entirely in English — it is fed to generation engines that expect English.
+- "name" (2–4 words) and "rationale" (one sentence) are written in ${langName}.
+- The style must be reusable: never mention a specific plot, character, brand or project.
+- Obey the category rules exactly; they describe where the text is injected.
+
+${rules}`,
+    maxTokens: 1200,
+    user: refining
+      ? `Current style:
+name: ${current.name}
+instructions: """
+${current.instructions}
+"""
+
+The director asks for this adjustment:
+"""
+${refinement}
+"""
+
+Revise the style with the adjustment applied, keeping everything it does not touch and staying inside the category rules.
+
+JSON schema:
+{"name":"...","instructions":"...","rationale":"..."}`
+      : `The director describes the style they want (their words, any language):
+"""
+${idea}
+"""
+
+Design one style preset that delivers it. Be specific and opinionated — a preset that could have come from a real production bible, not a generic description.
+
+JSON schema:
+{"name":"...","instructions":"...","rationale":"..."}`,
+  };
+}

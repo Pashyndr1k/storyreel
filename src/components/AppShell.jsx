@@ -1,6 +1,7 @@
 import Dropdown from './Dropdown.jsx';
 import ThemeToggle from './ThemeToggle.jsx';
-import { Clapperboard, Grid, Layers, Cog, Globe, Search, User, MapPin, Palette } from './icons.jsx';
+import Logo from './Logo.jsx';
+import { Grid, Layers, Cog, Globe, Search, User, MapPin, Palette } from './icons.jsx';
 import { LANGS, useI18n } from '../lib/i18n.js';
 
 // Persistent violet app frame with the left icon rail and the top bar.
@@ -42,7 +43,7 @@ export default function AppShell({
       <div className="app-frame">
         <aside className="rail">
           <div className="rail-logo" aria-hidden="true">
-            <Clapperboard size={20} />
+            <Logo size={24} />
           </div>
           {railItem('home', <Grid size={20} />, route === 'home', () => onNavigate('home'), t('nav.projects'))}
           {railItem('archive', <Layers size={20} />, route === 'archive', () => onNavigate('archive'), t('nav.archive'))}

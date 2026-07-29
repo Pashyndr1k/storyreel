@@ -1,6 +1,6 @@
 import ProjectCard from '../components/ProjectCard.jsx';
 import AppShell from '../components/AppShell.jsx';
-import { Clapperboard } from '../components/icons.jsx';
+import Logo from '../components/Logo.jsx';
 import { useI18n } from '../lib/i18n.js';
 
 export default function Archive({ projects, updateProject, removeProject, settings, setSettings, onOpen, onNav, onBack, onSettings }) {
@@ -33,7 +33,7 @@ export default function Archive({ projects, updateProject, removeProject, settin
 
       {archived.length === 0 ? (
         <div className="empty">
-          <div className="empty-tile"><Clapperboard size={30} /></div>
+          <div className="empty-tile"><Logo size={38} /></div>
           <p>{t('archive.empty')}</p>
         </div>
       ) : (

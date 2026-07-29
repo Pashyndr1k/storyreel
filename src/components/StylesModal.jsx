@@ -3,12 +3,15 @@ import { STYLE_CATEGORIES, newStyle, buildStylesExport, parseStylesFile, mergeSt
 import { downloadText } from '../lib/exportScript.js';
 import { useI18n } from '../lib/i18n.js';
 import AutoTextarea from './AutoTextarea.jsx';
+import StyleAssistant from './StyleAssistant.jsx';
+import { Wand } from './icons.jsx';
 
 // Manage the global style library across the three categories.
-export default function StylesModal({ styles, setStyles, initialCat = 'script', onClose }) {
+export default function StylesModal({ styles, setStyles, settings, onSettings, initialCat = 'script', onClose }) {
   const { t } = useI18n();
   const [cat, setCat] = useState(STYLE_CATEGORIES.includes(initialCat) ? initialCat : 'script');
   const [editing, setEditing] = useState(null); // style object being added/edited
+  const [assist, setAssist] = useState(false);
 
   const list = styles[cat] || [];
 
@@ -113,6 +116,11 @@ export default function StylesModal({ styles, setStyles, initialCat = 'script', 
             </div>
             <div className="row">
               <button className="btn small" onClick={() => setEditing(newStyle())}>{t('styles.add')}</button>
+              {settings && (
+                <button className="btn small primary" onClick={() => setAssist(true)}>
+                  <Wand size={14} /> {t('sa.button')}
+                </button>
+              )}
             </div>
           </>
         )}
@@ -131,6 +139,19 @@ export default function StylesModal({ styles, setStyles, initialCat = 'script', 
           <button className="btn primary" onClick={onClose}>{t('styles.done')}</button>
         </div>
       </div>
+
+      {assist && (
+        <StyleAssistant
+          settings={settings}
+          category={cat}
+          onSettings={onSettings}
+          onSave={(c, style) => {
+            setStyles((prev) => ({ ...prev, [c]: [...(prev[c] || []), style] }));
+            setCat(c);
+          }}
+          onClose={() => setAssist(false)}
+        />
+      )}
     </div>
   );
 }

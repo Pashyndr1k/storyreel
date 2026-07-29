@@ -142,6 +142,8 @@ export default function Project({ project, updateProject, settings, setSettings,
           update={update}
           styles={styles}
           setStyles={setStyles}
+          settings={settings}
+          onSettings={onSettings}
           onClose={() => setShowProjectSettings(false)}
         />
       )}

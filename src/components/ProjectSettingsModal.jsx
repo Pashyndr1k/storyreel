@@ -4,7 +4,7 @@ import { STYLE_CATEGORIES } from '../lib/styles.js';
 import StylesModal from './StylesModal.jsx';
 import AspectSelector from './AspectSelector.jsx';
 
-export default function ProjectSettingsModal({ project, update, styles, setStyles, onClose }) {
+export default function ProjectSettingsModal({ project, update, styles, setStyles, settings, onSettings, onClose }) {
   const { t } = useI18n();
   const [manageCat, setManageCat] = useState(null); // opens the library manager at a category
 
@@ -61,6 +61,8 @@ export default function ProjectSettingsModal({ project, update, styles, setStyle
         <StylesModal
           styles={styles}
           setStyles={setStyles}
+          settings={settings}
+          onSettings={onSettings}
           initialCat={manageCat}
           onClose={() => setManageCat(null)}
         />

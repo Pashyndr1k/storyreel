@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.18.2 — 2026-07-28
+
+- New app logo and icon: the StoryReel bracket-and-camera mark now appears in
+  the sidebar, on empty pages, in the browser tab and as the Windows and macOS
+  application icon.
+- Style assistant: describe the look you want in plain language and the
+  assistant writes a complete style for the chosen category — script, image or
+  video — following the rules of the engine that consumes it. Refine it with
+  follow-up notes until it fits, then save it to the library. Available on the
+  Styles page and in a project's style manager.
+- Style library page: script, image and video styles now have their own page on
+  the sidebar, under Locations, with search, add, edit, duplicate and delete.
+- Project cards are colour-coded by progress: green at stage 1, blue deepening
+  through stages 2–5, violet once the final cut is being assembled.
+- Renaming a project no longer scatters folders: each project keeps ONE folder,
+  which is renamed with the project. Settings › Backups gains the projects
+  folder with Browse and Open buttons, plus "Find duplicate folders" to clear
+  the copies left by the old behaviour.
+
 ## 1.18.1 — 2026-07-26
 
 - Stage 5: upload a ready-made final frame for a shot — a new corner-brackets

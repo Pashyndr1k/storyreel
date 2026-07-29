@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import AppShell from '../components/AppShell.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import StyleAssistant from '../components/StyleAssistant.jsx';
+import { Wand } from '../components/icons.jsx';
 import { useI18n } from '../lib/i18n.js';
 import { STYLE_CATEGORIES, newStyle, buildStylesExport, parseStylesFile, mergeStyles } from '../lib/styles.js';
 import { downloadText } from '../lib/exportScript.js';
@@ -12,6 +14,7 @@ export default function StylesPage({ styles, setStyles, settings, setSettings, o
   const [cat, setCat] = useState('script');
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState(null);
+  const [assist, setAssist] = useState(false);
 
   const list = styles[cat] || [];
   const q = query.trim().toLowerCase();
@@ -76,7 +79,10 @@ export default function StylesPage({ styles, setStyles, settings, setSettings, o
             <input type="file" accept=".json,application/json" onChange={importStyles} hidden />
           </label>
           <button className="btn" onClick={exportStyles}>{t('styles.export')}</button>
-          <button className="btn primary" onClick={() => setEditing(newStyle())}>{t('styles.add')}</button>
+          <button className="btn" onClick={() => setEditing(newStyle())}>{t('styles.add')}</button>
+          <button className="btn primary" onClick={() => setAssist(true)}>
+            <Wand size={15} /> {t('sa.button')}
+          </button>
         </div>
       </div>
 
@@ -119,6 +125,20 @@ export default function StylesPage({ styles, setStyles, settings, setSettings, o
             </div>
           ))}
         </div>
+      )}
+
+      {assist && (
+        <StyleAssistant
+          settings={settings}
+          category={cat}
+          onSettings={onSettings}
+          onSave={(c, style) => {
+            setStyles((prev) => ({ ...prev, [c]: [...(prev[c] || []), style] }));
+            setCat(c);
+            setQuery('');
+          }}
+          onClose={() => setAssist(false)}
+        />
       )}
 
       {editing && (

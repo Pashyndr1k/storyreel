@@ -1,7 +1,7 @@
 {
   "name": "storyreel",
   "productName": "StoryReel",
-  "version": "1.18.1",
+  "version": "1.18.2",
   "private": true,
   "description": "AI assistant for writing short videos: from plot idea to per-shot image & video generation prompts.",
   "author": "StoryReel",
@@ -44,9 +44,11 @@
       "**/node_modules/ffmpeg-static/**"
     ],
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         "nsis",
         "portable"
@@ -57,6 +59,7 @@
       "allowToChangeInstallationDirectory": true
     },
     "mac": {
+      "icon": "build/icon.png",
       "target": [
         "dmg"
       ],
