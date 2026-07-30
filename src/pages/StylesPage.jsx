@@ -2,7 +2,7 @@ import { useState } from 'react';
 import AppShell from '../components/AppShell.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import StyleAssistant from '../components/StyleAssistant.jsx';
-import { Wand } from '../components/icons.jsx';
+import { Wand, Search } from '../components/icons.jsx';
 import { useI18n } from '../lib/i18n.js';
 import { STYLE_CATEGORIES, newStyle, buildStylesExport, parseStylesFile, mergeStyles } from '../lib/styles.js';
 import { downloadText } from '../lib/exportScript.js';
@@ -66,7 +66,6 @@ export default function StylesPage({ styles, setStyles, settings, setSettings, o
       setLang={(l) => setSettings({ ...settings, lang: l })}
       theme={settings.theme || 'dark'}
       setTheme={(th) => setSettings({ ...settings, theme: th })}
-      search={{ value: query, onChange: setQuery, placeholder: t('styles.searchPh') }}
     >
       <div className="title-row">
         <div className="title-left">
@@ -74,6 +73,15 @@ export default function StylesPage({ styles, setStyles, settings, setSettings, o
           <span className="count-chip">{shown.length}</span>
         </div>
         <div className="title-actions">
+          <div className="tr-search">
+            <Search size={16} />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t('styles.searchPh')}
+              aria-label={t('styles.searchPh')}
+            />
+          </div>
           <label className="btn file-btn">
             {t('styles.import')}
             <input type="file" accept=".json,application/json" onChange={importStyles} hidden />

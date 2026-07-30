@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.19.0 — 2026-07-30
+
+- Full UI redesign: the "quiet editorial" system by Claude Design. Flat
+  ink-on-paper surfaces, monospace typography, hairline grid lines, a single
+  red accent, text-and-icon buttons instead of boxed ones, and restrained,
+  fast motion throughout. Every feature and control from 1.18.2 is preserved.
+- Three color themes rebuilt for the new language: Ink (dark), Newsprint
+  (medium) and Paper (light), with text, hairline and accent colors tuned per
+  theme.
+- Dashboard: hairline project grid with full-bleed cover cells — covers render
+  grayscale at rest and regain full color on hover; per-card progress shown as
+  six accent segments with a tabular counter; whole card opens the project.
+- Navigation moved from the left rail to a horizontal header bar with the ink
+  logo tile, app name and version, and nav icons; search lives in the page
+  title row.
+- Project pipeline: the stage strip and scene tabs are flat hairline cells
+  with "0N" numerals, red completion checks and an inverted active cell.
+- Stage 5 editor, Stage 6 timeline, all modals and toasts retoned to the
+  editorial palette.
+
 ## 1.18.2 — 2026-07-28
 
 - New app logo and icon: the StoryReel bracket-and-camera mark now appears in

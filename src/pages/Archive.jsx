@@ -37,7 +37,7 @@ export default function Archive({ projects, updateProject, removeProject, settin
           <p>{t('archive.empty')}</p>
         </div>
       ) : (
-        <div className="grid">
+        <div className="pgrid">
           {archived.map((p) => (
             <ProjectCard
               key={p.id}

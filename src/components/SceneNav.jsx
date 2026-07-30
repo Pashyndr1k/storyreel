@@ -1,9 +1,9 @@
 import { useI18n } from '../lib/i18n.js';
 import { Check } from './icons.jsx';
 
-// Scene navigation for stages 4 and 5 — same rectangular-segment family as the
-// stage bar, but calmer: wraps into rows for long outlines, and the selected
-// scene uses a soft violet fill instead of the stage bar's saturated gradient.
+// Scene navigation for stages 4 and 5 — flat editorial tabs (design 5b):
+// "0N Name", active tab inverted to ink-on-paper, finished scenes get the
+// red check.
 export default function SceneNav({ outline, currentId, isDone, onSelect }) {
   const { t } = useI18n();
   return (
@@ -18,7 +18,7 @@ export default function SceneNav({ outline, currentId, isDone, onSelect }) {
             className={`scn ${sel ? 'sel' : ''} ${done ? 'done' : ''}`}
             onClick={() => onSelect(s.id)}
           >
-            <span className="scn-num">{i + 1}</span>
+            <span className="scn-num">{String(i + 1).padStart(2, '0')}</span>
             <span className="scn-title">{s.title || t('s4.untitled')}</span>
             {done && !sel && <Check size={13} className="scn-check" />}
           </button>

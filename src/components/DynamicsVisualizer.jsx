@@ -63,7 +63,7 @@ export default function DynamicsVisualizer({ plan, playhead = null }) {
                 {[1, 5, 10].map((lv) => (
                   <g key={lv}>
                     <line x1={PAD_X} y1={y(lv)} x2={W - PAD_X} y2={y(lv)} stroke="rgba(255,255,255,0.07)" strokeWidth="1" />
-                    <text x={PAD_X - 6} y={y(lv) + 3} textAnchor="end" fontSize="8" fill="#56516e">{lv}</text>
+                    <text x={PAD_X - 6} y={y(lv) + 3} textAnchor="end" fontSize="8" fill="var(--muted-3)">{lv}</text>
                   </g>
                 ))}
                 {blocks.map((b, i) => (
@@ -71,15 +71,15 @@ export default function DynamicsVisualizer({ plan, playhead = null }) {
                     {i > 0 && (
                       <line x1={x(b.timestamp_start)} y1={PAD_Y} x2={x(b.timestamp_start)} y2={H - PAD_Y} stroke="rgba(255,255,255,0.1)" strokeDasharray="2 3" strokeWidth="1" />
                     )}
-                    <text x={(x(b.timestamp_start) + x(b.timestamp_start + b.intended_duration_sec)) / 2} y={H + 12} textAnchor="middle" fontSize="8" fill="#8b87a0">
+                    <text x={(x(b.timestamp_start) + x(b.timestamp_start + b.intended_duration_sec)) / 2} y={H + 12} textAnchor="middle" fontSize="8" fill="var(--muted-2)">
                       {b.block_id} · {b.shot_density}
                     </text>
                   </g>
                 ))}
-                <path d={path('kinetic_energy_level')} fill="none" stroke="#7c5cff" strokeWidth="2.5" strokeLinejoin="round" />
-                <path d={path('dialogue_volume')} fill="none" stroke="#d946ef" strokeWidth="2" strokeDasharray="5 3" strokeLinejoin="round" />
+                <path d={path('kinetic_energy_level')} fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinejoin="round" />
+                <path d={path('dialogue_volume')} fill="none" stroke="var(--muted-2)" strokeWidth="2" strokeDasharray="5 3" strokeLinejoin="round" />
                 {playhead != null && playhead <= total && (
-                  <line x1={x(playhead)} y1={PAD_Y - 4} x2={x(playhead)} y2={H - PAD_Y + 4} stroke="#ff5470" strokeWidth="1.5" />
+                  <line x1={x(playhead)} y1={PAD_Y - 4} x2={x(playhead)} y2={H - PAD_Y + 4} stroke="var(--accent)" strokeWidth="1.5" />
                 )}
               </svg>
               <div className="dyn-viz-legend">

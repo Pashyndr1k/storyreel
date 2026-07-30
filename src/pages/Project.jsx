@@ -170,7 +170,7 @@ export default function Project({ project, updateProject, settings, setSettings,
               disabled={s.n > project.stage}
               onClick={() => setView(s.n)}
             >
-              <span className="stg-num">{s.n}</span>
+              <span className="stg-num">{String(s.n).padStart(2, '0')}</span>
               <span className="stg-title">{s.label}</span>
               {done && !sel && <Check size={16} className="stg-check" />}
             </button>

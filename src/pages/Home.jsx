@@ -3,7 +3,7 @@ import ProjectCard from '../components/ProjectCard.jsx';
 import NewProjectModal from '../components/NewProjectModal.jsx';
 import AppShell from '../components/AppShell.jsx';
 import Dropdown from '../components/Dropdown.jsx';
-import { Upload, Plus } from '../components/icons.jsx';
+import { Upload, Plus, Search } from '../components/icons.jsx';
 import Logo from '../components/Logo.jsx';
 import { newProject, uid, migrateProject } from '../lib/storage.js';
 import { parseProjectFile } from '../lib/exportScript.js';
@@ -112,7 +112,6 @@ export default function Home({
       setLang={(l) => setSettings({ ...settings, lang: l })}
       theme={settings.theme || 'dark'}
       setTheme={(th) => setSettings({ ...settings, theme: th })}
-      search={{ value: query, onChange: setQuery, placeholder: t('home.search') }}
     >
       <div className="title-row">
         <div className="title-left">
@@ -120,14 +119,23 @@ export default function Home({
           <span className="count-chip">{active.length}</span>
         </div>
         <div className="title-actions">
+          <div className="tr-search">
+            <Search size={16} />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t('home.search')}
+              aria-label={t('home.search')}
+            />
+          </div>
           <Dropdown value={sort} options={sortOptions} onChange={setSort} title={t('home.newest')} />
-          <label className="glass-btn file-btn">
+          <label className="btn file-btn">
             <Upload size={15} />
             {t('home.import')}
             <input type="file" accept=".zip,.md,.json,application/zip,text/markdown,application/json" hidden onChange={importProject} />
           </label>
           <button className="btn primary" onClick={() => setShowNew(true)}>
-            <Plus size={16} />
+            <Plus size={14} />
             {t('home.newProject')}
           </button>
         </div>
@@ -149,7 +157,7 @@ export default function Home({
           )}
         </div>
       ) : (
-        <div className="grid">
+        <div className="pgrid">
           {sorted.map((p) => (
             <ProjectCard
               key={p.id}

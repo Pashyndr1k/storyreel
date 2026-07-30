@@ -1,6 +1,4 @@
 import { useI18n, localeOf } from '../lib/i18n.js';
-import StageRing from './StageRing.jsx';
-import { stageTint, rgbOf } from '../lib/stageColor.js';
 import { Copy, Archive as ArchiveIcon, Trash, RestoreIcon } from './icons.jsx';
 
 // Prefer the generated cover; fall back to the first reference photo.
@@ -12,69 +10,80 @@ function posterOf(project) {
   return charPhoto || null;
 }
 
+// Dashboard project cell (design 5a): the whole card is the open action.
+// The still sits grayscale under a paper wash and regains full colour on
+// hover; progress is six accent segments plus a tabular counter.
 export default function ProjectCard({ project, onOpen, onArchive, onRestore, onDuplicate, onDelete }) {
   const { t, lang } = useI18n();
   const date = new Date(project.createdAt).toLocaleDateString(localeOf(lang), {
-    month: 'short',
-    day: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric',
   });
   const poster = posterOf(project);
-  // The card's accent tracks how far the project has come, so the board reads
-  // as a progress map at a glance.
-  const stage = Math.min(project.stage || 1, 6);
-  const tint = stageTint(stage);
-  const rgb = rgbOf(tint);
+  const stage = Math.max(1, Math.min(project.stage || 1, 6));
 
-  const posterStyle = poster
-    ? { backgroundImage: `url(${poster})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-    : {
-        background: `repeating-linear-gradient(45deg, rgba(${rgb},0.12) 0 12px, rgba(${rgb},0.05) 12px 24px)`,
-      };
+  const act = (fn) => (e) => {
+    e.stopPropagation();
+    fn();
+  };
 
   return (
-    <div className="sr-card stage-tinted" style={{ '--stage-tint': tint, '--stage-rgb': rgb }}>
-      <div className="sr-poster" style={posterStyle} onClick={onOpen}>
-        {!poster && (
-          <span className="sr-poster-label" style={{ color: `rgba(${rgb},0.8)` }}>
-            poster · 16:9
+    <div
+      className="pc"
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+    >
+      {poster && <div className="pc-still" style={{ backgroundImage: `url(${poster})` }} />}
+      <div className="pc-wash" />
+      <div className="pc-in">
+        <div className="pc-top">
+          <span>{date}</span>
+          <span className="pc-prog">
+            <span className="pc-segs">
+              {[1, 2, 3, 4, 5, 6].map((n) => (
+                <span key={n} className={`pc-seg ${n <= stage ? 'on' : ''}`} />
+              ))}
+            </span>
+            <span className="pc-count">{stage}/6</span>
           </span>
-        )}
-        <span className="sr-date">{date}</span>
-      </div>
-
-      <div className="sr-body">
-        <div className="sr-body-main">
-          <h3 className="sr-title" onClick={onOpen}>{project.title}</h3>
-          <div className="sr-tags">
-            {project.genres.slice(0, 3).map((g) => (
-              <span key={g} className="sr-tag">{g}</span>
-            ))}
-            {!project.genres.length && <span className="sr-tag muted">{t('card.noGenre')}</span>}
+        </div>
+        <h4 className="pc-title">{project.title}</h4>
+        <div className="pc-tags">
+          {project.genres.slice(0, 3).map((g) => (
+            <span key={g} className="pc-tag">{g}</span>
+          ))}
+          {!project.genres.length && <span className="pc-tag">{t('card.noGenre')}</span>}
+        </div>
+        <div className="pc-foot">
+          <div className="pc-acts">
+            {onDuplicate && (
+              <button className="icon-btn" title={t('card.duplicate')} aria-label={t('card.duplicate')} onClick={act(onDuplicate)}>
+                <Copy size={14} />
+              </button>
+            )}
+            {onArchive && (
+              <button className="icon-btn" title={t('card.archive')} aria-label={t('card.archive')} onClick={act(onArchive)}>
+                <ArchiveIcon size={14} />
+              </button>
+            )}
+            {onRestore && (
+              <button className="icon-btn" title={t('card.restore')} aria-label={t('card.restore')} onClick={act(onRestore)}>
+                <RestoreIcon size={14} />
+              </button>
+            )}
+            <button className="icon-btn danger" title={t('card.delete')} aria-label={t('card.delete')} onClick={act(onDelete)}>
+              <Trash size={14} />
+            </button>
           </div>
         </div>
-        <StageRing stage={stage} total={6} color={tint} />
-      </div>
-
-      <div className="sr-actions">
-        <button className="btn primary sr-open" onClick={onOpen}>{t('card.open')}</button>
-        {onDuplicate && (
-          <button className="icon-btn" title={t('card.duplicate')} aria-label={t('card.duplicate')} onClick={onDuplicate}>
-            <Copy size={15} />
-          </button>
-        )}
-        {onArchive && (
-          <button className="icon-btn" title={t('card.archive')} aria-label={t('card.archive')} onClick={onArchive}>
-            <ArchiveIcon size={15} />
-          </button>
-        )}
-        {onRestore && (
-          <button className="icon-btn" title={t('card.restore')} aria-label={t('card.restore')} onClick={onRestore}>
-            <RestoreIcon size={15} />
-          </button>
-        )}
-        <button className="icon-btn danger" title={t('card.delete')} aria-label={t('card.delete')} onClick={onDelete}>
-          <Trash size={15} />
-        </button>
       </div>
     </div>
   );

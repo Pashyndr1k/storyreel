@@ -1,11 +1,12 @@
 import Dropdown from './Dropdown.jsx';
 import ThemeToggle from './ThemeToggle.jsx';
 import Logo from './Logo.jsx';
-import { Grid, Layers, Cog, Globe, Search, User, MapPin, Palette } from './icons.jsx';
+import { Grid, Box, Cog, Globe, User, MapPin, Palette } from './icons.jsx';
 import { LANGS, useI18n } from '../lib/i18n.js';
 
-// Persistent violet app frame with the left icon rail and the top bar.
-// `search` (optional) => { value, onChange, placeholder } renders the centered search field.
+// Editorial app frame (design 5a): a hairline header bar with the ink logo
+// tile, app name + version, horizontal nav icons and the right-side controls.
+// Pages render their own title rows (with search where they need it).
 export default function AppShell({
   route,
   onNavigate,
@@ -14,19 +15,18 @@ export default function AppShell({
   setLang,
   theme,
   setTheme,
-  search,
   children,
 }) {
   const { t } = useI18n();
 
-  const railItem = (key, icon, active, onClick, label) => (
+  const navItem = (key, icon, label) => (
     <button
       type="button"
-      className={`rail-ico ${active ? 'active' : ''}`}
+      className={`hd-ico ${route === key ? 'active' : ''}`}
       title={label}
       aria-label={label}
-      aria-current={active ? 'page' : undefined}
-      onClick={onClick}
+      aria-current={route === key ? 'page' : undefined}
+      onClick={() => onNavigate(key)}
     >
       {icon}
     </button>
@@ -39,66 +39,46 @@ export default function AppShell({
 
   return (
     <div className="app-page">
-      <div className="app-glow" />
-      <div className="app-frame">
-        <aside className="rail">
-          <div className="rail-logo" aria-hidden="true">
-            <Logo size={24} />
+      <header className="hd">
+        <div className="hd-inner">
+          <button className="hd-logo" aria-label="StoryReel" onClick={() => onNavigate('home')}>
+            <Logo size={26} />
+          </button>
+          <div className="hd-brand">
+            <span className="hd-name">StoryReel</span>
+            <span className="hd-ver">v{__APP_VERSION__}</span>
           </div>
-          {railItem('home', <Grid size={20} />, route === 'home', () => onNavigate('home'), t('nav.projects'))}
-          {railItem('archive', <Layers size={20} />, route === 'archive', () => onNavigate('archive'), t('nav.archive'))}
-          {railItem('characters', <User size={20} />, route === 'characters', () => onNavigate('characters'), t('nav.characters'))}
-          {railItem('locations', <MapPin size={20} />, route === 'locations', () => onNavigate('locations'), t('nav.locations'))}
-          {railItem('styles', <Palette size={20} />, route === 'styles', () => onNavigate('styles'), t('nav.styles'))}
-          <div className="rail-spacer" />
-        </aside>
-
-        <div className="app-main">
-          <div className="topbar">
-            <div className="brand">
-              <div className="brand-name">StoryReel</div>
-              <div className="brand-tagline">v{__APP_VERSION__}</div>
-            </div>
-
-            {search ? (
-              <div className="topbar-search">
-                <Search size={17} className="topbar-search-ico" />
-                <input
-                  value={search.value}
-                  onChange={(e) => search.onChange(e.target.value)}
-                  placeholder={search.placeholder}
-                  aria-label={search.placeholder}
-                />
-              </div>
-            ) : (
-              <div className="topbar-search-spacer" />
-            )}
-
-            <div className="topbar-right">
-              <Dropdown
-                pill
-                value={lang || 'en'}
-                options={langOptions}
-                onChange={setLang}
-                icon={<Globe size={15} />}
-                title={t('set.language')}
-              />
-              {setTheme && <ThemeToggle theme={theme} setTheme={setTheme} />}
-              <button
-                type="button"
-                className="icon-btn h44"
-                title={t('set.title')}
-                aria-label={t('set.title')}
-                onClick={onSettings}
-              >
-                <Cog size={18} />
-              </button>
-            </div>
+          <nav className="hd-nav">
+            {navItem('home', <Grid size={19} />, t('nav.projects'))}
+            {navItem('archive', <Box size={19} />, t('nav.archive'))}
+            {navItem('characters', <User size={19} />, t('nav.characters'))}
+            {navItem('locations', <MapPin size={19} />, t('nav.locations'))}
+            {navItem('styles', <Palette size={19} />, t('nav.styles'))}
+          </nav>
+          <div className="hd-right">
+            <Dropdown
+              pill
+              value={lang || 'en'}
+              options={langOptions}
+              onChange={setLang}
+              icon={<Globe size={15} />}
+              title={t('set.language')}
+            />
+            {setTheme && <ThemeToggle theme={theme} setTheme={setTheme} />}
+            <button
+              type="button"
+              className="icon-btn"
+              title={t('set.title')}
+              aria-label={t('set.title')}
+              onClick={onSettings}
+            >
+              <Cog size={16} />
+            </button>
           </div>
-
-          {children}
         </div>
-      </div>
+      </header>
+
+      <main className="app-main">{children}</main>
     </div>
   );
 }

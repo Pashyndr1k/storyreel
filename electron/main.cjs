@@ -145,7 +145,7 @@ function createWindow() {
     minWidth: 900,
     minHeight: 600,
     autoHideMenuBar: true,
-    backgroundColor: '#0f1115',
+    backgroundColor: '#151514',
     ...(fs.existsSync(devIcon) ? { icon: devIcon } : {}),
     webPreferences: {
       contextIsolation: true,

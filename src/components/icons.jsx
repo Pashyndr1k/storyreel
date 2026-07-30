@@ -1,6 +1,6 @@
-// Lucide-style inline icons used across the violet redesign.
+// Lucide-style inline icons. Editorial system (v1.19): stroke 2 on a 24 grid.
 // Inherit color via currentColor; size defaults to 20 but is overridable.
-const S = ({ size = 20, sw = 1.7, children, ...rest }) => (
+const S = ({ size = 20, sw = 2, children, ...rest }) => (
   <svg
     width={size}
     height={size}
@@ -32,6 +32,13 @@ export const Grid = (p) => (
     <rect x="14" y="3" width="7" height="7" rx="1.5" />
     <rect x="3" y="14" width="7" height="7" rx="1.5" />
     <rect x="14" y="14" width="7" height="7" rx="1.5" />
+  </S>
+);
+
+export const Box = (p) => (
+  <S {...p}>
+    <path d="M12 3 4 7.5v9L12 21l8-4.5v-9L12 3z" />
+    <path d="M4 7.5 12 12l8-4.5M12 12v9" />
   </S>
 );
 
@@ -76,7 +83,7 @@ export const Zap = (p) => (
 );
 
 export const Search = (p) => (
-  <S {...p} sw={1.8}>
+  <S {...p}>
     <circle cx="11" cy="11" r="7" />
     <path d="m21 21-4.3-4.3" />
   </S>
@@ -90,7 +97,7 @@ export const Layers = (p) => (
 );
 
 export const Settings = (p) => (
-  <S {...p} sw={1.6}>
+  <S {...p}>
     <line x1="4" y1="7" x2="20" y2="7" />
     <line x1="4" y1="12" x2="20" y2="12" />
     <line x1="4" y1="17" x2="20" y2="17" />
@@ -101,14 +108,14 @@ export const Settings = (p) => (
 );
 
 export const Globe = (p) => (
-  <S {...p} sw={1.6}>
+  <S {...p}>
     <circle cx="12" cy="12" r="9" />
     <path d="M3 12h18M12 3c2.5 2.7 2.5 15.3 0 18M12 3c-2.5 2.7-2.5 15.3 0 18" />
   </S>
 );
 
 export const Chevron = (p) => (
-  <S {...p} sw={1.8}>
+  <S {...p}>
     <path d="m6 9 6 6 6-6" />
   </S>
 );
@@ -120,7 +127,7 @@ export const Plus = (p) => (
 );
 
 export const Upload = (p) => (
-  <S {...p} sw={1.6}>
+  <S {...p}>
     <path d="M12 16V4" />
     <path d="m7 9 5-5 5 5" />
     <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
@@ -135,7 +142,7 @@ export const Copy = (p) => (
 );
 
 export const Archive = (p) => (
-  <S {...p} sw={1.6}>
+  <S {...p}>
     <rect x="3" y="4" width="18" height="4" rx="1" />
     <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" />
     <path d="M10 12h4" />
@@ -149,21 +156,21 @@ export const Trash = (p) => (
 );
 
 export const RestoreIcon = (p) => (
-  <S {...p} sw={1.7}>
+  <S {...p}>
     <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
     <path d="M3 3v5h5" />
   </S>
 );
 
 export const ArrowLeft = (p) => (
-  <S {...p} sw={1.8}>
+  <S {...p}>
     <path d="M19 12H5" />
     <path d="m12 19-7-7 7-7" />
   </S>
 );
 
 export const Download = (p) => (
-  <S {...p} sw={1.6}>
+  <S {...p}>
     <path d="M12 4v12" />
     <path d="m7 11 5 5 5-5" />
     <path d="M4 20h16" />
@@ -171,7 +178,7 @@ export const Download = (p) => (
 );
 
 export const Sliders = (p) => (
-  <S {...p} sw={1.7}>
+  <S {...p}>
     <line x1="4" y1="8" x2="20" y2="8" />
     <line x1="4" y1="16" x2="20" y2="16" />
     <circle cx="9" cy="8" r="2.4" fill="var(--panel)" />
@@ -186,21 +193,21 @@ export const Check = (p) => (
 );
 
 export const User = (p) => (
-  <S {...p} sw={1.7}>
+  <S {...p}>
     <circle cx="12" cy="8" r="4" />
     <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
   </S>
 );
 
 export const MapPin = (p) => (
-  <S {...p} sw={1.7}>
+  <S {...p}>
     <path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z" />
     <circle cx="12" cy="10" r="2.5" />
   </S>
 );
 
 export const Palette = (p) => (
-  <S {...p} sw={1.7}>
+  <S {...p}>
     <path d="M12 3a9 9 0 1 0 0 18c1.3 0 2-.8 2-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.1 0-1 .8-1.7 1.8-1.7H16a5 5 0 0 0 5-5c0-3.9-4-7.3-9-7.3z" />
     <circle cx="7.5" cy="12" r="1.1" />
     <circle cx="9.8" cy="8" r="1.1" />
@@ -210,26 +217,26 @@ export const Palette = (p) => (
 );
 
 export const Play = (p) => (
-  <S {...p} sw={1.7}>
+  <S {...p}>
     <path d="M7 5v14l12-7z" />
   </S>
 );
 
 export const StopSq = (p) => (
-  <S {...p} sw={1.7}>
+  <S {...p}>
     <rect x="6" y="6" width="12" height="12" rx="2" />
   </S>
 );
 
 export const Pause = (p) => (
-  <S {...p} sw={1.7}>
+  <S {...p}>
     <rect x="7" y="5" width="3.5" height="14" rx="1" />
     <rect x="13.5" y="5" width="3.5" height="14" rx="1" />
   </S>
 );
 
 export const Dice = (p) => (
-  <S {...p} sw={1.7}>
+  <S {...p}>
     <rect x="3" y="3" width="18" height="18" rx="3" />
     <circle cx="8.5" cy="8.5" r="1.1" fill="currentColor" stroke="none" />
     <circle cx="15.5" cy="8.5" r="1.1" fill="currentColor" stroke="none" />
@@ -240,7 +247,7 @@ export const Dice = (p) => (
 );
 
 export const Grip = (p) => (
-  <S {...p} sw={1.8}>
+  <S {...p}>
     <circle cx="9" cy="6" r="1" />
     <circle cx="15" cy="6" r="1" />
     <circle cx="9" cy="12" r="1" />
@@ -251,7 +258,7 @@ export const Grip = (p) => (
 );
 
 export const Mic = (p) => (
-  <S {...p} sw={1.7}>
+  <S {...p}>
     <rect x="9" y="2" width="6" height="12" rx="3" />
     <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
     <line x1="12" y1="18" x2="12" y2="22" />
@@ -259,7 +266,7 @@ export const Mic = (p) => (
 );
 
 export const PencilStar = (p) => (
-  <S {...p} sw={1.7}>
+  <S {...p}>
     <path d="M17.5 6.5a2.1 2.1 0 0 1 3 3L9 21l-4 1 1-4Z" />
     <path
       d="M6.5 1.5 7.4 3.6 9.5 4.5 7.4 5.4 6.5 7.5 5.6 5.4 3.5 4.5 5.6 3.6Z"
@@ -270,7 +277,7 @@ export const PencilStar = (p) => (
 );
 
 export const Wand = (p) => (
-  <S {...p} sw={1.7}>
+  <S {...p}>
     <path d="m15 4 1 2 2 1-2 1-1 2-1-2-2-1 2-1z" />
     <path d="M6 12l.8 1.6L8.4 14l-1.6.8L6 16.4l-.8-1.6L3.6 14l1.6-.4z" />
     <path d="M13 11 20 18" />
@@ -279,7 +286,7 @@ export const Wand = (p) => (
 );
 
 export const Cog = (p) => (
-  <S {...p} sw={1.6}>
+  <S {...p}>
     <circle cx="12" cy="12" r="3" />
     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
   </S>
