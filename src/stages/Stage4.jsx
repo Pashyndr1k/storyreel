@@ -9,6 +9,7 @@ import AutoTextarea from '../components/AutoTextarea.jsx';
 import StoryboardTimeline from '../components/StoryboardTimeline.jsx';
 import { StyleChip } from '../components/StyleControls.jsx';
 import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
+import Lightbox from '../components/Lightbox.jsx';
 import SceneNav from '../components/SceneNav.jsx';
 import { blockForScene, densityRange } from '../lib/dynamics.js';
 
@@ -46,6 +47,7 @@ const mapShots = (rawShots, range = { min: 2, max: 10 }) =>
 
 export default function Stage4({ project, update, settings, goNext, onSettings, onProjectSettings, genLang, styles, scriptStyle, library, libUpsert }) {
   const { t } = useI18n();
+  const [lightbox, setLightbox] = useState(null); // full-size photo pop-up
   const [sceneId, setSceneId] = useState(project.outline[0]?.id || null);
   const [prog, setProg] = useState(null);
   const { busy, error, run, runBatch } = useGenerate(settings);
@@ -159,7 +161,7 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
             <div className="photo-row">
               {(scene.photos || []).map((ph, i) => (
                 <div key={i} className="photo-thumb">
-                  <img src={ph} alt="" />
+                  <img src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
                   <button
                     className="photo-x"
                     onClick={() => updateScenePhotos((scene.photos || []).filter((_, j) => j !== i))}
@@ -307,6 +309,7 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
           {t('s4.continue')}
         </button>
       </footer>
+      <Lightbox item={lightbox} onClose={() => setLightbox(null)} />
     </section>
   );
 }

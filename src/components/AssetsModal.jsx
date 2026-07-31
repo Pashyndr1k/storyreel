@@ -4,6 +4,7 @@ import { newLibraryEntry, sortLibrary } from '../lib/library.js';
 import { fileToResizedDataURL } from '../lib/images.js';
 import AutoTextarea from './AutoTextarea.jsx';
 import { Upload } from './icons.jsx';
+import Lightbox from './Lightbox.jsx';
 
 // Pop-up manager for the global ASSET library (logos, props, wardrobe, UI
 // screenshots…). Same shape as the character/location library entries, but
@@ -12,6 +13,7 @@ import { Upload } from './icons.jsx';
 export default function AssetsModal({ library, libUpsert, libDelete, onClose }) {
   const { t } = useI18n();
   const [editing, setEditing] = useState(null);
+  const [lightbox, setLightbox] = useState(null); // full-size image pop-up
 
   const assets = sortLibrary((library || []).filter((e) => e.kind === 'asset'), 'date');
 
@@ -47,7 +49,11 @@ export default function AssetsModal({ library, libUpsert, libDelete, onClose }) 
             {assets.map((a) => (
               <div key={a.id} className="asset-card">
                 <div className="asset-thumb">
-                  {a.photos[0] ? <img src={a.photos[0]} alt="" /> : <span>{t('lib.noPhoto')}</span>}
+                  {a.photos[0] ? (
+                    <img src={a.photos[0]} alt="" onClick={() => setLightbox({ kind: 'img', src: a.photos[0] })} />
+                  ) : (
+                    <span>{t('lib.noPhoto')}</span>
+                  )}
                 </div>
                 <strong className="asset-name">{a.name || t('asset.untitled')}</strong>
                 {a.description && <p className="asset-desc">{a.description}</p>}
@@ -92,7 +98,7 @@ export default function AssetsModal({ library, libUpsert, libDelete, onClose }) 
             <div className="photo-row">
               {editing.photos.map((ph, i) => (
                 <div key={i} className="photo-thumb">
-                  <img src={ph} alt="" />
+                  <img src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
                   <button
                     className="photo-x"
                     onClick={() => setEditing({ ...editing, photos: editing.photos.filter((_, j) => j !== i) })}
@@ -126,6 +132,7 @@ export default function AssetsModal({ library, libUpsert, libDelete, onClose }) 
           </div>
         </div>
       )}
+      <Lightbox item={lightbox} onClose={() => setLightbox(null)} />
     </div>
   );
 }

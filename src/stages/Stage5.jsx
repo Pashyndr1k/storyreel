@@ -13,6 +13,7 @@ import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
 import SceneNav from '../components/SceneNav.jsx';
 import { blockForScene, DYNAMICS_CONFIG } from '../lib/dynamics.js';
 import AssetsModal from '../components/AssetsModal.jsx';
+import Lightbox from '../components/Lightbox.jsx';
 import LibraryPicker from '../components/LibraryPicker.jsx';
 import { newLibraryEntry } from '../lib/library.js';
 import { fileToResizedDataURL, resizeDataURL } from '../lib/images.js';
@@ -1418,7 +1419,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       <div className="photo-row">
                         {shotAssets.map((a) => (
                           <div key={a.id} className="photo-thumb asset-thumb-sm" title={a.name}>
-                            <img src={a.photos[0]} alt="" />
+                            <img src={a.photos[0]} alt="" onClick={() => setLightbox({ kind: 'img', src: a.photos[0] })} />
                             <span className="asset-tag">{a.name}</span>
                             <button className="photo-x" onClick={() => detachAsset(shot.id, a.id)}>✕</button>
                           </div>
@@ -1452,7 +1453,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       <div className="photo-row">
                         {(scene?.photos || []).map((ph, j) => (
                           <div key={j} className="photo-thumb">
-                            <img src={ph} alt="" />
+                            <img src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
                             <button
                               className="photo-x"
                               onClick={() => updateScenePhotos((scene.photos || []).filter((_, k) => k !== j))}
@@ -1772,18 +1773,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         </footer>
       )}
 
-      {lightbox && (
-        <div className="lightbox" onClick={() => setLightbox(null)}>
-          {lightbox.kind === 'vid' ? (
-            <video src={lightbox.src} controls autoPlay onClick={(e) => e.stopPropagation()} />
-          ) : (
-            <img src={lightbox.src} alt="" onClick={(e) => e.stopPropagation()} />
-          )}
-          <button type="button" className="lightbox-x" aria-label="close" onClick={() => setLightbox(null)}>
-            ✕
-          </button>
-        </div>
-      )}
+      <Lightbox item={lightbox} onClose={() => setLightbox(null)} />
       {showAssets && (
         <AssetsModal
           library={library}

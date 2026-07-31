@@ -10,6 +10,7 @@ import { fileToResizedDataURL } from '../lib/images.js';
 import { useI18n } from '../lib/i18n.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import Lightbox from '../components/Lightbox.jsx';
 import VoiceButton from '../components/VoiceButton.jsx';
 import LibraryPicker from '../components/LibraryPicker.jsx';
 import { StylePicker } from '../components/StyleControls.jsx';
@@ -18,6 +19,7 @@ import { RestoreIcon, Upload, Layers } from '../components/icons.jsx';
 export default function Stage2({ project, update, rawUpdate, settings, goNext, onSettings, genLang, styles, scriptStyle, imageStyle, library, libUpsert }) {
   const [pickFor, setPickFor] = useState(null); // character id awaiting a library pick
   const { t } = useI18n();
+  const [lightbox, setLightbox] = useState(null); // full-size photo pop-up
   const { busy, error, run } = useGenerate(settings);
   const storyline = project.storyline;
 
@@ -308,7 +310,7 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
               <div className="photo-row">
                 {(c.photos || []).map((ph, i) => (
                   <div key={i} className="photo-thumb">
-                    <img src={ph} alt="" />
+                    <img src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
                     <button className="photo-x" onClick={() => removePhoto(c.id, i)}>✕</button>
                   </div>
                 ))}
@@ -373,6 +375,7 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
           {t('s2.continue')}
         </button>
       </footer>
+      <Lightbox item={lightbox} onClose={() => setLightbox(null)} />
     </section>
   );
 }

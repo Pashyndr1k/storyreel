@@ -4,12 +4,14 @@ import AutoTextarea from '../components/AutoTextarea.jsx';
 import { useI18n, localeOf } from '../lib/i18n.js';
 import { newLibraryEntry, sortLibrary, CHARACTER_TYPES, LOCATION_TYPES } from '../lib/library.js';
 import { fileToResizedDataURL } from '../lib/images.js';
+import Lightbox from '../components/Lightbox.jsx';
 
 // Generic manager for the character / location libraries (kind prop).
 export default function LibraryPage({ kind, library, libUpsert, libDelete, settings, setSettings, onNav, onSettings }) {
   const { t, lang } = useI18n();
   const [sort, setSort] = useState('date');
   const [editing, setEditing] = useState(null);
+  const [lightbox, setLightbox] = useState(null); // full-size photo pop-up
 
   const types = kind === 'location' ? LOCATION_TYPES : CHARACTER_TYPES;
   const entries = sortLibrary((library || []).filter((e) => e.kind === kind), sort);
@@ -62,7 +64,7 @@ export default function LibraryPage({ kind, library, libUpsert, libDelete, setti
             <div key={e.id} className="sr-card lib-card">
               <div className="sr-poster lib-poster">
                 {e.photos[0] ? (
-                  <img src={e.photos[0]} alt="" />
+                  <img src={e.photos[0]} alt="" onClick={() => setLightbox({ kind: 'img', src: e.photos[0] })} />
                 ) : (
                   <span className="sr-poster-label">{t('lib.noPhoto')}</span>
                 )}
@@ -110,7 +112,7 @@ export default function LibraryPage({ kind, library, libUpsert, libDelete, setti
             <div className="photo-row">
               {editing.photos.map((ph, i) => (
                 <div key={i} className="photo-thumb">
-                  <img src={ph} alt="" />
+                  <img src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
                   <button
                     className="photo-x"
                     onClick={() => setEditing({ ...editing, photos: editing.photos.filter((_, j) => j !== i) })}
@@ -151,6 +153,7 @@ export default function LibraryPage({ kind, library, libUpsert, libDelete, setti
           </div>
         </div>
       )}
+      <Lightbox item={lightbox} onClose={() => setLightbox(null)} />
     </AppShell>
   );
 }
