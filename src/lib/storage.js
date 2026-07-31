@@ -133,6 +133,7 @@ export function loadSettings() {
   };
   try {
     const s = { ...defaults, ...(JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}) };
+    if (s.uiFont === 'courier') s.uiFont = 'archivo-mix'; // scheme replaced in 1.19.x
     s.apiKey = revealKey(s.apiKey);
     s.geminiKey = revealKey(s.geminiKey);
     return s;

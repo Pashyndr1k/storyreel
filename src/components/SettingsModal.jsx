@@ -8,14 +8,17 @@ import { sanitizeFolder } from '../lib/projectFiles.js';
 import { downloadText } from '../lib/exportScript.js';
 import { Archive, Key, Cpu, Sliders } from './icons.jsx';
 
-// UI font schemes (Interface tab). Every option keeps monospace-like
-// proportions so the hairline layout keeps its rhythm; the stacks rely on
-// fonts stocked with Windows/macOS — nothing is downloaded.
+// UI font schemes (Interface tab). Every option keeps similar proportions so
+// the hairline layout keeps its rhythm. Stacks use fonts stocked with
+// Windows/macOS, except Archivo, which ships with the app (public/fonts);
+// 'archivo-mix' sets Archivo for text while headings keep the default mono
+// (--ui-font-display in styles.css).
 const FONT_SCHEMES = [
   { id: 'default', label: 'Cascadia Code (default)', stack: "ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, Consolas, monospace" },
   { id: 'cascadia-mono', label: 'Cascadia Mono', stack: "'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" },
   { id: 'consolas', label: 'Consolas', stack: "Consolas, Monaco, 'Andale Mono', monospace" },
-  { id: 'courier', label: 'Courier (typewriter)', stack: "'Courier New', Courier, monospace" },
+  { id: 'archivo-mix', label: 'Archivo + mono headings', stack: "Archivo, 'Segoe UI', sans-serif" },
+  { id: 'archivo', label: 'Archivo', stack: "Archivo, 'Segoe UI', sans-serif" },
   { id: 'lucida', label: 'Lucida Console', stack: "'Lucida Console', 'Lucida Sans Typewriter', Monaco, monospace" },
   { id: 'bahnschrift', label: 'Bahnschrift (sans)', stack: "Bahnschrift, 'Avenir Next Condensed', 'Segoe UI', sans-serif" },
 ];
