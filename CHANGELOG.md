@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.19.1 — 2026-07-30
+
+- Full-size image pop-up: clicking any reference thumbnail — character
+  portraits, scene environment photos, asset images, library photos — opens
+  it in the full-screen viewer (Escape, ✕ or backdrop click closes).
+- Settings › Interface: UI font selector with seven schemes — Cascadia Code
+  (default), Cascadia Mono, Consolas, Archivo + mono headings, Archivo,
+  Lucida Console and Bahnschrift. Archivo ships with the app; the mix scheme
+  keeps headings in mono while text goes sans.
+- Width alignment: the stage strip, Stage 6 preview and timeline all sit on
+  the same content column as the other stages; project pages share the
+  dashboard's width, so nothing jumps between screens.
+- Project header: arrow-only back button aligned with the title, genres on
+  the same line, title sizes to its text.
+- Dashboard cards: left hairline, larger action icons; primary generate
+  buttons show a highlight fill instead of a shadow; Stage 6 controls sit on
+  one even 32px row; the Dynamics Plan icon lives in each stage's action row.
+- The two-star mark replaces the magic wand everywhere; Stage 3's script
+  style link matches Stage 5's chips.
+
 ## 1.19.0 — 2026-07-30
 
 - Full UI redesign: the "quiet editorial" system by Claude Design. Flat
