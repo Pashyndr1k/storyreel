@@ -134,11 +134,20 @@
 }
 ::-webkit-scrollbar-corner { background: transparent; }
 
+/* UI font schemes (Settings > Interface). All options share monospace-like
+   proportions so the hairline layout keeps its rhythm. */
+:root { --ui-font: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, Consolas, monospace; }
+:root[data-font='cascadia-mono'] { --ui-font: 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace; }
+:root[data-font='consolas'] { --ui-font: Consolas, Monaco, 'Andale Mono', monospace; }
+:root[data-font='courier'] { --ui-font: 'Courier New', Courier, monospace; }
+:root[data-font='lucida'] { --ui-font: 'Lucida Console', 'Lucida Sans Typewriter', Monaco, monospace; }
+:root[data-font='bahnschrift'] { --ui-font: Bahnschrift, 'Avenir Next Condensed', 'Segoe UI', sans-serif; }
+
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, Consolas, monospace;
+  font-family: var(--ui-font);
   font-size: 12.5px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;

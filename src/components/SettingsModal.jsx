@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { MODELS } from '../lib/claude.js';
 import { listImageModels } from '../lib/gemini.js';
 import { useI18n } from '../lib/i18n.js';
@@ -7,6 +7,18 @@ import { loadStyles, saveStyles, mergeStyles, buildStylesExport, parseStylesFile
 import { sanitizeFolder } from '../lib/projectFiles.js';
 import { downloadText } from '../lib/exportScript.js';
 import { Archive, Key, Cpu, Sliders } from './icons.jsx';
+
+// UI font schemes (Interface tab). Every option keeps monospace-like
+// proportions so the hairline layout keeps its rhythm; the stacks rely on
+// fonts stocked with Windows/macOS — nothing is downloaded.
+const FONT_SCHEMES = [
+  { id: 'default', label: 'Cascadia Code (default)', stack: "ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, Consolas, monospace" },
+  { id: 'cascadia-mono', label: 'Cascadia Mono', stack: "'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace" },
+  { id: 'consolas', label: 'Consolas', stack: "Consolas, Monaco, 'Andale Mono', monospace" },
+  { id: 'courier', label: 'Courier (typewriter)', stack: "'Courier New', Courier, monospace" },
+  { id: 'lucida', label: 'Lucida Console', stack: "'Lucida Console', 'Lucida Sans Typewriter', Monaco, monospace" },
+  { id: 'bahnschrift', label: 'Bahnschrift (sans)', stack: "Bahnschrift, 'Avenir Next Condensed', 'Segoe UI', sans-serif" },
+];
 
 export default function SettingsModal({ settings, setSettings, projects = [], styles, setStyles, onClose }) {
   const { t } = useI18n();
@@ -24,6 +36,17 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
   const [comfyOutputDir, setComfyOutputDir] = useState(settings.comfyOutputDir || 'D:\\Claude work\\ComfyUI\\Output');
   const [projectsDir, setProjectsDir] = useState(settings.projectsDir || 'D:\\Claude work\\StoryReel Projects');
   const [hideStaleToast, setHideStaleToast] = useState(!!settings.hideStaleToast);
+  const [uiFont, setUiFont] = useState(settings.uiFont || 'default');
+
+  // The selector previews its scheme live; when the modal closes, whatever is
+  // actually saved in settings wins again (Save updates settings before close,
+  // Cancel leaves them untouched — both paths restore correctly here).
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  useEffect(
+    () => () => document.documentElement.setAttribute('data-font', settingsRef.current.uiFont || 'default'),
+    []
+  );
   const [modelList, setModelList] = useState(null);
   const [fetching, setFetching] = useState(false);
   const [fetchErr, setFetchErr] = useState('');
@@ -94,6 +117,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
       comfyOutputDir: comfyOutputDir.trim() || 'D:\\Claude work\\ComfyUI\\Output',
       projectsDir: projectsDir.trim() || 'D:\\Claude work\\StoryReel Projects',
       hideStaleToast,
+      uiFont,
     });
     onClose();
   };
@@ -320,6 +344,23 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
 
   const uiBody = (
     <>
+      <label>{t('set.uiFont')}</label>
+      <p className="hint">{t('set.uiFontHint')}</p>
+      <select
+        value={uiFont}
+        onChange={(e) => {
+          setUiFont(e.target.value);
+          // preview instantly; Cancel restores the saved scheme on close
+          document.documentElement.setAttribute('data-font', e.target.value);
+        }}
+      >
+        {FONT_SCHEMES.map((f) => (
+          <option key={f.id} value={f.id} style={{ fontFamily: f.stack }}>
+            {f.label}
+          </option>
+        ))}
+      </select>
+
       <label>{t('set.staleToast')}</label>
       <p className="hint">{t('set.staleToastHint')}</p>
       <label className="check-row">

@@ -209,6 +209,9 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', settings.theme || 'dark');
   }, [settings.theme]);
   useEffect(() => {
+    document.documentElement.setAttribute('data-font', settings.uiFont || 'default');
+  }, [settings.uiFont]);
+  useEffect(() => {
     checkForUpdate(__APP_VERSION__).then((u) => u && setUpdateInfo(u));
   }, []);
 

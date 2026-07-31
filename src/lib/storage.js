@@ -129,6 +129,7 @@ export function loadSettings() {
     comfyUrl: 'http://127.0.0.1:8000',
     comfyOutputDir: 'D:\\Claude work\\ComfyUI\\Output',
     projectsDir: 'D:\\Claude work\\StoryReel Projects', // per-project folders (project.md + media files)
+    uiFont: 'default', // UI font scheme (see FONT_SCHEMES in SettingsModal)
   };
   try {
     const s = { ...defaults, ...(JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}) };
