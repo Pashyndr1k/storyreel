@@ -66,21 +66,21 @@ export default function ProjectCard({ project, onOpen, onArchive, onRestore, onD
           <div className="pc-acts">
             {onDuplicate && (
               <button className="icon-btn" title={t('card.duplicate')} aria-label={t('card.duplicate')} onClick={act(onDuplicate)}>
-                <Copy size={14} />
+                <Copy size={17} />
               </button>
             )}
             {onArchive && (
               <button className="icon-btn" title={t('card.archive')} aria-label={t('card.archive')} onClick={act(onArchive)}>
-                <ArchiveIcon size={14} />
+                <ArchiveIcon size={17} />
               </button>
             )}
             {onRestore && (
               <button className="icon-btn" title={t('card.restore')} aria-label={t('card.restore')} onClick={act(onRestore)}>
-                <RestoreIcon size={14} />
+                <RestoreIcon size={17} />
               </button>
             )}
             <button className="icon-btn danger" title={t('card.delete')} aria-label={t('card.delete')} onClick={act(onDelete)}>
-              <Trash size={14} />
+              <Trash size={17} />
             </button>
           </div>
         </div>

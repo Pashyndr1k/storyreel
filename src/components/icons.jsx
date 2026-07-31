@@ -265,6 +265,13 @@ export const Mic = (p) => (
   </S>
 );
 
+export const Stars = (p) => (
+  <S {...p}>
+    <path d="M14 3.5 15.9 8l4.6 1.9-4.6 1.9L14 16.3l-1.9-4.5-4.6-1.9L12.1 8z" />
+    <path d="M6 15.5l1 2.5 2.5 1-2.5 1-1 2.5-1-2.5L2.5 19l2.5-1z" />
+  </S>
+);
+
 export const PencilStar = (p) => (
   <S {...p}>
     <path d="M17.5 6.5a2.1 2.1 0 0 1 3 3L9 21l-4 1 1-4Z" />

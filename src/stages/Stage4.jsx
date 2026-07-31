@@ -137,7 +137,6 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
         >
           {t('s4.title')}
         </h2>
-        <DynamicsVisualizer plan={project.dynamicsPlan} />
       </div>
 
       <SceneNav
@@ -184,6 +183,8 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
         {prog && (
           <span className="total-badge">{t('batch.progress', { a: prog.a, b: prog.b })}</span>
         )}
+        <span className="push-right" />
+        <DynamicsVisualizer plan={project.dynamicsPlan} />
       </div>
       <ErrorNote error={error} onSettings={onSettings} />
 

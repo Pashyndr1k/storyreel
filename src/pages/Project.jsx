@@ -12,7 +12,7 @@ import ProjectSettingsModal from '../components/ProjectSettingsModal.jsx';
 import SmartEditModal from '../components/SmartEditModal.jsx';
 import Dropdown from '../components/Dropdown.jsx';
 import ThemeToggle from '../components/ThemeToggle.jsx';
-import { ArrowLeft, Download, Sliders, Cog, PencilStar, Check, Globe } from '../components/icons.jsx';
+import { ArrowLeft, Download, Sliders, Cog, Stars, Check, Globe } from '../components/icons.jsx';
 import { LANGS } from '../lib/i18n.js';
 
 export default function Project({ project, updateProject, settings, setSettings, styles, setStyles, library, libUpsert, libDelete, onBack, onSettings }) {
@@ -92,7 +92,9 @@ export default function Project({ project, updateProject, settings, setSettings,
   return (
     <div className="page project-page">
       <header className="project-header">
-        <button className="btn back" onClick={onBack}><ArrowLeft size={16} />{t('proj.back')}</button>
+        <button className="btn back" onClick={onBack} title={t('proj.back')} aria-label={t('proj.back')}>
+          <ArrowLeft size={22} />
+        </button>
         <div className="project-title-block">
           <input
             className="title-input"
@@ -122,7 +124,7 @@ export default function Project({ project, updateProject, settings, setSettings,
           />
           <ThemeToggle theme={settings.theme || 'dark'} setTheme={(th) => setSettings({ ...settings, theme: th })} />
           <button className="icon-btn h44" title={t('edit.button')} aria-label={t('edit.button')} onClick={() => setShowSmartEdit(true)}>
-            <PencilStar size={18} />
+            <Stars size={18} />
           </button>
           <button className="icon-btn h44" title={t('proj.export')} aria-label={t('proj.export')} onClick={exportScript}>
             <Download size={18} />

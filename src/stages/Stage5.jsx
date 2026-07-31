@@ -1023,7 +1023,6 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     <section className="stage">
       <div className="stage-head-row">
         <h2 className="stage-h2" data-tip={t('s5.desc')}>{t('s5.title')}</h2>
-        <DynamicsVisualizer plan={project.dynamicsPlan} />
       </div>
 
       <SceneNav
@@ -1073,6 +1072,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         >
           <Grid size={18} />
         </button>
+        <DynamicsVisualizer plan={project.dynamicsPlan} />
       </div>
       <ErrorNote error={error} onSettings={onSettings} />
 

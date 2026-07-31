@@ -1168,7 +1168,6 @@ export default function Stage6({ project, update, settings }) {
     <section className="stage">
       <div className="stage-head-row">
         <h2 className="stage-h2" data-tip={t('s6.desc')}>{t('s6.title')}</h2>
-        <DynamicsVisualizer plan={project.dynamicsPlan} playhead={playing || elapsed > 0 ? elapsed : null} />
       </div>
 
       <div className="asm-preview">
@@ -1675,6 +1674,7 @@ export default function Stage6({ project, update, settings }) {
         >
           <Plus size={16} />
         </button>
+        <DynamicsVisualizer plan={project.dynamicsPlan} playhead={playing || elapsed > 0 ? elapsed : null} />
         {rendering && (
           <>
             {renderProg && (

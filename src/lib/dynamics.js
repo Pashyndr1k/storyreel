@@ -46,7 +46,7 @@ function clampInt(v, lo, hi, dflt) {
 // then a fallback by scene position across blocks.
 export function blockForScene(plan, sceneNumber) {
   if (!plan?.rhythm_blocks?.length) return null;
-  const byScene = plan.rhythm_blocks.find((b) => b.scene_numbers.includes(sceneNumber));
+  const byScene = plan.rhythm_blocks.find((b) => (b.scene_numbers || []).includes(sceneNumber));
   if (byScene) return byScene;
   const idx = Math.min(plan.rhythm_blocks.length - 1, Math.floor(((sceneNumber - 1) / Math.max(1, sceneNumber)) * plan.rhythm_blocks.length));
   return plan.rhythm_blocks[idx] || plan.rhythm_blocks[plan.rhythm_blocks.length - 1];

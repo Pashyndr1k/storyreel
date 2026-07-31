@@ -4,7 +4,7 @@ import { uid } from '../lib/storage.js';
 import { useI18n } from '../lib/i18n.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
-import { StyleIndicator } from '../components/StyleControls.jsx';
+import { StyleChip } from '../components/StyleControls.jsx';
 import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
 import { normalizePlan } from '../lib/dynamics.js';
 import { Grip } from '../components/icons.jsx';
@@ -72,19 +72,20 @@ export default function Stage3({ project, update, settings, goNext, onSettings, 
     <section className="stage">
       <div className="stage-head-row">
         <h2 className="stage-h2" data-tip={t('s3.desc')}>{t('s3.title')}</h2>
-        <DynamicsVisualizer plan={project.dynamicsPlan} />
       </div>
-      <StyleIndicator project={project} styles={styles} cats={['script']} onClick={onProjectSettings} />
 
       <div className="row">
         <button className="btn primary" disabled={busy} onClick={generate}>
           {busy ? t('gen.generating') : outline.length ? t('s3.regenerate') : t('s3.generate')}
         </button>
+        <StyleChip project={project} styles={styles} cat="script" onClick={onProjectSettings} />
         {outline.length > 0 && (
           <span className={`total-badge ${total > maxDuration ? 'over' : ''}`}>
             {t('s3.total', { t: fmt(total) })} / ≤{fmt(maxDuration)}
           </span>
         )}
+        <span className="push-right" />
+        <DynamicsVisualizer plan={project.dynamicsPlan} />
       </div>
       <ErrorNote error={error} onSettings={onSettings} />
 
