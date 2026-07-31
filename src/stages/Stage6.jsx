@@ -7,7 +7,7 @@ import { generateJSON, textKeyError } from '../lib/claude.js';
 import { stage6SmartCutPrompt } from '../lib/prompts.js';
 import { decodeMediaAudio, audioBufferToWavDataURL } from '../lib/audio.js';
 import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
-import { Play, StopSq, Grip, Download, Upload, Wand, Trash, Scissors, TransitionIcon, Plus } from '../components/icons.jsx';
+import { Play, StopSq, Grip, Download, Upload, Stars, Trash, Scissors, TransitionIcon, Plus } from '../components/icons.jsx';
 
 const readFileDataURL = (file) =>
   new Promise((resolve, reject) => {
@@ -1644,7 +1644,7 @@ export default function Stage6({ project, update, settings }) {
           disabled={total <= 0}
           onClick={() => setSmartCut({ text: '', busy: false, err: '', result: null })}
         >
-          <Wand size={16} />
+          <Stars size={16} />
         </button>
         <button
           type="button"

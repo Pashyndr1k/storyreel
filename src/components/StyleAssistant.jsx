@@ -5,7 +5,7 @@ import { useI18n } from '../lib/i18n.js';
 import { useGenerate } from '../lib/useGenerate.js';
 import { styleAssistantPrompt } from '../lib/prompts.js';
 import { STYLE_CATEGORIES, newStyle } from '../lib/styles.js';
-import { Wand } from './icons.jsx';
+import { Stars } from './icons.jsx';
 
 // Describe a look in plain language and get back a ready style for the chosen
 // category; refine it in place until it fits, then save it to the library.
@@ -40,7 +40,7 @@ export default function StyleAssistant({ settings, category, onSave, onClose, on
     <div className="overlay" onClick={onClose}>
       <div className="modal wide" onClick={(e) => e.stopPropagation()}>
         <h2>
-          <Wand size={17} /> {t('sa.title')}
+          <Stars size={17} /> {t('sa.title')}
         </h2>
         <p className="hint">{t('sa.intro')}</p>
 

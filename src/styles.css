@@ -651,7 +651,10 @@ label {
 }
 .project-title-block { flex: 1; min-width: 260px; display: flex; align-items: baseline; gap: 14px; }
 .title-input {
-  flex: 0 1 420px;
+  flex: 0 1 auto;
+  field-sizing: content;
+  min-width: 120px;
+  max-width: 52%;
   width: auto;
   font-size: 18px;
   line-height: 1.1;
@@ -1108,9 +1111,8 @@ label {
 .stg-bar {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  border-top: 1px solid var(--hairline);
-  border-bottom: 1px solid var(--hairline);
-  margin: 0 -26px 26px;
+  border: 1px solid var(--hairline);
+  margin: 0 0 26px;
 }
 .stg {
   position: relative;
@@ -1717,9 +1719,8 @@ label {
 /* ============ STAGE 6 — final assembly ============ */
 .asm-preview {
   position: relative;
-  aspect-ratio: 16 / 9;
-  max-height: 420px;
-  margin: 0 auto 14px;
+  height: 420px;
+  margin: 0 0 14px;
   width: 100%;
   border-radius: 3px;
   overflow: hidden;

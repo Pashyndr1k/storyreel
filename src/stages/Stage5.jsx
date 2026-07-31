@@ -18,7 +18,7 @@ import LibraryPicker from '../components/LibraryPicker.jsx';
 import { newLibraryEntry } from '../lib/library.js';
 import { fileToResizedDataURL, resizeDataURL } from '../lib/images.js';
 import { extractPalette } from '../lib/palette.js';
-import { Download, RestoreIcon, MapPin, Upload, Layers, Grid, Trash, Wand, Zap, Expand } from '../components/icons.jsx';
+import { Download, RestoreIcon, MapPin, Upload, Layers, Grid, Trash, Stars, Zap, Expand } from '../components/icons.jsx';
 
 const readFileDataURL = (file) =>
   new Promise((resolve, reject) => {
@@ -1743,7 +1743,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         disabled={anyBusy || !(shot.dialogue || '').trim()}
                         onClick={() => redraftVoice(shot)}
                       >
-                        <Wand size={16} />
+                        <Stars size={16} />
                       </button>
                       {shotAud && (
                         <button

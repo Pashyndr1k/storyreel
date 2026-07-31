@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { transcribeAudio, groomText } from '../lib/gemini.js';
 import { useI18n } from '../lib/i18n.js';
-import { Mic, Wand } from './icons.jsx';
+import { Mic, Stars } from './icons.jsx';
 
 // Push-to-talk voice input: records via MediaRecorder, transcribes via Gemini,
 // then hands the text to the parent (appended to the field). When getText /
@@ -93,7 +93,7 @@ export default function VoiceButton({ settings, onText, getText, onReplace }) {
           disabled={grooming || busy || rec}
           onClick={groom}
         >
-          {grooming ? <span className="voice-dots">…</span> : <Wand size={14} />}
+          {grooming ? <span className="voice-dots">…</span> : <Stars size={14} />}
         </button>
       )}
     </div>

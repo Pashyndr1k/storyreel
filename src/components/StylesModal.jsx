@@ -4,7 +4,7 @@ import { downloadText } from '../lib/exportScript.js';
 import { useI18n } from '../lib/i18n.js';
 import AutoTextarea from './AutoTextarea.jsx';
 import StyleAssistant from './StyleAssistant.jsx';
-import { Wand } from './icons.jsx';
+import { Stars } from './icons.jsx';
 
 // Manage the global style library across the three categories.
 export default function StylesModal({ styles, setStyles, settings, onSettings, initialCat = 'script', onClose }) {
@@ -118,7 +118,7 @@ export default function StylesModal({ styles, setStyles, settings, onSettings, i
               <button className="btn small" onClick={() => setEditing(newStyle())}>{t('styles.add')}</button>
               {settings && (
                 <button className="btn small primary" onClick={() => setAssist(true)}>
-                  <Wand size={14} /> {t('sa.button')}
+                  <Stars size={14} /> {t('sa.button')}
                 </button>
               )}
             </div>

@@ -3,7 +3,7 @@ import { useGenerate } from '../lib/useGenerate.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
 import { generateCoverImage, generateImage } from '../lib/gemini.js';
 import { resizeDataURL } from '../lib/images.js';
-import { Wand } from '../components/icons.jsx';
+import { Stars } from '../components/icons.jsx';
 import { stage2Prompt, extractCharacterPrompt, coverPromptSpec } from '../lib/prompts.js';
 import { uid } from '../lib/storage.js';
 import { fileToResizedDataURL } from '../lib/images.js';
@@ -346,7 +346,7 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
                       disabled={portraitBusy === c.id}
                       onClick={() => genPortrait(c)}
                     >
-                      {portraitBusy === c.id ? <span className="voice-dots">…</span> : <Wand size={20} />}
+                      {portraitBusy === c.id ? <span className="voice-dots">…</span> : <Stars size={20} />}
                     </button>
                   </>
                 )}
