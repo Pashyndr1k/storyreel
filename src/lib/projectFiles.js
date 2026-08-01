@@ -41,6 +41,7 @@ export function splitProjectMedia(project) {
   lite.shotFinalImages = mapOf(project.shotFinalImages, 'final', 'jpg');
   lite.shotVideos = mapOf(project.shotVideos, 'vid', 'mp4');
   lite.shotAudios = mapOf(project.shotAudios, 'aud', 'mp3');
+  lite.shotAudioSrc = mapOf(project.shotAudioSrc, 'audsrc', 'mp3');
   lite.storyboards = mapOf(project.storyboards, 'sb', 'jpg');
   lite.shotImageHistory = {};
   for (const [k, arr] of Object.entries(project.shotImageHistory || {})) {
@@ -93,6 +94,7 @@ export function mergeProjectMedia(lite, getDataURL) {
   p.shotFinalImages = mapOf(p.shotFinalImages);
   p.shotVideos = mapOf(p.shotVideos);
   p.shotAudios = mapOf(p.shotAudios);
+  p.shotAudioSrc = mapOf(p.shotAudioSrc);
   p.storyboards = mapOf(p.storyboards);
   p.shotImageHistory = {};
   for (const [k, arr] of Object.entries(lite.shotImageHistory || {})) {

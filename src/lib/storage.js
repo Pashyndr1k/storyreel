@@ -175,7 +175,9 @@ function projectDefaults() {
     shotImageHistory: {}, // shotId -> older versions, newest first (max 5)
     shotFinalImages: {}, // shotId -> generated FINAL frame (data URL), paired with shotImages
     shotVideos: {}, // shotId -> generated shot video (data URL, ComfyUI LTX-2)
-    shotAudios: {}, // shotId -> generated voice audio (data URL, ComfyUI Chatterbox TTS)
+    shotAudios: {}, // shotId -> voice audio actually used (data URL; padded when pads are set)
+    shotAudioSrc: {}, // shotId -> unpadded source clip (generated / uploaded / recorded)
+    shotAudioPads: {}, // shotId -> { lead, tail } seconds of silence around the clip
     shotAssets: {}, // shotId -> [assetId] referencing the global asset library
     dynamicsPlan: null, // Action Dynamics Plan generated at Stage 3 (see lib/dynamics.js)
     videoGenDurations: {}, // shotId -> raw seconds requested from the video model (+2s padding)
@@ -241,6 +243,8 @@ export function migrateProject(raw) {
   p.shotAssets = p.shotAssets && typeof p.shotAssets === 'object' ? p.shotAssets : {};
   p.dynamicsPlan = p.dynamicsPlan && typeof p.dynamicsPlan === 'object' ? p.dynamicsPlan : null;
   p.videoGenDurations = p.videoGenDurations && typeof p.videoGenDurations === 'object' ? p.videoGenDurations : {};
+  p.shotAudioSrc = p.shotAudioSrc && typeof p.shotAudioSrc === 'object' ? p.shotAudioSrc : {};
+  p.shotAudioPads = p.shotAudioPads && typeof p.shotAudioPads === 'object' ? p.shotAudioPads : {};
   p.shotTrims = p.shotTrims && typeof p.shotTrims === 'object' ? p.shotTrims : {};
   p.shotTransitions = p.shotTransitions && typeof p.shotTransitions === 'object' ? p.shotTransitions : {};
   p.storyboards = p.storyboards && typeof p.storyboards === 'object' ? p.storyboards : {};

@@ -30,6 +30,38 @@ export async function decodeMediaAudio(dataURL) {
   }
 }
 
+// Duration in seconds of any decodable media data URL (0 when undecodable).
+export async function mediaDuration(dataURL) {
+  const buf = await decodeMediaAudio(dataURL);
+  return buf ? buf.duration : 0;
+}
+
+// Rebuild a recording with silence padded before and/or after it. Used by
+// Stage 5 to control a voice clip's timing: the padded file becomes the audio
+// that drives the talking-video (si2v) generation, so lead/tail silence shows
+// up as held frames before and after the speech.
+export async function padAudioWithSilence(dataURL, leadSec = 0, tailSec = 0) {
+  const src = await decodeMediaAudio(dataURL);
+  if (!src) throw new Error('AUDIO_UNDECODABLE');
+  const lead = Math.max(0, Number(leadSec) || 0);
+  const tail = Math.max(0, Number(tailSec) || 0);
+  if (lead < 0.005 && tail < 0.005) return audioBufferToWavDataURL(src);
+
+  const rate = src.sampleRate;
+  const channels = Math.min(2, src.numberOfChannels || 1);
+  const leadFrames = Math.round(lead * rate);
+  const tailFrames = Math.round(tail * rate);
+  const Ctor = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const out = new Ctor(channels, leadFrames + src.length + tailFrames, rate);
+  const buf = out.createBuffer(channels, leadFrames + src.length + tailFrames, rate);
+  for (let c = 0; c < channels; c++) {
+    const dst = buf.getChannelData(c);
+    const s = src.getChannelData(Math.min(c, src.numberOfChannels - 1));
+    dst.set(s, leadFrames); // frames outside the copy stay zero = silence
+  }
+  return audioBufferToWavDataURL(buf);
+}
+
 // AudioBuffer → 16-bit PCM WAV data URL (keeps the buffer's channel count and
 // sample rate; ffmpeg and <audio> both resample as needed).
 export function audioBufferToWavDataURL(buffer) {

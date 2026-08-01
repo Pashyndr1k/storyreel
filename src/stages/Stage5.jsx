@@ -14,11 +14,12 @@ import SceneNav from '../components/SceneNav.jsx';
 import { blockForScene, DYNAMICS_CONFIG } from '../lib/dynamics.js';
 import AssetsModal from '../components/AssetsModal.jsx';
 import Lightbox from '../components/Lightbox.jsx';
+import { padAudioWithSilence, mediaDuration } from '../lib/audio.js';
 import LibraryPicker from '../components/LibraryPicker.jsx';
 import { newLibraryEntry } from '../lib/library.js';
 import { fileToResizedDataURL, resizeDataURL } from '../lib/images.js';
 import { extractPalette } from '../lib/palette.js';
-import { Download, RestoreIcon, MapPin, Upload, Layers, Grid, Trash, Stars, Zap, Expand } from '../components/icons.jsx';
+import { Download, RestoreIcon, MapPin, Upload, Layers, Grid, Trash, Stars, Zap, Expand, Mic, StopSq } from '../components/icons.jsx';
 
 const readFileDataURL = (file) =>
   new Promise((resolve, reject) => {
@@ -1050,13 +1051,164 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         dataURL = res.dataURL;
         saveToLocalOutputs(settings, res.filename, dataURL); // best-effort local copy
       }
-      update((p) => ({ shotAudios: { ...(p.shotAudios || {}), [shot.id]: dataURL } }));
+      update((p) => ({
+        shotAudios: { ...(p.shotAudios || {}), [shot.id]: dataURL },
+        shotAudioSrc: { ...(p.shotAudioSrc || {}), [shot.id]: dataURL },
+      }));
     } catch (e) {
       setImgErr({ id: shot.id, msg: e.message === 'COMFY_UNREACHABLE' ? 'COMFY_UNREACHABLE' : e.message || String(e) });
     } finally {
       setImgBusy(null);
     }
   };
+
+  // ---- audio source, silence padding, upload and microphone recording -------
+  // shotAudioSrc holds the RAW clip (generated / uploaded / recorded);
+  // shotAudios holds what the app actually uses — the raw clip when no pads
+  // are set, otherwise the rebuilt file with silence around it. Keeping the
+  // raw clip means changing the pads never compounds silence.
+  const audioSrcOf = (p, shotId) => (p.shotAudioSrc || {})[shotId] || (p.shotAudios || {})[shotId] || null;
+  const padsOf = (shotId) => {
+    const raw = (project.shotAudioPads || {})[shotId] || {};
+    return { lead: Number(raw.lead) || 0, tail: Number(raw.tail) || 0 };
+  };
+  const setPads = (shotId, patch) =>
+    update((p) => {
+      const cur = (p.shotAudioPads || {})[shotId] || {};
+      const next = {
+        lead: Math.max(0, Math.min(10, Number(patch.lead ?? cur.lead) || 0)),
+        tail: Math.max(0, Math.min(10, Number(patch.tail ?? cur.tail) || 0)),
+      };
+      return { shotAudioPads: { ...(p.shotAudioPads || {}), [shotId]: next } };
+    });
+
+  // Store a new raw clip and make it the active audio (pads re-applied later
+  // via "Update audio" so an import is instantly audible as-is).
+  const setAudioSource = (shotId, dataURL) =>
+    update((p) => ({
+      shotAudioSrc: { ...(p.shotAudioSrc || {}), [shotId]: dataURL },
+      shotAudios: { ...(p.shotAudios || {}), [shotId]: dataURL },
+    }));
+
+  const uploadAudio = async (shot, file) => {
+    setImgErr(null);
+    try {
+      const dataURL = await readFileDataURL(file);
+      setAudioSource(shot.id, dataURL);
+      setPads(shot.id, { lead: 0, tail: 0 });
+    } catch (e) {
+      setImgErr({ id: shot.id, msg: e.message || String(e) });
+    }
+  };
+
+  // Rebuild the working audio from the raw clip + the current pads. The shot
+  // duration grows to fit the padded clip (never shrinks) so the talking-video
+  // workflow, which renders voiced shots at the exact shot duration, keeps the
+  // whole take including its silence.
+  const applyAudioPads = async (shot) => {
+    const cur = projectRef.current;
+    const src = audioSrcOf(cur, shot.id);
+    if (!src) return;
+    const { lead, tail } = padsOf(shot.id);
+    setImgBusy(`${shot.id}:audp`);
+    setImgErr(null);
+    try {
+      const out = await padAudioWithSilence(src, lead, tail);
+      const dur = await mediaDuration(out);
+      update((p) => {
+        const patch = {
+          shotAudioSrc: { ...(p.shotAudioSrc || {}), [shot.id]: src },
+          shotAudios: { ...(p.shotAudios || {}), [shot.id]: out },
+        };
+        const needed = Math.min(10, Math.ceil(dur * 10) / 10);
+        if (dur > 0 && needed > (shot.duration || 0)) {
+          patch.sceneDetails = {
+            ...p.sceneDetails,
+            [scene.id]: {
+              shots: (p.sceneDetails[scene.id]?.shots || []).map((s) =>
+                s.id === shot.id ? { ...s, duration: needed } : s
+              ),
+            },
+          };
+        }
+        return patch;
+      });
+    } catch (e) {
+      setImgErr({ id: shot.id, msg: e.message === 'AUDIO_UNDECODABLE' ? t('aud.padFailed') : e.message || String(e) });
+    } finally {
+      setImgBusy(null);
+    }
+  };
+
+  // Microphone recording (system default input). Toggle: first click starts,
+  // second stops and stores the take as the shot's audio source.
+  const [recording, setRecording] = useState(null); // shotId being recorded
+  const recRef = useRef(null); // { rec, stream, chunks }
+  const stopRecording = () => {
+    const r = recRef.current;
+    if (r?.rec && r.rec.state !== 'inactive') r.rec.stop();
+  };
+  const toggleRecording = async (shot) => {
+    if (recording === shot.id) {
+      stopRecording();
+      return;
+    }
+    if (recording) return; // another shot is recording
+    setImgErr(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find(
+        (m) => window.MediaRecorder?.isTypeSupported?.(m)
+      );
+      const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      const chunks = [];
+      rec.ondataavailable = (e) => e.data?.size && chunks.push(e.data);
+      rec.onstop = async () => {
+        stream.getTracks().forEach((tr) => tr.stop());
+        recRef.current = null;
+        setRecording(null);
+        if (!chunks.length) return;
+        try {
+          const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
+          const raw = await new Promise((res, rej) => {
+            const fr = new FileReader();
+            fr.onload = () => res(fr.result);
+            fr.onerror = () => rej(fr.error);
+            fr.readAsDataURL(blob);
+          });
+          // Re-encode to WAV so ComfyUI (and ffmpeg) always get a format they
+          // accept, whatever the browser recorded in.
+          let dataURL = raw;
+          try {
+            dataURL = await padAudioWithSilence(raw, 0, 0);
+          } catch {
+            /* keep the original container */
+          }
+          setAudioSource(shot.id, dataURL);
+          setPads(shot.id, { lead: 0, tail: 0 });
+        } catch (e) {
+          setImgErr({ id: shot.id, msg: e.message || String(e) });
+        }
+      };
+      recRef.current = { rec, stream, chunks };
+      rec.start();
+      setRecording(shot.id);
+    } catch (e) {
+      setImgErr({ id: shot.id, msg: e.name === 'NotAllowedError' ? t('aud.micDenied') : e.message || String(e) });
+    }
+  };
+  // Never leave the microphone open when the stage unmounts.
+  useEffect(() => () => {
+    const r = recRef.current;
+    if (r) {
+      try {
+        r.rec.state !== 'inactive' && r.rec.stop();
+      } catch {
+        /* already stopped */
+      }
+      r.stream?.getTracks?.().forEach((tr) => tr.stop());
+    }
+  }, []);
 
   const downloadAudio = (shot, i) => {
     const aud = (project.shotAudios || {})[shot.id];
@@ -1731,10 +1883,52 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       </div>
                     </div>
                     )}
+                    {/* Timing: silence before/after the take. "Update audio"
+                        rebuilds the file from the raw clip so the pads never
+                        compound, and the shot grows to fit the result. */}
+                    {shotAud && (
+                      <div className="s5e-padrow">
+                        <span className="s5e-eyebrow">{t('aud.timing')}</span>
+                        <label className="s5e-pad">
+                          {t('aud.padLead')}
+                          <input
+                            type="number"
+                            min="0"
+                            max="10"
+                            step="0.1"
+                            value={padsOf(shot.id).lead}
+                            disabled={anyBusy}
+                            onChange={(e) => setPads(shot.id, { lead: e.target.value })}
+                          />
+                          <i>s</i>
+                        </label>
+                        <label className="s5e-pad">
+                          {t('aud.padTail')}
+                          <input
+                            type="number"
+                            min="0"
+                            max="10"
+                            step="0.1"
+                            value={padsOf(shot.id).tail}
+                            disabled={anyBusy}
+                            onChange={(e) => setPads(shot.id, { tail: e.target.value })}
+                          />
+                          <i>s</i>
+                        </label>
+                        <button
+                          className="btn small"
+                          disabled={anyBusy}
+                          onClick={() => applyAudioPads(shot)}
+                        >
+                          {imgBusy === `${shot.id}:audp` ? t('aud.updating') : t('aud.updateAudio')}
+                        </button>
+                      </div>
+                    )}
+
                     <div className="s5e-btnrow">
                       <button
                         className="btn small primary s5e-gen fixedw-lg"
-                        disabled={anyBusy || (!(shot.dialogue || '').trim() && !(p.voicePrompt || '').trim())}
+                        disabled={anyBusy || recording === shot.id || (!(shot.dialogue || '').trim() && !(p.voicePrompt || '').trim())}
                         onClick={() => genVoice(shot, i)}
                       >
                         {audBusy ? t('aud.generating') : shotAud ? t('aud.regenerate') : t('aud.generate')}
@@ -1749,6 +1943,34 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       >
                         <Stars size={16} />
                       </button>
+                      <button
+                        type="button"
+                        className={`s5e-ico ${recording === shot.id ? 'rec' : ''}`}
+                        title={recording === shot.id ? t('aud.recStop') : t('aud.record')}
+                        aria-label={recording === shot.id ? t('aud.recStop') : t('aud.record')}
+                        disabled={anyBusy || (recording && recording !== shot.id)}
+                        onClick={() => toggleRecording(shot)}
+                      >
+                        {recording === shot.id ? <StopSq size={16} /> : <Mic size={16} />}
+                      </button>
+                      <label
+                        className={`s5e-ico file-btn ${anyBusy || recording ? 'disabled' : ''}`}
+                        title={t('aud.upload')}
+                        aria-label={t('aud.upload')}
+                      >
+                        <Upload size={16} />
+                        <input
+                          type="file"
+                          accept="audio/*"
+                          hidden
+                          disabled={anyBusy || !!recording}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            e.target.value = '';
+                            if (f) uploadAudio(shot, f);
+                          }}
+                        />
+                      </label>
                       {shotAud && (
                         <button
                           type="button"

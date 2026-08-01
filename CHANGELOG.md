@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.20.0 — 2026-08-01
+
+- Stage 5 audio: bring your own take. An upload button next to Download loads
+  any audio file for a shot, and a record button captures your voice straight
+  from the system microphone — both become the shot's audio and drive the
+  talking-video generation just like a generated voice.
+- Stage 5 audio timing: set silence before and/or after the take, then press
+  "Update audio" to build a new file from the silence plus the voice. The raw
+  take is kept separately, so changing the padding never stacks silence on
+  silence, and the shot's duration grows to fit the padded audio (so the
+  talking-video render keeps the whole take).
+
 ## 1.19.2 — 2026-07-31
 
 - Stage 5: the image version strip shows EVERY version as a thumbnail in a
