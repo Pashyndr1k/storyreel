@@ -64,7 +64,7 @@ export default function LibraryPage({ kind, library, libUpsert, libDelete, setti
             <div key={e.id} className="sr-card lib-card">
               <div className="sr-poster lib-poster">
                 {e.photos[0] ? (
-                  <img src={e.photos[0]} alt="" onClick={() => setLightbox({ kind: 'img', src: e.photos[0] })} />
+                  <img decoding="async" loading="lazy" src={e.photos[0]} alt="" onClick={() => setLightbox({ kind: 'img', src: e.photos[0] })} />
                 ) : (
                   <span className="sr-poster-label">{t('lib.noPhoto')}</span>
                 )}
@@ -112,7 +112,7 @@ export default function LibraryPage({ kind, library, libUpsert, libDelete, setti
             <div className="photo-row">
               {editing.photos.map((ph, i) => (
                 <div key={i} className="photo-thumb">
-                  <img src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
+                  <img decoding="async" loading="lazy" src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
                   <button
                     className="photo-x"
                     onClick={() => setEditing({ ...editing, photos: editing.photos.filter((_, j) => j !== i) })}

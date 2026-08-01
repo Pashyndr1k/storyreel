@@ -50,7 +50,7 @@ export default function AssetsModal({ library, libUpsert, libDelete, onClose }) 
               <div key={a.id} className="asset-card">
                 <div className="asset-thumb">
                   {a.photos[0] ? (
-                    <img src={a.photos[0]} alt="" onClick={() => setLightbox({ kind: 'img', src: a.photos[0] })} />
+                    <img decoding="async" loading="lazy" src={a.photos[0]} alt="" onClick={() => setLightbox({ kind: 'img', src: a.photos[0] })} />
                   ) : (
                     <span>{t('lib.noPhoto')}</span>
                   )}
@@ -98,7 +98,7 @@ export default function AssetsModal({ library, libUpsert, libDelete, onClose }) 
             <div className="photo-row">
               {editing.photos.map((ph, i) => (
                 <div key={i} className="photo-thumb">
-                  <img src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
+                  <img decoding="async" loading="lazy" src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
                   <button
                     className="photo-x"
                     onClick={() => setEditing({ ...editing, photos: editing.photos.filter((_, j) => j !== i) })}

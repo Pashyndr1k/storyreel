@@ -694,7 +694,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
               onClick={act}
               onKeyDown={(e) => e.key === 'Enter' && act()}
             >
-              <img src={v} alt="" />
+              <img decoding="async" loading="lazy" src={v} alt="" />
               <span
                 className="s5e-ver-x"
                 role="button"
@@ -1290,7 +1290,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       <div className="frame-pair">
                         <figure>
                           <div className="s5e-imgwrap">
-                            <img src={genImg} alt="" className="zoomable" onClick={() => setLightbox({ kind: 'img', src: genImg })} />
+                            <img decoding="async" loading="lazy" src={genImg} alt="" className="zoomable" onClick={() => setLightbox({ kind: 'img', src: genImg })} />
                             <button type="button" className="s5e-dl" title={t('img.download')} onClick={() => downloadImage(shot, i)}>
                               <Download size={14} />
                             </button>
@@ -1299,7 +1299,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         </figure>
                         <figure>
                           <div className="s5e-imgwrap">
-                            <img src={finalImg} alt="" className="zoomable" onClick={() => setLightbox({ kind: 'img', src: finalImg })} />
+                            <img decoding="async" loading="lazy" src={finalImg} alt="" className="zoomable" onClick={() => setLightbox({ kind: 'img', src: finalImg })} />
                             <div className="img-actions">
                               <IconAction title={t('img.finalRegen')} disabled={anyBusy} onClick={() => genFinalFrame(shot)}>
                                 <RestoreIcon size={14} />
@@ -1317,7 +1317,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       </div>
                     ) : (
                       <div className="s5e-imgwrap">
-                        <img src={genImg} alt="" className="zoomable" onClick={() => setLightbox({ kind: 'img', src: genImg })} />
+                        <img decoding="async" loading="lazy" src={genImg} alt="" className="zoomable" onClick={() => setLightbox({ kind: 'img', src: genImg })} />
                         <button type="button" className="s5e-dl" title={t('img.download')} onClick={() => downloadImage(shot, i)}>
                           <Download size={14} />
                         </button>
@@ -1423,7 +1423,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       <div className="photo-row">
                         {shotAssets.map((a) => (
                           <div key={a.id} className="photo-thumb asset-thumb-sm" title={a.name}>
-                            <img src={a.photos[0]} alt="" onClick={() => setLightbox({ kind: 'img', src: a.photos[0] })} />
+                            <img decoding="async" loading="lazy" src={a.photos[0]} alt="" onClick={() => setLightbox({ kind: 'img', src: a.photos[0] })} />
                             <span className="asset-tag">{a.name}</span>
                             <button className="photo-x" onClick={() => detachAsset(shot.id, a.id)}>✕</button>
                           </div>
@@ -1457,7 +1457,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       <div className="photo-row">
                         {(scene?.photos || []).map((ph, j) => (
                           <div key={j} className="photo-thumb">
-                            <img src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
+                            <img decoding="async" loading="lazy" src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
                             <button
                               className="photo-x"
                               onClick={() => updateScenePhotos((scene.photos || []).filter((_, k) => k !== j))}

@@ -1254,7 +1254,7 @@ export default function Stage6({ project, update, settings }) {
         {cur?.video ? (
           <video key={cur.shot.id} ref={pvRef} src={cur.video} preload="auto" playsInline />
         ) : cur?.image ? (
-          <img src={cur.image} alt="" />
+          <img decoding="async" loading="lazy" src={cur.image} alt="" />
         ) : (
           <div className="asm-blank">{cur ? t('s4.shot', { n: curIdx + 1 }) : ''}</div>
         )}
@@ -1368,7 +1368,7 @@ export default function Stage6({ project, update, settings }) {
                       {it.video ? (
                         <video src={it.video} muted preload="metadata" />
                       ) : it.image ? (
-                        <img src={it.image} alt="" draggable={false} />
+                        <img decoding="async" loading="lazy" src={it.image} alt="" draggable={false} />
                       ) : (
                         <span className="nle-clip-num">{globalIdx + 1}</span>
                       )}
@@ -1512,7 +1512,7 @@ export default function Stage6({ project, update, settings }) {
                         else delete audioRefs.current[c.id];
                       }}
                       src={c.dataURL}
-                      preload="auto"
+                      preload="metadata"
                     />
                   </div>
                 ))}

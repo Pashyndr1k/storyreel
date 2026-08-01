@@ -234,7 +234,7 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
                 <label>{t('cover.label')}</label>
                 <div className="cover-frame">
                   {project.cover ? (
-                    <img className="cover-preview" src={project.cover} alt={t('cover.label')} />
+                    <img decoding="async" loading="lazy" className="cover-preview" src={project.cover} alt={t('cover.label')} />
                   ) : (
                     <div className="cover-placeholder">{coverBusy ? '…' : '16:9'}</div>
                   )}
@@ -310,7 +310,7 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
               <div className="photo-row">
                 {(c.photos || []).map((ph, i) => (
                   <div key={i} className="photo-thumb">
-                    <img src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
+                    <img decoding="async" loading="lazy" src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
                     <button className="photo-x" onClick={() => removePhoto(c.id, i)}>✕</button>
                   </div>
                 ))}

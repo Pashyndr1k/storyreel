@@ -2185,6 +2185,19 @@ label {
 .sa-result label:first-child { margin-top: 10px; }
 .sa-why { margin: 10px 0 0; font-style: italic; }
 
+/* Rendering performance: offscreen cards are skipped entirely (mounting a
+   stage full of media used to decode and lay out every card at once — the
+   stage-switch lag). intrinsic-size reserves an estimate so scrollbars stay
+   sane. */
+.shot-card,
+.scene-row,
+.char-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 420px;
+}
+.sr-card, .style-card { content-visibility: auto; contain-intrinsic-size: auto 240px; }
+.pc { content-visibility: auto; contain-intrinsic-size: auto 280px; }
+
 /* folder path + browse buttons (settings) */
 .dir-row { display: flex; gap: 8px; align-items: center; }
 .dir-row input { flex: 1; min-width: 0; }

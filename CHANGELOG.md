@@ -18,6 +18,10 @@
 - Neutral (ink-toned) styling for the upload/generate squares — asset upload,
   character photo, scene environment photo, portrait generation — and the
   refine-text button; red now stays reserved for accents and primary actions.
+- Performance: switching stages and screens no longer decodes every image up
+  front — offscreen cards skip rendering entirely, images decode
+  asynchronously, Stage 6 audio clips stop preloading their full data on
+  mount, and the on-disk project mirror runs only when the app is idle.
 
 ## 1.19.1 — 2026-07-30
 

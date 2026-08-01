@@ -193,7 +193,7 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
         <div className="sb-preview-row">
           <div className="sb-preview">
             {sb[current?.id] ? (
-              <img src={sb[current.id]} alt="" />
+              <img decoding="async" loading="lazy" src={sb[current.id]} alt="" />
             ) : (
               <div className="sb-preview-empty">{t('s4.shot', { n: shots.indexOf(current) + 1 })}</div>
             )}
@@ -250,7 +250,7 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
                 if (from != null && from !== i) onReorder(from, i);
               }}
             >
-              {sb[s.id] ? <img src={sb[s.id]} alt="" draggable={false} /> : <span className="nle-clip-num">{i + 1}</span>}
+              {sb[s.id] ? <img decoding="async" loading="lazy" src={sb[s.id]} alt="" draggable={false} /> : <span className="nle-clip-num">{i + 1}</span>}
               <span className="nle-dur">{Number(s.duration || 0).toFixed(1)}s</span>
               {onDuration && (
                 <span

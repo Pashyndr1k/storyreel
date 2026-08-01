@@ -178,7 +178,11 @@ export default function App() {
     saveTimer.current = setTimeout(() => {
       pendingRef.current = null;
       saveProjects(projects);
-      mirrorChanged(projects);
+      // The disk mirror re-serializes the whole project (markdown + media
+      // split) — heavy string work. Run it when the main thread is idle so it
+      // never competes with typing or stage switches.
+      const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 400));
+      idle(() => mirrorChanged(projects));
     }, SAVE_DEBOUNCE_MS);
     return () => clearTimeout(saveTimer.current);
   }, [projects, loaded]);

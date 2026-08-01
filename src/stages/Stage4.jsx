@@ -161,7 +161,7 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
             <div className="photo-row">
               {(scene.photos || []).map((ph, i) => (
                 <div key={i} className="photo-thumb">
-                  <img src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
+                  <img decoding="async" loading="lazy" src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
                   <button
                     className="photo-x"
                     onClick={() => updateScenePhotos((scene.photos || []).filter((_, j) => j !== i))}
