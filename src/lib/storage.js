@@ -161,6 +161,8 @@ function projectDefaults() {
     title: 'Untitled project',
     genres: [],
     createdAt: Date.now(),
+    updatedAt: Date.now(), // last content edit — drives the "last edited" sort
+    pinned: false, // pinned projects sort to the top of the dashboard
     archived: false,
     lang: '', // '' = follow the app language; 'en'/'ru'/'uk' = per-project override
     scriptType: 'medium', // 'short' 10-30s | 'medium' 1-4min | 'long' 5-10min
@@ -244,6 +246,8 @@ export function migrateProject(raw) {
   p.shotAssets = p.shotAssets && typeof p.shotAssets === 'object' ? p.shotAssets : {};
   p.dynamicsPlan = p.dynamicsPlan && typeof p.dynamicsPlan === 'object' ? p.dynamicsPlan : null;
   p.videoGenDurations = p.videoGenDurations && typeof p.videoGenDurations === 'object' ? p.videoGenDurations : {};
+  p.updatedAt = Number(p.updatedAt) || Number(p.createdAt) || Date.now();
+  p.pinned = p.pinned === true;
   p.shotVideoModes = p.shotVideoModes && typeof p.shotVideoModes === 'object' ? p.shotVideoModes : {};
   p.shotAudioSrc = p.shotAudioSrc && typeof p.shotAudioSrc === 'object' ? p.shotAudioSrc : {};
   p.shotAudioPads = p.shotAudioPads && typeof p.shotAudioPads === 'object' ? p.shotAudioPads : {};

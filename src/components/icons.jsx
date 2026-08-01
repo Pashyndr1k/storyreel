@@ -265,6 +265,16 @@ export const Mic = (p) => (
   </S>
 );
 
+// Pin marker on project cards. `filled` paints it solid for pinned projects.
+export const Star = ({ filled, ...p }) => (
+  <S {...p}>
+    <path
+      d="M12 3.6l2.6 5.3 5.8.85-4.2 4.1 1 5.75L12 16.9l-5.2 2.7 1-5.75-4.2-4.1 5.8-.85z"
+      fill={filled ? 'currentColor' : 'none'}
+    />
+  </S>
+);
+
 export const Stars = (p) => (
   <S {...p}>
     <path d="M14 3.5 15.9 8l4.6 1.9-4.6 1.9L14 16.3l-1.9-4.5-4.6-1.9L12.1 8z" />

@@ -1,5 +1,5 @@
 import { useI18n, localeOf } from '../lib/i18n.js';
-import { Copy, Archive as ArchiveIcon, Trash, RestoreIcon } from './icons.jsx';
+import { Copy, Archive as ArchiveIcon, Trash, RestoreIcon, Star } from './icons.jsx';
 
 // Prefer the generated cover; fall back to the first reference photo.
 function posterOf(project) {
@@ -13,7 +13,7 @@ function posterOf(project) {
 // Dashboard project cell (design 5a): the whole card is the open action.
 // The still sits grayscale under a paper wash and regains full colour on
 // hover; progress is six accent segments plus a tabular counter.
-export default function ProjectCard({ project, onOpen, onArchive, onRestore, onDuplicate, onDelete }) {
+export default function ProjectCard({ project, onOpen, onArchive, onRestore, onDuplicate, onDelete, onPin }) {
   const { t, lang } = useI18n();
   const date = new Date(project.createdAt).toLocaleDateString(localeOf(lang), {
     month: '2-digit',
@@ -45,6 +45,18 @@ export default function ProjectCard({ project, onOpen, onArchive, onRestore, onD
       <div className="pc-wash" />
       <div className="pc-in">
         <div className="pc-top">
+          {onPin && (
+            <button
+              type="button"
+              className={`pc-pin ${project.pinned ? 'on' : ''}`}
+              title={project.pinned ? t('card.unpin') : t('card.pin')}
+              aria-label={project.pinned ? t('card.unpin') : t('card.pin')}
+              aria-pressed={!!project.pinned}
+              onClick={act(onPin)}
+            >
+              <Star size={13} filled={!!project.pinned} />
+            </button>
+          )}
           <span>{date}</span>
           <span className="pc-prog">
             <span className="pc-segs">

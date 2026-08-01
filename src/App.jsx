@@ -219,9 +219,16 @@ export default function App() {
     checkForUpdate(__APP_VERSION__).then((u) => u && setUpdateInfo(u));
   }, []);
 
-  const updateProject = (id, patch) =>
+  // Content edits stamp updatedAt (the "last edited" sort reads it). View-only
+  // changes — pinning, archiving — pass { touch: false } so they don't pretend
+  // the film was worked on.
+  const updateProject = (id, patch, { touch = true } = {}) =>
     setProjects((ps) =>
-      ps.map((p) => (p.id === id ? { ...p, ...(typeof patch === 'function' ? patch(p) : patch) } : p))
+      ps.map((p) =>
+        p.id === id
+          ? { ...p, ...(typeof patch === 'function' ? patch(p) : patch), ...(touch ? { updatedAt: Date.now() } : {}) }
+          : p
+      )
     );
 
   const removeProject = (id) => {

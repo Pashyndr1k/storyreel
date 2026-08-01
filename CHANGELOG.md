@@ -2,6 +2,12 @@
 
 ## 1.20.0 — 2026-08-01
 
+- Dashboard: pin a project with the star in a card's top-left corner and it
+  leads the list in every sort order. Pinning is a view preference, so it
+  never counts as editing the film.
+- Dashboard: new "Last edited" sort order, alongside newest, oldest, A–Z and
+  by stage.
+
 - Stage 5 audio: bring your own take. An upload button next to Download loads
   any audio file for a shot, and a record button captures your voice straight
   from the system microphone — both become the shot's audio and drive the

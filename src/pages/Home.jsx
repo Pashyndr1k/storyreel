@@ -37,13 +37,16 @@ export default function Home({
       p.genres.some((g) => g.toLowerCase().includes(q)) ||
       (p.logline || '').toLowerCase().includes(q)
   );
-  const sorted = [...filtered].sort((a, b) => {
+  // Pinned projects always lead, whatever the sort order.
+  const order = (a, b) => {
     if (sort === 'newest') return b.createdAt - a.createdAt;
     if (sort === 'oldest') return a.createdAt - b.createdAt;
+    if (sort === 'edited') return (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt);
     if (sort === 'az') return a.title.localeCompare(b.title);
     if (sort === 'stage') return b.stage - a.stage;
     return 0;
-  });
+  };
+  const sorted = [...filtered].sort((a, b) => (a.pinned === b.pinned ? order(a, b) : a.pinned ? -1 : 1));
 
   const create = (title, logline, scriptType, aspectRatio) => {
     const p = newProject({ title, logline, scriptType, aspectRatio });
@@ -99,6 +102,7 @@ export default function Home({
   const sortOptions = [
     { value: 'newest', label: t('home.newest') },
     { value: 'oldest', label: t('home.oldest') },
+    { value: 'edited', label: t('home.sortEdited') },
     { value: 'az', label: t('home.sortAZ') },
     { value: 'stage', label: t('home.sortStage') },
   ];
@@ -163,7 +167,8 @@ export default function Home({
               key={p.id}
               project={p}
               onOpen={() => onOpen(p.id)}
-              onArchive={() => updateProject(p.id, { archived: true })}
+              onArchive={() => updateProject(p.id, { archived: true }, { touch: false })}
+              onPin={() => updateProject(p.id, { pinned: !p.pinned }, { touch: false })}
               onDuplicate={() => duplicate(p)}
               onDelete={() => del(p)}
             />

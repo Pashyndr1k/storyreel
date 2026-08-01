@@ -634,6 +634,26 @@ label {
   text-transform: uppercase;
   color: var(--muted);
 }
+/* pin toggle, first thing in the card's top row */
+.pc-pin {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0 7px 0 -2px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transform-origin: center;
+  transition: transform 0.18s var(--ease), color 0.15s;
+}
+.pc-pin:hover { color: var(--text); transform: scale(1.15); }
+.pc-pin:active { transform: scale(0.92); }
+.pc-pin.on { color: var(--accent); }
 .pc-prog { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
 .pc-segs { display: inline-flex; gap: 3px; }
 .pc-seg {
