@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.19.2 — 2026-07-31
+
+- Stage 5: the image version strip now shows EVERY version as a thumbnail —
+  the currently selected image comes first with an accent ring (click zooms
+  it); history thumbs restore on click as before.
+- Stage 6: the transition indicator is a small triangular tab in each shot's
+  top-right corner; clicking it opens the transition picker.
+- Stage 6: active-segment playback — two triangular markers on the ruler
+  select the working window (whole film by default). Play runs only that
+  window, and Render exports only it: boundary shots are trimmed on the fly,
+  transitions and the audio timeline are re-mapped into the window.
+- Transitions table: the description column is now the widest and nothing
+  scrolls horizontally. Also unclamped the smart-cut, music and dynamics
+  pop-ups, which the redesign had accidentally limited to 520px.
+- Neutral (ink-toned) styling for the upload/generate squares — asset upload,
+  character photo, scene environment photo, portrait generation — and the
+  refine-text button; red now stays reserved for accents and primary actions.
+
 ## 1.19.1 — 2026-07-30
 
 - Full-size image pop-up: clicking any reference thumbnail — character

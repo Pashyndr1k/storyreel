@@ -968,9 +968,9 @@ label {
   justify-content: center;
   line-height: 1;
   border-radius: 3px;
-  border: 1.5px dashed rgba(var(--accent-rgb), 0.45);
-  background: rgba(var(--accent-rgb), 0.07);
-  color: var(--violet-text, var(--accent));
+  border: 1.5px dashed var(--hairline-strong);
+  background: rgba(var(--ink-rgb), 0.04);
+  color: var(--muted);
   cursor: pointer;
   margin: 0;
   padding: 0;
@@ -978,7 +978,7 @@ label {
 }
 .photo-add svg { flex: none; pointer-events: none; }
 .photo-row { align-items: flex-start; }
-.photo-add:hover { border-color: var(--accent); background: rgba(var(--accent-rgb), 0.16); }
+.photo-add:hover:not(:disabled) { border-color: var(--ink); background: rgba(var(--ink-rgb), 0.09); color: var(--text); }
 
 /* scene palette swatches inside the toggle */
 .pal-swatches { display: inline-flex; gap: 2px; margin-left: 6px; vertical-align: middle; }
@@ -1309,11 +1309,11 @@ label {
   width: 40px;
   height: 40px;
   border-radius: 3px;
-  background: rgba(var(--accent-rgb), 0.28);
-  border: 1px solid rgba(var(--accent-rgb), 0.45);
-  color: #fff;
+  background: rgba(var(--ink-rgb), 0.06);
+  border: 1px solid var(--hairline);
+  color: var(--text);
 }
-.groom-btn:hover:not(:disabled) { background: rgba(var(--accent-rgb), 0.45); border-color: var(--accent); color: #fff; }
+.groom-btn:hover:not(:disabled) { background: rgba(var(--ink-rgb), 0.11); border-color: var(--ink); }
 .groom-btn:disabled { opacity: 0.5; }
 .voice-btn.rec {
   background: rgba(var(--accent-rgb), 0.16);
@@ -1548,11 +1548,16 @@ label {
 }
 .lane-more:hover { color: var(--accent); }
 /* transitions reference table */
-.cuts-modal { width: min(860px, 94vw); max-height: 94vh; overflow-y: auto; padding: 16px 20px; }
+.modal.cuts-modal { width: min(880px, 94vw); max-width: min(880px, 94vw); max-height: 94vh; overflow-y: auto; overflow-x: hidden; padding: 16px 20px; }
 .cuts-modal h3 { margin: 0 0 2px; }
 .cuts-modal .hint { margin: 2px 0 6px; }
 .cuts-modal .row { margin: 8px 0 0; }
-.cuts-table { width: 100%; border-collapse: collapse; margin: 8px 0 4px; }
+.cuts-table { width: 100%; border-collapse: collapse; margin: 8px 0 4px; table-layout: fixed; }
+.cuts-table th:nth-child(1) { width: 30px; }
+.cuts-table th:nth-child(2) { width: 42px; }
+.cuts-table th:nth-child(3) { width: 128px; }
+.cuts-table th:nth-child(5) { width: 128px; }
+.cuts-table td { vertical-align: top; overflow-wrap: break-word; }
 .cuts-table th {
   text-align: left;
   font-size: 10.5px;
@@ -1574,9 +1579,9 @@ label {
   border-radius: 3px;
   padding: 2px 5px;
 }
-.cut-name { font-weight: 600; color: var(--text); white-space: nowrap; }
+.cut-name { font-weight: 600; color: var(--text); white-space: normal; }
 .cut-desc { color: var(--text-2); line-height: 1.4; font-size: 11.5px; }
-.cut-eff { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--muted-2); white-space: nowrap; }
+.cut-eff { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px; color: var(--muted-2); white-space: normal; }
 
 /* transient toast — the only notification surface on Stage 6 */
 .s6-toast {
@@ -1614,11 +1619,11 @@ label {
 .s6-controls .icon-btn:hover:not(:disabled) { background: rgba(var(--ink-rgb), 0.11); }
 
 /* background music modal */
-.music-modal { width: min(560px, 94vw); }
+.modal.music-modal { width: min(560px, 94vw); max-width: min(560px, 94vw); }
 .music-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 4px; }
 
 /* smart cut modal */
-.smartcut-modal { width: min(620px, 94vw); }
+.modal.smartcut-modal { width: min(620px, 94vw); max-width: min(620px, 94vw); }
 .smartcut-modal textarea { width: 100%; margin-top: 4px; }
 .smartcut-notes { margin: 6px 0 0; font-style: italic; }
 .smartcut-regen { margin: 6px 0 0; padding-left: 18px; }
@@ -1756,6 +1761,35 @@ label {
   box-shadow: 0 0 8px rgba(var(--accent-rgb), 0.7);
   pointer-events: none;
 }
+/* active-segment selectors: two triangles hanging from the ruler; playback
+   and Render use only the window between them */
+.nle-rmark {
+  position: absolute;
+  top: 0;
+  width: 0;
+  height: 0;
+  padding: 0;
+  margin-left: -8px;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 11px solid var(--accent);
+  border-bottom: none;
+  background: none;
+  cursor: ew-resize;
+  z-index: 6;
+  touch-action: none;
+}
+.nle-rmark:hover { border-top-color: var(--accent-deep); }
+.nle-rmark:focus-visible { outline-offset: 6px; }
+.nle-range {
+  position: absolute;
+  top: 0;
+  height: 26px;
+  background: rgba(var(--accent-rgb), 0.14);
+  border-bottom: 1px solid rgba(var(--accent-rgb), 0.5);
+  pointer-events: none;
+  z-index: 1;
+}
 .nle-clip video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
 
 /* ============ STAGE 5 — shot video player ============ */
@@ -1856,31 +1890,29 @@ label {
 .clip-trim-mark.head { left: 0; }
 .clip-trim-mark.tail { right: 0; }
 
-/* transition badge on the cut into the next shot */
+/* transition indicator: a small triangular tab in the clip's top-right
+   corner; clicking it opens the transition picker */
 .cut-badge {
   position: absolute;
-  right: -9px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 0;
+  right: 0;
   z-index: 3;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 1px solid var(--hairline-strong);
-  background: var(--menu);
-  color: var(--accent);
-  font-size: 7.5px;
-  font-weight: 800;
-  font-family: ui-monospace, monospace;
-  letter-spacing: 0.02em;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 0;
   padding: 0;
+  background: var(--accent);
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+  color: transparent;
+  font-size: 0;
+  line-height: 0;
+  cursor: pointer;
+  transform-origin: top right;
+  transition: transform 0.15s var(--ease), background 0.15s;
 }
-.cut-badge:hover { background: var(--block); border-color: var(--accent); }
-.cut-badge.ovr { border-color: var(--accent); color: var(--accent); font-weight: 800; }
+.cut-badge:hover { transform: scale(1.35); }
+.cut-badge.ovr { background: var(--accent-deep); width: 18px; height: 18px; }
 
 /* transition picker menu (opened from a cut badge) */
 .cut-menu-backdrop { position: fixed; inset: 0; z-index: 60; }
@@ -1958,7 +1990,7 @@ label {
 .dyn-viz-body { padding: 4px 14px 10px; }
 /* dynamics plan pop-up (opened from the chart-icon button in stage headers) */
 .dyn-btn { flex: none; }
-.dyn-modal { width: min(860px, 92vw); position: relative; }
+.modal.dyn-modal { width: min(860px, 92vw); max-width: min(860px, 92vw); position: relative; }
 .dyn-modal h2 { margin: 0 0 4px; }
 .dyn-modal .dyn-viz-meta { margin: 0 0 12px; }
 .dyn-modal .dyn-viz-body { padding: 0; }
@@ -2548,6 +2580,8 @@ textarea.s5e-prompt-sm { min-height: 110px; }
 }
 .s5e-ver img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 3px; }
 .s5e-ver:hover { border-color: var(--accent); }
+/* the currently selected version: accent ring, no delete control */
+.s5e-ver.cur { border-color: var(--accent); box-shadow: 0 0 0 1.5px var(--accent); cursor: zoom-in; }
 .s5e-ver-x {
   position: absolute;
   top: -6px;
@@ -2575,11 +2609,11 @@ textarea.s5e-prompt-sm { min-height: 110px; }
 .s5e-refgrid .photo-row { margin: 0; }
 .s5e .photo-add {
   background: transparent;
-  border: 1.5px dashed rgba(var(--accent-rgb), 0.28);
+  border: 1.5px dashed var(--hairline-strong);
   border-radius: 3px;
   color: var(--muted-2);
 }
-.s5e .photo-add:hover { border-color: rgba(var(--accent-rgb), 0.55); color: var(--violet-text); background: rgba(var(--accent-rgb), 0.07); }
+.s5e .photo-add:hover:not(:disabled) { border-color: var(--ink); color: var(--text); background: rgba(var(--ink-rgb), 0.06); }
 
 /* image lightbox */
 .lightbox {

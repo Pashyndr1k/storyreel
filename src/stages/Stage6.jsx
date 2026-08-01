@@ -172,6 +172,7 @@ export default function Stage6({ project, update, settings }) {
   const cancelRef = useRef(false);
   const [scale, setScale] = useState(() => defaultScale(project));
   const scrollRef = useRef(null);
+  const innerRef = useRef(null); // .nle-inner — coordinate space for ruler markers
   const [showCuts, setShowCuts] = useState(false); // transitions reference table
   const [splitBusy, setSplitBusy] = useState(false);
   const [smartCut, setSmartCut] = useState(null); // { text, busy, err, result } | null
@@ -378,6 +379,49 @@ export default function Stage6({ project, update, settings }) {
   const total = items.reduce((a, it) => a + (it.shot.duration || 0), 0);
   const startOf = (idx) => items.slice(0, idx).reduce((a, it) => a + (it.shot.duration || 0), 0);
 
+  // Active timeline segment (two ruler markers). Default: the whole film
+  // (rangeOut null = "track the end"). Playback runs and Render exports only
+  // the [effIn, effOut] window.
+  const [rangeIn, setRangeIn] = useState(0);
+  const [rangeOut, setRangeOut] = useState(null);
+  const outRaw = rangeOut == null ? total : Math.min(rangeOut, total);
+  const effIn = Math.max(0, Math.min(rangeIn, Math.max(0, outRaw - 0.2)));
+  const effOut = Math.max(Math.min(outRaw, total), Math.min(effIn + 0.2, total));
+  const hasRange = effIn > 0.01 || effOut < total - 0.01;
+  const rangeRef = useRef({ in: 0, out: null });
+  rangeRef.current = { in: effIn, out: rangeOut };
+
+  // Drag a ruler marker: pointer x → timeline seconds (0.1s snap). Dragging
+  // the out-marker to the very end restores "track the end" (null).
+  const dragRangeMark = (which) => (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const inner = innerRef.current;
+    if (!inner || total <= 0) return;
+    const toSec = (clientX) => {
+      const r = inner.getBoundingClientRect();
+      const x = clientX - r.left - NLE_GUT;
+      const sec = zoomed ? x / scale : (x / Math.max(1, r.width - NLE_GUT)) * total;
+      return Math.round(Math.max(0, Math.min(total, sec)) * 10) / 10;
+    };
+    const move = (ev) => {
+      const s = toSec(ev.clientX);
+      if (which === 'in') {
+        const lim = (rangeRef.current.out == null ? total : rangeRef.current.out) - 0.2;
+        setRangeIn(Math.max(0, Math.min(s, lim)));
+      } else {
+        setRangeOut(s >= total - 0.1 ? null : Math.max(s, rangeRef.current.in + 0.2));
+      }
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    move(e);
+  };
+
   // current item under the playhead
   let curIdx = 0;
   {
@@ -394,23 +438,24 @@ export default function Stage6({ project, update, settings }) {
   const cur = items[curIdx];
   const curOffset = elapsed - startOf(curIdx);
 
-  // playback clock (same pattern as the Stage-4 timeline)
+  // playback clock (same pattern as the Stage-4 timeline); stops at the
+  // active segment's end and parks the playhead back at its start
   useEffect(() => {
     if (!playing || total <= 0) return;
     const start = elapsed;
     const t0 = performance.now();
     const iv = setInterval(() => {
       const e = start + (performance.now() - t0) / 1000;
-      if (e >= total) {
+      if (e >= effOut) {
         setPlaying(false);
-        setElapsed(0);
+        setElapsed(effIn);
       } else {
         setElapsed(e);
       }
     }, 80);
     return () => clearInterval(iv);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing, total]);
+  }, [playing, total, effIn, effOut]);
 
   // Preview video element follows the playhead: (re)start it when the current
   // clip changes. A video shorter than its clip simply HOLDS ITS LAST FRAME
@@ -827,21 +872,42 @@ export default function Stage6({ project, update, settings }) {
     setRendering(true);
     setPlaying(false);
     const [w, h] = videoDims(project.aspectRatio || '16:9', project.videoResolution);
-    const segments = items.map((it) => {
-      if (it.video)
-        return {
-          kind: 'video',
-          dataURL: it.video,
-          trimStart: it.trim?.head || 0,
-          duration: it.shot.duration || 0,
-          tailSlack: it.trim?.tail || 0,
-          muted: !!it.muted,
-        };
-      if (it.image) return { kind: 'image', dataURL: it.image, trimStart: 0, duration: it.shot.duration || 0, tailSlack: 0 };
-      return { kind: 'black', trimStart: 0, duration: it.shot.duration || 0, tailSlack: 0 };
-    });
-    const transitions = items.slice(0, -1).map((_, i) => {
-      const c = cutFor(i);
+    // Only the active segment [effIn, effOut] is rendered: clips outside the
+    // window are dropped, boundary clips are trimmed into on the fly.
+    const rIn = effIn;
+    const rOut = effOut;
+    const included = [];
+    {
+      let acc = 0;
+      items.forEach((it, i) => {
+        const d = it.shot.duration || 0;
+        const s0 = acc;
+        const s1 = acc + d;
+        acc = s1;
+        const a = Math.max(s0, rIn);
+        const b = Math.min(s1, rOut);
+        if (b - a < 0.05) return;
+        const headCut = a - s0;
+        let seg;
+        if (it.video)
+          seg = {
+            kind: 'video',
+            dataURL: it.video,
+            trimStart: (it.trim?.head || 0) + headCut,
+            duration: b - a,
+            tailSlack: it.trim?.tail || 0,
+            muted: !!it.muted,
+          };
+        else if (it.image) seg = { kind: 'image', dataURL: it.image, trimStart: 0, duration: b - a, tailSlack: 0 };
+        else seg = { kind: 'black', trimStart: 0, duration: b - a, tailSlack: 0 };
+        included.push({ seg, origIdx: i });
+      });
+    }
+    const segments = included.map((x) => x.seg);
+    const transitions = included.slice(0, -1).map((x, k) => {
+      // a styled transition only makes sense between originally adjacent shots
+      if (included[k + 1].origIdx !== x.origIdx + 1) return { xfade: 'cut' };
+      const c = cutFor(x.origIdx);
       return CUT_FFMPEG[c?.transition_type] || { xfade: 'cut' };
     });
     const safe = (project.title || 'storyreel').replace(/[^\w\d\- ]+/g, '').trim().replace(/\s+/g, '-') || 'storyreel';
@@ -854,15 +920,29 @@ export default function Stage6({ project, update, settings }) {
       .flatMap((L) =>
         (L.clips || [])
           .filter((c) => c.dataURL && c.duration > 0.01 && !c.muted)
-          .map((c) => ({
-            dataURL: c.dataURL,
-            start: c.start || 0,
-            offset: c.offset || 0,
-            duration: c.duration,
-            fadeIn: c.fadeIn || 0,
-            fadeOut: c.fadeOut || 0,
-            volume: L.volume ?? 1,
-          }))
+          .map((c) => {
+            // shift into the active segment's clock and clip to its window
+            let start = (c.start || 0) - rIn;
+            let offset = c.offset || 0;
+            let duration = c.duration;
+            if (start < 0) {
+              offset += -start;
+              duration += start;
+              start = 0;
+            }
+            duration = Math.min(duration, rOut - rIn - start);
+            if (duration <= 0.01) return null;
+            return {
+              dataURL: c.dataURL,
+              start,
+              offset,
+              duration,
+              fadeIn: c.fadeIn || 0,
+              fadeOut: c.fadeOut || 0,
+              volume: L.volume ?? 1,
+            };
+          })
+          .filter(Boolean)
       );
     const off = window.ffmpegBridge.onProgress((p) =>
       setRenderProg({ pct: Math.min(100, Math.round((p.sec / (p.total || 1)) * 100)) })
@@ -1186,7 +1266,7 @@ export default function Stage6({ project, update, settings }) {
 
       <div className="nle">
        <div className={`nle-scroll ${zoomed ? 'zoomed' : ''}`} ref={scrollRef}>
-        <div className="nle-inner" style={zoomed ? { width: innerWidth } : undefined}>
+        <div className="nle-inner" ref={innerRef} style={zoomed ? { width: innerWidth } : undefined}>
         <div className="nle-ruler">
           <span className="nle-gut nle-gut-ruler" />
           {Array.from({ length: seconds }, (_, i) => (
@@ -1321,6 +1401,7 @@ export default function Stage6({ project, update, settings }) {
                               type="button"
                               className={`cut-badge ${c.overridden ? 'ovr' : ''}`}
                               title={`${t('cut.tip')}: ${t(`cut.${c.transition_type}`)}${c.audio_bridge !== 'none' ? ` · ${c.audio_bridge.replace('_', '-')}` : ''}`}
+                              aria-label={`${t('cut.tip')}: ${t(`cut.${c.transition_type}`)}`}
                               draggable={false}
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1330,9 +1411,7 @@ export default function Stage6({ project, update, settings }) {
                                 e.preventDefault();
                                 e.stopPropagation();
                               }}
-                            >
-                              {CUT_ABBR[c.transition_type] || 'A'}
-                            </button>
+                            />
                           );
                         })()}
                     </div>
@@ -1511,6 +1590,49 @@ export default function Stage6({ project, update, settings }) {
             <span className="nle-playhead-cap" />
           </div>
         )}
+        {/* active-segment markers: drag the triangles on the ruler to narrow
+            what plays and what Render exports */}
+        {total > 0 && (
+          <>
+            {hasRange && (
+              <div
+                className="nle-range"
+                style={
+                  zoomed
+                    ? { left: NLE_GUT + effIn * scale, width: (effOut - effIn) * scale }
+                    : {
+                        left: `calc(${NLE_GUT}px + (100% - ${NLE_GUT}px) * ${effIn / Math.max(0.1, total)})`,
+                        width: `calc((100% - ${NLE_GUT}px) * ${(effOut - effIn) / Math.max(0.1, total)})`,
+                      }
+                }
+              />
+            )}
+            <button
+              type="button"
+              className="nle-rmark"
+              title={t('s6.rangeIn')}
+              aria-label={t('s6.rangeIn')}
+              style={
+                zoomed
+                  ? { left: NLE_GUT + effIn * scale }
+                  : { left: `calc(${NLE_GUT}px + (100% - ${NLE_GUT}px) * ${effIn / Math.max(0.1, total)})` }
+              }
+              onPointerDown={dragRangeMark('in')}
+            />
+            <button
+              type="button"
+              className="nle-rmark"
+              title={t('s6.rangeOut')}
+              aria-label={t('s6.rangeOut')}
+              style={
+                zoomed
+                  ? { left: NLE_GUT + effOut * scale }
+                  : { left: `calc(${NLE_GUT}px + (100% - ${NLE_GUT}px) * ${effOut / Math.max(0.1, total)})` }
+              }
+              onPointerDown={dragRangeMark('out')}
+            />
+          </>
+        )}
         </div>
        </div>
       </div>
@@ -1623,7 +1745,14 @@ export default function Stage6({ project, update, settings }) {
       </div>
 
       <div className="row s6-controls">
-        <button className="btn small primary fixedw" disabled={rendering || total <= 0} onClick={() => setPlaying((v) => !v)}>
+        <button
+          className="btn small primary fixedw"
+          disabled={rendering || total <= 0}
+          onClick={() => {
+            if (!playing && (elapsed < effIn - 0.01 || elapsed >= effOut - 0.05)) setElapsed(effIn);
+            setPlaying((v) => !v);
+          }}
+        >
           {playing ? <><StopSq size={14} /> {t('sb.stop')}</> : <><Play size={14} /> {t('sb.play')}</>}
         </button>
         <button className="btn small fixedw" disabled={rendering} onClick={doRender}>

@@ -654,6 +654,53 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       };
     });
 
+  // Version strip: EVERY version as a thumbnail — the current image first,
+  // highlighted with the accent ring (click = zoom); history thumbs restore on
+  // click and carry the ✕ delete control.
+  const renderVersions = (shot, genImg, cls) => {
+    const hist = (project.shotImageHistory || {})[shot.id] || [];
+    if (!genImg || hist.length === 0) return null;
+    return (
+      <div className={cls}>
+        <span>{t('ver.label')}</span>
+        <span
+          className="s5e-ver cur"
+          role="button"
+          tabIndex={0}
+          title={t('ver.current')}
+          onClick={() => setLightbox({ kind: 'img', src: genImg })}
+          onKeyDown={(e) => e.key === 'Enter' && setLightbox({ kind: 'img', src: genImg })}
+        >
+          <img src={genImg} alt="" />
+        </span>
+        {hist.map((v, vi) => (
+          <span
+            key={vi}
+            className="s5e-ver"
+            role="button"
+            tabIndex={0}
+            title={t('ver.restore')}
+            onClick={() => restoreVersion(shot.id, vi)}
+            onKeyDown={(e) => e.key === 'Enter' && restoreVersion(shot.id, vi)}
+          >
+            <img src={v} alt="" />
+            <span
+              className="s5e-ver-x"
+              role="button"
+              title={t('ver.delete')}
+              onClick={(e) => {
+                e.stopPropagation();
+                deleteVersion(shot.id, vi);
+              }}
+            >
+              ✕
+            </span>
+          </span>
+        ))}
+      </div>
+    );
+  };
+
   // Edit-by-instruction: send the current image back to Nano Banana as the edit
   // reference with the user's refinement ("make it darker", "move camera lower").
   const refineImage = async (shot) => {
@@ -1262,36 +1309,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         <button type="button" className="s5e-dl" title={t('img.download')} onClick={() => downloadImage(shot, i)}>
                           <Download size={14} />
                         </button>
-                        {/* Version stack hovers over the preview; ✕ removes a variant. */}
-                        {((project.shotImageHistory || {})[shot.id] || []).length > 0 && (
-                          <div className="s5e-vers-overlay">
-                            <span>{t('ver.label')}</span>
-                            {((project.shotImageHistory || {})[shot.id] || []).map((v, vi) => (
-                              <span
-                                key={vi}
-                                className="s5e-ver"
-                                role="button"
-                                tabIndex={0}
-                                title={t('ver.restore')}
-                                onClick={() => restoreVersion(shot.id, vi)}
-                                onKeyDown={(e) => e.key === 'Enter' && restoreVersion(shot.id, vi)}
-                              >
-                                <img src={v} alt="" />
-                                <span
-                                  className="s5e-ver-x"
-                                  role="button"
-                                  title={t('ver.delete')}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    deleteVersion(shot.id, vi);
-                                  }}
-                                >
-                                  ✕
-                                </span>
-                              </span>
-                            ))}
-                          </div>
-                        )}
+                        {/* Version stack hovers over the preview: every version
+                            incl. the current one (highlighted); ✕ removes a variant. */}
+                        {renderVersions(shot, genImg, 's5e-vers-overlay')}
                       </div>
                     )
                   ) : (
@@ -1299,35 +1319,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                   )}
 
                   {/* Versions under the frame pair (the small first frame has no room for an overlay). */}
-                  {genImg && finalImg && ((project.shotImageHistory || {})[shot.id] || []).length > 0 && (
-                    <div className="s5e-vers">
-                      <span>{t('ver.label')}</span>
-                      {((project.shotImageHistory || {})[shot.id] || []).map((v, vi) => (
-                        <span
-                          key={vi}
-                          className="s5e-ver"
-                          role="button"
-                          tabIndex={0}
-                          title={t('ver.restore')}
-                          onClick={() => restoreVersion(shot.id, vi)}
-                          onKeyDown={(e) => e.key === 'Enter' && restoreVersion(shot.id, vi)}
-                        >
-                          <img src={v} alt="" />
-                          <span
-                            className="s5e-ver-x"
-                            role="button"
-                            title={t('ver.delete')}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteVersion(shot.id, vi);
-                            }}
-                          >
-                            ✕
-                          </span>
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  {genImg && finalImg && renderVersions(shot, genImg, 's5e-vers')}
 
                   {/* Image tweak: sits directly beneath the image frame, full width. */}
                   <div className="voice-row refine-row">
