@@ -7,7 +7,7 @@ import AutoTextarea from '../components/AutoTextarea.jsx';
 import { StyleChip } from '../components/StyleControls.jsx';
 import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
 import { normalizePlan } from '../lib/dynamics.js';
-import { Grip } from '../components/icons.jsx';
+import { Grip, Stars } from '../components/icons.jsx';
 import { useRef, useState } from 'react';
 
 function fmt(sec) {
@@ -76,7 +76,7 @@ export default function Stage3({ project, update, settings, goNext, onSettings, 
 
       <div className="row">
         <button className="btn primary" disabled={busy} onClick={generate}>
-          {busy ? t('gen.generating') : outline.length ? t('s3.regenerate') : t('s3.generate')}
+          <Stars size={14} /> {busy ? t('gen.generating') : outline.length ? t('s3.regenerate') : t('s3.generate')}
         </button>
         <StyleChip project={project} styles={styles} cat="script" onClick={onProjectSettings} />
         {outline.length > 0 && (

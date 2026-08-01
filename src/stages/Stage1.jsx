@@ -6,6 +6,7 @@ import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import VoiceButton from '../components/VoiceButton.jsx';
 import RandomizationSelector from '../components/RandomizationSelector.jsx';
+import { Stars } from '../components/icons.jsx';
 
 export default function Stage1({ project, update, settings, goNext, onSettings, genLang, scriptStyle }) {
   const { t } = useI18n();
@@ -57,7 +58,7 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
 
       <div className="row">
         <button className="btn primary" disabled={busy || !project.logline.trim()} onClick={generate}>
-          {busy ? t('gen.generating') : project.ideas.length ? t('s1.regenerate') : t('s1.generate')}
+          <Stars size={14} /> {busy ? t('gen.generating') : project.ideas.length ? t('s1.regenerate') : t('s1.generate')}
         </button>
       </div>
       <ErrorNote error={error} onSettings={onSettings} />

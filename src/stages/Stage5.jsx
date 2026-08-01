@@ -1256,7 +1256,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       <div className="row">
         {shots.length > 0 && (
           <button className="btn primary" disabled={busy} onClick={generate}>
-            {busy && !prog ? t('gen.generating') : hasPrompts ? t('s5.regenerate') : t('s5.generate', { n: shots.length })}
+            <Stars size={14} /> {busy && !prog ? t('gen.generating') : hasPrompts ? t('s5.regenerate') : t('s5.generate', { n: shots.length })}
           </button>
         )}
         <button className="btn" disabled={busy} onClick={processAll}>{t('batch.run5')}</button>

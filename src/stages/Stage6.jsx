@@ -1966,7 +1966,7 @@ export default function Stage6({ project, update, settings }) {
                 disabled={smartCut.busy || !smartCut.text.trim()}
                 onClick={runSmartCut}
               >
-                {smartCut.busy ? t('s6.smartCutBusy') : t('s6.smartCutRun')}
+                <Stars size={14} /> {smartCut.busy ? t('s6.smartCutBusy') : t('s6.smartCutRun')}
               </button>
               <button className="btn small" disabled={smartCut.busy} onClick={() => setSmartCut(null)}>
                 {t('s6.close')}
