@@ -76,7 +76,7 @@ export default function Stage3({ project, update, settings, goNext, onSettings, 
 
       <div className="row">
         <button className="btn primary" disabled={busy} onClick={generate}>
-          <Stars size={14} /> {busy ? t('gen.generating') : outline.length ? t('s3.regenerate') : t('s3.generate')}
+          {!outline.length && <Stars size={14} />} {busy ? t('gen.generating') : outline.length ? t('s3.regenerate') : t('s3.generate')}
         </button>
         <StyleChip project={project} styles={styles} cat="script" onClick={onProjectSettings} />
         {outline.length > 0 && (

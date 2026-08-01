@@ -177,7 +177,7 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
 
       <div className="row">
         <button className="btn primary" disabled={busy} onClick={generate}>
-          <Stars size={14} /> {busy && !prog ? t('gen.generating') : shots.length ? t('s4.regenerate') : t('s4.generate')}
+          {!shots.length && <Stars size={14} />} {busy && !prog ? t('gen.generating') : shots.length ? t('s4.regenerate') : t('s4.generate')}
         </button>
         <button className="btn" disabled={busy} onClick={processAll}>
           {t('batch.run4')}

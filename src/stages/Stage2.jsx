@@ -221,7 +221,7 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
 
       <div className="row">
         <button className="btn primary" disabled={busy} onClick={generate}>
-          <Stars size={14} /> {busy ? t('gen.generating') : storyline ? t('s2.regenerate') : t('s2.generate')}
+          {!storyline && <Stars size={14} />} {busy ? t('gen.generating') : storyline ? t('s2.regenerate') : t('s2.generate')}
         </button>
       </div>
       <ErrorNote error={error} onSettings={onSettings} />
@@ -256,7 +256,7 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
                 </div>
                 {!project.cover && (
                   <button className="btn small" disabled={coverBusy} onClick={genCover}>
-                    <Stars size={14} /> {coverBusy ? t('cover.generating') : t('cover.generate')}
+                    {!project.cover && <Stars size={14} />} {coverBusy ? t('cover.generating') : t('cover.generate')}
                   </button>
                 )}
               </div>

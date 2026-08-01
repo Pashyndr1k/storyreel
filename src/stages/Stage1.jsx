@@ -58,7 +58,7 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
 
       <div className="row">
         <button className="btn primary" disabled={busy || !project.logline.trim()} onClick={generate}>
-          <Stars size={14} /> {busy ? t('gen.generating') : project.ideas.length ? t('s1.regenerate') : t('s1.generate')}
+          {!project.ideas.length && <Stars size={14} />} {busy ? t('gen.generating') : project.ideas.length ? t('s1.regenerate') : t('s1.generate')}
         </button>
       </div>
       <ErrorNote error={error} onSettings={onSettings} />
