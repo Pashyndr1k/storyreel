@@ -2,9 +2,10 @@
 
 ## 1.19.2 — 2026-07-31
 
-- Stage 5: the image version strip now shows EVERY version as a thumbnail —
-  the currently selected image comes first with an accent ring (click zooms
-  it); history thumbs restore on click as before.
+- Stage 5: the image version strip shows EVERY version as a thumbnail in a
+  fixed creation order — the very first image at the start, new versions
+  appended to the right. Selecting a version only moves the accent-ring
+  highlight (clicking the selected thumb zooms it); nothing is reordered.
 - Stage 6: the transition indicator is a small triangular tab in each shot's
   top-right corner; clicking it opens the transition picker.
 - Stage 6: active-segment playback — two triangular markers on the ruler

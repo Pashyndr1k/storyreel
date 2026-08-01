@@ -622,81 +622,93 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       return { shotFinalImages: next };
     });
 
-  // New image becomes current; the previous current joins the history (max 5).
-  const pushVersion = (shotId, img) =>
-    update((p) => {
-      const hist = { ...(p.shotImageHistory || {}) };
-      const cur = (p.shotImages || {})[shotId];
-      if (cur) hist[shotId] = [cur, ...(hist[shotId] || [])].slice(0, 5);
-      return { shotImages: { ...p.shotImages, [shotId]: img }, shotImageHistory: hist };
-    });
+  // Image versions are a STATIC list in creation order (oldest first);
+  // shotImages[shotId] marks which one is selected — selecting never reorders.
+  // Older projects stored the history newest-first WITHOUT the current image;
+  // versionList normalizes that on read, and every write persists the new
+  // format (the list contains all versions, the current one included).
+  const versionList = (p, shotId) => {
+    const hist = (p.shotImageHistory || {})[shotId] || [];
+    const cur = (p.shotImages || {})[shotId];
+    if (!cur) return hist;
+    return hist.includes(cur) ? hist : [...[...hist].reverse(), cur];
+  };
 
-  // Remove one version from the shot's image history stack.
+  // A newly generated image appends to the right and becomes selected (max 6
+  // versions kept — the oldest drops off).
+  const pushVersion = (shotId, img) =>
+    update((p) => ({
+      shotImages: { ...p.shotImages, [shotId]: img },
+      shotImageHistory: {
+        ...(p.shotImageHistory || {}),
+        [shotId]: [...versionList(p, shotId), img].slice(-6),
+      },
+    }));
+
+  // Select an existing version — order stays exactly as created.
+  const selectVersion = (shotId, img) =>
+    update((p) => ({
+      shotImages: { ...p.shotImages, [shotId]: img },
+      shotImageHistory: { ...(p.shotImageHistory || {}), [shotId]: versionList(p, shotId) },
+    }));
+
+  // Remove one version; deleting the selected one selects its neighbour.
   const deleteVersion = (shotId, idx) =>
     update((p) => {
-      const hist = [...((p.shotImageHistory || {})[shotId] || [])];
-      hist.splice(idx, 1);
-      return { shotImageHistory: { ...(p.shotImageHistory || {}), [shotId]: hist } };
-    });
-
-  // Swap a history version back to current (current takes its place in history).
-  const restoreVersion = (shotId, idx) =>
-    update((p) => {
-      const hist = [...((p.shotImageHistory || {})[shotId] || [])];
-      const chosen = hist[idx];
-      if (!chosen) return {};
-      hist.splice(idx, 1);
+      const list = versionList(p, shotId);
       const cur = (p.shotImages || {})[shotId];
-      if (cur) hist.unshift(cur);
-      return {
-        shotImages: { ...p.shotImages, [shotId]: chosen },
-        shotImageHistory: { ...(p.shotImageHistory || {}), [shotId]: hist.slice(0, 5) },
-      };
+      const removed = list[idx];
+      const next = list.filter((_, i) => i !== idx);
+      const patch = { shotImageHistory: { ...(p.shotImageHistory || {}), [shotId]: next } };
+      if (removed === cur) {
+        const repl = next[Math.min(idx, next.length - 1)];
+        const imgs = { ...p.shotImages };
+        if (repl) imgs[shotId] = repl;
+        else delete imgs[shotId];
+        patch.shotImages = imgs;
+      }
+      return patch;
     });
 
-  // Version strip: EVERY version as a thumbnail — the current image first,
-  // highlighted with the accent ring (click = zoom); history thumbs restore on
-  // click and carry the ✕ delete control.
+  // Version strip: a STATIC list in creation order — the very first image at
+  // the start, newer versions appended to the right. Selecting highlights a
+  // thumb (accent ring) without moving anything; clicking the selected thumb
+  // zooms it; ✕ deletes any version.
   const renderVersions = (shot, genImg, cls) => {
-    const hist = (project.shotImageHistory || {})[shot.id] || [];
-    if (!genImg || hist.length === 0) return null;
+    const list = versionList(project, shot.id);
+    if (!genImg || list.length < 2) return null;
+    const curIdx = list.indexOf(genImg);
     return (
       <div className={cls}>
         <span>{t('ver.label')}</span>
-        <span
-          className="s5e-ver cur"
-          role="button"
-          tabIndex={0}
-          title={t('ver.current')}
-          onClick={() => setLightbox({ kind: 'img', src: genImg })}
-          onKeyDown={(e) => e.key === 'Enter' && setLightbox({ kind: 'img', src: genImg })}
-        >
-          <img src={genImg} alt="" />
-        </span>
-        {hist.map((v, vi) => (
-          <span
-            key={vi}
-            className="s5e-ver"
-            role="button"
-            tabIndex={0}
-            title={t('ver.restore')}
-            onClick={() => restoreVersion(shot.id, vi)}
-            onKeyDown={(e) => e.key === 'Enter' && restoreVersion(shot.id, vi)}
-          >
-            <img src={v} alt="" />
+        {list.map((v, vi) => {
+          const isCur = vi === curIdx;
+          const act = () => (isCur ? setLightbox({ kind: 'img', src: v }) : selectVersion(shot.id, v));
+          return (
             <span
-              className="s5e-ver-x"
+              key={vi}
+              className={`s5e-ver ${isCur ? 'cur' : ''}`}
               role="button"
-              title={t('ver.delete')}
-              onClick={(e) => {
-                e.stopPropagation();
-                deleteVersion(shot.id, vi);
-              }}
+              tabIndex={0}
+              title={isCur ? t('ver.current') : t('ver.restore')}
+              onClick={act}
+              onKeyDown={(e) => e.key === 'Enter' && act()}
             >
-              ✕
+              <img src={v} alt="" />
+              <span
+                className="s5e-ver-x"
+                role="button"
+                title={t('ver.delete')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteVersion(shot.id, vi);
+                }}
+              >
+                ✕
+              </span>
             </span>
-          </span>
-        ))}
+          );
+        })}
       </div>
     );
   };
