@@ -243,13 +243,28 @@ const clone = (o) => JSON.parse(JSON.stringify(o));
 const sanitize = (s) => (s || 'shot').replace(/[^\w\d-]+/g, '_').slice(0, 60);
 
 // ---- Stage 5: shot video ---------------------------------------------------
-// Voice audio + first frame → ltx_si2v (talking video: the model reads mood,
-// lip sync and pacing from the audio and image, so the prompt stays brief);
-// first frame only → ltx_i2v; first + last frame → ltx_flf2v. Returns the
-// video as a data URL plus the ComfyUI-side filename.
+// Three LTX-2 workflows. 'auto' picks the richest one the shot's material
+// allows: voice audio + first frame → ltx_si2v (talking video: the model reads
+// mood, lip sync and pacing from the audio and image, so the prompt stays
+// brief); first + last frame → ltx_flf2v; first frame only → ltx_i2v. Stage 5
+// can pin a specific workflow per shot instead. Returns the video as a data
+// URL plus the ComfyUI-side filename.
+export const VIDEO_MODES = ['auto', 'i2v', 'flf2v', 'si2v'];
+
+// The workflow a shot would actually run, given its material and the pinned
+// mode. A pinned workflow whose material is missing falls back to auto.
+export function resolveVideoMode(mode, { lastFrame, audio } = {}) {
+  if (mode === 'si2v' && audio) return 'si2v';
+  if (mode === 'flf2v' && lastFrame) return 'flf2v';
+  if (mode === 'i2v') return 'i2v';
+  if (audio) return 'si2v';
+  if (lastFrame) return 'flf2v';
+  return 'i2v';
+}
+
 export async function generateComfyVideo(
   settings,
-  { prompt, firstFrame, lastFrame, audio, durationSec, aspectRatio, resolution, name },
+  { prompt, firstFrame, lastFrame, audio, durationSec, aspectRatio, resolution, name, mode = 'auto' },
   { onStatus } = {}
 ) {
   const [w, h] = videoDims(aspectRatio, resolution);
@@ -257,9 +272,10 @@ export async function generateComfyVideo(
   // dynamics padding (head/tail get trimmed in assembly) — allow up to 12.
   const dur = Math.max(2, Math.min(12, Math.round(durationSec || 4)));
   const stamp = Date.now();
+  const useMode = resolveVideoMode(mode, { lastFrame, audio });
   let graph;
 
-  if (audio) {
+  if (useMode === 'si2v') {
     // Dialogue shot: the generated video carries the voice track and is
     // rendered at the EXACT shot duration (no padding — trimming would break
     // the audio sync), so assembly plays it as-is.
@@ -275,7 +291,7 @@ export async function generateComfyVideo(
     graph['340:324'].inputs.value = h;
     graph['340:286'].inputs.noise_seed = rndSeed();
     graph['341'].inputs.filename_prefix = `StoryReel/${sanitize(name)}`;
-  } else if (lastFrame) {
+  } else if (useMode === 'flf2v') {
     graph = clone(flf2vTemplate);
     graph['31'].inputs.image = await uploadInput(settings, firstFrame, `storyreel_${stamp}_first.png`);
     graph['39'].inputs.image = await uploadInput(settings, lastFrame, `storyreel_${stamp}_last.png`);

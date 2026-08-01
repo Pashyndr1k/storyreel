@@ -6,6 +6,11 @@
   any audio file for a shot, and a record button captures your voice straight
   from the system microphone — both become the shot's audio and drive the
   talking-video generation just like a generated voice.
+- Stage 5 video: pick the generation workflow per shot — Auto, image-to-video,
+  first/last-frame-to-video or sound-to-video. Auto keeps the previous
+  behaviour (the richest workflow the shot's material allows); options whose
+  material is missing stay disabled, and the row always states which workflow
+  the next render will use.
 - Stage 5 audio timing: set silence before and/or after the take, then press
   "Update audio" to build a new file from the silence plus the voice. The raw
   take is kept separately, so changing the padding never stacks silence on

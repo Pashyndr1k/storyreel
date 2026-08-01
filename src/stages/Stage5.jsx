@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage, generateGeminiVoice, GEMINI_VOICES } from '../lib/gemini.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
-import { generateComfyVideo, generateComfyImage, generateComfyVoice, saveToLocalOutputs, VIDEO_RESOLUTIONS, OMNI_VOICE_TAGS, OMNI_VOICE_SLOTS, OMNI_LANGUAGES, VOICE_LIBRARY } from '../lib/comfy.js';
+import { generateComfyVideo, generateComfyImage, generateComfyVoice, saveToLocalOutputs, VIDEO_RESOLUTIONS, VIDEO_MODES, resolveVideoMode, OMNI_VOICE_TAGS, OMNI_VOICE_SLOTS, OMNI_LANGUAGES, VOICE_LIBRARY } from '../lib/comfy.js';
 import { stage5Prompt, stage5VideoPrompt, stage5AudioPrompt, stage5VoicePrompt, stage5GeminiVoicePrompt, finalFramePrompt, tweakPromptSpec } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
 import { aspectDescription } from '../lib/aspect.js';
@@ -917,20 +917,26 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     if (!first || !vPrompt) return;
     const last = (cur.shotFinalImages || {})[shot.id] || null;
     const voiceAud = (cur.shotAudios || {})[shot.id] || null;
+    // A pinned workflow wins over the automatic choice (and silently falls
+    // back to auto when its material is missing).
+    const mode = (cur.shotVideoModes || {})[shot.id] || 'auto';
+    const useMode = resolveVideoMode(mode, { lastFrame: last, audio: voiceAud });
     setImgBusy(`${shot.id}:vid`);
     setImgErr(null);
-    // +3s padding rule (silent shots only): generate longer than the timeline
-    // needs; Stage 6 trims 15 frames from head and tail to mask AI ramp-up
-    // and tail degradation. Voice-synced shots render at the exact duration.
-    const genDuration = voiceAud
+    // +3s padding rule (silent workflows only): generate longer than the
+    // timeline needs; Stage 6 trims 15 frames from head and tail to mask AI
+    // ramp-up and tail degradation. Voice-synced shots render at the exact
+    // duration so assembly never trims into synced speech.
+    const genDuration = useMode === 'si2v'
       ? Number(shot.duration || 4)
       : Math.round(shot.duration || 4) + DYNAMICS_CONFIG.generation_padding_sec;
     try {
       const { dataURL, filename } = await generateComfyVideo(settings, {
         prompt: vPrompt,
         firstFrame: first,
-        lastFrame: last,
-        audio: voiceAud,
+        lastFrame: useMode === 'flf2v' ? last : null,
+        audio: useMode === 'si2v' ? voiceAud : null,
+        mode: useMode,
         durationSec: genDuration,
         aspectRatio: project.aspectRatio || '16:9',
         resolution: cur.videoResolution || 'HD',
@@ -1317,6 +1323,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           const tabList = ['image', 'video', ...(hasAudioTab ? ['audio'] : [])];
           const tab = tabList.includes(shotTab[shot.id]) ? shotTab[shot.id] : 'image';
           const tabHasMedia = { image: !!genImg, video: !!shotVid, audio: !!shotAud };
+          // pinned workflow + the one that will actually run for this shot
+          const shotMode = (project.shotVideoModes || {})[shot.id] || 'auto';
+          const effMode = resolveVideoMode(shotMode, { lastFrame: finalImg, audio: shotAud });
           return (
             <div key={shot.id} className="shot-card s5e-card">
               {/* Card header: shot identity, timing, type and action. */}
@@ -1727,8 +1736,34 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         </button>
                       ))}
                     </span>
-                    {shotVid && genImg && (
-                      <span className="hint">{shotAud ? t('vid.modeSI2V') : finalImg ? t('vid.modeFLF') : t('vid.modeI2V')}</span>
+                    {/* Workflow: Auto picks the richest one the shot's material
+                        allows; a pinned choice overrides it. Options whose
+                        material is missing stay disabled. */}
+                    <span className="seg seg-tall" title={t('vid.wfTip')}>
+                      {VIDEO_MODES.map((m) => {
+                        const avail = m === 'si2v' ? !!shotAud : m === 'flf2v' ? !!finalImg : true;
+                        return (
+                          <button
+                            key={m}
+                            type="button"
+                            className={`seg-btn ${shotMode === m ? 'on' : ''}`}
+                            disabled={!avail}
+                            title={avail ? t(`vid.wf_${m}`) : t(`vid.wfNeed_${m}`)}
+                            onClick={() =>
+                              update((pr) => ({
+                                shotVideoModes: { ...(pr.shotVideoModes || {}), [shot.id]: m },
+                              }))
+                            }
+                          >
+                            {t(`vid.wfShort_${m}`)}
+                          </button>
+                        );
+                      })}
+                    </span>
+                    {genImg && (
+                      <span className="hint">
+                        {effMode === 'si2v' ? t('vid.modeSI2V') : effMode === 'flf2v' ? t('vid.modeFLF') : t('vid.modeI2V')}
+                      </span>
                     )}
                   </div>
                 </div>

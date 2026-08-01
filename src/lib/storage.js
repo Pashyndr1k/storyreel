@@ -181,6 +181,7 @@ function projectDefaults() {
     shotAssets: {}, // shotId -> [assetId] referencing the global asset library
     dynamicsPlan: null, // Action Dynamics Plan generated at Stage 3 (see lib/dynamics.js)
     videoGenDurations: {}, // shotId -> raw seconds requested from the video model (+2s padding)
+    shotVideoModes: {}, // shotId -> pinned video workflow: 'auto' | 'i2v' | 'flf2v' | 'si2v'
     shotTrims: {}, // shotId -> { head, tail } seconds — manual overrides of the 15-frame rule
     // Multi-layer audio timeline (Stage 6). Each layer is its own track lane:
     // { id, name, enabled, volume, clips: [{ id, name, dataURL, start, offset,
@@ -243,6 +244,7 @@ export function migrateProject(raw) {
   p.shotAssets = p.shotAssets && typeof p.shotAssets === 'object' ? p.shotAssets : {};
   p.dynamicsPlan = p.dynamicsPlan && typeof p.dynamicsPlan === 'object' ? p.dynamicsPlan : null;
   p.videoGenDurations = p.videoGenDurations && typeof p.videoGenDurations === 'object' ? p.videoGenDurations : {};
+  p.shotVideoModes = p.shotVideoModes && typeof p.shotVideoModes === 'object' ? p.shotVideoModes : {};
   p.shotAudioSrc = p.shotAudioSrc && typeof p.shotAudioSrc === 'object' ? p.shotAudioSrc : {};
   p.shotAudioPads = p.shotAudioPads && typeof p.shotAudioPads === 'object' ? p.shotAudioPads : {};
   p.shotTrims = p.shotTrims && typeof p.shotTrims === 'object' ? p.shotTrims : {};
