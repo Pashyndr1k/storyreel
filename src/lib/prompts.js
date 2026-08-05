@@ -819,3 +819,116 @@ JSON schema:
 {"name":"...","instructions":"...","rationale":"..."}`,
   };
 }
+
+// ---- MiniMax H3 video prompting --------------------------------------------
+// H3 is an omni model: picture and 32kHz stereo audio (dialogue, effects,
+// score) come out of ONE forward pass. The open weights ship without the
+// H3-Context-IR module that normally rewrites a casual prompt into the
+// model's training format, so we write that format ourselves — the
+// three-field schema from MiniMax's VIDEO_PROMPT_WRITING_GUIDE. A prompt that
+// only describes pictures leaves half the model idle, which is why the audio
+// fields are mandatory here (unlike the LTX engines, where audio is a
+// separate TTS pass).
+const H3_CAMERA = `Camera vocabulary (motion type, then OPTIONAL amplitude and speed, written as natural English inside the sentence — never stacked as labels):
+- motion: Zoom In/Out · Push In/Pull Out · Pan Left/Right · Truck Left/Right · Tilt Up/Down · Pedestal Up/Down · Arc Shot · Tracking Shot · Static Shot · Shake Slightly/Strongly · POV · Roll Clockwise/Counterclockwise
+- amplitude (only when it matters): "with small amplitude" | "with large amplitude"
+- speed (only when it matters): "at slow speed" | "at fast speed"
+Example: "The camera pushes in with small amplitude at slow speed toward the folded letter in her hands."`;
+
+const H3_SYSTEM = `You write prompts for MiniMax H3, an omni-modal video model that generates picture AND stereo audio in a single pass.
+
+Respond with VALID JSON ONLY. No markdown, no commentary.
+
+Produce exactly three fields, in MiniMax's training format:
+
+1. "integrated_multimodal_description" — the main body, along the timeline.
+   - Open [Shot 1] with the overall style and initial composition ("Live-action, cinematic, a medium-wide shot frames…"). Styles: Cinematic, live-action, 2D-animated, 3D CG, claymation, watercolor, vintage film.
+   - [Shot 1] carries NO timestamp. Later shots (only if the beat genuinely needs a new viewpoint) use "[Shot 2] At 00:03.500, the camera cuts to…" with strictly increasing times inside the duration. A cut must introduce NEW information (subject, space, state, viewpoint, time); if only the distance or angle changes, move the camera instead.
+   - ${H3_CAMERA}
+   - Speakers get stable IDs: (S1), (S2); simultaneous speakers (S1,S2). Establish identity on first appearance (type, age, gender, on/off-screen, pitch, timbre, rate, accent). Identity, action and delivery go OUTSIDE the tag; INSIDE goes only the language tag and the verbatim words: The woman (S1) says: <d>[English] Text here.</d>
+   - Voiceover uses the exact phrase "says in an off-screen voiceover", and immediately after the </d> states that the character's lips remain closed.
+   - On-screen text goes in double quotes, verbatim, untranslated.
+   - Describe diegetic sound (sounds the characters can hear) here, synchronized to the action.
+
+2. "overall_soundscape" — 1–4 sentences, one paragraph: ambience, physical action sounds, non-verbal human sounds across the whole video (wind, traffic, footsteps, fabric, impacts, breathing). Never repeat dialogue here. "N/A" only for deliberate total silence.
+
+3. "non_diegetic_music" — 1–3 sentences: score only the audience hears. Instrumentation, tempo, rhythm, dynamics — NOT mood words, NOT its emotional function. "N/A" when there is none.
+
+Hard rules:
+- Everything in English except the verbatim contents of <d>…</d> and on-screen text, which keep their original language.
+- Structured long, not verbose long: spend length on timeline, camera and audio, never on stacked adjectives.
+- Do not invent dialogue that the shot does not have. If the shot is silent, say so through the soundscape instead.
+- Describe only what is seeable or hearable.`;
+
+// First-frame / first+last-frame alignment header. H3 wants this as the first
+// line, followed by a blank line, whenever reference frames are attached.
+export function h3AlignmentHeader({ hasFirst, hasLast, seconds }) {
+  const s = (Number(seconds) || 4).toFixed(2);
+  if (hasFirst && hasLast) {
+    return `How the reference pictures align with the target video — Picture 1 (from Shot 1) aligns with the 0.00-second mark of the target video; Picture 2 (from Shot 1) aligns with the ${s}-second mark of the target video.`;
+  }
+  if (hasFirst) {
+    return 'For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.';
+  }
+  return '';
+}
+
+// Assemble the final prompt string handed to the H3 node.
+// The three fields live in ONE editable text block (what Stage 5 shows). Only
+// the mechanical alignment header is added at run time — it depends on which
+// frames are actually attached and on the real snapped duration, so it is
+// never stored, and a stale header inside the body is stripped first.
+export function h3ComposePrompt(body, { hasFirst = true, hasLast = false, seconds = 4 } = {}) {
+  const clean = String(body || '')
+    .replace(/^\s*(For the target video,|How the reference pictures align)[^\n]*\n+/i, '')
+    .trim();
+  const head = h3AlignmentHeader({ hasFirst, hasLast, seconds });
+  return head ? `${head}\n\n${clean}` : clean;
+}
+
+// Rewrite a scene's shots into H3 three-field prompts. Mirrors stage5VideoPrompt
+// (same scene context and continuity chain) but targets the H3 schema and asks
+// for the sound design the model can actually render.
+export function stage5H3VideoPrompt(project, scene, shots, videoStyle, block, seconds) {
+  const chars = characterBlock(project);
+  const styleNote = (videoStyle || DEFAULT_VIDEO_MOTION_STYLE).trim();
+  const dyn = block
+    ? `\nAction dynamics for this scene — kinetic energy ${block.kinetic_energy_level}/10, dialogue volume ${block.dialogue_volume}/10, camera momentum "${String(block.required_camera_momentum).replace(/_/g, ' ')}". Express these through concrete motion and sound, never by quoting the numbers.`
+    : '';
+  const list = shots
+    .map((s, i) => {
+      const dur = Number(s.duration || 4);
+      return `Shot ${i + 1} (id ${s.id}, ${dur}s${s.shotType ? `, ${s.shotType}` : ''}):
+  action: ${s.action || '(none)'}
+  dialogue: ${(s.dialogue || '').trim() || '(none — this shot has no speech)'}
+  location: ${s.location || scene.title || ''}`;
+    })
+    .join('\n');
+  return {
+    system: H3_SYSTEM,
+    maxTokens: 6000,
+    user: `FILM: ${project.title}
+SCENE ${project.outline.indexOf(scene) + 1}: ${scene.title} — ${scene.summary}
+${chars ? `CHARACTERS:\n${chars}\n` : ''}
+DIRECTORIAL STYLE to express as concrete motion and sound: "${styleNote}"${dyn}
+
+Each shot below already has a generated FIRST FRAME that will be attached to the model, so the frame carries the appearance, wardrobe, lighting and set — do NOT re-describe them. Refer to people by neutral visual handles ("the woman", "the taller man"), never by name.
+
+${list}
+
+For EACH shot write the three H3 fields describing only that shot's own duration. Where a shot carries dialogue, put it verbatim inside <d>[Language] …</d> with a speaker ID and an established voice identity — H3 speaks it natively.
+
+Return one entry per shot, in order, numbered from 1. "video_prompt" holds the three fields as ONE text block written exactly like this, blank line between fields:
+
+integrated_multimodal_description: [Shot 1] …
+
+overall_soundscape: …
+
+non_diegetic_music: …
+
+Do NOT add an alignment header — the app prepends it.
+
+JSON schema:
+{"prompts":[{"shot":1,"video_prompt":"integrated_multimodal_description: …\n\noverall_soundscape: …\n\nnon_diegetic_music: …"}]}`,
+  };
+}

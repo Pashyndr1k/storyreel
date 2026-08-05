@@ -3,7 +3,7 @@ import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage, generateGeminiVoice, GEMINI_VOICES } from '../lib/gemini.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
 import { generateComfyVideo, generateComfyImage, generateComfyVoice, saveToLocalOutputs, VIDEO_RESOLUTIONS, VIDEO_MODES, resolveVideoMode, OMNI_VOICE_TAGS, OMNI_VOICE_SLOTS, OMNI_LANGUAGES, VOICE_LIBRARY } from '../lib/comfy.js';
-import { stage5Prompt, stage5VideoPrompt, stage5AudioPrompt, stage5VoicePrompt, stage5GeminiVoicePrompt, finalFramePrompt, tweakPromptSpec } from '../lib/prompts.js';
+import { stage5Prompt, stage5VideoPrompt, stage5H3VideoPrompt, h3ComposePrompt, stage5AudioPrompt, stage5VoicePrompt, stage5GeminiVoicePrompt, finalFramePrompt, tweakPromptSpec } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
 import { aspectDescription } from '../lib/aspect.js';
 import ErrorNote from '../components/ErrorNote.jsx';
@@ -394,7 +394,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       kind === 'image'
         ? stage5Prompt(cur, sceneArg, sceneShots, genLang, imageStyle)
         : kind === 'video'
-          ? stage5VideoPrompt(cur, sceneArg, sceneShots, videoStyle, block)
+          ? settings.videoEngine === 'minimax'
+            ? stage5H3VideoPrompt(cur, sceneArg, sceneShots, videoStyle, block)
+            : stage5VideoPrompt(cur, sceneArg, sceneShots, videoStyle, block)
           : stage5AudioPrompt(cur, sceneArg, sceneShots, block);
     setRegenBusy(`${shot.id}:${kind}`);
     setImgErr(null);
@@ -915,6 +917,10 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const first = (cur.shotImages || {})[shot.id];
     const vPrompt = (cur.shotPrompts[shot.id]?.videoPrompt || '').trim();
     if (!first || !vPrompt) return;
+    // MiniMax H3 wants its native three-field schema plus a reference-frame
+    // alignment header. Prompts generated for H3 are stored as JSON fields;
+    // an LTX-era plain prompt is passed through so nothing breaks mid-project.
+    const isH3 = settings.videoEngine === 'minimax';
     const last = (cur.shotFinalImages || {})[shot.id] || null;
     const voiceAud = (cur.shotAudios || {})[shot.id] || null;
     // A pinned workflow wins over the automatic choice (and silently falls
@@ -931,8 +937,15 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       ? Number(shot.duration || 4)
       : Math.round(shot.duration || 4) + DYNAMICS_CONFIG.generation_padding_sec;
     try {
+      const sendPrompt = isH3
+        ? h3ComposePrompt(vPrompt, {
+            hasFirst: true,
+            hasLast: useMode === 'flf2v' && !!last,
+            seconds: genDuration,
+          })
+        : vPrompt;
       const { dataURL, filename } = await generateComfyVideo(settings, {
-        prompt: vPrompt,
+        prompt: sendPrompt,
         firstFrame: first,
         lastFrame: useMode === 'flf2v' ? last : null,
         audio: useMode === 'si2v' ? voiceAud : null,

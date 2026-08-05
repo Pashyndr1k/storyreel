@@ -34,6 +34,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
   const [storyboardService, setStoryboardService] = useState(settings.storyboardService || 'gemini');
   const [imageService, setImageService] = useState(settings.imageService || 'gemini');
   const [videoService, setVideoService] = useState(settings.videoService || 'comfy');
+  const [videoEngine, setVideoEngine] = useState(settings.videoEngine || 'ltx');
   const [voiceService, setVoiceService] = useState(settings.voiceService || 'comfy');
   const [comfyUrl, setComfyUrl] = useState(settings.comfyUrl || 'http://127.0.0.1:8000');
   const [comfyOutputDir, setComfyOutputDir] = useState(settings.comfyOutputDir || 'D:\\Claude work\\ComfyUI\\Output');
@@ -115,6 +116,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
       storyboardService,
       imageService,
       videoService,
+      videoEngine,
       voiceService,
       comfyUrl: comfyUrl.trim() || 'http://127.0.0.1:8000',
       comfyOutputDir: comfyOutputDir.trim() || 'D:\\Claude work\\ComfyUI\\Output',
@@ -337,6 +339,12 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
       <select value={videoService} onChange={(e) => setVideoService(e.target.value)}>
         <option value="comfy">{t('set.svcComfyVid')}</option>
       </select>
+      <label>{t('set.videoEngine')}</label>
+      <select value={videoEngine} onChange={(e) => setVideoEngine(e.target.value)}>
+        <option value="ltx">{t('set.engLtx')}</option>
+        <option value="minimax">{t('set.engMinimax')}</option>
+      </select>
+      <p className="hint">{t(videoEngine === 'minimax' ? 'set.engMinimaxHint' : 'set.engLtxHint')}</p>
       <label>{t('set.voiceService')}</label>
       <select value={voiceService} onChange={(e) => setVoiceService(e.target.value)}>
         <option value="comfy">{t('set.svcOmniVoice')}</option>

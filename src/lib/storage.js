@@ -126,6 +126,7 @@ export function loadSettings() {
     textService: 'claude', // 'claude' | 'gemini' — plots, scripts and prompts
     storyboardService: 'gemini', // 'gemini' | 'comfy' — Stage-4 storyboard frames
     videoService: 'comfy', // shot video generation (only ComfyUI for now)
+    videoEngine: 'ltx', // local video model: 'ltx' (LTX-2.3) | 'minimax' (MiniMax H3)
     comfyUrl: 'http://127.0.0.1:8000',
     comfyOutputDir: 'D:\\Claude work\\ComfyUI\\Output',
     projectsDir: 'D:\\Claude work\\StoryReel Projects', // per-project folders (project.md + media files)

@@ -12,6 +12,7 @@ import t2iTemplate from '../data/comfy/krea2_t2i_api.json';
 import flux2Template from '../data/comfy/flux2_klein_edit_api.json';
 import ttsTemplate from '../data/comfy/omnivoice_tts_api.json';
 import si2vTemplate from '../data/comfy/ltx_si2v_api.json';
+import h3Template from '../data/comfy/minimax_h3_i2v_api.json';
 import aceTemplate from '../data/comfy/ace_step_api.json';
 
 export const DEFAULT_COMFY_URL = 'http://127.0.0.1:8000';
@@ -53,6 +54,34 @@ const VIDEO_DIMS = {
   },
 };
 export const VIDEO_RESOLUTIONS = ['SD', 'HD', 'FHD'];
+
+// ---- MiniMax H3 (local open weights) ---------------------------------------
+// The open checkpoint is H3-Base: a 768px SHORT EDGE ceiling (the 2K figure in
+// the marketing belongs to the API-only Regenerate-2K module), dimensions in
+// multiples of 32, 24fps, and native stereo audio produced in the same forward
+// pass as the picture. Our SD/HD/FHD tiers therefore map onto H3's own
+// megapixel ladder rather than the LTX dimensions.
+export const VIDEO_ENGINES = ['ltx', 'minimax'];
+const H3_DIMS = {
+  SD: { '16:9': [640, 352], '4:3': [576, 448], '1:1': [512, 512], '3:4': [448, 576], '9:16': [352, 640] },
+  HD: { '16:9': [864, 480], '4:3': [800, 608], '1:1': [704, 704], '3:4': [608, 800], '9:16': [480, 864] },
+  // 768 is a hard SHORT-EDGE ceiling for the open weights — a square frame
+  // tops out at 768x768, it does not get to be 896.
+  FHD: { '16:9': [1344, 768], '4:3': [1024, 768], '1:1': [768, 768], '3:4': [768, 1024], '9:16': [768, 1344] },
+};
+export const h3Dims = (ratio, resolution = 'HD') => {
+  const tier = H3_DIMS[resolution] || H3_DIMS.HD;
+  return tier[ratio] || tier['16:9'];
+};
+
+// H3 works in temporal blocks: only 17n+5 frame counts are valid at 24fps, and
+// the model rounds UP. Mirrors the template's math node so the app can report
+// the real duration instead of the requested one.
+export const h3Frames = (seconds) => {
+  const want = Math.max(5, Math.round((Number(seconds) || 4) * 24));
+  return want + ((17 - ((want - 5) % 17)) % 17);
+};
+export const h3Seconds = (seconds) => h3Frames(seconds) / 24;
 export const videoDims = (ratio, resolution = 'HD') => {
   const tier = VIDEO_DIMS[resolution] || VIDEO_DIMS.HD;
   return tier[ratio] || tier['16:9'];
@@ -262,18 +291,51 @@ export function resolveVideoMode(mode, { lastFrame, audio } = {}) {
   return 'i2v';
 }
 
+// Pull the finished video out of a completed run (shared by both engines).
+async function firstVideo(outputs, settings) {
+  const vid = collectFiles(outputs).find((f) => /\.(mp4|webm|mov|mkv)$/i.test(f.filename));
+  if (!vid) throw new Error('ComfyUI finished but returned no video file.');
+  const blob = await fetchOutputBlob(settings, vid);
+  return { dataURL: await blobToDataURL(blob), filename: vid.filename };
+}
+
 export async function generateComfyVideo(
   settings,
   { prompt, firstFrame, lastFrame, audio, durationSec, aspectRatio, resolution, name, mode = 'auto' },
   { onStatus } = {}
 ) {
-  const [w, h] = videoDims(aspectRatio, resolution);
+  const engine = settings.videoEngine === 'minimax' ? 'minimax' : 'ltx';
+  const [w, h] = engine === 'minimax'
+    ? h3Dims(aspectRatio, resolution)
+    : videoDims(aspectRatio, resolution);
   // Shots are 2-10s on the timeline, but generation requests carry the +2s
   // dynamics padding (head/tail get trimmed in assembly) — allow up to 12.
   const dur = Math.max(2, Math.min(12, Math.round(durationSec || 4)));
   const stamp = Date.now();
   const useMode = resolveVideoMode(mode, { lastFrame, audio });
   let graph;
+
+  // ---- MiniMax H3 ----------------------------------------------------------
+  // One node covers t2va/i2va/fl2va, and it scores itself: dialogue, effects
+  // and music come out of the same pass, so no separate voice track is fed in.
+  if (engine === 'minimax') {
+    graph = clone(h3Template);
+    graph['200'].inputs.image = await uploadInput(settings, firstFrame, `storyreel_${stamp}_first.png`);
+    graph['104'].inputs.first_frame = ['200', 0];
+    if (lastFrame && useMode !== 'i2v') {
+      graph['201'] = { class_type: 'LoadImage', inputs: { image: '', upload: 'image' }, _meta: { title: 'last frame' } };
+      graph['201'].inputs.image = await uploadInput(settings, lastFrame, `storyreel_${stamp}_last.png`);
+      graph['104'].inputs.last_frame = ['201', 0];
+    }
+    graph['104'].inputs.prompt = prompt;
+    graph['104'].inputs.width = w;
+    graph['104'].inputs.height = h;
+    graph['104'].inputs.length = h3Frames(durationSec || 4);
+    graph['15'].inputs.noise_seed = rndSeed();
+    graph['92'].inputs.filename_prefix = `StoryReel/${sanitize(name)}`;
+    const outs = await runGraph(settings, graph, { onStatus });
+    return firstVideo(outs, settings);
+  }
 
   if (useMode === 'si2v') {
     // Dialogue shot: the generated video carries the voice track and is
@@ -314,10 +376,7 @@ export async function generateComfyVideo(
   }
 
   const outputs = await runGraph(settings, graph, { onStatus });
-  const vid = collectFiles(outputs).find((f) => /\.(mp4|webm|mov|mkv)$/i.test(f.filename));
-  if (!vid) throw new Error('ComfyUI finished but returned no video file.');
-  const blob = await fetchOutputBlob(settings, vid);
-  return { dataURL: await blobToDataURL(blob), filename: vid.filename };
+  return firstVideo(outputs, settings);
 }
 
 // ---- Stage 5: shot image via Flux.2 Klein 9B --------------------------------
