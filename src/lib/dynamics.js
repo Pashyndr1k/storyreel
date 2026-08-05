@@ -109,10 +109,15 @@ export function trimSeconds() {
 // Default trim for a shot's raw video: apply the 15-frame rule only when the
 // raw generation is actually longer than the timeline target (old footage
 // generated without the +3s padding is used untrimmed).
-export function defaultTrim(targetSec, rawSec) {
+// `tailOnly` is for clips that carry their own generated sound and whose first
+// frame is a fixed reference (MiniMax H3): cutting the head would clip the
+// dialogue onset and drop the frame the render was aligned to, so the whole
+// overshoot comes off the end instead.
+export function defaultTrim(targetSec, rawSec, { tailOnly = false } = {}) {
   if (!rawSec || rawSec <= targetSec + 0.2) return { head: 0, tail: 0 };
   const t = trimSeconds();
   const spare = rawSec - targetSec;
+  if (tailOnly) return { head: 0, tail: round2(Math.min(t.head + t.tail, spare)) };
   const head = Math.min(t.head, spare / 2);
   const tail = Math.min(t.tail, spare - head);
   return { head: round2(head), tail: round2(tail) };

@@ -101,14 +101,20 @@ We already generate storyboard frames at Stage 4. Feeding the board plus the
 per-panel action is officially supported and is, in effect, handing the model
 the multi-shot timeline it was trained on. Cheap to add once P3 exists.
 
-## P6 — Honest duration, and a Stage 6 that knows
+## P6 — Honest duration, and a Stage 6 that knows — **implemented (v1.20.0)**
 
 `17n+5` means a 4 s shot renders as 4.46 s. Today the timeline assumes it got
 what it asked for.
 
-**Proposal:** surface `h3Seconds()` next to the duration stepper ("4.0 s →
-4.46 s") and store the real length in `videoGenDurations`, which Stage 6 already
-reads for trimming. Small change, prevents slow drift across a long edit.
+**Done:** Stage 5 prints the snapped length next to the duration stepper when
+the engine is H3 ("4.0s → 4.46s", silent on grid-exact lengths such as 8.0s),
+and `videoGenDurations` now stores the real rendered length. Two consequences
+came with it: H3 shots render at their exact duration with no `+3 s` padding
+(the padding exists to give Stage 6 trim material, and trimming a clip that
+carries generated dialogue would cut into it), and Stage 6 takes the whole
+overshoot off the tail for H3 clips — `shotVideoEngines` records which engine
+rendered each shot — so the aligned first frame and the dialogue onset survive.
+LTX trimming is unchanged.
 
 ## P7 — Speed and hardware honesty
 

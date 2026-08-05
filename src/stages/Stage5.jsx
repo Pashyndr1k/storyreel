@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage, generateGeminiVoice, GEMINI_VOICES } from '../lib/gemini.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
-import { generateComfyVideo, generateComfyImage, generateComfyVoice, saveToLocalOutputs, VIDEO_RESOLUTIONS, VIDEO_MODES, resolveVideoMode, OMNI_VOICE_TAGS, OMNI_VOICE_SLOTS, OMNI_LANGUAGES, VOICE_LIBRARY } from '../lib/comfy.js';
+import { generateComfyVideo, generateComfyImage, generateComfyVoice, saveToLocalOutputs, VIDEO_RESOLUTIONS, VIDEO_MODES, resolveVideoMode, h3Seconds, OMNI_VOICE_TAGS, OMNI_VOICE_SLOTS, OMNI_LANGUAGES, VOICE_LIBRARY } from '../lib/comfy.js';
 import { stage5Prompt, stage5VideoPrompt, stage5H3VideoPrompt, h3ComposePrompt, stage5AudioPrompt, stage5VoicePrompt, stage5GeminiVoicePrompt, finalFramePrompt, tweakPromptSpec } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
 import { aspectDescription } from '../lib/aspect.js';
@@ -611,6 +611,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       update((p) => ({
         shotVideos: { ...(p.shotVideos || {}), [shot.id]: dataURL },
         videoGenDurations: { ...(p.videoGenDurations || {}), [shot.id]: Math.round(dur * 10) / 10 },
+        shotVideoEngines: { ...(p.shotVideoEngines || {}), [shot.id]: 'upload' },
       }));
     } catch (e) {
       setImgErr({ id: shot.id, msg: e.message || String(e) });
@@ -932,8 +933,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     // +3s padding rule (silent workflows only): generate longer than the
     // timeline needs; Stage 6 trims 15 frames from head and tail to mask AI
     // ramp-up and tail degradation. Voice-synced shots render at the exact
-    // duration so assembly never trims into synced speech.
-    const genDuration = useMode === 'si2v'
+    // duration so assembly never trims into synced speech — and H3 counts as
+    // voice-synced, because it generates its own dialogue, effects and score.
+    const genDuration = useMode === 'si2v' || isH3
       ? Number(shot.duration || 4)
       : Math.round(shot.duration || 4) + DYNAMICS_CONFIG.generation_padding_sec;
     try {
@@ -958,7 +960,11 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       saveToLocalOutputs(settings, filename, dataURL); // best-effort local copy
       update((p) => ({
         shotVideos: { ...(p.shotVideos || {}), [shot.id]: dataURL },
-        videoGenDurations: { ...(p.videoGenDurations || {}), [shot.id]: genDuration },
+        videoGenDurations: {
+          ...(p.videoGenDurations || {}),
+          [shot.id]: isH3 ? Math.round(h3Seconds(genDuration) * 100) / 100 : genDuration,
+        },
+        shotVideoEngines: { ...(p.shotVideoEngines || {}), [shot.id]: isH3 ? 'minimax' : 'ltx' },
       }));
     } catch (e) {
       setImgErr({ id: shot.id, msg: e.message === 'COMFY_UNREACHABLE' ? 'COMFY_UNREACHABLE' : e.message || String(e) });
@@ -1353,6 +1359,13 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     +
                   </button>
                 </span>
+                {/* H3 only renders 17n+5 frame counts at 24fps and rounds up,
+                    so state the length it will actually produce. */}
+                {settings.videoEngine === 'minimax' && Math.abs(h3Seconds(dur) - dur) > 0.02 && (
+                  <span className="s5e-snap" title={t('s5.h3SnapTip')}>
+                    → {h3Seconds(dur).toFixed(2)}s
+                  </span>
+                )}
                 <StyleChip project={project} styles={styles} cat="image" onClick={onProjectSettings} />
                 <StyleChip project={project} styles={styles} cat="video" onClick={onProjectSettings} />
               </div>

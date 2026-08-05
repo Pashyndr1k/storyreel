@@ -312,8 +312,10 @@ export default function Stage6({ project, update, settings }) {
       shots: (project.sceneDetails[scene.id]?.shots || []).map((shot) => {
         const video = (project.shotVideos || {})[shot.id] || null;
         const raw = (project.videoGenDurations || {})[shot.id] || 0;
+        const nativeAudio = (project.shotVideoEngines || {})[shot.id] === 'minimax';
         const trim = video
-          ? (project.shotTrims || {})[shot.id] || defaultTrim(shot.duration || 0, raw)
+          ? (project.shotTrims || {})[shot.id]
+            || defaultTrim(shot.duration || 0, raw, { tailOnly: nativeAudio })
           : { head: 0, tail: 0 };
         return {
           shot,

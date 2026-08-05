@@ -2994,3 +2994,13 @@ textarea.s5e-prompt-sm { min-height: 110px; }
 }
 .check-row input[type='checkbox'] { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; }
 .set-page .settings-io + .settings-io { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--glass-border-soft); }
+
+/* H3 snapped-duration readout beside the shot stepper (17n+5 frame grid) */
+.s5e-snap {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
