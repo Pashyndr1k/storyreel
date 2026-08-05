@@ -3,6 +3,8 @@
 Status: **integration landed** (engine selectable in Settings › Model selection).
 This document proposes what to build next to use the model to its full extent.
 
+Russian version: [minimax-h3-proposal.ru.md](./minimax-h3-proposal.ru.md)
+
 ## What actually changed under us
 
 H3 is not "another LTX". Three properties break assumptions the video module
