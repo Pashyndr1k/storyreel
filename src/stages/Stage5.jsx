@@ -314,6 +314,12 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     }
   };
 
+  // Video prompts are written in the target model's own format (H3's
+  // three-field schema vs LTX's motion-only prose), so the app remembers which
+  // engine each prompt was written for and flags mismatches.
+  const curEngine = settings.videoEngine === 'minimax' ? 'minimax' : 'ltx';
+  const engineName = (e) => (e === 'minimax' ? 'H3' : 'LTX');
+
   // Each generation is up to three calls (image, video, then audio prompts for
   // scenes with dialogue), each returning only its own field — so merge into
   // the existing entry, never overwrite the other fields.
@@ -321,6 +327,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     update((p) => {
       const sceneShots = p.sceneDetails[targetScene.id]?.shots || [];
       const next = { ...p.shotPrompts };
+      const engines = { ...(p.shotPromptEngines || {}) };
       (data.prompts || []).forEach((pr) => {
         const shot = sceneShots[(Number(pr.shot) || 1) - 1];
         if (!shot) return;
@@ -335,8 +342,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           videoPrompt: pr.video_prompt != null ? pr.video_prompt : cur.videoPrompt || '',
           ...(audioPrompt != null ? { audioPrompt } : {}),
         };
+        if (pr.video_prompt != null) engines[shot.id] = curEngine;
       });
-      return { shotPrompts: next };
+      return { shotPrompts: next, shotPromptEngines: engines };
     });
 
   const specFor = (s) => {
@@ -345,7 +353,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const block = blockForScene(project.dynamicsPlan, sceneArg.number);
     const specs = [
       stage5Prompt(project, sceneArg, sceneShots, genLang, imageStyle),
-      stage5VideoPrompt(project, sceneArg, sceneShots, videoStyle, block),
+      curEngine === 'minimax'
+        ? stage5H3VideoPrompt(project, sceneArg, sceneShots, videoStyle, block)
+        : stage5VideoPrompt(project, sceneArg, sceneShots, videoStyle, block),
     ];
     if (sceneShots.some((sh) => (sh.dialogue || '').trim())) {
       specs.push(stage5AudioPrompt(project, sceneArg, sceneShots, block));
@@ -368,6 +378,23 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       targets = withShots;
     }
     runBatch(targets, specFor, (s, data) => applyPrompts(s, data), (a, b) => setProg(b ? { a, b } : null));
+  };
+
+  // Rewrite only this scene's video prompts in the current engine's format —
+  // shown when some shots still carry prompts written for the other engine.
+  const staleVideoPrompts = shots.some((sh) => {
+    const w = (project.shotPromptEngines || {})[sh.id];
+    return w && w !== curEngine && (project.shotPrompts[sh.id]?.videoPrompt || '').trim();
+  });
+  const regenVideoPrompts = () => {
+    const sceneArg = { ...scene, number: project.outline.indexOf(scene) + 1 };
+    const sceneShots = project.sceneDetails[scene.id]?.shots || [];
+    const block = blockForScene(project.dynamicsPlan, sceneArg.number);
+    const spec =
+      curEngine === 'minimax'
+        ? stage5H3VideoPrompt(project, sceneArg, sceneShots, videoStyle, block)
+        : stage5VideoPrompt(project, sceneArg, sceneShots, videoStyle, block);
+    runMany([spec], (data) => applyPrompts(scene, data));
   };
 
   const setPrompt = (shotId, patch) =>
@@ -410,6 +437,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         [kind === 'image' ? 'imagePrompt' : kind === 'video' ? 'videoPrompt' : 'audioPrompt']:
           kind === 'audio' ? ensureDialogueInAudioPrompt(text, shot.dialogue) : text,
       });
+      if (kind === 'video') {
+        update((p) => ({ shotPromptEngines: { ...(p.shotPromptEngines || {}), [shot.id]: curEngine } }));
+      }
     } catch (e) {
       setImgErr({ id: shot.id, msg: e.message || String(e) });
     } finally {
@@ -430,6 +460,25 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       <RestoreIcon size={13} />
     </button>
   );
+
+  // Engine badge in the video prompt header: the prompt on screen was written
+  // for the other engine's format — one click rewrites it for the current one.
+  const promptEngineBadge = (shot) => {
+    const written = (project.shotPromptEngines || {})[shot.id];
+    if (!written || written === curEngine) return null;
+    if (!(project.shotPrompts[shot.id]?.videoPrompt || '').trim()) return null;
+    return (
+      <button
+        type="button"
+        className="prompt-engine-badge"
+        title={t('s5.engineMismatch', { a: engineName(written), b: engineName(curEngine) })}
+        disabled={!!regenBusy}
+        onClick={() => regenPrompt(shot, 'video')}
+      >
+        {engineName(written)} → {engineName(curEngine)}
+      </button>
+    );
+  };
 
   // "Tweak this": the user types a plain-language adjustment and Claude
   // rewrites the underlying technical prompt — no manual jargon editing.
@@ -1279,6 +1328,11 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           </button>
         )}
         <button className="btn" disabled={busy} onClick={processAll}>{t('batch.run5')}</button>
+        {staleVideoPrompts && (
+          <button className="btn" disabled={busy} onClick={regenVideoPrompts} title={t('s5.updateEngineTip', { e: engineName(curEngine) })}>
+            {t('s5.updateEngine', { e: engineName(curEngine) })}
+          </button>
+        )}
         {prog && <span className="total-badge">{t('batch.progress', { a: prog.a, b: prog.b })}</span>}
         {mediaProg && (
           <>
@@ -1695,6 +1749,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                   <div className="prompt-head">
                     <label>{t('s5.vid', { d: dur })}</label>
                     <span className="prompt-tools">
+                      {promptEngineBadge(shot)}
                       {regenBtn(shot, 'video')}
                       <CopyButton text={p.videoPrompt} />
                     </span>

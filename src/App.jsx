@@ -317,6 +317,25 @@ export default function App() {
           onClose={() => setShowSettings(false)}
         />
       )}
+      {!settings.h3NoticeShown && settings.videoEngine !== 'minimax' && (
+        <div className="stale-toast update-toast">
+          <p>{t('h3n.msg')}</p>
+          <div className="row">
+            <button
+              className="btn small primary"
+              onClick={() => {
+                setSettings((s) => ({ ...s, h3NoticeShown: true }));
+                setShowSettings(true);
+              }}
+            >
+              {t('h3n.open')}
+            </button>
+            <button className="btn small" onClick={() => setSettings((s) => ({ ...s, h3NoticeShown: true }))}>
+              {t('upd.later')}
+            </button>
+          </div>
+        </div>
+      )}
       {updateInfo && (
         <div className="stale-toast update-toast">
           <p>{t('upd.msg', { v: updateInfo.version })}</p>

@@ -3004,3 +3004,26 @@ textarea.s5e-prompt-sm { min-height: 110px; }
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* Video-prompt engine badge: prompt was written for the other engine */
+.prompt-engine-badge {
+  border: 1px solid rgba(var(--accent-rgb), 0.55);
+  background: rgba(var(--accent-rgb), 0.08);
+  color: var(--accent);
+  border-radius: 3px;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 1px 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 150ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.prompt-engine-badge:hover:not(:disabled) {
+  background: rgba(var(--accent-rgb), 0.18);
+}
+.prompt-engine-badge:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

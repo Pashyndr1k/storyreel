@@ -126,15 +126,22 @@ export function loadSettings() {
     textService: 'claude', // 'claude' | 'gemini' — plots, scripts and prompts
     storyboardService: 'gemini', // 'gemini' | 'comfy' — Stage-4 storyboard frames
     videoService: 'comfy', // shot video generation (only ComfyUI for now)
-    videoEngine: 'ltx', // local video model: 'ltx' (LTX-2.3) | 'minimax' (MiniMax H3)
+    videoEngine: 'minimax', // local video model: 'minimax' (MiniMax H3, default) | 'ltx' (LTX-2.3)
+    h3NoticeShown: true, // one-time "H3 is now the default" notice (false only for pre-2.0 installs)
     comfyUrl: 'http://127.0.0.1:8000',
     comfyOutputDir: 'D:\\Claude work\\ComfyUI\\Output',
     projectsDir: 'D:\\Claude work\\StoryReel Projects', // per-project folders (project.md + media files)
     uiFont: 'default', // UI font scheme (see FONT_SCHEMES in SettingsModal)
   };
   try {
-    const s = { ...defaults, ...(JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}) };
+    const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY));
+    const s = { ...defaults, ...(raw || {}) };
     if (s.uiFont === 'courier') s.uiFont = 'archivo-mix'; // scheme replaced in 1.19.x
+    // Pre-2.0 installs: the default engine flipped to H3, but a working setup
+    // is never switched under the user — they keep LTX and get a one-time
+    // notice pointing at Settings instead.
+    if (raw && !('videoEngine' in raw)) s.videoEngine = 'ltx';
+    if (raw && !('h3NoticeShown' in raw)) s.h3NoticeShown = false;
     s.apiKey = revealKey(s.apiKey);
     s.geminiKey = revealKey(s.geminiKey);
     return s;
@@ -186,6 +193,7 @@ function projectDefaults() {
     videoGenDurations: {}, // shotId -> raw seconds requested from the video model (+2s padding)
     shotVideoModes: {}, // shotId -> pinned video workflow: 'auto' | 'i2v' | 'flf2v' | 'si2v'
     shotVideoEngines: {}, // shotId -> engine that rendered it: 'ltx' | 'minimax' (drives Stage 6 trim)
+    shotPromptEngines: {}, // shotId -> engine the video prompt was WRITTEN for: 'ltx' | 'minimax'
     shotTrims: {}, // shotId -> { head, tail } seconds — manual overrides of the 15-frame rule
     // Multi-layer audio timeline (Stage 6). Each layer is its own track lane:
     // { id, name, enabled, volume, clips: [{ id, name, dataURL, start, offset,
@@ -252,6 +260,7 @@ export function migrateProject(raw) {
   p.pinned = p.pinned === true;
   p.shotVideoModes = p.shotVideoModes && typeof p.shotVideoModes === 'object' ? p.shotVideoModes : {};
   p.shotVideoEngines = p.shotVideoEngines && typeof p.shotVideoEngines === 'object' ? p.shotVideoEngines : {};
+  p.shotPromptEngines = p.shotPromptEngines && typeof p.shotPromptEngines === 'object' ? p.shotPromptEngines : {};
   p.shotAudioSrc = p.shotAudioSrc && typeof p.shotAudioSrc === 'object' ? p.shotAudioSrc : {};
   p.shotAudioPads = p.shotAudioPads && typeof p.shotAudioPads === 'object' ? p.shotAudioPads : {};
   p.shotTrims = p.shotTrims && typeof p.shotTrims === 'object' ? p.shotTrims : {};

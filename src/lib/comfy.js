@@ -299,6 +299,57 @@ async function firstVideo(outputs, settings) {
   return { dataURL: await blobToDataURL(blob), filename: vid.filename };
 }
 
+// ---- H3 preflight -----------------------------------------------------------
+// The H3 graph needs the MiniMax node pack plus four model files; without them
+// ComfyUI fails with an opaque "node type not found" / "value not in list".
+// So before the first H3 render per ComfyUI url, verify everything is in place
+// and name exactly what is absent. Verification is best-effort: if ComfyUI is
+// unreachable or an endpoint shape is unknown, the render proceeds and the
+// normal error path speaks.
+const H3_HF = 'https://huggingface.co/Comfy-Org/MiniMax-H3';
+const h3PreflightOk = new Set();
+export async function h3Preflight(settings, template = h3Template) {
+  const key = (settings.comfyUrl || '') + '|' + (template === h3Template ? 'i2v' : 'r2v');
+  if (h3PreflightOk.has(key)) return;
+  const loaderField = { UNETLoader: 'unet_name', CLIPLoader: 'clip_name', VAELoader: 'vae_name' };
+  // Model files the graph actually references — read from the template so the
+  // check can never drift from the workflow.
+  const needs = {};
+  let h3Node = null;
+  for (const node of Object.values(template)) {
+    const field = loaderField[node.class_type];
+    if (field) (needs[node.class_type] = needs[node.class_type] || new Set()).add(node.inputs[field]);
+    if (node.class_type.startsWith('MiniMaxH3')) h3Node = node.class_type;
+  }
+  const info = async (cls) => {
+    try {
+      const res = await request(settings, `/object_info/${cls}`);
+      return res.json();
+    } catch {
+      return null;
+    }
+  };
+  const nodeInfo = await info(h3Node);
+  if (nodeInfo === null) return; // ComfyUI unreachable — not a preflight matter
+  const missing = [];
+  if (!nodeInfo[h3Node]) {
+    missing.push(`${h3Node} node — update ComfyUI to a build with MiniMax H3 support`);
+  }
+  for (const [cls, files] of Object.entries(needs)) {
+    const ci = await info(cls);
+    const avail = ci?.[cls]?.input?.required?.[loaderField[cls]]?.[0];
+    if (!Array.isArray(avail)) continue; // unknown shape — do not block on it
+    for (const f of files) if (!avail.includes(f)) missing.push(f);
+  }
+  if (missing.length) {
+    throw new Error(
+      `MiniMax H3 is not ready on this ComfyUI:\n• ${missing.join('\n• ')}\n` +
+        `Model files: ${H3_HF} → ComfyUI/models (unet / text_encoders / vae).`
+    );
+  }
+  h3PreflightOk.add(key);
+}
+
 export async function generateComfyVideo(
   settings,
   { prompt, firstFrame, lastFrame, audio, durationSec, aspectRatio, resolution, name, mode = 'auto' },
@@ -319,6 +370,7 @@ export async function generateComfyVideo(
   // One node covers t2va/i2va/fl2va, and it scores itself: dialogue, effects
   // and music come out of the same pass, so no separate voice track is fed in.
   if (engine === 'minimax') {
+    await h3Preflight(settings);
     graph = clone(h3Template);
     graph['200'].inputs.image = await uploadInput(settings, firstFrame, `storyreel_${stamp}_first.png`);
     graph['104'].inputs.first_frame = ['200', 0];
