@@ -901,6 +901,18 @@ export function stage5H3VideoPrompt(project, scene, shots, videoStyle, block, se
     const v = Math.max(0, Number(sec) || 0);
     return `${String(Math.floor(v / 60)).padStart(2, '0')}:${String(Math.floor(v % 60)).padStart(2, '0')}.${String(Math.round((v % 1) * 1000)).padStart(3, '0')}`;
   };
+  // Reference list for a shot (H3 reference mode) — shared by plain shots and
+  // take leads, so refs survive grouping.
+  const refBlockOf = (id) => {
+    const refs = (project.shotRefs || {})[id] || null;
+    if (!refs) return '';
+    const lines = [
+      ...(refs.images || []).map((r, k) => `  <Picture ${k + 1}> = ${r.label || 'reference image'}${r.board ? ' [STORYBOARD FRAME]' : ''}`),
+      ...(refs.videos || []).map((r, k) => `  <Video ${k + 1}> = ${r.label || 'reference video'}`),
+      ...(refs.audios || []).map((r, k) => `  <Audio ${k + 1}> = ${r.label || 'reference audio'}`),
+    ].join('\n');
+    return lines ? `\n  REFERENCE MODE — attached media:\n${lines}` : '';
+  };
   const shotLine = (s) => {
     const line = (s.dialogue || '').trim();
     const native = (project.shotVoiceSources || {})[s.id] === 'native';
@@ -933,7 +945,7 @@ export function stage5H3VideoPrompt(project, scene, shots, videoStyle, block, se
           .join('\n');
         return `Shot ${i + 1} (id ${s.id}) — GROUP TAKE: ${members.length} shots in ONE ${total}s generation with H3-timed internal cuts:
 ${inner}
-  location: ${s.location || scene.title || ''}`;
+  location: ${s.location || scene.title || ''}${refBlockOf(s.id)}`;
       }
       const dur = Number(s.duration || 4);
       const line = (s.dialogue || '').trim();
@@ -947,21 +959,10 @@ ${inner}
         : native
           ? `[NATIVE VOICE] "${line}"${spk ? `\n  speaker: ${spk}` : ''}`
           : `[VOICE ADDED IN POST] "${line}"`;
-      // Reference-mode shots list their curated media; the writer must then
-      // produce the six-section reference prompt for that shot instead of the
-      // plain first-frame description.
-      const refs = (project.shotRefs || {})[s.id] || null;
-      const refLines = refs
-        ? [
-            ...(refs.images || []).map((r, k) => `  <Picture ${k + 1}> = ${r.label || 'reference image'}`),
-            ...(refs.videos || []).map((r, k) => `  <Video ${k + 1}> = ${r.label || 'reference video'}`),
-            ...(refs.audios || []).map((r, k) => `  <Audio ${k + 1}> = ${r.label || 'reference audio'}`),
-          ].join('\n')
-        : '';
       return `Shot ${i + 1} (id ${s.id}, ${dur}s${s.shotType ? `, ${s.shotType}` : ''}):
   action: ${s.action || '(none)'}
   dialogue: ${dialogue}
-  location: ${s.location || scene.title || ''}${refLines ? `\n  REFERENCE MODE — attached media:\n${refLines}` : ''}`;
+  location: ${s.location || scene.title || ''}${refBlockOf(s.id)}`;
     })
     .filter(Boolean)
     .join('\n');
@@ -977,7 +978,7 @@ Each shot below already has a generated FIRST FRAME that will be attached to the
 
 ${list}
 
-For EACH shot write the three H3 fields describing only that shot's own duration. Shots marked REFERENCE MODE are rendered by H3's reference checkpoint: open their integrated_multimodal_description with subject definitions binding each reference to a role (“<Subject 1> is the woman from <Picture 1>”), state retention explicitly (“Use <Picture 1> exactly as it is” / “retain the voice of <Audio 1>”), then describe the shot; every attached reference must be mentioned by its label. GROUP TAKE entries are ONE multi-shot generation: write ONE video_prompt for the whole take — open with [Shot 1] (no timestamp), start every later segment with [Shot N] At MM:SS.mmm exactly matching the listed times, put <scenetrans> at each internal cut, keep continuity across the cuts — and return it under the take's shot number only; folded shots get NO entry of their own. Dialogue handling: where a line is marked [NATIVE VOICE], put it verbatim inside <d>[Language] …</d> with a speaker ID and an established voice identity (honor the speaker notes) — H3 speaks it natively. Where a line is marked [VOICE ADDED IN POST], the character visibly delivers it — mouth and body act the words — but NO speech may appear in any audio field: no <d> tags for that shot, the soundscape stays ambience and effects, the voice track is laid on in editing.
+For EACH shot write the three H3 fields describing only that shot's own duration. Shots marked REFERENCE MODE are rendered by H3's reference checkpoint: open their integrated_multimodal_description with subject definitions binding each reference to a role (“<Subject 1> is the woman from <Picture 1>”), state retention explicitly (“Use <Picture 1> exactly as it is” / “retain the voice of <Audio 1>”), then describe the shot; every attached reference must be mentioned by its label. References tagged [STORYBOARD FRAME] use MiniMax's official storyboard declaration — “<Picture N> is a storyboard reference for [Shot K], defining its viewpoint, subject placement, and shot order” — bound to the shot the frame belongs to (its scene/shot number is in the label). GROUP TAKE entries are ONE multi-shot generation: write ONE video_prompt for the whole take — open with [Shot 1] (no timestamp), start every later segment with [Shot N] At MM:SS.mmm exactly matching the listed times, put <scenetrans> at each internal cut, keep continuity across the cuts — and return it under the take's shot number only; folded shots get NO entry of their own. Dialogue handling: where a line is marked [NATIVE VOICE], put it verbatim inside <d>[Language] …</d> with a speaker ID and an established voice identity (honor the speaker notes) — H3 speaks it natively. Where a line is marked [VOICE ADDED IN POST], the character visibly delivers it — mouth and body act the words — but NO speech may appear in any audio field: no <d> tags for that shot, the soundscape stays ambience and effects, the voice track is laid on in editing.
 
 Return one entry per shot, in order, numbered from 1. "video_prompt" holds the three fields as ONE text block written exactly like this, blank line between fields:
 

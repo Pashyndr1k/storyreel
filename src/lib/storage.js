@@ -207,6 +207,7 @@ function projectDefaults() {
     audioLayers: [],
     shotTransitions: {}, // shotId -> transition_type override for the cut INTO the next shot
     storyboards: {}, // shotId -> low-res storyboard frame (data URL)
+    referenceFrames: {}, // shotId -> reference-quality frame (real image pipeline + style; feeds H3 reference mode)
     logline: '',
     ideas: [],
     selectedIdeaId: null,
@@ -275,6 +276,7 @@ export function migrateProject(raw) {
   p.shotTrims = p.shotTrims && typeof p.shotTrims === 'object' ? p.shotTrims : {};
   p.shotTransitions = p.shotTransitions && typeof p.shotTransitions === 'object' ? p.shotTransitions : {};
   p.storyboards = p.storyboards && typeof p.storyboards === 'object' ? p.storyboards : {};
+  p.referenceFrames = p.referenceFrames && typeof p.referenceFrames === 'object' ? p.referenceFrames : {};
   p.shotPrompts = p.shotPrompts && typeof p.shotPrompts === 'object' ? p.shotPrompts : {};
 
   p.storyline =

@@ -45,7 +45,7 @@ const mapShots = (rawShots, range = { min: 2, max: 10 }) =>
     notes: s.notes || '',
   }));
 
-export default function Stage4({ project, update, settings, goNext, onSettings, onProjectSettings, genLang, styles, scriptStyle, library, libUpsert }) {
+export default function Stage4({ project, update, settings, goNext, onSettings, onProjectSettings, genLang, styles, scriptStyle, imageStyle, library, libUpsert }) {
   const { t } = useI18n();
   const [lightbox, setLightbox] = useState(null); // full-size photo pop-up
   const [sceneId, setSceneId] = useState(project.outline[0]?.id || null);
@@ -199,6 +199,8 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
           onReorder={moveShotTo}
           onDuration={(id, d) => updateShot(id, { duration: clamp(d, 2, 10) })}
           onFrames={(frames) => update((p) => ({ storyboards: { ...p.storyboards, ...frames } }))}
+          onRefFrames={(frames) => update((p) => ({ referenceFrames: { ...(p.referenceFrames || {}), ...frames } }))}
+          imageStyle={imageStyle}
           onSettings={onSettings}
         />
       )}

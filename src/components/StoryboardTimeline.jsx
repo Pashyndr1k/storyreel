@@ -10,12 +10,23 @@ function framePrompt(shot, scene) {
   return `Rough cinematic storyboard frame, ${shot.shotType || 'medium'} shot, simple loose sketch-style composition, muted colors: ${shot.action || scene.summary || ''}. Setting: ${shot.location || scene.title || ''}. No text, no labels, no captions. Don't render text in the preview frames.`;
 }
 
+// Reference-quality frame: the project's image style + character descriptions,
+// composed as a clean frame reference (D6) — good enough to hand H3's
+// reference mode as a storyboard picture, unlike the loose sketches above.
+function refFramePrompt(shot, scene, project, imageStyle) {
+  const cast = (project.storyline?.characters || [])
+    .filter((c) => c.name && (`${shot.action || ''} ${shot.dialogue || ''}`.includes(c.name)))
+    .map((c) => `${c.name}: ${c.description || ''}`.trim())
+    .join('. ');
+  return `${(imageStyle || '').trim() || 'Cinematic film still, natural light, realistic detail'}. ${shot.shotType || 'medium'} shot: ${shot.action || scene.summary || ''}. Setting: ${shot.location || scene.title || ''}${scene.timeOfDay ? `, ${scene.timeOfDay}` : ''}.${cast ? ` Characters: ${cast}.` : ''} Precise frame reference for video generation — accurate composition, subject placement and camera viewpoint. No text, no labels, no captions.`;
+}
+
 // NLE-style animatic timeline (design 3a): black surface with a per-second time
 // ruler, square clips butted together whose widths are proportional to their
 // durations, a red playhead spanning ruler + track, and real-time playback.
 // Clips are editable: drag a clip to reorder, drag its right edge to trim or
 // extend the duration — both write straight into the shot breakdown data.
-export default function StoryboardTimeline({ project, scene, shots, settings, onReorder, onDuration, onFrames, onSettings }) {
+export default function StoryboardTimeline({ project, scene, shots, settings, onReorder, onDuration, onFrames, onRefFrames, onSettings, imageStyle }) {
   const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const [prog, setProg] = useState(null);
@@ -87,9 +98,17 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
     window.addEventListener('pointercancel', up);
   };
 
-  const sb = project.storyboards || {};
+  // Frame quality mode: 'sketch' (cheap animatic frames) or 'ref'
+  // (reference-quality frames for H3 reference mode). Each mode has its own
+  // store; the strip shows the active mode's frame and falls back to the other.
+  const [frameMode, setFrameMode] = useState('sketch');
+  const sketches = project.storyboards || {};
+  const refFrames = project.referenceFrames || {};
+  const refMode = frameMode === 'ref' && !!onRefFrames;
+  const active = refMode ? refFrames : sketches;
+  const sb = { ...(refMode ? sketches : refFrames), ...active }; // display: active first, other as fallback
   const total = shots.reduce((a, s) => a + (s.duration || 0), 0);
-  const missing = shots.filter((s) => !sb[s.id]);
+  const missing = shots.filter((s) => !active[s.id]);
 
   // playback clock (resumes from the current position)
   useEffect(() => {
@@ -129,16 +148,18 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
   // ComfyUI Krea-2 Turbo workflow. Comfy frames keep a full-res copy in the
   // local outputs folder; the animatic strip stores the small version.
   const genFrame = async (shot, idx) => {
-    const prompt = framePrompt(shot, scene);
+    const prompt = refMode ? refFramePrompt(shot, scene, project, imageStyle) : framePrompt(shot, scene);
     const aspectRatio = project.aspectRatio || '16:9';
     if (useComfy) {
       const { dataURL, filename } = await generateComfyStoryboard(settings, {
         prompt,
         aspectRatio,
-        name: `${(project.title || 'project').slice(0, 24)}_sb_shot${idx + 1}`,
+        name: `${(project.title || 'project').slice(0, 24)}_${refMode ? 'ref' : 'sb'}_shot${idx + 1}`,
       });
       saveToLocalOutputs(settings, filename, dataURL); // best-effort local copy
-      return resizeDataURL(dataURL, 320 * 200, 0.72);
+      // Reference frames keep enough pixels to serve as H3 reference media;
+      // sketches stay tiny — they only feed the animatic strip.
+      return resizeDataURL(dataURL, refMode ? 864 * 544 : 320 * 200, refMode ? 0.82 : 0.72);
     }
     return generateStoryboardImage(settings, { prompt, aspectRatio });
   };
@@ -164,7 +185,7 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
         if (i >= targets.length) return;
         try {
           const img = await genFrame(targets[i], shots.indexOf(targets[i]));
-          onFrames({ [targets[i].id]: img });
+          (refMode ? onRefFrames : onFrames)({ [targets[i].id]: img });
         } catch (e) {
           setErr(e.message === 'NO_GEMINI_KEY' ? 'NO_GEMINI_KEY' : e.message || String(e));
         }
@@ -187,6 +208,21 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
     <div className="sb-block">
       <div className="sb-head">
         <strong>{t('sb.title')}</strong>
+        {onRefFrames && (
+          <span className="seg" title={t('sb.modeTip')}>
+            {['sketch', 'ref'].map((m) => (
+              <button
+                key={m}
+                type="button"
+                className={`seg-btn ${frameMode === m ? 'on' : ''}`}
+                disabled={busy}
+                onClick={() => setFrameMode(m)}
+              >
+                {t(`sb.mode_${m}`)}
+              </button>
+            ))}
+          </span>
+        )}
       </div>
 
       {(playing || elapsed > 0) && (

@@ -33,11 +33,13 @@ export default function RefPicker({ project, scene, shot, refs, onChange, onClos
       (project.sceneDetails[sc.id]?.shots || []).forEach((sh, shi) => {
         const img = (project.shotImages || {})[sh.id];
         const fin = (project.shotFinalImages || {})[sh.id];
+        const board = (project.referenceFrames || {})[sh.id];
         const vid = (project.shotVideos || {})[sh.id];
         const aud = (project.shotAudios || {})[sh.id];
         const at = { s: si + 1, n: shi + 1 };
         if (img) images.push({ src: img, label: t('refs.shotFrame', at) });
         if (fin) images.push({ src: fin, label: t('refs.shotFinal', at) });
+        if (board) images.push({ src: board, label: t('refs.shotBoard', at), board: true });
         if (vid && sh.id !== shot.id) videos.push({ src: vid, label: t('refs.shotVideo', at) });
         if (aud) audios.push({ src: aud, label: t('refs.shotVoice', at) });
       });
@@ -53,7 +55,9 @@ export default function RefPicker({ project, scene, shot, refs, onChange, onClos
     if (!has && (cur[kind].length >= capOf[kind] || total >= H3_REF_CAPS.total)) return;
     const next = {
       ...cur,
-      [kind]: has ? cur[kind].filter((r) => r.src !== item.src) : [...cur[kind], { src: item.src, label: item.label }],
+      [kind]: has
+        ? cur[kind].filter((r) => r.src !== item.src)
+        : [...cur[kind], { src: item.src, label: item.label, ...(item.board ? { board: true } : {}) }],
     };
     onChange(next);
   };
