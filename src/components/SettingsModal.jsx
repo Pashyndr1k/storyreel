@@ -34,7 +34,8 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
   const [storyboardService, setStoryboardService] = useState(settings.storyboardService || 'gemini');
   const [imageService, setImageService] = useState(settings.imageService || 'gemini');
   const [videoService, setVideoService] = useState(settings.videoService || 'comfy');
-  const [videoEngine, setVideoEngine] = useState(settings.videoEngine || 'ltx');
+  const [videoEngine, setVideoEngine] = useState(settings.videoEngine || 'minimax');
+  const [h3RefImageSize, setH3RefImageSize] = useState(settings.h3RefImageSize || 'match');
   const [voiceService, setVoiceService] = useState(settings.voiceService || 'comfy');
   const [comfyUrl, setComfyUrl] = useState(settings.comfyUrl || 'http://127.0.0.1:8000');
   const [comfyOutputDir, setComfyOutputDir] = useState(settings.comfyOutputDir || 'D:\\Claude work\\ComfyUI\\Output');
@@ -117,6 +118,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
       imageService,
       videoService,
       videoEngine,
+      h3RefImageSize,
       voiceService,
       comfyUrl: comfyUrl.trim() || 'http://127.0.0.1:8000',
       comfyOutputDir: comfyOutputDir.trim() || 'D:\\Claude work\\ComfyUI\\Output',
@@ -345,6 +347,16 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
         <option value="minimax">{t('set.engMinimax')}</option>
       </select>
       <p className="hint">{t(videoEngine === 'minimax' ? 'set.engMinimaxHint' : 'set.engLtxHint')}</p>
+      {videoEngine === 'minimax' && (
+        <>
+          <label>{t('set.refSize')}</label>
+          <select value={h3RefImageSize} onChange={(e) => setH3RefImageSize(e.target.value)}>
+            <option value="match">{t('set.refSizeMatch')}</option>
+            <option value="max">{t('set.refSizeMax')}</option>
+          </select>
+          <p className="hint">{t('set.refSizeHint')}</p>
+        </>
+      )}
       <label>{t('set.voiceService')}</label>
       <select value={voiceService} onChange={(e) => setVoiceService(e.target.value)}>
         <option value="comfy">{t('set.svcOmniVoice')}</option>

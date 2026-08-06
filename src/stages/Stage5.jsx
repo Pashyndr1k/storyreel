@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage, generateGeminiVoice, GEMINI_VOICES } from '../lib/gemini.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
-import { generateComfyVideo, generateComfyImage, generateComfyVoice, saveToLocalOutputs, VIDEO_RESOLUTIONS, VIDEO_MODES, resolveVideoMode, h3Seconds, OMNI_VOICE_TAGS, OMNI_VOICE_SLOTS, OMNI_LANGUAGES, VOICE_LIBRARY } from '../lib/comfy.js';
+import { generateComfyVideo, generateComfyRefVideo, generateComfyImage, generateComfyVoice, saveToLocalOutputs, VIDEO_RESOLUTIONS, VIDEO_MODES, H3_VIDEO_MODES, resolveVideoMode, resolveH3VideoMode, h3Seconds, OMNI_VOICE_TAGS, OMNI_VOICE_SLOTS, OMNI_LANGUAGES, VOICE_LIBRARY } from '../lib/comfy.js';
 import { stage5Prompt, stage5VideoPrompt, stage5H3VideoPrompt, h3ComposePrompt, stage5AudioPrompt, stage5VoicePrompt, stage5GeminiVoicePrompt, finalFramePrompt, tweakPromptSpec } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
 import { aspectDescription } from '../lib/aspect.js';
@@ -14,6 +14,7 @@ import SceneNav from '../components/SceneNav.jsx';
 import { blockForScene, DYNAMICS_CONFIG } from '../lib/dynamics.js';
 import AssetsModal from '../components/AssetsModal.jsx';
 import Lightbox from '../components/Lightbox.jsx';
+import RefPicker from '../components/RefPicker.jsx';
 import { padAudioWithSilence, mediaDuration, decodeMediaAudio, audioBufferToWavDataURL } from '../lib/audio.js';
 import LibraryPicker from '../components/LibraryPicker.jsx';
 import { newLibraryEntry } from '../lib/library.js';
@@ -175,7 +176,8 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const [mediaProg, setMediaProg] = useState(null); // { a, b } scene-media queue
   const mediaCancel = useRef(false);
   const [palette, setPalette] = useState(null); // { src: shotId, colors: [] } for this scene
-  const [lightbox, setLightbox] = useState(null); // { kind: 'img' | 'vid', src } shown in the large pop-up
+  const [lightbox, setLightbox] = useState(null);
+  const [refPickFor, setRefPickFor] = useState(null); // shot whose references are being edited // { kind: 'img' | 'vid', src } shown in the large pop-up
   const [tweakText, setTweakText] = useState({}); // `${shotId}:${kind}` -> adjustment draft
   const [tweakBusy, setTweakBusy] = useState(null); // `${shotId}:${kind}` in flight
   const [regenBusy, setRegenBusy] = useState(null); // `${shotId}:${kind}` single-prompt regen in flight
@@ -966,7 +968,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const cur = projectRef.current;
     const first = (cur.shotImages || {})[shot.id];
     const vPrompt = (cur.shotPrompts[shot.id]?.videoPrompt || '').trim();
-    if (!first || !vPrompt) return;
+    if (!vPrompt) return;
     // MiniMax H3 wants its native three-field schema plus a reference-frame
     // alignment header. Prompts generated for H3 are stored as JSON fields;
     // an LTX-era plain prompt is passed through so nothing breaks mid-project.
@@ -976,7 +978,14 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     // A pinned workflow wins over the automatic choice (and silently falls
     // back to auto when its material is missing).
     const mode = (cur.shotVideoModes || {})[shot.id] || 'auto';
-    const useMode = resolveVideoMode(mode, { lastFrame: last, audio: voiceAud });
+    const refs = (cur.shotRefs || {})[shot.id] || null;
+    const hasRefs = !!refs && ((refs.images || []).length || (refs.videos || []).length || (refs.audios || []).length) > 0;
+    // H3 has its own workflow set: it never takes audio in (it scores itself),
+    // and reference mode replaces the first-frame anchor entirely.
+    const useMode = isH3
+      ? resolveH3VideoMode(mode, { lastFrame: last, hasRefs })
+      : resolveVideoMode(mode, { lastFrame: last, audio: voiceAud });
+    if (!first && useMode !== 'r2v') return; // every non-reference workflow is frame-anchored
     setImgBusy(`${shot.id}:vid`);
     setImgErr(null);
     // +3s padding rule (silent workflows only): generate longer than the
@@ -988,24 +997,36 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       ? Number(shot.duration || 4)
       : Math.round(shot.duration || 4) + DYNAMICS_CONFIG.generation_padding_sec;
     try {
-      const sendPrompt = isH3
-        ? h3ComposePrompt(vPrompt, {
-            hasFirst: true,
-            hasLast: useMode === 'flf2v' && !!last,
-            seconds: genDuration,
-          })
-        : vPrompt;
-      const { dataURL, filename } = await generateComfyVideo(settings, {
+      const sendPrompt =
+        isH3 && useMode !== 'r2v'
+          ? h3ComposePrompt(vPrompt, {
+              hasFirst: true,
+              hasLast: useMode === 'flf2v' && !!last,
+              seconds: genDuration,
+            })
+          : vPrompt;
+      const genArgs = {
         prompt: sendPrompt,
-        firstFrame: first,
-        lastFrame: useMode === 'flf2v' ? last : null,
-        audio: useMode === 'si2v' ? voiceAud : null,
-        mode: useMode,
         durationSec: genDuration,
         aspectRatio: project.aspectRatio || '16:9',
         resolution: cur.videoResolution || 'HD',
         name: `${(project.title || 'project').slice(0, 24)}_sc${project.outline.indexOf(scene) + 1}_shot${i + 1}`,
-      });
+      };
+      const { dataURL, filename } =
+        useMode === 'r2v'
+          ? await generateComfyRefVideo(settings, {
+              ...genArgs,
+              refImages: (refs.images || []).map((r) => r.src),
+              refVideos: (refs.videos || []).map((r) => r.src),
+              refAudios: (refs.audios || []).map((r) => r.src),
+            })
+          : await generateComfyVideo(settings, {
+              ...genArgs,
+              firstFrame: first,
+              lastFrame: useMode === 'flf2v' ? last : null,
+              audio: useMode === 'si2v' ? voiceAud : null,
+              mode: useMode,
+            });
       saveToLocalOutputs(settings, filename, dataURL); // best-effort local copy
       // H3 clips carry a full native mix (dialogue, effects, score). Detach it
       // onto the "H3 mix" lane NLE-style — video muted, audio on its own lane
@@ -1194,6 +1215,10 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const voiceSourceOf = (shotId) => ((project.shotVoiceSources || {})[shotId] === 'native' ? 'native' : 'tts');
   const setVoiceSource = (shotId, v) =>
     update((p) => ({ shotVoiceSources: { ...(p.shotVoiceSources || {}), [shotId]: v } }));
+  const refsOf = (shotId) => {
+    const r = (project.shotRefs || {})[shotId];
+    return r && ((r.images || []).length || (r.videos || []).length || (r.audios || []).length) ? r : null;
+  };
   const nativeVoiceOn = (shot) =>
     curEngine === 'minimax' && (shot.dialogue || '').trim() !== '' && voiceSourceOf(shot.id) === 'native';
   const padsOf = (shotId) => {
@@ -1452,7 +1477,10 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           const tabHasMedia = { image: !!genImg, video: !!shotVid, audio: !!shotAud };
           // pinned workflow + the one that will actually run for this shot
           const shotMode = (project.shotVideoModes || {})[shot.id] || 'auto';
-          const effMode = resolveVideoMode(shotMode, { lastFrame: finalImg, audio: shotAud });
+          const effMode =
+            curEngine === 'minimax'
+              ? resolveH3VideoMode(shotMode, { lastFrame: finalImg, hasRefs: !!refsOf(shot.id) })
+              : resolveVideoMode(shotMode, { lastFrame: finalImg, audio: shotAud });
           return (
             <div key={shot.id} className="shot-card s5e-card">
               {/* Card header: shot identity, timing, type and action. */}
@@ -1875,8 +1903,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         allows; a pinned choice overrides it. Options whose
                         material is missing stay disabled. */}
                     <span className="seg seg-tall" title={t('vid.wfTip')}>
-                      {VIDEO_MODES.map((m) => {
-                        const avail = m === 'si2v' ? !!shotAud : m === 'flf2v' ? !!finalImg : true;
+                      {(curEngine === 'minimax' ? H3_VIDEO_MODES : VIDEO_MODES).map((m) => {
+                        const avail =
+                          m === 'si2v' ? !!shotAud : m === 'flf2v' ? !!finalImg : m === 'r2v' ? !!refsOf(shot.id) : true;
                         return (
                           <button
                             key={m}
@@ -1895,12 +1924,38 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         );
                       })}
                     </span>
-                    {genImg && (
+                    {(genImg || effMode === 'r2v') && (
                       <span className="hint">
-                        {effMode === 'si2v' ? t('vid.modeSI2V') : effMode === 'flf2v' ? t('vid.modeFLF') : t('vid.modeI2V')}
+                        {effMode === 'r2v'
+                          ? t('vid.modeR2V')
+                          : effMode === 'si2v'
+                            ? t('vid.modeSI2V')
+                            : effMode === 'flf2v'
+                              ? t('vid.modeFLF')
+                              : t('vid.modeI2V')}
                       </span>
                     )}
                   </div>
+                  {/* Reference curation (H3 only): the media the ref2va
+                      checkpoint is conditioned on. Thumbnails preview the
+                      set; the picker edits it. */}
+                  {curEngine === 'minimax' && (
+                    <div className="s5e-refrow">
+                      <span className="s5e-eyebrow">{t('refs.row')}</span>
+                      {(refsOf(shot.id)?.images || []).map((r, k) => (
+                        <img key={`ri${k}`} className="s5e-refthumb" src={r.src} alt="" title={r.label} loading="lazy" decoding="async" />
+                      ))}
+                      {(refsOf(shot.id)?.videos || []).map((r, k) => (
+                        <video key={`rv${k}`} className="s5e-refthumb" src={r.src} preload="metadata" muted title={r.label} />
+                      ))}
+                      {(refsOf(shot.id)?.audios || []).map((r, k) => (
+                        <span key={`ra${k}`} className="s5e-refthumb s5e-refaud" title={r.label}>♪</span>
+                      ))}
+                      <button type="button" className="btn small" onClick={() => setRefPickFor(shot)}>
+                        {refsOf(shot.id) ? t('refs.edit') : t('refs.add')}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2213,6 +2268,18 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       )}
 
       <Lightbox item={lightbox} onClose={() => setLightbox(null)} />
+      {refPickFor && (
+        <RefPicker
+          project={project}
+          scene={scene}
+          shot={refPickFor}
+          refs={(project.shotRefs || {})[refPickFor.id]}
+          onChange={(next) =>
+            update((p) => ({ shotRefs: { ...(p.shotRefs || {}), [refPickFor.id]: next } }))
+          }
+          onClose={() => setRefPickFor(null)}
+        />
+      )}
       {showAssets && (
         <AssetsModal
           library={library}

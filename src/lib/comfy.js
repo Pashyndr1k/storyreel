@@ -13,6 +13,7 @@ import flux2Template from '../data/comfy/flux2_klein_edit_api.json';
 import ttsTemplate from '../data/comfy/omnivoice_tts_api.json';
 import si2vTemplate from '../data/comfy/ltx_si2v_api.json';
 import h3Template from '../data/comfy/minimax_h3_i2v_api.json';
+import h3RefTemplate from '../data/comfy/minimax_h3_r2v_api.json';
 import aceTemplate from '../data/comfy/ace_step_api.json';
 
 export const DEFAULT_COMFY_URL = 'http://127.0.0.1:8000';
@@ -279,6 +280,19 @@ const sanitize = (s) => (s || 'shot').replace(/[^\w\d-]+/g, '_').slice(0, 60);
 // can pin a specific workflow per shot instead. Returns the video as a data
 // URL plus the ComfyUI-side filename.
 export const VIDEO_MODES = ['auto', 'i2v', 'flf2v', 'si2v'];
+// H3 exposes its own workflow set: no audio-in (the model scores itself), and
+// the extra reference mode when the shot has curated reference media.
+export const H3_VIDEO_MODES = ['auto', 'i2v', 'flf2v', 'r2v'];
+
+// H3 counterpart of resolveVideoMode: r2v only with references, flf2v only
+// with a final frame, auto prefers the richest available.
+export function resolveH3VideoMode(mode, { lastFrame, hasRefs } = {}) {
+  if (mode === 'r2v' && hasRefs) return 'r2v';
+  if (mode === 'flf2v' && lastFrame) return 'flf2v';
+  if (mode === 'i2v') return 'i2v';
+  if (mode === 'r2v' || mode === 'si2v' || mode === 'auto') return lastFrame ? 'flf2v' : 'i2v';
+  return lastFrame ? 'flf2v' : 'i2v';
+}
 
 // The workflow a shot would actually run, given its material and the pinned
 // mode. A pinned workflow whose material is missing falls back to auto.
@@ -309,7 +323,7 @@ async function firstVideo(outputs, settings) {
 const H3_HF = 'https://huggingface.co/Comfy-Org/MiniMax-H3';
 const h3PreflightOk = new Set();
 export async function h3Preflight(settings, template = h3Template) {
-  const key = (settings.comfyUrl || '') + '|' + (template === h3Template ? 'i2v' : 'r2v');
+  const key = (settings.comfyUrl || '') + '|' + (template === h3RefTemplate ? 'r2v' : 'i2v');
   if (h3PreflightOk.has(key)) return;
   const loaderField = { UNETLoader: 'unet_name', CLIPLoader: 'clip_name', VAELoader: 'vae_name' };
   // Model files the graph actually references — read from the template so the
@@ -348,6 +362,64 @@ export async function h3Preflight(settings, template = h3Template) {
     );
   }
   h3PreflightOk.add(key);
+}
+
+// MiniMax H3 reference mode (ref2va checkpoint): the shot is conditioned on
+// a curated set of reference media instead of a first frame. Documented caps:
+// 9 images, 3 videos, 3 audio clips, 12 files and ~15s of media in total.
+export const H3_REF_CAPS = { images: 9, videos: 3, audios: 3, total: 12 };
+
+export async function generateComfyRefVideo(
+  settings,
+  { prompt, refImages = [], refVideos = [], refAudios = [], durationSec, aspectRatio, resolution, name },
+  { onStatus } = {}
+) {
+  await h3Preflight(settings, h3RefTemplate);
+  const [w, h] = h3Dims(aspectRatio, resolution);
+  const stamp = Date.now();
+  const graph = clone(h3RefTemplate);
+  graph['136'].inputs.prompt = prompt;
+  graph['136'].inputs.width = w;
+  graph['136'].inputs.height = h;
+  graph['136'].inputs.length = h3Frames(durationSec || 4);
+  graph['136'].inputs.ref_image_size = settings.h3RefImageSize === 'max' ? 'max' : 'match';
+  // Dynamic reference slots use the node's dotted input names, exactly as the
+  // UI graph serializes them (ref_images.ref_image_0, ref_videos.ref_video_0
+  // with a paired ref_video_audios slot, ref_audios.ref_audio_0).
+  refImages.slice(0, H3_REF_CAPS.images).forEach((dataURL, k) => {
+    const id = String(200 + k);
+    graph[id] = { class_type: 'LoadImage', inputs: { image: '', upload: 'image' }, _meta: { title: `ref image ${k + 1}` } };
+    graph['136'].inputs[`ref_images.ref_image_${k}`] = [id, 0];
+    graph[id]._pendingUpload = { dataURL, name: `storyreel_${stamp}_ref${k}.png` };
+  });
+  refAudios.slice(0, H3_REF_CAPS.audios).forEach((dataURL, k) => {
+    const id = String(220 + k);
+    graph[id] = { class_type: 'LoadAudio', inputs: { audio: '' }, _meta: { title: `ref audio ${k + 1}` } };
+    graph['136'].inputs[`ref_audios.ref_audio_${k}`] = [id, 0];
+    graph[id]._pendingUpload = { dataURL, name: `storyreel_${stamp}_refaud${k}.wav`, field: 'audio' };
+  });
+  refVideos.slice(0, H3_REF_CAPS.videos).forEach((dataURL, k) => {
+    const vid = String(240 + k);
+    const comp = String(260 + k);
+    graph[vid] = { class_type: 'LoadVideo', inputs: { file: '' }, _meta: { title: `ref video ${k + 1}` } };
+    // GetVideoComponents outputs: images, audio, fps — the paired audio slot
+    // takes the clip's own soundtrack.
+    graph[comp] = { class_type: 'GetVideoComponents', inputs: { video: [vid, 0] }, _meta: { title: `ref video ${k + 1} audio` } };
+    graph['136'].inputs[`ref_videos.ref_video_${k}`] = [vid, 0];
+    graph['136'].inputs[`ref_video_audios.ref_video_audio_${k}`] = [comp, 1];
+    graph[vid]._pendingUpload = { dataURL, name: `storyreel_${stamp}_refvid${k}.mp4`, field: 'file' };
+  });
+  // Upload everything, then patch the filenames into the loaders.
+  for (const node of Object.values(graph)) {
+    if (!node._pendingUpload) continue;
+    const { dataURL, name: fname, field = 'image' } = node._pendingUpload;
+    node.inputs[field] = await uploadInput(settings, dataURL, fname);
+    delete node._pendingUpload;
+  }
+  graph['129'].inputs.noise_seed = rndSeed();
+  graph['92'].inputs.filename_prefix = `StoryReel/${sanitize(name)}`;
+  const outs = await runGraph(settings, graph, { onStatus });
+  return firstVideo(outs, settings);
 }
 
 export async function generateComfyVideo(

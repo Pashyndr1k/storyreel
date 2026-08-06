@@ -909,10 +909,21 @@ export function stage5H3VideoPrompt(project, scene, shots, videoStyle, block, se
         : native
           ? `[NATIVE VOICE] "${line}"${spk ? `\n  speaker: ${spk}` : ''}`
           : `[VOICE ADDED IN POST] "${line}"`;
+      // Reference-mode shots list their curated media; the writer must then
+      // produce the six-section reference prompt for that shot instead of the
+      // plain first-frame description.
+      const refs = (project.shotRefs || {})[s.id] || null;
+      const refLines = refs
+        ? [
+            ...(refs.images || []).map((r, k) => `  <Picture ${k + 1}> = ${r.label || 'reference image'}`),
+            ...(refs.videos || []).map((r, k) => `  <Video ${k + 1}> = ${r.label || 'reference video'}`),
+            ...(refs.audios || []).map((r, k) => `  <Audio ${k + 1}> = ${r.label || 'reference audio'}`),
+          ].join('\n')
+        : '';
       return `Shot ${i + 1} (id ${s.id}, ${dur}s${s.shotType ? `, ${s.shotType}` : ''}):
   action: ${s.action || '(none)'}
   dialogue: ${dialogue}
-  location: ${s.location || scene.title || ''}`;
+  location: ${s.location || scene.title || ''}${refLines ? `\n  REFERENCE MODE — attached media:\n${refLines}` : ''}`;
     })
     .join('\n');
   return {
@@ -927,7 +938,7 @@ Each shot below already has a generated FIRST FRAME that will be attached to the
 
 ${list}
 
-For EACH shot write the three H3 fields describing only that shot's own duration. Dialogue handling: where a line is marked [NATIVE VOICE], put it verbatim inside <d>[Language] …</d> with a speaker ID and an established voice identity (honor the speaker notes) — H3 speaks it natively. Where a line is marked [VOICE ADDED IN POST], the character visibly delivers it — mouth and body act the words — but NO speech may appear in any audio field: no <d> tags for that shot, the soundscape stays ambience and effects, the voice track is laid on in editing.
+For EACH shot write the three H3 fields describing only that shot's own duration. Shots marked REFERENCE MODE are rendered by H3's reference checkpoint: open their integrated_multimodal_description with subject definitions binding each reference to a role (“<Subject 1> is the woman from <Picture 1>”), state retention explicitly (“Use <Picture 1> exactly as it is” / “retain the voice of <Audio 1>”), then describe the shot; every attached reference must be mentioned by its label. Dialogue handling: where a line is marked [NATIVE VOICE], put it verbatim inside <d>[Language] …</d> with a speaker ID and an established voice identity (honor the speaker notes) — H3 speaks it natively. Where a line is marked [VOICE ADDED IN POST], the character visibly delivers it — mouth and body act the words — but NO speech may appear in any audio field: no <d> tags for that shot, the soundscape stays ambience and effects, the voice track is laid on in editing.
 
 Return one entry per shot, in order, numbered from 1. "video_prompt" holds the three fields as ONE text block written exactly like this, blank line between fields:
 

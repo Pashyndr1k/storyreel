@@ -128,6 +128,7 @@ export function loadSettings() {
     videoService: 'comfy', // shot video generation (only ComfyUI for now)
     videoEngine: 'minimax', // local video model: 'minimax' (MiniMax H3, default) | 'ltx' (LTX-2.3)
     h3NoticeShown: true, // one-time "H3 is now the default" notice (false only for pre-2.0 installs)
+    h3RefImageSize: 'match', // ref2va identity strength: 'match' | 'max' (max = stronger identity lock)
     comfyUrl: 'http://127.0.0.1:8000',
     comfyOutputDir: 'D:\\Claude work\\ComfyUI\\Output',
     projectsDir: 'D:\\Claude work\\StoryReel Projects', // per-project folders (project.md + media files)
@@ -196,6 +197,7 @@ function projectDefaults() {
     shotPromptEngines: {}, // shotId -> engine the video prompt was WRITTEN for: 'ltx' | 'minimax'
     shotVoiceSources: {}, // shotId -> 'tts' (default, both engines) | 'native' (H3 speaks the line itself)
     shotSpeakerNotes: {}, // shotId -> voice identity/timbre/delivery notes fed into the H3 prompt
+    shotRefs: {}, // shotId -> { images: [{src,label}], videos: [{src,label}], audios: [{src,label}] } for H3 reference mode
     shotTrims: {}, // shotId -> { head, tail } seconds — manual overrides of the 15-frame rule
     // Multi-layer audio timeline (Stage 6). Each layer is its own track lane:
     // { id, name, enabled, volume, clips: [{ id, name, dataURL, start, offset,
@@ -265,6 +267,7 @@ export function migrateProject(raw) {
   p.shotPromptEngines = p.shotPromptEngines && typeof p.shotPromptEngines === 'object' ? p.shotPromptEngines : {};
   p.shotVoiceSources = p.shotVoiceSources && typeof p.shotVoiceSources === 'object' ? p.shotVoiceSources : {};
   p.shotSpeakerNotes = p.shotSpeakerNotes && typeof p.shotSpeakerNotes === 'object' ? p.shotSpeakerNotes : {};
+  p.shotRefs = p.shotRefs && typeof p.shotRefs === 'object' ? p.shotRefs : {};
   p.shotAudioSrc = p.shotAudioSrc && typeof p.shotAudioSrc === 'object' ? p.shotAudioSrc : {};
   p.shotAudioPads = p.shotAudioPads && typeof p.shotAudioPads === 'object' ? p.shotAudioPads : {};
   p.shotTrims = p.shotTrims && typeof p.shotTrims === 'object' ? p.shotTrims : {};
