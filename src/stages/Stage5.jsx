@@ -15,6 +15,7 @@ import { blockForScene, DYNAMICS_CONFIG } from '../lib/dynamics.js';
 import AssetsModal from '../components/AssetsModal.jsx';
 import Lightbox from '../components/Lightbox.jsx';
 import RefPicker from '../components/RefPicker.jsx';
+import { takeOf, isTakeMember, takeTotal, canCombine } from '../lib/takes.js';
 import { padAudioWithSilence, mediaDuration, decodeMediaAudio, audioBufferToWavDataURL } from '../lib/audio.js';
 import LibraryPicker from '../components/LibraryPicker.jsx';
 import { newLibraryEntry } from '../lib/library.js';
@@ -920,6 +921,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       const cur = projectRef.current;
       if (
         !(cur.shotVideos || {})[shot.id] &&
+        !isTakeMember(cur, shot.id) &&
         cur.shotPrompts[shot.id]?.videoPrompt?.trim() &&
         (cur.shotImages || {})[shot.id]
       ) {
@@ -966,6 +968,10 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     // Read through projectRef: the prompt/frames must be the LATEST state at
     // call time (fixes regeneration using a stale video prompt after edits).
     const cur = projectRef.current;
+    // Take members are rendered inside their lead's generation.
+    if (isTakeMember(cur, shot.id)) return;
+    const take = takeOf(cur, shot.id);
+    const takeDur = take ? takeTotal(cur, take) : 0;
     const first = (cur.shotImages || {})[shot.id];
     const vPrompt = (cur.shotPrompts[shot.id]?.videoPrompt || '').trim();
     if (!vPrompt) return;
@@ -993,8 +999,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     // ramp-up and tail degradation. Voice-synced shots render at the exact
     // duration so assembly never trims into synced speech — and H3 counts as
     // voice-synced, because it generates its own dialogue, effects and score.
+    const slotDur = take && isH3 ? takeDur : Number(shot.duration || 4);
     const genDuration = useMode === 'si2v' || isH3
-      ? Number(shot.duration || 4)
+      ? slotDur
       : Math.round(shot.duration || 4) + DYNAMICS_CONFIG.generation_padding_sec;
     try {
       const sendPrompt =
@@ -1064,7 +1071,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           dataURL: mixWav,
           start: startAt,
           offset: 0, // H3 trims tail-only, so the mix starts at the first frame
-          duration: Math.min(Number(shot.duration) || mixBuf.duration, mixBuf.duration),
+          duration: Math.min(slotDur || mixBuf.duration, mixBuf.duration),
           srcDuration: mixBuf.duration,
           fadeIn: 0,
           fadeOut: 0,
@@ -1215,6 +1222,23 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const voiceSourceOf = (shotId) => ((project.shotVoiceSources || {})[shotId] === 'native' ? 'native' : 'tts');
   const setVoiceSource = (shotId, v) =>
     update((p) => ({ shotVoiceSources: { ...(p.shotVoiceSources || {}), [shotId]: v } }));
+  // Multi-shot takes (H3): combine 2-3 consecutive shots into one generation.
+  const combineTake = (sceneShots, startIdx, count) => {
+    const check = canCombine(project, scene.id, startIdx, count);
+    if (!check.ok) {
+      const shot = sceneShots[startIdx];
+      setImgErr({ id: shot.id, msg: t(check.reason === 'long' ? 'take.tooLong' : 'take.blocked') });
+      return;
+    }
+    update((p) => ({ shotGroups: { ...(p.shotGroups || {}), [check.ids[0]]: { shotIds: check.ids } } }));
+  };
+  const ungroupTake = (leadId) =>
+    update((p) => {
+      const next = { ...(p.shotGroups || {}) };
+      delete next[leadId];
+      return { shotGroups: next };
+    });
+
   const refsOf = (shotId) => {
     const r = (project.shotRefs || {})[shotId];
     return r && ((r.images || []).length || (r.videos || []).length || (r.audios || []).length) ? r : null;
@@ -1502,6 +1526,55 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     → {h3Seconds(dur).toFixed(2)}s
                   </span>
                 )}
+                {/* Multi-shot takes (H3): the user decides which 2-3
+                    consecutive shots render as ONE generation with model-timed
+                    internal cuts. Lead card shows the take size + ungroup;
+                    members show where they render. */}
+                {curEngine === 'minimax' &&
+                  (() => {
+                    const take = takeOf(project, shot.id);
+                    if (!take) {
+                      return (
+                        <span className="s5e-takebtns" title={t('take.tip')}>
+                          <span className="s5e-eyebrow">{t('take.label')}</span>
+                          <button
+                            type="button"
+                            className="btn small"
+                            disabled={!canCombine(project, scene.id, i, 2).ok}
+                            onClick={() => combineTake(shots, i, 2)}
+                          >
+                            +1
+                          </button>
+                          <button
+                            type="button"
+                            className="btn small"
+                            disabled={!canCombine(project, scene.id, i, 3).ok}
+                            onClick={() => combineTake(shots, i, 3)}
+                          >
+                            +2
+                          </button>
+                        </span>
+                      );
+                    }
+                    if (take.shotIds[0] === shot.id) {
+                      return (
+                        <span className="s5e-takebtns">
+                          <span className="take-badge" title={t('take.leadTip', { n: take.shotIds.length, s: takeTotal(project, take).toFixed(1) })}>
+                            {t('take.lead', { n: take.shotIds.length })}
+                          </span>
+                          <button type="button" className="btn small" onClick={() => ungroupTake(shot.id)}>
+                            {t('take.ungroup')}
+                          </button>
+                        </span>
+                      );
+                    }
+                    const leadIdx = shots.findIndex((sh) => sh.id === take.shotIds[0]);
+                    return (
+                      <span className="take-badge member" title={t('take.memberTip', { n: leadIdx + 1 })}>
+                        {t('take.member', { n: leadIdx + 1 })}
+                      </span>
+                    );
+                  })()}
                 <StyleChip project={project} styles={styles} cat="image" onClick={onProjectSettings} />
                 <StyleChip project={project} styles={styles} cat="video" onClick={onProjectSettings} />
               </div>
@@ -1866,10 +1939,22 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       {!genImg ? t('vid.needFrame') : shotAud ? t('vid.modeSI2V') : finalImg ? t('vid.modeFLF') : t('vid.modeI2V')}
                     </div>
                   )}
+                  {curEngine === 'minimax' && isTakeMember(project, shot.id) && (
+                    <p className="hint take-note">
+                      {t('take.renderNote', {
+                        n: shots.findIndex((sh) => sh.id === takeOf(project, shot.id).shotIds[0]) + 1,
+                      })}
+                    </p>
+                  )}
                   <div className="s5e-btnrow">
                     <button
                       className="btn small primary s5e-gen fixedw-lg"
-                      disabled={anyBusy || !p.videoPrompt?.trim() || !genImg}
+                      disabled={
+                        anyBusy ||
+                        !p.videoPrompt?.trim() ||
+                        (!genImg && effMode !== 'r2v') ||
+                        (curEngine === 'minimax' && isTakeMember(project, shot.id))
+                      }
                       onClick={() => genVideo(shot, i)}
                     >
                       {vidBusy ? t('vid.generating') : shotVid ? t('vid.regenerate') : t('vid.generate')}

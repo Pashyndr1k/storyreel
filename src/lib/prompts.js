@@ -895,8 +895,46 @@ export function stage5H3VideoPrompt(project, scene, shots, videoStyle, block, se
   const dyn = block
     ? `\nAction dynamics for this scene — kinetic energy ${block.kinetic_energy_level}/10, dialogue volume ${block.dialogue_volume}/10, camera momentum "${String(block.required_camera_momentum).replace(/_/g, ' ')}". Express these through concrete motion and sound, never by quoting the numbers.`
     : '';
+  const takes = project.shotGroups || {};
+  const takeFor = (id) => Object.values(takes).find((g) => (g.shotIds || []).includes(id));
+  const stamp = (sec) => {
+    const v = Math.max(0, Number(sec) || 0);
+    return `${String(Math.floor(v / 60)).padStart(2, '0')}:${String(Math.floor(v % 60)).padStart(2, '0')}.${String(Math.round((v % 1) * 1000)).padStart(3, '0')}`;
+  };
+  const shotLine = (s) => {
+    const line = (s.dialogue || '').trim();
+    const native = (project.shotVoiceSources || {})[s.id] === 'native';
+    const spk = ((project.shotSpeakerNotes || {})[s.id] || '').trim();
+    const dialogue = !line
+      ? '(no speech)'
+      : native
+        ? `[NATIVE VOICE] "${line}"${spk ? ` (speaker: ${spk})` : ''}`
+        : `[VOICE ADDED IN POST] "${line}"`;
+    return `action: ${s.action || '(none)'}; dialogue: ${dialogue}`;
+  };
   const list = shots
     .map((s, i) => {
+      // Take members fold into their lead's GROUP TAKE entry.
+      const take = takeFor(s.id);
+      if (take && take.shotIds[0] !== s.id) return null;
+      if (take) {
+        const members = take.shotIds
+          .map((id) => shots.find((x) => x.id === id))
+          .filter(Boolean);
+        const total = members.reduce((a, x) => a + (Number(x.duration) || 0), 0);
+        let at = 0;
+        const inner = members
+          .map((m, k) => {
+            const head = k === 0 ? `[Shot 1]` : `[Shot ${k + 1}] At ${stamp(at)}`;
+            const row = `  ${head} (${Number(m.duration) || 4}s${m.shotType ? `, ${m.shotType}` : ''}): ${shotLine(m)}`;
+            at += Number(m.duration) || 0;
+            return row;
+          })
+          .join('\n');
+        return `Shot ${i + 1} (id ${s.id}) — GROUP TAKE: ${members.length} shots in ONE ${total}s generation with H3-timed internal cuts:
+${inner}
+  location: ${s.location || scene.title || ''}`;
+      }
       const dur = Number(s.duration || 4);
       const line = (s.dialogue || '').trim();
       // Voice source decides whether H3 generates the speech (native) or the
@@ -925,6 +963,7 @@ export function stage5H3VideoPrompt(project, scene, shots, videoStyle, block, se
   dialogue: ${dialogue}
   location: ${s.location || scene.title || ''}${refLines ? `\n  REFERENCE MODE — attached media:\n${refLines}` : ''}`;
     })
+    .filter(Boolean)
     .join('\n');
   return {
     system: H3_SYSTEM,
@@ -938,7 +977,7 @@ Each shot below already has a generated FIRST FRAME that will be attached to the
 
 ${list}
 
-For EACH shot write the three H3 fields describing only that shot's own duration. Shots marked REFERENCE MODE are rendered by H3's reference checkpoint: open their integrated_multimodal_description with subject definitions binding each reference to a role (“<Subject 1> is the woman from <Picture 1>”), state retention explicitly (“Use <Picture 1> exactly as it is” / “retain the voice of <Audio 1>”), then describe the shot; every attached reference must be mentioned by its label. Dialogue handling: where a line is marked [NATIVE VOICE], put it verbatim inside <d>[Language] …</d> with a speaker ID and an established voice identity (honor the speaker notes) — H3 speaks it natively. Where a line is marked [VOICE ADDED IN POST], the character visibly delivers it — mouth and body act the words — but NO speech may appear in any audio field: no <d> tags for that shot, the soundscape stays ambience and effects, the voice track is laid on in editing.
+For EACH shot write the three H3 fields describing only that shot's own duration. Shots marked REFERENCE MODE are rendered by H3's reference checkpoint: open their integrated_multimodal_description with subject definitions binding each reference to a role (“<Subject 1> is the woman from <Picture 1>”), state retention explicitly (“Use <Picture 1> exactly as it is” / “retain the voice of <Audio 1>”), then describe the shot; every attached reference must be mentioned by its label. GROUP TAKE entries are ONE multi-shot generation: write ONE video_prompt for the whole take — open with [Shot 1] (no timestamp), start every later segment with [Shot N] At MM:SS.mmm exactly matching the listed times, put <scenetrans> at each internal cut, keep continuity across the cuts — and return it under the take's shot number only; folded shots get NO entry of their own. Dialogue handling: where a line is marked [NATIVE VOICE], put it verbatim inside <d>[Language] …</d> with a speaker ID and an established voice identity (honor the speaker notes) — H3 speaks it natively. Where a line is marked [VOICE ADDED IN POST], the character visibly delivers it — mouth and body act the words — but NO speech may appear in any audio field: no <d> tags for that shot, the soundscape stays ambience and effects, the voice track is laid on in editing.
 
 Return one entry per shot, in order, numbered from 1. "video_prompt" holds the three fields as ONE text block written exactly like this, blank line between fields:
 

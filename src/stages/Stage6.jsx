@@ -3,6 +3,7 @@ import { useI18n } from '../lib/i18n.js';
 import { uid } from '../lib/storage.js';
 import { videoDims, saveToLocalOutputs, generateComfyMusic } from '../lib/comfy.js';
 import { blockForScene, defaultTrim, transitionFor, overlapSeconds } from '../lib/dynamics.js';
+import { takeOf, takeTotal, takeCutTimes } from '../lib/takes.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
 import { stage6SmartCutPrompt } from '../lib/prompts.js';
 import { decodeMediaAudio, audioBufferToWavDataURL } from '../lib/audio.js';
@@ -309,24 +310,34 @@ export default function Stage6({ project, update, settings }) {
     return {
       scene,
       block,
-      shots: (project.sceneDetails[scene.id]?.shots || []).map((shot) => {
-        const video = (project.shotVideos || {})[shot.id] || null;
-        const raw = (project.videoGenDurations || {})[shot.id] || 0;
-        const nativeAudio = (project.shotVideoEngines || {})[shot.id] === 'minimax';
-        const trim = video
-          ? (project.shotTrims || {})[shot.id]
-            || defaultTrim(shot.duration || 0, raw, { tailOnly: nativeAudio })
-          : { head: 0, tail: 0 };
-        return {
-          shot,
-          block,
-          video,
-          raw,
-          trim,
-          image: (project.shotImages || {})[shot.id] || null,
-          muted: !!(project.shotMutes || {})[shot.id],
-        };
-      }),
+      shots: (project.sceneDetails[scene.id]?.shots || [])
+        .map((orig) => {
+          // Multi-shot takes: members fold into the lead's clip — the lead's
+          // slot covers the take's total length and carries the internal cut
+          // positions H3 generated; folded members leave the timeline.
+          const take = takeOf(project, orig.id);
+          if (take && take.shotIds[0] !== orig.id) return null;
+          const shot = take ? { ...orig, duration: takeTotal(project, take) } : orig;
+          const takeCuts = take ? takeCutTimes(project, take) : null;
+          const video = (project.shotVideos || {})[shot.id] || null;
+          const raw = (project.videoGenDurations || {})[shot.id] || 0;
+          const nativeAudio = (project.shotVideoEngines || {})[shot.id] === 'minimax';
+          const trim = video
+            ? (project.shotTrims || {})[shot.id]
+              || defaultTrim(shot.duration || 0, raw, { tailOnly: nativeAudio })
+            : { head: 0, tail: 0 };
+          return {
+            shot,
+            block,
+            video,
+            raw,
+            trim,
+            takeCuts,
+            image: (project.shotImages || {})[shot.id] || null,
+            muted: !!(project.shotMutes || {})[shot.id],
+          };
+        })
+        .filter(Boolean),
     };
   });
   const items = scenes.flatMap((g) => g.shots.map((it) => ({ ...it, sceneId: g.scene.id })));
@@ -1395,6 +1406,14 @@ export default function Stage6({ project, update, settings }) {
                       {it.trim?.tail > 0 && (
                         <span className="clip-trim-mark tail" title={`−${it.trim.tail.toFixed(2)}s`} />
                       )}
+                      {(it.takeCuts || []).map((c, k) => (
+                        <span
+                          key={`tc${k}`}
+                          className="take-cut-mark"
+                          style={{ left: `${(c / (it.shot.duration || 1)) * 100}%` }}
+                          title={t('s6.takeCut', { s: c.toFixed(1) })}
+                        />
+                      ))}
                       {globalIdx < items.length - 1 &&
                         (() => {
                           const c = cutFor(globalIdx);

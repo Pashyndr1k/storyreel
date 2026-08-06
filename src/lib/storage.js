@@ -198,6 +198,7 @@ function projectDefaults() {
     shotVoiceSources: {}, // shotId -> 'tts' (default, both engines) | 'native' (H3 speaks the line itself)
     shotSpeakerNotes: {}, // shotId -> voice identity/timbre/delivery notes fed into the H3 prompt
     shotRefs: {}, // shotId -> { images: [{src,label}], videos: [{src,label}], audios: [{src,label}] } for H3 reference mode
+    shotGroups: {}, // leadShotId -> { shotIds: [lead, ...members] } — H3 multi-shot takes (2-3 consecutive shots, one generation)
     shotTrims: {}, // shotId -> { head, tail } seconds — manual overrides of the 15-frame rule
     // Multi-layer audio timeline (Stage 6). Each layer is its own track lane:
     // { id, name, enabled, volume, clips: [{ id, name, dataURL, start, offset,
@@ -268,6 +269,7 @@ export function migrateProject(raw) {
   p.shotVoiceSources = p.shotVoiceSources && typeof p.shotVoiceSources === 'object' ? p.shotVoiceSources : {};
   p.shotSpeakerNotes = p.shotSpeakerNotes && typeof p.shotSpeakerNotes === 'object' ? p.shotSpeakerNotes : {};
   p.shotRefs = p.shotRefs && typeof p.shotRefs === 'object' ? p.shotRefs : {};
+  p.shotGroups = p.shotGroups && typeof p.shotGroups === 'object' ? p.shotGroups : {};
   p.shotAudioSrc = p.shotAudioSrc && typeof p.shotAudioSrc === 'object' ? p.shotAudioSrc : {};
   p.shotAudioPads = p.shotAudioPads && typeof p.shotAudioPads === 'object' ? p.shotAudioPads : {};
   p.shotTrims = p.shotTrims && typeof p.shotTrims === 'object' ? p.shotTrims : {};
