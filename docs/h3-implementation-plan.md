@@ -4,6 +4,8 @@ Target: **v2.0.0**. Base: `main` @ v1.20.0 (`93606d3`). Rollback at any moment:
 `git checkout main` — main is frozen at 1.20.0 and every phase below lands as
 its own commit on `h3-full`, so partial rollback is also possible.
 
+Status: **all five phases landed** on `h3-full`. Remaining before release: live-ComfyUI QA of r2v (video/audio reference slots) and multi-shot takes, then version bump + CHANGELOG on order.
+
 Implements the remaining proposals from
 [minimax-h3-proposal.md](./minimax-h3-proposal.md) (P1–P5, P7; P6 shipped in
 1.20.0), shaped by six locked decisions:
@@ -40,7 +42,7 @@ i2v one) + a `buildH3RefGraph()` that injects 1–12 uploaded references.
 
 ---
 
-## Phase 1 — Foundation: default engine, per-model prompts, preflight
+## Phase 1 — Foundation: default engine, per-model prompts, preflight — **landed** (`318cff0`)
 
 *(D3, D4, P7 — everything else builds on this)*
 
@@ -62,7 +64,7 @@ i2v one) + a `buildH3RefGraph()` that injects 1–12 uploaded references.
    an engine note: 768 px short-edge ceiling, ~9 min / 5 s @ 864×480 on a
    3060 class card, preview ladder = our SD/HD/FHD tiers.
 
-## Phase 2 — Voice policy and audio harvest
+## Phase 2 — Voice policy and audio harvest — **landed** (`f3355af`)
 
 *(D5, P1, P2)*
 
@@ -78,7 +80,7 @@ i2v one) + a `buildH3RefGraph()` that injects 1–12 uploaded references.
    with per-clip unmute/volume. The video clip itself is muted to avoid double
    audio. Editor can keep the mix, kill it, or duck it under ACE-Step.
 
-## Phase 3 — Reference mode (P4, D1)
+## Phase 3 — Reference mode (P4, D1) — **landed** (`c25a408`)
 
 1. Convert r2v to API format; add `videoWorkflow: 'i2v' | 'r2v'` as a per-shot
    choice on H3 (segmented control next to the existing mode selector).
@@ -92,7 +94,7 @@ i2v one) + a `buildH3RefGraph()` that injects 1–12 uploaded references.
    in slot order.
 4. Advanced toggle: `ref_image_size: max` ("stronger identity lock").
 
-## Phase 4 — Multi-shot takes (P3, D2)
+## Phase 4 — Multi-shot takes (P3, D2) — **landed** (`c45525d`)
 
 1. **User-driven grouping (D2):** checkbox-select 2–3 *consecutive* shots in a
    scene → "Combine into one take". Validation: same scene, contiguous,
@@ -109,7 +111,7 @@ i2v one) + a `buildH3RefGraph()` that injects 1–12 uploaded references.
 4. First-frame anchoring: group uses the first member's frame (i2v) or the
    reference set (r2v) — both workflows support grouped prompts.
 
-## Phase 5 — Storyboards as references (P5, D6)
+## Phase 5 — Storyboards as references (P5, D6) — **landed** (`996f46c`)
 
 1. **Quality upgrade first (D6):** current storyboards are throwaway sketches
    (`Rough … loose sketch-style` local prompt, low-res). Add a per-scene
