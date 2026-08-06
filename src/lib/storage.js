@@ -194,6 +194,8 @@ function projectDefaults() {
     shotVideoModes: {}, // shotId -> pinned video workflow: 'auto' | 'i2v' | 'flf2v' | 'si2v'
     shotVideoEngines: {}, // shotId -> engine that rendered it: 'ltx' | 'minimax' (drives Stage 6 trim)
     shotPromptEngines: {}, // shotId -> engine the video prompt was WRITTEN for: 'ltx' | 'minimax'
+    shotVoiceSources: {}, // shotId -> 'tts' (default, both engines) | 'native' (H3 speaks the line itself)
+    shotSpeakerNotes: {}, // shotId -> voice identity/timbre/delivery notes fed into the H3 prompt
     shotTrims: {}, // shotId -> { head, tail } seconds — manual overrides of the 15-frame rule
     // Multi-layer audio timeline (Stage 6). Each layer is its own track lane:
     // { id, name, enabled, volume, clips: [{ id, name, dataURL, start, offset,
@@ -261,6 +263,8 @@ export function migrateProject(raw) {
   p.shotVideoModes = p.shotVideoModes && typeof p.shotVideoModes === 'object' ? p.shotVideoModes : {};
   p.shotVideoEngines = p.shotVideoEngines && typeof p.shotVideoEngines === 'object' ? p.shotVideoEngines : {};
   p.shotPromptEngines = p.shotPromptEngines && typeof p.shotPromptEngines === 'object' ? p.shotPromptEngines : {};
+  p.shotVoiceSources = p.shotVoiceSources && typeof p.shotVoiceSources === 'object' ? p.shotVoiceSources : {};
+  p.shotSpeakerNotes = p.shotSpeakerNotes && typeof p.shotSpeakerNotes === 'object' ? p.shotSpeakerNotes : {};
   p.shotAudioSrc = p.shotAudioSrc && typeof p.shotAudioSrc === 'object' ? p.shotAudioSrc : {};
   p.shotAudioPads = p.shotAudioPads && typeof p.shotAudioPads === 'object' ? p.shotAudioPads : {};
   p.shotTrims = p.shotTrims && typeof p.shotTrims === 'object' ? p.shotTrims : {};

@@ -14,7 +14,7 @@ import SceneNav from '../components/SceneNav.jsx';
 import { blockForScene, DYNAMICS_CONFIG } from '../lib/dynamics.js';
 import AssetsModal from '../components/AssetsModal.jsx';
 import Lightbox from '../components/Lightbox.jsx';
-import { padAudioWithSilence, mediaDuration } from '../lib/audio.js';
+import { padAudioWithSilence, mediaDuration, decodeMediaAudio, audioBufferToWavDataURL } from '../lib/audio.js';
 import LibraryPicker from '../components/LibraryPicker.jsx';
 import { newLibraryEntry } from '../lib/library.js';
 import { fileToResizedDataURL, resizeDataURL } from '../lib/images.js';
@@ -1007,14 +1007,59 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         name: `${(project.title || 'project').slice(0, 24)}_sc${project.outline.indexOf(scene) + 1}_shot${i + 1}`,
       });
       saveToLocalOutputs(settings, filename, dataURL); // best-effort local copy
-      update((p) => ({
-        shotVideos: { ...(p.shotVideos || {}), [shot.id]: dataURL },
-        videoGenDurations: {
-          ...(p.videoGenDurations || {}),
-          [shot.id]: isH3 ? Math.round(h3Seconds(genDuration) * 100) / 100 : genDuration,
-        },
-        shotVideoEngines: { ...(p.shotVideoEngines || {}), [shot.id]: isH3 ? 'minimax' : 'ltx' },
-      }));
+      // H3 clips carry a full native mix (dialogue, effects, score). Detach it
+      // onto the "H3 mix" lane NLE-style — video muted, audio on its own lane
+      // at the same volume — so Stage 6 can keep, kill or duck it.
+      let mixBuf = null;
+      if (isH3) {
+        try {
+          mixBuf = await decodeMediaAudio(dataURL);
+        } catch {
+          mixBuf = null; // no audio track — leave the clip as-is
+        }
+      }
+      const mixWav = mixBuf ? audioBufferToWavDataURL(mixBuf) : null;
+      update((p) => {
+        const base = {
+          shotVideos: { ...(p.shotVideos || {}), [shot.id]: dataURL },
+          videoGenDurations: {
+            ...(p.videoGenDurations || {}),
+            [shot.id]: isH3 ? Math.round(h3Seconds(genDuration) * 100) / 100 : genDuration,
+          },
+          shotVideoEngines: { ...(p.shotVideoEngines || {}), [shot.id]: isH3 ? 'minimax' : 'ltx' },
+        };
+        if (!mixWav) return base;
+        // timeline start = summed durations of every shot before this one
+        let startAt = 0;
+        outer: for (const sc of p.outline) {
+          for (const sh of p.sceneDetails[sc.id]?.shots || []) {
+            if (sh.id === shot.id) break outer;
+            startAt += Number(sh.duration) || 0;
+          }
+        }
+        const clip = {
+          id: `h3_${shot.id}`,
+          name: t('s6.h3Clip', { n: shot.number || '' }).trim(),
+          dataURL: mixWav,
+          start: startAt,
+          offset: 0, // H3 trims tail-only, so the mix starts at the first frame
+          duration: Math.min(Number(shot.duration) || mixBuf.duration, mixBuf.duration),
+          srcDuration: mixBuf.duration,
+          fadeIn: 0,
+          fadeOut: 0,
+        };
+        let Ls = [...(p.audioLayers || [])];
+        const li = Ls.findIndex((L) => L.id === 'h3mix');
+        if (li >= 0) {
+          Ls[li] = { ...Ls[li], clips: [...Ls[li].clips.filter((c) => c.id !== clip.id), clip] };
+        } else {
+          const lane = { id: 'h3mix', name: t('s6.h3Lane'), enabled: true, volume: 1, clips: [clip] };
+          const mi = Ls.findIndex((L) => L.id === 'bgmusic' || String(L.id).startsWith('bgm_'));
+          if (mi >= 0) Ls.splice(mi, 0, lane);
+          else Ls.push(lane);
+        }
+        return { ...base, audioLayers: Ls, shotMutes: { ...(p.shotMutes || {}), [shot.id]: true } };
+      });
     } catch (e) {
       setImgErr({ id: shot.id, msg: e.message === 'COMFY_UNREACHABLE' ? 'COMFY_UNREACHABLE' : e.message || String(e) });
     } finally {
@@ -1142,6 +1187,15 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   // are set, otherwise the rebuilt file with silence around it. Keeping the
   // raw clip means changing the pads never compounds silence.
   const audioSrcOf = (p, shotId) => (p.shotAudioSrc || {})[shotId] || (p.shotAudios || {})[shotId] || null;
+
+  // Voice source (H3 dialogue shots only): 'tts' keeps the TTS pipeline —
+  // H3 renders the delivery silently and the take is laid on in Stage 6;
+  // 'native' hands the line to H3's own voice, driven by the speaker notes.
+  const voiceSourceOf = (shotId) => ((project.shotVoiceSources || {})[shotId] === 'native' ? 'native' : 'tts');
+  const setVoiceSource = (shotId, v) =>
+    update((p) => ({ shotVoiceSources: { ...(p.shotVoiceSources || {}), [shotId]: v } }));
+  const nativeVoiceOn = (shot) =>
+    curEngine === 'minimax' && (shot.dialogue || '').trim() !== '' && voiceSourceOf(shot.id) === 'native';
   const padsOf = (shotId) => {
     const raw = (project.shotAudioPads || {})[shotId] || {};
     return { lead: Number(raw.lead) || 0, tail: Number(raw.tail) || 0 };
@@ -1873,8 +1927,49 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                   </div>
 
                   {/* Voice generation (Chatterbox TTS): player, the editable
-                      voice text drafted by the voice director, controls. */}
+                      voice text drafted by the voice director, controls. On
+                      H3, a dialogue shot can instead hand the line to the
+                      model's own voice — the TTS panel then gives way to a
+                      speaker block that feeds the video prompt. */}
                   <div className="s5e-panel">
+                    {curEngine === 'minimax' && (shot.dialogue || '').trim() !== '' && (
+                      <div className="s5e-vsrc">
+                        <span className="s5e-eyebrow">{t('vsrc.label')}</span>
+                        <span className="seg">
+                          {['tts', 'native'].map((v) => (
+                            <button
+                              key={v}
+                              type="button"
+                              className={`seg-btn ${voiceSourceOf(shot.id) === v ? 'on' : ''}`}
+                              onClick={() => setVoiceSource(shot.id, v)}
+                            >
+                              {t(`vsrc.${v}`)}
+                            </button>
+                          ))}
+                        </span>
+                      </div>
+                    )}
+                    {nativeVoiceOn(shot) ? (
+                      <div className="s5e-speaker">
+                        <p className="hint">{t('vsrc.nativeHint')}</p>
+                        <div className="prompt-head">
+                          <label>{t('vsrc.speaker')}</label>
+                        </div>
+                        <AutoTextarea
+                          minRows={3}
+                          className="s5e-prompt s5e-prompt-sm"
+                          value={(project.shotSpeakerNotes || {})[shot.id] || ''}
+                          placeholder={t('vsrc.speakerPh')}
+                          onChange={(e) =>
+                            update((p) => ({
+                              shotSpeakerNotes: { ...(p.shotSpeakerNotes || {}), [shot.id]: e.target.value },
+                            }))
+                          }
+                        />
+                        <p className="hint">{t('vsrc.regenHint')}</p>
+                      </div>
+                    ) : (
+                      <>
                     {shotAud ? (
                       <audio className="s5e-audio" controls src={shotAud} />
                     ) : (
@@ -2099,6 +2194,8 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         </button>
                       )}
                     </div>
+                      </>
+                    )}
                   </div>
                 </div>
               )}

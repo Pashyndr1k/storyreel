@@ -3027,3 +3027,17 @@ textarea.s5e-prompt-sm { min-height: 110px; }
   opacity: 0.5;
   cursor: default;
 }
+
+/* Stage 5 voice-source row (TTS vs native H3 voice) */
+.s5e-vsrc {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.s5e-speaker .hint {
+  margin: 0 0 8px;
+}
+.s5e-speaker .hint:last-child {
+  margin: 8px 0 0;
+}

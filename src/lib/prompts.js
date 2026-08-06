@@ -898,9 +898,20 @@ export function stage5H3VideoPrompt(project, scene, shots, videoStyle, block, se
   const list = shots
     .map((s, i) => {
       const dur = Number(s.duration || 4);
+      const line = (s.dialogue || '').trim();
+      // Voice source decides whether H3 generates the speech (native) or the
+      // line is laid on later from a TTS/recorded take (post) — the prompt
+      // must never let H3 speak a post-voiced line.
+      const native = (project.shotVoiceSources || {})[s.id] === 'native';
+      const spk = ((project.shotSpeakerNotes || {})[s.id] || '').trim();
+      const dialogue = !line
+        ? '(none — this shot has no speech)'
+        : native
+          ? `[NATIVE VOICE] "${line}"${spk ? `\n  speaker: ${spk}` : ''}`
+          : `[VOICE ADDED IN POST] "${line}"`;
       return `Shot ${i + 1} (id ${s.id}, ${dur}s${s.shotType ? `, ${s.shotType}` : ''}):
   action: ${s.action || '(none)'}
-  dialogue: ${(s.dialogue || '').trim() || '(none — this shot has no speech)'}
+  dialogue: ${dialogue}
   location: ${s.location || scene.title || ''}`;
     })
     .join('\n');
@@ -916,7 +927,7 @@ Each shot below already has a generated FIRST FRAME that will be attached to the
 
 ${list}
 
-For EACH shot write the three H3 fields describing only that shot's own duration. Where a shot carries dialogue, put it verbatim inside <d>[Language] …</d> with a speaker ID and an established voice identity — H3 speaks it natively.
+For EACH shot write the three H3 fields describing only that shot's own duration. Dialogue handling: where a line is marked [NATIVE VOICE], put it verbatim inside <d>[Language] …</d> with a speaker ID and an established voice identity (honor the speaker notes) — H3 speaks it natively. Where a line is marked [VOICE ADDED IN POST], the character visibly delivers it — mouth and body act the words — but NO speech may appear in any audio field: no <d> tags for that shot, the soundscape stays ambience and effects, the voice track is laid on in editing.
 
 Return one entry per shot, in order, numbered from 1. "video_prompt" holds the three fields as ONE text block written exactly like this, blank line between fields:
 
