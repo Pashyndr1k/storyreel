@@ -815,7 +815,8 @@ export default function Stage6({ project, update, settings }) {
     const tempo = MUSIC_TEMPOS.find(([id]) => id === music.tempo) || MUSIC_TEMPOS[1];
     const mood = MUSIC_MOODS.find(([id]) => id === music.mood) || MUSIC_MOODS[0];
     const tags = `${genre[1]} ${mood[1]} ${tempo[2]} Pure instrumental — no vocals, no singing.`;
-    const seconds = Math.max(10, Math.ceil(total || 60));
+    // Editable length: defaults to the film's length, clamped to 10-300s.
+    const seconds = Math.max(10, Math.min(300, Math.round(Number(music.seconds) || Math.ceil(total || 60))));
     setMusic((m) => ({ ...m, busy: true }));
     try {
       const { dataURL, filename } = await generateComfyMusic(settings, {
@@ -1782,7 +1783,7 @@ export default function Stage6({ project, update, settings }) {
         <button
           className="btn small"
           disabled={total <= 0}
-          onClick={() => setMusic({ genre: 'cinematic', tempo: 'medium', mood: 'uplifting', busy: false })}
+          onClick={() => setMusic({ genre: 'cinematic', tempo: 'medium', mood: 'uplifting', seconds: Math.max(10, Math.ceil(total || 60)), busy: false })}
         >
           🎵 {t('s6.musicBtn')}
         </button>
@@ -1908,8 +1909,8 @@ export default function Stage6({ project, update, settings }) {
         <div className="overlay" onClick={() => !music.busy && setMusic(null)}>
           <div className="modal music-modal" onClick={(e) => e.stopPropagation()}>
             <h3>{t('s6.musicTitle')}</h3>
-            <p className="hint">{t('s6.musicHint', { s: Math.max(10, Math.ceil(total || 60)) })}</p>
-            <div className="music-grid">
+            <p className="hint">{t('s6.musicHint')}</p>
+            <div className="music-grid music-grid-4">
               <div className="s5e-vsel">
                 <label>{t('s6.musicGenre')}</label>
                 <select value={music.genre} disabled={music.busy} onChange={(e) => setMusic((m) => ({ ...m, genre: e.target.value }))}>
@@ -1933,6 +1934,36 @@ export default function Stage6({ project, update, settings }) {
                     <option key={id} value={id}>{t(`s6.mm_${id}`)}</option>
                   ))}
                 </select>
+              </div>
+              <div className="s5e-vsel">
+                <label>{t('s6.musicLen')}</label>
+                <div className="music-len">
+                  <input
+                    type="number"
+                    min="10"
+                    max="300"
+                    step="5"
+                    value={music.seconds}
+                    disabled={music.busy}
+                    onChange={(e) => setMusic((m) => ({ ...m, seconds: e.target.value }))}
+                    onBlur={() =>
+                      setMusic((m) => ({
+                        ...m,
+                        seconds: Math.max(10, Math.min(300, Math.round(Number(m.seconds) || Math.ceil(total || 60)))),
+                      }))
+                    }
+                  />
+                  <i>{t('s6.musicLenS')}</i>
+                  <button
+                    type="button"
+                    className="btn small"
+                    disabled={music.busy || Number(music.seconds) === Math.max(10, Math.ceil(total || 60))}
+                    title={t('s6.musicLenFilmTip', { s: Math.max(10, Math.ceil(total || 60)) })}
+                    onClick={() => setMusic((m) => ({ ...m, seconds: Math.max(10, Math.ceil(total || 60)) }))}
+                  >
+                    {t('s6.musicLenFilm')}
+                  </button>
+                </div>
               </div>
             </div>
             <div className="row">

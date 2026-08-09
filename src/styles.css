@@ -3168,3 +3168,20 @@ textarea.s5e-prompt-sm { min-height: 110px; }
 .take-btn:disabled { opacity: 0.35; cursor: default; }
 /* refs-row square button matches the 34px ref thumbnails it sits beside */
 .s5e-refbtn { width: 34px; height: 34px; min-width: 34px; }
+
+/* Music modal: 2x2 option grid with the editable length field */
+.music-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.music-len {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.music-len input {
+  width: 72px;
+  font-variant-numeric: tabular-nums;
+}
+.music-len i {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--muted);
+}
