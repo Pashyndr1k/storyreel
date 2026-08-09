@@ -4,7 +4,7 @@ Target: **v2.0.0**. Base: `main` @ v1.20.0 (`93606d3`). Rollback at any moment:
 `git checkout main` — main is frozen at 1.20.0 and every phase below lands as
 its own commit on `h3-full`, so partial rollback is also possible.
 
-Status: **all five phases landed** on `h3-full`. Remaining before release: live-ComfyUI QA of r2v (video/audio reference slots) and multi-shot takes, then version bump + CHANGELOG on order.
+Status: **released as v2.0.0** (2026-08-08) from `h3-full`. All five phases landed. Still unverified against a live ComfyUI: the r2v video/audio reference slots and a real multi-shot take render — both were validated only at graph level.
 
 Implements the remaining proposals from
 [minimax-h3-proposal.md](./minimax-h3-proposal.md) (P1–P5, P7; P6 shipped in

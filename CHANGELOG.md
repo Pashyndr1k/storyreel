@@ -1,5 +1,57 @@
 # Changelog
 
+## 2.0.0 — 2026-08-08
+
+MiniMax H3 becomes the video engine. H3 renders picture and 32 kHz stereo
+audio — dialogue, effects and score — in a single pass, can cut between
+several shots inside one generation, and can be conditioned on reference
+media instead of a single frame. This release rebuilds the video module
+around those abilities. LTX-2.3 stays fully available and unchanged.
+
+This release also carries everything from 1.20.0, which was never published.
+
+- **H3 is the default engine** for new installs. Existing installs keep the
+  engine they had and get a one-time notice pointing at Settings › Model
+  selection — nothing switches under you.
+- **Prompts are written for the chosen model.** Every video prompt remembers
+  which engine it was written for; a prompt written for the other engine is
+  flagged on its frame ("LTX → H3") and can be rewritten with one click, or
+  per scene from the header. Batch generation now uses the selected engine's
+  format too — previously it always produced LTX prompts.
+- **Voice stays yours.** TTS (OmniVoice / Gemini) remains the default for
+  dialogue on both engines. On H3 a shot can opt in to the model's own voice,
+  which replaces the TTS panel with a speaker block (identity, timbre,
+  delivery) that feeds the prompt. Shots left on TTS now tell H3 to act the
+  line silently, so the generated video no longer speaks over your take.
+- **H3 mix lane.** The native soundtrack of an H3 render is detached onto its
+  own "H3 mix" lane in Stage 6, so it can be kept, muted or ducked under an
+  ACE-Step score instead of being baked in.
+- **Reference mode (ref2va).** A shot can be rendered from curated reference
+  media instead of a first frame: character photos, location photos, shot
+  frames, an earlier shot's video, a voice take — up to 9 images, 3 videos
+  and 3 audio clips. A picker curates them within the documented budget, and
+  Settings offers a stronger identity lock when a face drifts.
+- **Multi-shot takes.** Combine 2–3 consecutive shots of a scene into one H3
+  generation and the model renders the cuts itself, with continuity across
+  them. Grouping is always your decision; the timeline shows the take as one
+  clip with its internal cuts marked.
+- **Reference-quality storyboards.** Stage 4 gains a Reference mode beside the
+  quick sketches: frames rendered through the real image pipeline with the
+  project's style and characters, good enough to hand H3 as storyboard
+  references. Sketches remain for fast iteration.
+- **Honest durations.** H3 only renders 17n+5 frame counts at 24 fps and
+  rounds up, so a 4.0 s shot really is 4.46 s. Stage 5 states the snapped
+  length next to the duration stepper and the timeline trims against the real
+  file length, taking the overshoot off the tail so generated dialogue and the
+  aligned first frame survive.
+- **Preflight.** Before the first H3 render StoryReel checks that the node
+  pack and model files are present and names exactly what is missing, instead
+  of leaving ComfyUI's opaque "node type not found".
+- Stage 6: the music pop-up has an editable **Length** field (10–300 s,
+  defaulting to the film's length) with a one-click reset.
+- Dashboard: the sort order now survives opening a project — "Last edited"
+  used to silently reset to "Newest first".
+
 ## 1.20.0 — 2026-08-01
 
 - Dashboard: pin a project with the star in a card's top-left corner and it
