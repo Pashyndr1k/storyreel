@@ -24,7 +24,13 @@ export default function Home({
 }) {
   const { t } = useI18n();
   const [query, setQuery] = useState('');
-  const [sort, setSort] = useState('newest');
+  // The sort choice survives navigation and restarts — Home unmounts whenever
+  // a project opens, so plain component state silently reset it to "newest".
+  const [sort, setSortState] = useState(() => localStorage.getItem('storyreel.homeSort.v1') || 'newest');
+  const setSort = (v) => {
+    setSortState(v);
+    localStorage.setItem('storyreel.homeSort.v1', v);
+  };
   const [showNew, setShowNew] = useState(false);
 
   const active = projects.filter((p) => !p.archived);

@@ -322,6 +322,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   // engine each prompt was written for and flags mismatches.
   const curEngine = settings.videoEngine === 'minimax' ? 'minimax' : 'ltx';
   const engineName = (e) => (e === 'minimax' ? 'H3' : 'LTX');
+  const engineHintName = curEngine === 'minimax' ? 'MiniMax H3' : 'LTX-2';
 
   // Each generation is up to three calls (image, video, then audio prompts for
   // scenes with dialogue), each returning only its own field — so merge into
@@ -1539,7 +1540,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                           <span className="s5e-eyebrow">{t('take.label')}</span>
                           <button
                             type="button"
-                            className="btn small"
+                            className="take-btn"
                             disabled={!canCombine(project, scene.id, i, 2).ok}
                             onClick={() => combineTake(shots, i, 2)}
                           >
@@ -1547,7 +1548,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                           </button>
                           <button
                             type="button"
-                            className="btn small"
+                            className="take-btn"
                             disabled={!canCombine(project, scene.id, i, 3).ok}
                             onClick={() => combineTake(shots, i, 3)}
                           >
@@ -1936,7 +1937,15 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     </div>
                   ) : (
                     <div className="s5-media-empty">
-                      {!genImg ? t('vid.needFrame') : shotAud ? t('vid.modeSI2V') : finalImg ? t('vid.modeFLF') : t('vid.modeI2V')}
+                      {effMode === 'r2v'
+                        ? t('vid.modeR2V')
+                        : !genImg
+                          ? t('vid.needFrame')
+                          : effMode === 'si2v'
+                            ? t('vid.modeSI2V', { e: engineHintName })
+                            : effMode === 'flf2v'
+                              ? t('vid.modeFLF', { e: engineHintName })
+                              : t('vid.modeI2V', { e: engineHintName })}
                     </div>
                   )}
                   {curEngine === 'minimax' && isTakeMember(project, shot.id) && (
@@ -2014,10 +2023,10 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         {effMode === 'r2v'
                           ? t('vid.modeR2V')
                           : effMode === 'si2v'
-                            ? t('vid.modeSI2V')
+                            ? t('vid.modeSI2V', { e: engineHintName })
                             : effMode === 'flf2v'
-                              ? t('vid.modeFLF')
-                              : t('vid.modeI2V')}
+                              ? t('vid.modeFLF', { e: engineHintName })
+                              : t('vid.modeI2V', { e: engineHintName })}
                       </span>
                     )}
                   </div>
@@ -2036,8 +2045,14 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       {(refsOf(shot.id)?.audios || []).map((r, k) => (
                         <span key={`ra${k}`} className="s5e-refthumb s5e-refaud" title={r.label}>♪</span>
                       ))}
-                      <button type="button" className="btn small" onClick={() => setRefPickFor(shot)}>
-                        {refsOf(shot.id) ? t('refs.edit') : t('refs.add')}
+                      <button
+                        type="button"
+                        className="s5e-ico s5e-refbtn"
+                        title={refsOf(shot.id) ? t('refs.edit') : t('refs.add')}
+                        aria-label={refsOf(shot.id) ? t('refs.edit') : t('refs.add')}
+                        onClick={() => setRefPickFor(shot)}
+                      >
+                        <Layers size={16} />
                       </button>
                     </div>
                   )}

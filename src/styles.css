@@ -3148,3 +3148,23 @@ textarea.s5e-prompt-sm { min-height: 110px; }
   border-left: 2px dashed rgba(var(--accent-rgb), 0.8);
   pointer-events: none;
 }
+
+/* Take chips: same look as the Stage 6 scale −/+ buttons under the timeline */
+.s5e-takebtns .s5e-eyebrow { margin: 0; line-height: 1; }
+.take-btn {
+  padding: 2px 10px;
+  border-radius: 3px;
+  border: 1px solid var(--hairline);
+  background: var(--glass);
+  color: var(--text);
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.take-btn:hover:not(:disabled) { background: rgba(var(--accent-rgb), 0.35); border-color: var(--accent); }
+.take-btn:disabled { opacity: 0.35; cursor: default; }
+/* refs-row square button matches the 34px ref thumbnails it sits beside */
+.s5e-refbtn { width: 34px; height: 34px; min-width: 34px; }
