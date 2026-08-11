@@ -15,6 +15,7 @@ import si2vTemplate from '../data/comfy/ltx_si2v_api.json';
 import h3Template from '../data/comfy/minimax_h3_i2v_api.json';
 import h3RefTemplate from '../data/comfy/minimax_h3_r2v_api.json';
 import aceTemplate from '../data/comfy/ace_step_api.json';
+import sfxTemplate from '../data/comfy/stable_audio_sfx_api.json';
 
 export const DEFAULT_COMFY_URL = 'http://127.0.0.1:8000';
 export const DEFAULT_OUTPUT_DIR = 'D:\\Claude work\\ComfyUI\\Output';
@@ -659,6 +660,24 @@ export async function generateComfyMusic(settings, { tags, bpm, seconds, name },
   graph['10'].inputs.filename_prefix = `StoryReel/${sanitize(name)}`;
 
   const outputs = await runGraph(settings, graph, { timeoutMs: 15 * 60 * 1000, onStatus });
+  const aud = collectFiles(outputs).find((f) => /\.(mp3|flac|wav|ogg|opus)$/i.test(f.filename));
+  if (!aud) throw new Error('ComfyUI finished but returned no audio file.');
+  const blob = await fetchOutputBlob(settings, aud);
+  return { dataURL: await blobToDataURL(blob), filename: aud.filename };
+}
+
+// Sound effect via Stable Audio 3 Medium (the audio_stable_audio_3_medium
+// workflow, flattened; the optional LLM re-prompt path is skipped — StoryReel
+// sends the user's text straight to the encoder). English prompts work best.
+export async function generateComfySfx(settings, { prompt, seconds, name }, { onStatus } = {}) {
+  const graph = clone(sfxTemplate);
+  const dur = Math.max(1, Math.min(120, Math.round((Number(seconds) || 5) * 10) / 10));
+  graph['6'].inputs.text = prompt;
+  graph['11'].inputs.seconds = dur;
+  graph['3'].inputs.seed = rndSeed();
+  graph['19'].inputs.filename_prefix = `StoryReel/${sanitize(name)}`;
+
+  const outputs = await runGraph(settings, graph, { timeoutMs: 10 * 60 * 1000, onStatus });
   const aud = collectFiles(outputs).find((f) => /\.(mp3|flac|wav|ogg|opus)$/i.test(f.filename));
   if (!aud) throw new Error('ComfyUI finished but returned no audio file.');
   const blob = await fetchOutputBlob(settings, aud);

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../lib/i18n.js';
 import { uid } from '../lib/storage.js';
-import { videoDims, saveToLocalOutputs, generateComfyMusic } from '../lib/comfy.js';
+import { videoDims, saveToLocalOutputs, generateComfyMusic, generateComfySfx } from '../lib/comfy.js';
 import { blockForScene, defaultTrim, transitionFor, overlapSeconds } from '../lib/dynamics.js';
 import { takeOf, takeTotal, takeCutTimes } from '../lib/takes.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
@@ -803,6 +803,51 @@ export default function Stage6({ project, update, settings }) {
       }));
     } catch (e) {
       setSmartCut((s) => ({ ...s, busy: false, err: e.message || String(e) }));
+    }
+  };
+
+  // Sound effects via Stable Audio 3 Medium: free-text prompt + length,
+  // dropped as a clip on the shared "Sound FX" lane at the playhead position
+  // so the user can scrub to the moment first, then generate.
+  const [sfx, setSfx] = useState(null); // { prompt, seconds, busy }
+  const runSfx = async () => {
+    if (!sfx || sfx.busy) return;
+    const promptText = (sfx.prompt || '').trim();
+    if (!promptText) return;
+    const seconds = Math.max(1, Math.min(120, Math.round((Number(sfx.seconds) || 5) * 10) / 10));
+    setSfx((x) => ({ ...x, busy: true }));
+    try {
+      const { dataURL, filename } = await generateComfySfx(settings, {
+        prompt: promptText,
+        seconds,
+        name: `${(project.title || 'project').slice(0, 24)}_sfx`,
+      });
+      saveToLocalOutputs(settings, filename, dataURL); // best-effort local copy
+      const dur = await probeAudioDuration(dataURL);
+      const at = Math.max(0, Math.min(Math.max(0, total - 0.1), elapsed));
+      const clip = {
+        id: uid(),
+        name: promptText.slice(0, 30),
+        dataURL,
+        start: Math.round(at * 100) / 100,
+        offset: 0,
+        duration: dur || seconds,
+        srcDuration: dur || seconds,
+        fadeIn: 0,
+        fadeOut: 0,
+      };
+      update((p) => {
+        let Ls = [...(p.audioLayers || [])];
+        const li = Ls.findIndex((L) => L.id === 'sfx');
+        if (li >= 0) Ls[li] = { ...Ls[li], clips: [...Ls[li].clips, clip] };
+        else Ls = insertAboveMusic(Ls, { id: 'sfx', name: t('s6.sfxLane'), enabled: true, volume: 1, clips: [clip] });
+        return { audioLayers: Ls };
+      });
+      setSfx(null);
+      showToast(t('s6.sfxDone'));
+    } catch (e) {
+      setSfx((x) => (x ? { ...x, busy: false } : x));
+      showToast(e.message === 'COMFY_UNREACHABLE' ? t('err.comfyDown') : e.message || String(e), 'error');
     }
   };
 
@@ -1788,6 +1833,13 @@ export default function Stage6({ project, update, settings }) {
           🎵 {t('s6.musicBtn')}
         </button>
         <button
+          className="btn small"
+          disabled={total <= 0}
+          onClick={() => setSfx({ prompt: '', seconds: 5, busy: false })}
+        >
+          🔊 {t('s6.sfxBtn')}
+        </button>
+        <button
           type="button"
           className="icon-btn sq36"
           title={t('s6.smartCut')}
@@ -1971,6 +2023,52 @@ export default function Stage6({ project, update, settings }) {
                 {music.busy ? t('s6.musicBusy') : t('s6.musicRun')}
               </button>
               <button className="btn small" disabled={music.busy} onClick={() => setMusic(null)}>
+                {t('s6.close')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sound effects: Stable Audio 3, free prompt + length, onto the Sound FX lane. */}
+      {sfx && (
+        <div className="overlay" onClick={() => !sfx.busy && setSfx(null)}>
+          <div className="modal music-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>{t('s6.sfxTitle')}</h3>
+            <p className="hint">{t('s6.sfxHint')}</p>
+            <textarea
+              rows={2}
+              value={sfx.prompt}
+              placeholder={t('s6.sfxPh')}
+              disabled={sfx.busy}
+              onChange={(e) => setSfx((x) => ({ ...x, prompt: e.target.value }))}
+            />
+            <div className="s5e-vsel">
+              <label>{t('s6.musicLen')}</label>
+              <div className="music-len">
+                <input
+                  type="number"
+                  min="1"
+                  max="120"
+                  step="0.5"
+                  value={sfx.seconds}
+                  disabled={sfx.busy}
+                  onChange={(e) => setSfx((x) => ({ ...x, seconds: e.target.value }))}
+                  onBlur={() =>
+                    setSfx((x) => ({
+                      ...x,
+                      seconds: Math.max(1, Math.min(120, Math.round((Number(x.seconds) || 5) * 10) / 10)),
+                    }))
+                  }
+                />
+                <i>{t('s6.musicLenS')}</i>
+              </div>
+            </div>
+            <div className="row">
+              <button className="btn small primary fixedw" disabled={sfx.busy || !(sfx.prompt || '').trim()} onClick={runSfx}>
+                {sfx.busy ? t('s6.musicBusy') : t('s6.sfxRun')}
+              </button>
+              <button className="btn small" disabled={sfx.busy} onClick={() => setSfx(null)}>
                 {t('s6.close')}
               </button>
             </div>

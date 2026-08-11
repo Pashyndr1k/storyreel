@@ -850,9 +850,9 @@ Produce exactly three fields, in MiniMax's training format:
    - On-screen text goes in double quotes, verbatim, untranslated.
    - Describe diegetic sound (sounds the characters can hear) here, synchronized to the action.
 
-2. "overall_soundscape" — 1–4 sentences, one paragraph: ambience, physical action sounds, non-verbal human sounds across the whole video (wind, traffic, footsteps, fabric, impacts, breathing). Never repeat dialogue here. "N/A" only for deliberate total silence.
+2. "overall_soundscape" — 1–4 sentences, one paragraph: ambience, physical action sounds, non-verbal human sounds across the whole video (wind, traffic, footsteps, fabric, impacts, breathing). Never repeat dialogue here. No music of any kind here. "N/A" only for deliberate total silence.
 
-3. "non_diegetic_music" — 1–3 sentences: score only the audience hears. Instrumentation, tempo, rhythm, dynamics — NOT mood words, NOT its emotional function. "N/A" when there is none.
+3. "non_diegetic_music" — always exactly "N/A". StoryReel scores its films in the edit with a separate music generator, so the video model must produce NO music of its own: no score, no soundtrack, no musical stingers, no humming or singing ambience — only character speech and sound effects, and those belong to the fields above.
 
 Hard rules:
 - Everything in English except the verbatim contents of <d>…</d> and on-screen text, which keep their original language.
