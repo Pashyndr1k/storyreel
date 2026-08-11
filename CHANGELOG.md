@@ -1,6 +1,17 @@
 # Changelog
 
-## 2.0.0 — 2026-08-08
+## 2.1.0 — 2026-08-11
+
+- Stage 6: **sound effect generation**. The new Sound FX button opens a pop-up
+  where you describe one concrete sound and set its length (1–120 s); Stable
+  Audio 3 Medium renders it locally and the clip lands on a shared "Sound FX"
+  track at the playhead — scrub to the moment first, then generate.
+- Stage 5: video prompts no longer ask the video model for music. H3 now
+  scores nothing of its own — no soundtrack, no stingers, no humming ambience
+  — leaving only character speech and sound effects, so the generated audio
+  stops competing with the music you add in the edit.
+
+## 2.0.0 — 2026-08-11
 
 MiniMax H3 becomes the video engine. H3 renders picture and 32 kHz stereo
 audio — dialogue, effects and score — in a single pass, can cut between
