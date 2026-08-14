@@ -1,12 +1,12 @@
 // ComfyUI client. Talks to a local ComfyUI server (default http://127.0.0.1:8000)
 // using API-format workflow templates captured from the user's own proven runs:
-//   ltx_i2v_api.json    — LTX-2 image-to-video (first frame + motion prompt)
+//   ltx25_i2v_api.json  — LTX-2.5 image-to-video (first frame + motion prompt)
 //   ltx_flf2v_api.json  — LTX-2 first+last-frame-to-video
 //   krea2_t2i_api.json  — Krea-2 Turbo text-to-image (Stage-4 storyboards)
 // Requests avoid CORS preflights (text/plain POST bodies, FormData uploads);
 // in the Vite dev server they go through the /comfy proxy, in Electron the
 // main process strips the Origin header and injects CORS response headers.
-import i2vTemplate from '../data/comfy/ltx_i2v_api.json';
+import i2vTemplate from '../data/comfy/ltx25_i2v_api.json';
 import flf2vTemplate from '../data/comfy/ltx_flf2v_api.json';
 import t2iTemplate from '../data/comfy/krea2_t2i_api.json';
 import flux2Template from '../data/comfy/flux2_klein_edit_api.json';
@@ -489,14 +489,17 @@ export async function generateComfyVideo(
     graph['129:100'].inputs.noise_seed = rndSeed();
     graph['68'].inputs.filename_prefix = `StoryReel/${sanitize(name)}`;
   } else {
+    // LTX-2.5: two passes (half-res sample -> latent upscale -> refine) with
+    // audio latents alongside the video ones. 395 first frame, 376 prompt,
+    // 362 seconds, 372/360 size, 361 fps, 339/338 the two pass seeds.
     graph = clone(i2vTemplate);
-    graph['269'].inputs.image = await uploadInput(settings, firstFrame, `storyreel_${stamp}_first.png`);
-    graph['320:319'].inputs.value = prompt;
-    graph['320:301'].inputs.value = dur;
-    graph['320:312'].inputs.value = w;
-    graph['320:299'].inputs.value = h;
-    graph['320:276'].inputs.noise_seed = rndSeed();
-    graph['320:277'].inputs.noise_seed = rndSeed();
+    graph['395'].inputs.image = await uploadInput(settings, firstFrame, `storyreel_${stamp}_first.png`);
+    graph['376'].inputs.value = prompt;
+    graph['362'].inputs.value = dur;
+    graph['372'].inputs.value = w;
+    graph['360'].inputs.value = h;
+    graph['339'].inputs.noise_seed = rndSeed();
+    graph['338'].inputs.noise_seed = rndSeed();
     graph['75'].inputs.filename_prefix = `StoryReel/${sanitize(name)}`;
   }
 
