@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useI18n } from '../lib/i18n.js';
 import { H3_REF_CAPS } from '../lib/comfy.js';
+import { refCandidates } from '../lib/h3multi.js';
 
 // Reference picker for MiniMax H3 reference mode (ref2va). The app already
 // owns every asset the checkpoint wants — character photos, location refs,
@@ -15,37 +16,7 @@ export default function RefPicker({ project, scene, shot, refs, onChange, onClos
 
   // Candidate media, grouped by kind. Labels double as the <Picture N> /
   // <Video N> / <Audio N> descriptions fed into the prompt writer.
-  const candidates = useMemo(() => {
-    const images = [];
-    const videos = [];
-    const audios = [];
-    for (const ch of project.storyline?.characters || []) {
-      (ch.photos || []).forEach((src, k) =>
-        images.push({ src, label: t('refs.charPhoto', { name: ch.name || '?', n: k + 1 }) })
-      );
-    }
-    project.outline.forEach((sc, si) => {
-      (sc.photos || []).forEach((src, k) =>
-        images.push({ src, label: t('refs.scenePhoto', { n: si + 1, k: k + 1 }) })
-      );
-    });
-    project.outline.forEach((sc, si) => {
-      (project.sceneDetails[sc.id]?.shots || []).forEach((sh, shi) => {
-        const img = (project.shotImages || {})[sh.id];
-        const fin = (project.shotFinalImages || {})[sh.id];
-        const board = (project.referenceFrames || {})[sh.id];
-        const vid = (project.shotVideos || {})[sh.id];
-        const aud = (project.shotAudios || {})[sh.id];
-        const at = { s: si + 1, n: shi + 1 };
-        if (img) images.push({ src: img, label: t('refs.shotFrame', at) });
-        if (fin) images.push({ src: fin, label: t('refs.shotFinal', at) });
-        if (board) images.push({ src: board, label: t('refs.shotBoard', at), board: true });
-        if (vid && sh.id !== shot.id) videos.push({ src: vid, label: t('refs.shotVideo', at) });
-        if (aud) audios.push({ src: aud, label: t('refs.shotVoice', at) });
-      });
-    });
-    return { images, videos, audios };
-  }, [project, shot.id, t]);
+  const candidates = useMemo(() => refCandidates(project, shot, t), [project, shot, t]);
 
   const total = cur.images.length + cur.videos.length + cur.audios.length;
   const capOf = { images: H3_REF_CAPS.images, videos: H3_REF_CAPS.videos, audios: H3_REF_CAPS.audios };

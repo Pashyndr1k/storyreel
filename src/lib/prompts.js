@@ -829,6 +829,8 @@ JSON schema:
 // only describes pictures leaves half the model idle, which is why the audio
 // fields are mandatory here (unlike the LTX engines, where audio is a
 // separate TTS pass).
+import { h3MultiPlan } from './h3multi.js';
+
 const H3_CAMERA = `Camera vocabulary (motion type, then OPTIONAL amplitude and speed, written as natural English inside the sentence — never stacked as labels):
 - motion: Zoom In/Out · Push In/Pull Out · Pan Left/Right · Truck Left/Right · Tilt Up/Down · Pedestal Up/Down · Arc Shot · Tracking Shot · Static Shot · Shake Slightly/Strongly · POV · Roll Clockwise/Counterclockwise
 - amplitude (only when it matters): "with small amplitude" | "with large amplitude"
@@ -859,6 +861,41 @@ Hard rules:
 - Structured long, not verbose long: spend length on timeline, camera and audio, never on stacked adjectives.
 - Do not invent dialogue that the shot does not have. If the shot is silent, say so through the soundscape instead.
 - Describe only what is seeable or hearable.`;
+
+// ---- MULTI-FRAME REFERENCE (keyframe completion) prompt template ------------
+// Learned from MiniMax's own multiframe reference workflow. One ref2va
+// generation is anchored to several stills on the output timeline; the prompt
+// is written in the six-section reference format, with every <Picture N>
+// bound to a shot and a role, and every cut timed to its guide EXACTLY.
+export const H3_MULTI_FORMAT = `SIX-SECTION KEYFRAME FORMAT — write "video_prompt" as ONE text block with these six labelled sections, in this order, each label on its own line followed by its content:
+
+subject_definitions:
+<Subject 1> is the <who> in <Picture 1>, featuring <the permanent identity traits: face, skin, hair, defining wardrobe>.
+<Picture 1> is the first frame of [Shot 1], showing <what the frame shows>.
+<Picture N> is the keyframe of [Shot N], showing <what that frame shows>.      (one line per timeline picture; a reference-only picture reads "<Picture N> is a reference for <what it fixes: a face, a location, a style>")
+
+summary:
+[keyframe completion + reference generation] <one paragraph describing the whole target video in order, naming each <Picture N> where the video reaches it and each <Subject N> when it acts>
+
+retention_analysis:
+<Subject 1> (appears in [Shot 1], [Shot 2] …): fully_preserved | partially_preserved - <what stays identical and what may change (wardrobe, lighting, pose)>
+<Picture 1> ([Shot 1] first frame): fully_preserved - the video starts exactly from this framing, subject state and background.
+<Picture N> ([Shot N] keyframe): fully_preserved - <the composition the shot must hit at its timestamp>
+<Audio N>: fully_preserved - <voice or sound it fixes>          (only when an <Audio N> exists)
+
+detailed_description:
+<one sentence of medium and visual style — live-action / animation, lighting, palette>
+[Shot 1] The shot begins from <Picture 1>. <camera + action for the whole shot, present tense, concrete>
+[Shot N] At MM:SS.mmm, the shot cuts to <the next beat>, whose keyframe corresponds to <Picture N>. <camera + action>
+   (one [Shot N] per timeline picture; the timestamp is the picture's ANCHOR TIME from the table, to the millisecond — never invent, round or shift it; a picture marked "first frame of [Shot N]" is where that shot STARTS, a picture marked "keyframe of [Shot N]" is a composition the shot must reach)
+
+overall_soundscape:
+<one paragraph: ambience, physical action sounds, non-verbal human sounds, synchronised to the cuts — no music, no dialogue text>
+
+non_diegetic_music:
+N/A
+
+Rules: everything in English except verbatim <d>…</d> dialogue and on-screen text; only pictures listed in the anchor table exist — never invent a <Picture N>; every listed picture and audio must be mentioned by its tag in subject_definitions, retention_analysis AND detailed_description; cuts between anchored pictures are hard cuts (the model renders them), so describe continuity of the subject across the cut rather than a transition effect.`;
 
 // First-frame / first+last-frame alignment header. H3 wants this as the first
 // line, followed by a blank line, whenever reference frames are attached.
@@ -901,9 +938,39 @@ export function stage5H3VideoPrompt(project, scene, shots, videoStyle, block, se
     const v = Math.max(0, Number(sec) || 0);
     return `${String(Math.floor(v / 60)).padStart(2, '0')}:${String(Math.floor(v % 60)).padStart(2, '0')}.${String(Math.round((v % 1) * 1000)).padStart(3, '0')}`;
   };
+  // Multi-frame mode: the anchor table. Picture numbering comes from the same
+  // plan the graph builder uses, so <Picture N> in the prompt IS ref_image N-1.
+  const multiOf = (id) => {
+    if ((project.shotVideoModes || {})[id] !== 'mfr') return null;
+    // same length filter the graph builder applies, so no anchor is listed
+    // that the render would drop
+    const take = takeFor(id);
+    const durationSec = take
+      ? take.shotIds.reduce((a, mid) => a + (Number(shots.find((x) => x.id === mid)?.duration) || 0), 0)
+      : Number(shots.find((x) => x.id === id)?.duration) || 4;
+    const plan = h3MultiPlan(project, id, { durationSec });
+    if (!plan.hasKeyframes || !plan.first) return null;
+    return plan;
+  };
+  const multiBlockOf = (id, shotIndexOf) => {
+    const plan = multiOf(id);
+    if (!plan) return '';
+    let shotNo = 0;
+    const rows = plan.pictures.map((p) => {
+      if (p.role === 'first') { shotNo = 1; return `  <Picture 1> = first frame of [Shot 1] at 00:00.000 — ${p.label}`; }
+      if (p.role === 'keyframe') { shotNo += 1; return `  <Picture ${p.n}> = ${shotIndexOf(p) || `keyframe of [Shot ${shotNo}]`} at ${stamp(p.at)} — ${p.label}${p.board ? ' [STORYBOARD FRAME]' : ''}`; }
+      return `  <Picture ${p.n}> = reference — ${p.label}${p.board ? ' [STORYBOARD FRAME]' : ''}`;
+    });
+    plan.guides.filter((g) => g.kind === 'audio').forEach((g) => rows.push(`  audio guide at ${stamp(g.at)} — ${g.label || 'audio take'} (the sound starts exactly here; the picture must match it)`));
+    plan.refVideos.forEach((r, k) => rows.push(`  <Video ${k + 1}> = ${r.label || 'reference video'}`));
+    plan.refAudios.forEach((r, k) => rows.push(`  <Audio ${k + 1}> = ${r.label || 'reference audio'}`));
+    return `\n  MULTI-FRAME MODE — anchor table (timestamps are exact):\n${rows.join('\n')}`;
+  };
   // Reference list for a shot (H3 reference mode) — shared by plain shots and
-  // take leads, so refs survive grouping.
+  // take leads, so refs survive grouping. Multi-frame shots use the anchor
+  // table instead (it already numbers the references after the keyframes).
   const refBlockOf = (id) => {
+    if (multiOf(id)) return multiBlockOf(id, () => '');
     const refs = (project.shotRefs || {})[id] || null;
     if (!refs) return '';
     const lines = [
@@ -943,9 +1010,14 @@ export function stage5H3VideoPrompt(project, scene, shots, videoStyle, block, se
             return row;
           })
           .join('\n');
+        const plan = multiOf(s.id);
+        const memberByFrame = (p) => {
+          const idx = members.findIndex((m) => (project.shotImages || {})[m.id] === p.src);
+          return idx > 0 ? `first frame of [Shot ${idx + 1}]` : '';
+        };
         return `Shot ${i + 1} (id ${s.id}) — GROUP TAKE: ${members.length} shots in ONE ${total}s generation with H3-timed internal cuts:
 ${inner}
-  location: ${s.location || scene.title || ''}${refBlockOf(s.id)}`;
+  location: ${s.location || scene.title || ''}${plan ? multiBlockOf(s.id, memberByFrame) : refBlockOf(s.id)}`;
       }
       const dur = Number(s.duration || 4);
       const line = (s.dialogue || '').trim();
@@ -978,7 +1050,7 @@ Each shot below already has a generated FIRST FRAME that will be attached to the
 
 ${list}
 
-For EACH shot write the three H3 fields describing only that shot's own duration. Shots marked REFERENCE MODE are rendered by H3's reference checkpoint: open their integrated_multimodal_description with subject definitions binding each reference to a role (“<Subject 1> is the woman from <Picture 1>”), state retention explicitly (“Use <Picture 1> exactly as it is” / “retain the voice of <Audio 1>”), then describe the shot; every attached reference must be mentioned by its label. References tagged [STORYBOARD FRAME] use MiniMax's official storyboard declaration — “<Picture N> is a storyboard reference for [Shot K], defining its viewpoint, subject placement, and shot order” — bound to the shot the frame belongs to (its scene/shot number is in the label). GROUP TAKE entries are ONE multi-shot generation: write ONE video_prompt for the whole take — open with [Shot 1] (no timestamp), start every later segment with [Shot N] At MM:SS.mmm exactly matching the listed times, put <scenetrans> at each internal cut, keep continuity across the cuts — and return it under the take's shot number only; folded shots get NO entry of their own. Dialogue handling: where a line is marked [NATIVE VOICE], put it verbatim inside <d>[Language] …</d> with a speaker ID and an established voice identity (honor the speaker notes) — H3 speaks it natively. Where a line is marked [VOICE ADDED IN POST], the character visibly delivers it — mouth and body act the words — but NO speech may appear in any audio field: no <d> tags for that shot, the soundscape stays ambience and effects, the voice track is laid on in editing.
+For EACH shot write the three H3 fields describing only that shot's own duration. Shots marked REFERENCE MODE are rendered by H3's reference checkpoint: open their integrated_multimodal_description with subject definitions binding each reference to a role (“<Subject 1> is the woman from <Picture 1>”), state retention explicitly (“Use <Picture 1> exactly as it is” / “retain the voice of <Audio 1>”), then describe the shot; every attached reference must be mentioned by its label. References tagged [STORYBOARD FRAME] use MiniMax's official storyboard declaration — “<Picture N> is a storyboard reference for [Shot K], defining its viewpoint, subject placement, and shot order” — bound to the shot the frame belongs to (its scene/shot number is in the label). Shots marked MULTI-FRAME MODE are rendered by the reference checkpoint with stills pinned to exact timestamps: for those shots IGNORE the three-field layout and write "video_prompt" in the ${'SIX-SECTION KEYFRAME FORMAT'} defined at the end of this brief — the anchor table lists every picture with its role and its exact time, and [Shot N] markers inside the take must land on those times. GROUP TAKE entries are ONE multi-shot generation: write ONE video_prompt for the whole take — open with [Shot 1] (no timestamp), start every later segment with [Shot N] At MM:SS.mmm exactly matching the listed times, put <scenetrans> at each internal cut, keep continuity across the cuts — and return it under the take's shot number only; folded shots get NO entry of their own. Dialogue handling: where a line is marked [NATIVE VOICE], put it verbatim inside <d>[Language] …</d> with a speaker ID and an established voice identity (honor the speaker notes) — H3 speaks it natively. Where a line is marked [VOICE ADDED IN POST], the character visibly delivers it — mouth and body act the words — but NO speech may appear in any audio field: no <d> tags for that shot, the soundscape stays ambience and effects, the voice track is laid on in editing.
 
 Return one entry per shot, in order, numbered from 1. "video_prompt" holds the three fields as ONE text block written exactly like this, blank line between fields:
 
@@ -988,9 +1060,9 @@ overall_soundscape: …
 
 non_diegetic_music: …
 
-Do NOT add an alignment header — the app prepends it.
+Do NOT add an alignment header — the app prepends it (multi-frame shots need none: their anchor table is the alignment).
 
 JSON schema:
-{"prompts":[{"shot":1,"video_prompt":"integrated_multimodal_description: …\n\noverall_soundscape: …\n\nnon_diegetic_music: …"}]}`,
+{"prompts":[{"shot":1,"video_prompt":"integrated_multimodal_description: …\n\noverall_soundscape: …\n\nnon_diegetic_music: …"}]}${shots.some((s) => multiOf(s.id)) ? `\n\n${H3_MULTI_FORMAT}` : ''}`,
   };
 }

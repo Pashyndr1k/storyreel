@@ -4,6 +4,7 @@ import { uid } from '../lib/storage.js';
 import { videoDims, saveToLocalOutputs, generateComfyMusic, generateComfySfx } from '../lib/comfy.js';
 import { blockForScene, defaultTrim, transitionFor, overlapSeconds } from '../lib/dynamics.js';
 import { takeOf, takeTotal, takeCutTimes } from '../lib/takes.js';
+import { keyframesOf } from '../lib/h3multi.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
 import { stage6SmartCutPrompt } from '../lib/prompts.js';
 import { decodeMediaAudio, audioBufferToWavDataURL } from '../lib/audio.js';
@@ -319,6 +320,12 @@ export default function Stage6({ project, update, settings }) {
           if (take && take.shotIds[0] !== orig.id) return null;
           const shot = take ? { ...orig, duration: takeTotal(project, take) } : orig;
           const takeCuts = take ? takeCutTimes(project, take) : null;
+          // MULTI-mode anchors on a plain shot: shown like take cuts, with their own title
+          const keyMarks = !take && (project.shotVideoModes || {})[orig.id] === 'mfr'
+            ? keyframesOf(project, orig.id)
+                .filter((k) => k.kind === 'image' && k.at > 0.02 && k.at < (Number(orig.duration) || 0))
+                .map((k) => k.at)
+            : null;
           const video = (project.shotVideos || {})[shot.id] || null;
           const raw = (project.videoGenDurations || {})[shot.id] || 0;
           const nativeAudio = (project.shotVideoEngines || {})[shot.id] === 'minimax';
@@ -333,6 +340,7 @@ export default function Stage6({ project, update, settings }) {
             raw,
             trim,
             takeCuts,
+            keyMarks,
             image: (project.shotImages || {})[shot.id] || null,
             muted: !!(project.shotMutes || {})[shot.id],
           };
@@ -1452,6 +1460,14 @@ export default function Stage6({ project, update, settings }) {
                       {it.trim?.tail > 0 && (
                         <span className="clip-trim-mark tail" title={`−${it.trim.tail.toFixed(2)}s`} />
                       )}
+                      {(it.keyMarks || []).map((c, k) => (
+                        <span
+                          key={`km${k}`}
+                          className="take-cut-mark key-mark"
+                          style={{ left: `${(c / (it.shot.duration || 1)) * 100}%` }}
+                          title={t('s6.keyMark', { s: c.toFixed(1) })}
+                        />
+                      ))}
                       {(it.takeCuts || []).map((c, k) => (
                         <span
                           key={`tc${k}`}

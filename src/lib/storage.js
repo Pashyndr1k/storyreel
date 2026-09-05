@@ -129,6 +129,7 @@ export function loadSettings() {
     videoEngine: 'minimax', // local video model: 'minimax' (MiniMax H3, default) | 'ltx' (LTX-2.3)
     h3NoticeShown: true, // one-time "H3 is now the default" notice (false only for pre-2.0 installs)
     h3RefImageSize: 'match', // ref2va identity strength: 'match' | 'max' (max = stronger identity lock)
+    h3Lightning: false, // MULTI mode only: 4-step Lightning LoRA instead of the 20-step default
     comfyUrl: 'http://127.0.0.1:8000',
     comfyOutputDir: 'D:\\Claude work\\ComfyUI\\Output',
     projectsDir: 'D:\\Claude work\\StoryReel Projects', // per-project folders (project.md + media files)
@@ -199,6 +200,7 @@ function projectDefaults() {
     shotSpeakerNotes: {}, // shotId -> voice identity/timbre/delivery notes fed into the H3 prompt
     shotRefs: {}, // shotId -> { images: [{src,label}], videos: [{src,label}], audios: [{src,label}] } for H3 reference mode
     shotGroups: {}, // leadShotId -> { shotIds: [lead, ...members] } — H3 multi-shot takes (2-3 consecutive shots, one generation)
+    shotKeyframes: {}, // shotId -> [{ kind: 'image'|'audio', src, label, at }] — H3 MULTI mode anchors on the output timeline (seconds)
     shotTrims: {}, // shotId -> { head, tail } seconds — manual overrides of the 15-frame rule
     // Multi-layer audio timeline (Stage 6). Each layer is its own track lane:
     // { id, name, enabled, volume, clips: [{ id, name, dataURL, start, offset,
@@ -271,6 +273,7 @@ export function migrateProject(raw) {
   p.shotSpeakerNotes = p.shotSpeakerNotes && typeof p.shotSpeakerNotes === 'object' ? p.shotSpeakerNotes : {};
   p.shotRefs = p.shotRefs && typeof p.shotRefs === 'object' ? p.shotRefs : {};
   p.shotGroups = p.shotGroups && typeof p.shotGroups === 'object' ? p.shotGroups : {};
+  p.shotKeyframes = p.shotKeyframes && typeof p.shotKeyframes === 'object' ? p.shotKeyframes : {};
   p.shotAudioSrc = p.shotAudioSrc && typeof p.shotAudioSrc === 'object' ? p.shotAudioSrc : {};
   p.shotAudioPads = p.shotAudioPads && typeof p.shotAudioPads === 'object' ? p.shotAudioPads : {};
   p.shotTrims = p.shotTrims && typeof p.shotTrims === 'object' ? p.shotTrims : {};

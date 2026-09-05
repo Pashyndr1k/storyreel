@@ -14,6 +14,7 @@ import ttsTemplate from '../data/comfy/omnivoice_tts_api.json';
 import si2vTemplate from '../data/comfy/ltx_si2v_api.json';
 import h3Template from '../data/comfy/minimax_h3_i2v_api.json';
 import h3RefTemplate from '../data/comfy/minimax_h3_r2v_api.json';
+import h3MultiTemplate from '../data/comfy/minimax_h3_mfr_api.json';
 import aceTemplate from '../data/comfy/ace_step_api.json';
 import sfxTemplate from '../data/comfy/stable_audio_sfx_api.json';
 
@@ -283,11 +284,12 @@ const sanitize = (s) => (s || 'shot').replace(/[^\w\d-]+/g, '_').slice(0, 60);
 export const VIDEO_MODES = ['auto', 'i2v', 'flf2v', 'si2v'];
 // H3 exposes its own workflow set: no audio-in (the model scores itself), and
 // the extra reference mode when the shot has curated reference media.
-export const H3_VIDEO_MODES = ['auto', 'i2v', 'flf2v', 'r2v'];
+export const H3_VIDEO_MODES = ['auto', 'i2v', 'flf2v', 'r2v', 'mfr'];
 
 // H3 counterpart of resolveVideoMode: r2v only with references, flf2v only
 // with a final frame, auto prefers the richest available.
-export function resolveH3VideoMode(mode, { lastFrame, hasRefs } = {}) {
+export function resolveH3VideoMode(mode, { lastFrame, hasRefs, hasKeyframes } = {}) {
+  if (mode === 'mfr' && hasKeyframes) return 'mfr';
   if (mode === 'r2v' && hasRefs) return 'r2v';
   if (mode === 'flf2v' && lastFrame) return 'flf2v';
   if (mode === 'i2v') return 'i2v';
@@ -323,8 +325,9 @@ async function firstVideo(outputs, settings) {
 // normal error path speaks.
 const H3_HF = 'https://huggingface.co/Comfy-Org/MiniMax-H3';
 const h3PreflightOk = new Set();
-export async function h3Preflight(settings, template = h3Template) {
-  const key = (settings.comfyUrl || '') + '|' + (template === h3RefTemplate ? 'r2v' : 'i2v');
+export async function h3Preflight(settings, template = h3Template, { tag, lora } = {}) {
+  const which = tag || (template === h3RefTemplate ? 'r2v' : template === h3MultiTemplate ? 'mfr' : 'i2v');
+  const key = (settings.comfyUrl || '') + '|' + which + (lora ? '|' + lora : '');
   if (h3PreflightOk.has(key)) return;
   const loaderField = { UNETLoader: 'unet_name', CLIPLoader: 'clip_name', VAELoader: 'vae_name' };
   // Model files the graph actually references — read from the template so the
@@ -350,19 +353,134 @@ export async function h3Preflight(settings, template = h3Template) {
   if (!nodeInfo[h3Node]) {
     missing.push(`${h3Node} node — update ComfyUI to a build with MiniMax H3 support`);
   }
+  // Both schema shapes ComfyUI has shipped: [[...options], {...}] and ['COMBO', { options }].
+  const optionsOf = (spec) =>
+    Array.isArray(spec?.[0]) ? spec[0] : spec?.[0] === 'COMBO' && Array.isArray(spec[1]?.options) ? spec[1].options : null;
   for (const [cls, files] of Object.entries(needs)) {
     const ci = await info(cls);
-    const avail = ci?.[cls]?.input?.required?.[loaderField[cls]]?.[0];
+    const avail = optionsOf(ci?.[cls]?.input?.required?.[loaderField[cls]]);
     if (!Array.isArray(avail)) continue; // unknown shape — do not block on it
     for (const f of files) if (!avail.includes(f)) missing.push(f);
+  }
+  if (lora) {
+    const ci = await info('LoraLoaderModelOnly');
+    const avail = optionsOf(ci?.LoraLoaderModelOnly?.input?.required?.lora_name);
+    if (Array.isArray(avail) && !avail.includes(lora)) missing.push(`${lora} (Lightning LoRA — or switch it off in Settings)`);
   }
   if (missing.length) {
     throw new Error(
       `MiniMax H3 is not ready on this ComfyUI:\n• ${missing.join('\n• ')}\n` +
-        `Model files: ${H3_HF} → ComfyUI/models (unet / text_encoders / vae).`
+        `Model files: ${H3_HF} → ComfyUI/models (unet / text_encoders / vae / loras).`
     );
   }
   h3PreflightOk.add(key);
+}
+
+// ---- MiniMax H3 multi-frame reference mode ("MULTI") -----------------------
+// The ref2va graph plus chained MiniMaxH3AddGuide nodes: each guide pins a
+// still (and/or an audio take) at frame_idx on the OUTPUT timeline, so one
+// generation can be forced through several keyframes — a take's member frames
+// at their cut times, a mid-shot beat, an end pose. Picture 1 is the first
+// frame on ref_images; every image guide is ALSO plugged into a ref_images
+// slot (MiniMax's own recommendation) so the encoder reads it as <Picture N>.
+// Default sampling is the same 20-step res_multistep as i2v/r2v; the 4-step
+// Lightning LoRA is an opt-in from Settings.
+export const H3_LIGHTNING_LORA = 'minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors';
+
+// Pure graph assembly — network-free, so it can be unit-tested. `files` maps
+// every dataURL the plan references to its uploaded ComfyUI filename.
+export function buildH3MultiGraph(settings, { prompt, pictures, guides, refVideos = [], refAudios = [], durationSec, aspectRatio, resolution, name }, files) {
+  const [w, h] = h3Dims(aspectRatio, resolution);
+  const length = h3Frames(durationSec || 4);
+  const graph = clone(h3MultiTemplate);
+  const lightning = !!settings.h3Lightning;
+  graph['136'].inputs.prompt = prompt;
+  graph['136'].inputs.width = w;
+  graph['136'].inputs.height = h;
+  graph['136'].inputs.length = length;
+  graph['136'].inputs.ref_image_size = settings.h3RefImageSize === 'max' ? 'max' : 'match';
+  // pictures, in <Picture N> order (first frame, keyframes, then references)
+  pictures.slice(0, H3_REF_CAPS.images).forEach((p, k) => {
+    const id = String(200 + k);
+    graph[id] = { class_type: 'LoadImage', inputs: { image: files[p.src] }, _meta: { title: `picture ${k + 1} (${p.role})` } };
+    graph['136'].inputs[`ref_images.ref_image_${k}`] = [id, 0];
+  });
+  refAudios.slice(0, H3_REF_CAPS.audios).forEach((r, k) => {
+    const id = String(220 + k);
+    graph[id] = { class_type: 'LoadAudio', inputs: { audio: files[r.src] }, _meta: { title: `ref audio ${k + 1}` } };
+    graph['136'].inputs[`ref_audios.ref_audio_${k}`] = [id, 0];
+  });
+  refVideos.slice(0, H3_REF_CAPS.videos).forEach((r, k) => {
+    const vid = String(240 + k);
+    const comp = String(260 + k);
+    graph[vid] = { class_type: 'LoadVideo', inputs: { file: files[r.src] }, _meta: { title: `ref video ${k + 1}` } };
+    graph[comp] = { class_type: 'GetVideoComponents', inputs: { video: [vid, 0] }, _meta: { title: `ref video ${k + 1} audio` } };
+    graph['136'].inputs[`ref_videos.ref_video_${k}`] = [vid, 0];
+    graph['136'].inputs[`ref_video_audios.ref_video_audio_${k}`] = [comp, 1];
+  });
+  // guides, chained positive -> positive, all inside the generated length
+  let prev = ['136', 0];
+  guides
+    .filter((g) => g.frame >= 1 && g.frame < length - 1)
+    .sort((a, b) => a.frame - b.frame)
+    .forEach((g, k) => {
+      const gid = String(300 + k);
+      const node = {
+        class_type: 'MiniMaxH3AddGuide',
+        inputs: { positive: prev, latent: ['136', 1], vae: ['119', 0], audio_vae: ['120', 0], frame_idx: g.frame },
+        _meta: { title: `guide ${k + 1} @ frame ${g.frame}` },
+      };
+      if (g.kind === 'image') {
+        // reuse the picture loader when this still is also a <Picture N>
+        const pic = pictures.findIndex((p) => p.src === g.src);
+        if (pic >= 0 && pic < H3_REF_CAPS.images) node.inputs.image = [String(200 + pic), 0];
+        else {
+          const lid = String(320 + k);
+          graph[lid] = { class_type: 'LoadImage', inputs: { image: files[g.src] }, _meta: { title: `guide image ${k + 1}` } };
+          node.inputs.image = [lid, 0];
+        }
+      } else {
+        const aid = String(340 + k);
+        graph[aid] = { class_type: 'LoadAudio', inputs: { audio: files[g.src] }, _meta: { title: `guide audio ${k + 1}` } };
+        node.inputs.audio = [aid, 0];
+      }
+      graph[gid] = node;
+      prev = [gid, 0];
+    });
+  graph['126'].inputs.conditioning = prev;
+  // Lightning: LoRA on the model path and 4 steps; otherwise the 20-step default
+  if (lightning) {
+    graph['145'] = {
+      class_type: 'LoraLoaderModelOnly',
+      inputs: { model: ['127', 0], lora_name: H3_LIGHTNING_LORA, strength_model: 1 },
+      _meta: { title: 'Lightning LoRA' },
+    };
+    graph['124'].inputs.model = ['145', 0];
+    graph['126'].inputs.model = ['145', 0];
+    graph['124'].inputs.steps = 4;
+  }
+  graph['129'].inputs.noise_seed = rndSeed();
+  graph['92'].inputs.filename_prefix = `StoryReel/${sanitize(name)}`;
+  return graph;
+}
+
+export async function generateComfyMultiVideo(settings, args, { onStatus } = {}) {
+  await h3Preflight(settings, h3MultiTemplate, { tag: 'mfr', lora: settings.h3Lightning ? H3_LIGHTNING_LORA : null });
+  const stamp = Date.now();
+  // upload every distinct media item once
+  const files = {};
+  let k = 0;
+  const up = async (dataURL, ext, field) => {
+    if (!dataURL || files[dataURL]) return;
+    files[dataURL] = await uploadInput(settings, dataURL, `storyreel_${stamp}_m${k++}.${ext}`);
+  };
+  for (const p of args.pictures || []) await up(p.src, 'png');
+  for (const g of args.guides || []) await up(g.src, g.kind === 'audio' ? (/^data:audio\/wav/i.test(g.src) ? 'wav' : 'mp3') : 'png');
+  for (const r of args.refAudios || []) await up(r.src, /^data:audio\/wav/i.test(r.src) ? 'wav' : 'mp3');
+  for (const r of args.refVideos || []) await up(r.src, 'mp4');
+  const graph = buildH3MultiGraph(settings, args, files);
+  const outs = await runGraph(settings, graph, { onStatus });
+  return firstVideo(outs, settings);
 }
 
 // MiniMax H3 reference mode (ref2va checkpoint): the shot is conditioned on

@@ -36,6 +36,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
   const [videoService, setVideoService] = useState(settings.videoService || 'comfy');
   const [videoEngine, setVideoEngine] = useState(settings.videoEngine || 'minimax');
   const [h3RefImageSize, setH3RefImageSize] = useState(settings.h3RefImageSize || 'match');
+  const [h3Lightning, setH3Lightning] = useState(!!settings.h3Lightning);
   const [voiceService, setVoiceService] = useState(settings.voiceService || 'comfy');
   const [comfyUrl, setComfyUrl] = useState(settings.comfyUrl || 'http://127.0.0.1:8000');
   const [comfyOutputDir, setComfyOutputDir] = useState(settings.comfyOutputDir || 'D:\\Claude work\\ComfyUI\\Output');
@@ -119,6 +120,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
       videoService,
       videoEngine,
       h3RefImageSize,
+      h3Lightning,
       voiceService,
       comfyUrl: comfyUrl.trim() || 'http://127.0.0.1:8000',
       comfyOutputDir: comfyOutputDir.trim() || 'D:\\Claude work\\ComfyUI\\Output',
@@ -355,6 +357,12 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
             <option value="max">{t('set.refSizeMax')}</option>
           </select>
           <p className="hint">{t('set.refSizeHint')}</p>
+          <label>{t('set.h3Lightning')}</label>
+          <label className="check">
+            <input type="checkbox" checked={h3Lightning} onChange={(e) => setH3Lightning(e.target.checked)} />
+            <span>{t('set.h3LightningOn')}</span>
+          </label>
+          <p className="hint">{t('set.h3LightningHint')}</p>
         </>
       )}
       <label>{t('set.voiceService')}</label>

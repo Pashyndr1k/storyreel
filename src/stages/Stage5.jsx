@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage, generateGeminiVoice, GEMINI_VOICES } from '../lib/gemini.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
-import { generateComfyVideo, generateComfyRefVideo, generateComfyImage, generateComfyVoice, saveToLocalOutputs, VIDEO_RESOLUTIONS, VIDEO_MODES, H3_VIDEO_MODES, resolveVideoMode, resolveH3VideoMode, h3Seconds, OMNI_VOICE_TAGS, OMNI_VOICE_SLOTS, OMNI_LANGUAGES, VOICE_LIBRARY } from '../lib/comfy.js';
+import { generateComfyVideo, generateComfyRefVideo, generateComfyMultiVideo, generateComfyImage, generateComfyVoice, saveToLocalOutputs, VIDEO_RESOLUTIONS, VIDEO_MODES, H3_VIDEO_MODES, resolveVideoMode, resolveH3VideoMode, h3Seconds, OMNI_VOICE_TAGS, OMNI_VOICE_SLOTS, OMNI_LANGUAGES, VOICE_LIBRARY } from '../lib/comfy.js';
 import { stage5Prompt, stage5VideoPrompt, stage5H3VideoPrompt, h3ComposePrompt, stage5AudioPrompt, stage5VoicePrompt, stage5GeminiVoicePrompt, finalFramePrompt, tweakPromptSpec } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
 import { aspectDescription } from '../lib/aspect.js';
@@ -15,6 +15,8 @@ import { blockForScene, DYNAMICS_CONFIG } from '../lib/dynamics.js';
 import AssetsModal from '../components/AssetsModal.jsx';
 import Lightbox from '../components/Lightbox.jsx';
 import RefPicker from '../components/RefPicker.jsx';
+import KeyframePicker from '../components/KeyframePicker.jsx';
+import { h3MultiPlan, keyframesOf, seedTakeKeyframes, hasMultiInput, h3Stamp } from '../lib/h3multi.js';
 import { takeOf, isTakeMember, takeTotal, canCombine } from '../lib/takes.js';
 import { padAudioWithSilence, mediaDuration, decodeMediaAudio, audioBufferToWavDataURL } from '../lib/audio.js';
 import LibraryPicker from '../components/LibraryPicker.jsx';
@@ -178,7 +180,8 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const mediaCancel = useRef(false);
   const [palette, setPalette] = useState(null); // { src: shotId, colors: [] } for this scene
   const [lightbox, setLightbox] = useState(null);
-  const [refPickFor, setRefPickFor] = useState(null); // shot whose references are being edited // { kind: 'img' | 'vid', src } shown in the large pop-up
+  const [refPickFor, setRefPickFor] = useState(null);
+  const [keyPickFor, setKeyPickFor] = useState(null); // shot whose keyframes are being edited // shot whose references are being edited // { kind: 'img' | 'vid', src } shown in the large pop-up
   const [tweakText, setTweakText] = useState({}); // `${shotId}:${kind}` -> adjustment draft
   const [tweakBusy, setTweakBusy] = useState(null); // `${shotId}:${kind}` in flight
   const [regenBusy, setRegenBusy] = useState(null); // `${shotId}:${kind}` single-prompt regen in flight
@@ -989,10 +992,11 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const hasRefs = !!refs && ((refs.images || []).length || (refs.videos || []).length || (refs.audios || []).length) > 0;
     // H3 has its own workflow set: it never takes audio in (it scores itself),
     // and reference mode replaces the first-frame anchor entirely.
+    const hasKeyframes = hasMultiInput(cur, shot.id);
     const useMode = isH3
-      ? resolveH3VideoMode(mode, { lastFrame: last, hasRefs })
+      ? resolveH3VideoMode(mode, { lastFrame: last, hasRefs, hasKeyframes })
       : resolveVideoMode(mode, { lastFrame: last, audio: voiceAud });
-    if (!first && useMode !== 'r2v') return; // every non-reference workflow is frame-anchored
+    if (!first && useMode !== 'r2v' && useMode !== 'mfr') return; // every non-reference workflow is frame-anchored
     setImgBusy(`${shot.id}:vid`);
     setImgErr(null);
     // +3s padding rule (silent workflows only): generate longer than the
@@ -1006,7 +1010,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       : Math.round(shot.duration || 4) + DYNAMICS_CONFIG.generation_padding_sec;
     try {
       const sendPrompt =
-        isH3 && useMode !== 'r2v'
+        isH3 && useMode !== 'r2v' && useMode !== 'mfr'
           ? h3ComposePrompt(vPrompt, {
               hasFirst: true,
               hasLast: useMode === 'flf2v' && !!last,
@@ -1021,7 +1025,12 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         name: `${(project.title || 'project').slice(0, 24)}_sc${project.outline.indexOf(scene) + 1}_shot${i + 1}`,
       };
       const { dataURL, filename } =
-        useMode === 'r2v'
+        useMode === 'mfr'
+          ? await generateComfyMultiVideo(settings, {
+              ...genArgs,
+              ...h3MultiPlan(cur, shot.id, { durationSec: genDuration }),
+            })
+          : useMode === 'r2v'
           ? await generateComfyRefVideo(settings, {
               ...genArgs,
               refImages: (refs.images || []).map((r) => r.src),
@@ -1240,6 +1249,22 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       return { shotGroups: next };
     });
 
+  // Multi-frame keyframes (H3 MULTI mode): stills pinned to exact seconds.
+  const keysOf = (shotId) => keyframesOf(project, shotId);
+  const setKeyframes = (shotId, list) =>
+    update((p) => ({ shotKeyframes: { ...(p.shotKeyframes || {}), [shotId]: list } }));
+  // Switching a take lead to MULTI with no keyframes yet seeds the members'
+  // first frames at the take's cut times — the whole point of the mode.
+  const pickMode = (shot, m) => {
+    update((pr) => ({ shotVideoModes: { ...(pr.shotVideoModes || {}), [shot.id]: m } }));
+    if (m === 'mfr' && keysOf(shot.id).length === 0) {
+      const take = takeOf(project, shot.id);
+      if (take && take.shotIds[0] === shot.id) {
+        const seeded = seedTakeKeyframes(project, take, t);
+        if (seeded.length) setKeyframes(shot.id, seeded);
+      }
+    }
+  };
   const refsOf = (shotId) => {
     const r = (project.shotRefs || {})[shotId];
     return r && ((r.images || []).length || (r.videos || []).length || (r.audios || []).length) ? r : null;
@@ -1504,7 +1529,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           const shotMode = (project.shotVideoModes || {})[shot.id] || 'auto';
           const effMode =
             curEngine === 'minimax'
-              ? resolveH3VideoMode(shotMode, { lastFrame: finalImg, hasRefs: !!refsOf(shot.id) })
+              ? resolveH3VideoMode(shotMode, { lastFrame: finalImg, hasRefs: !!refsOf(shot.id), hasKeyframes: hasMultiInput(project, shot.id) })
               : resolveVideoMode(shotMode, { lastFrame: finalImg, audio: shotAud });
           return (
             <div key={shot.id} className="shot-card s5e-card">
@@ -1999,7 +2024,11 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     <span className="seg seg-tall" title={t('vid.wfTip')}>
                       {(curEngine === 'minimax' ? H3_VIDEO_MODES : VIDEO_MODES).map((m) => {
                         const avail =
-                          m === 'si2v' ? !!shotAud : m === 'flf2v' ? !!finalImg : m === 'r2v' ? !!refsOf(shot.id) : true;
+                          m === 'si2v' ? !!shotAud
+                            : m === 'flf2v' ? !!finalImg
+                            : m === 'r2v' ? !!refsOf(shot.id)
+                            : m === 'mfr' ? !!genImg
+                            : true;
                         return (
                           <button
                             key={m}
@@ -2007,11 +2036,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                             className={`seg-btn ${shotMode === m ? 'on' : ''}`}
                             disabled={!avail}
                             title={avail ? t(`vid.wf_${m}`) : t(`vid.wfNeed_${m}`)}
-                            onClick={() =>
-                              update((pr) => ({
-                                shotVideoModes: { ...(pr.shotVideoModes || {}), [shot.id]: m },
-                              }))
-                            }
+                            onClick={() => pickMode(shot, m)}
                           >
                             {t(`vid.wfShort_${m}`)}
                           </button>
@@ -2020,7 +2045,13 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     </span>
                     {(genImg || effMode === 'r2v') && (
                       <span className="hint">
-                        {effMode === 'r2v'
+                        {effMode === 'mfr'
+                          ? t('vid.modeMFR', {
+                              n: h3MultiPlan(project, shot.id, {
+                                durationSec: (() => { const tk = takeOf(project, shot.id); return tk ? takeTotal(project, tk) : Number(shot.duration || 4); })(),
+                              }).guides.length,
+                            })
+                          : effMode === 'r2v'
                           ? t('vid.modeR2V')
                           : effMode === 'si2v'
                             ? t('vid.modeSI2V', { e: engineHintName })
@@ -2053,6 +2084,37 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         onClick={() => setRefPickFor(shot)}
                       >
                         <Layers size={16} />
+                      </button>
+                    </div>
+                  )}
+                  {/* Keyframe anchors (H3 MULTI mode): stills pinned to exact
+                      seconds of the output. Shown once the mode is picked or
+                      anchors exist; the picker edits them. */}
+                  {curEngine === 'minimax' && (shotMode === 'mfr' || keysOf(shot.id).length > 0) && (
+                    <div className="s5e-refrow s5e-keyrow">
+                      <span className="s5e-eyebrow">{t('keys.row')}</span>
+                      <span className="s5e-key" title={t('keys.firstFrame')}>
+                        {genImg ? <img className="s5e-refthumb" src={genImg} alt="" loading="lazy" decoding="async" /> : <span className="s5e-refthumb s5e-refaud">1</span>}
+                        <i>00:00.0</i>
+                      </span>
+                      {keysOf(shot.id).map((k, idx) => (
+                        <span className="s5e-key" key={`kf${idx}`} title={`${k.label} — ${h3Stamp(k.at)}`}>
+                          {k.kind === 'image' ? (
+                            <img className="s5e-refthumb" src={k.src} alt="" loading="lazy" decoding="async" />
+                          ) : (
+                            <span className="s5e-refthumb s5e-refaud">♪</span>
+                          )}
+                          <i>{k.at.toFixed(1)}s</i>
+                        </span>
+                      ))}
+                      <button
+                        type="button"
+                        className="s5e-ico s5e-refbtn"
+                        title={keysOf(shot.id).length ? t('keys.edit') : t('keys.add')}
+                        aria-label={keysOf(shot.id).length ? t('keys.edit') : t('keys.add')}
+                        onClick={() => setKeyPickFor(shot)}
+                      >
+                        <Grid size={16} />
                       </button>
                     </div>
                   )}
@@ -2378,6 +2440,18 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
             update((p) => ({ shotRefs: { ...(p.shotRefs || {}), [refPickFor.id]: next } }))
           }
           onClose={() => setRefPickFor(null)}
+        />
+      )}
+      {keyPickFor && (
+        <KeyframePicker
+          project={project}
+          shot={keyPickFor}
+          durationSec={(() => {
+            const tk = takeOf(project, keyPickFor.id);
+            return tk ? takeTotal(project, tk) : Number(keyPickFor.duration || 4);
+          })()}
+          onChange={(next) => setKeyframes(keyPickFor.id, next)}
+          onClose={() => setKeyPickFor(null)}
         />
       )}
       {showAssets && (
