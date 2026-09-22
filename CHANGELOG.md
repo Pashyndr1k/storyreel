@@ -25,6 +25,10 @@ open there; project cards count out of 5.
   under the timeline.
 - Location photos now live with the scene tools rather than being repeated
   on every shot card.
+- Fixed: uploading the same first-frame file twice created two identical
+  versions, and the newer thumb could never be made current. An upload
+  that matches an existing version now selects it; duplicates already in a
+  project collapse into one.
 
 ## 2.2.0 — 2026-09-21
 

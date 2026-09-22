@@ -718,20 +718,27 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const versionList = (p, shotId) => {
     const hist = (p.shotImageHistory || {})[shotId] || [];
     const cur = (p.shotImages || {})[shotId];
-    if (!cur) return hist;
-    return hist.includes(cur) ? hist : [...[...hist].reverse(), cur];
+    const list = !cur ? hist : hist.includes(cur) ? hist : [...[...hist].reverse(), cur];
+    // Uploading the same file twice used to append a second identical entry;
+    // the "current" ring then stuck to the first copy and the newer thumb
+    // looked unselectable. Identical versions collapse into one (first kept).
+    return list.filter((v, i) => list.indexOf(v) === i);
   };
 
   // A newly generated image appends to the right and becomes selected (max 6
-  // versions kept — the oldest drops off).
+  // versions kept — the oldest drops off). An image that is already a version
+  // (e.g. the same file uploaded again) is selected instead of duplicated.
   const pushVersion = (shotId, img) =>
-    update((p) => ({
-      shotImages: { ...p.shotImages, [shotId]: img },
-      shotImageHistory: {
-        ...(p.shotImageHistory || {}),
-        [shotId]: [...versionList(p, shotId), img].slice(-6),
-      },
-    }));
+    update((p) => {
+      const list = versionList(p, shotId);
+      return {
+        shotImages: { ...p.shotImages, [shotId]: img },
+        shotImageHistory: {
+          ...(p.shotImageHistory || {}),
+          [shotId]: list.includes(img) ? list : [...list, img].slice(-6),
+        },
+      };
+    });
 
   // Select an existing version — order stays exactly as created.
   const selectVersion = (shotId, img) =>
