@@ -3,7 +3,6 @@ import Stage1 from '../stages/Stage1.jsx';
 import Stage2 from '../stages/Stage2.jsx';
 import Stage3 from '../stages/Stage3.jsx';
 import Stage4 from '../stages/Stage4.jsx';
-import Stage5 from '../stages/Stage5.jsx';
 import Stage6 from '../stages/Stage6.jsx';
 import { exportProjectZip } from '../lib/projectFiles.js';
 import { useI18n } from '../lib/i18n.js';
@@ -17,12 +16,12 @@ import { LANGS } from '../lib/i18n.js';
 
 export default function Project({ project, updateProject, settings, setSettings, styles, setStyles, library, libUpsert, libDelete, onBack, onSettings }) {
   const { t, lang } = useI18n();
-  const [view, setView] = useState(Math.min(project.stage, 6));
+  const [view, setView] = useState(Math.min(project.stage, 5));
   const [showProjectSettings, setShowProjectSettings] = useState(false);
   const [showSmartEdit, setShowSmartEdit] = useState(false);
   const [staleFrom, setStaleFrom] = useState(null);
 
-  const STAGES = [1, 2, 3, 4, 5, 6].map((n) => ({ n, label: t(`stages.${n}`) }));
+  const STAGES = [1, 2, 3, 4, 5].map((n) => ({ n, label: t(`stages.${n}`) }));
 
   // One global language drives both the UI and script generation (prompts for
   // image/video generation stay English). Already-generated text is untouched.
@@ -39,7 +38,7 @@ export default function Project({ project, updateProject, settings, setSettings,
   };
 
   const goNext = () => {
-    const next = Math.min(view + 1, 6);
+    const next = Math.min(view + 1, 5);
     update((p) => ({ stage: Math.max(p.stage, next) }));
     setView(next);
   };
@@ -184,8 +183,8 @@ export default function Project({ project, updateProject, settings, setSettings,
       {view === 2 && <Stage2 {...stageProps} />}
       {view === 3 && <Stage3 {...stageProps} />}
       {view === 4 && <Stage4 {...stageProps} />}
-      {view === 5 && <Stage5 {...stageProps} />}
-      {view === 6 && <Stage6 {...stageProps} />}
+      {/* 2.5: generation and assembly share one workspace */}
+      {view === 5 && <Stage6 {...stageProps} />}
 
       {staleFrom !== null && staleFrom < project.stage && !settings.hideStaleToast && (
         <div className="stale-toast">

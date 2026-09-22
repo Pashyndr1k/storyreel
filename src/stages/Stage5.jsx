@@ -23,7 +23,7 @@ import LibraryPicker from '../components/LibraryPicker.jsx';
 import { newLibraryEntry } from '../lib/library.js';
 import { fileToResizedDataURL, resizeDataURL } from '../lib/images.js';
 import { extractPalette } from '../lib/palette.js';
-import { Download, RestoreIcon, MapPin, Upload, Layers, Grid, Trash, Stars, Zap, Expand, Mic, StopSq } from '../components/icons.jsx';
+import { Download, RestoreIcon, MapPin, Upload, Layers, Grid, Trash, Stars, Zap, Expand, Mic, StopSq, Chevron } from '../components/icons.jsx';
 
 const readFileDataURL = (file) =>
   new Promise((resolve, reject) => {
@@ -164,9 +164,16 @@ function CopyButton({ text }) {
   );
 }
 
-export default function Stage5({ project, update, settings, onSettings, onProjectSettings, genLang, styles, imageStyle, videoStyle, library, libUpsert, libDelete, goNext }) {
+// Since 2.5 this component is the per-shot / per-scene workbench embedded in
+// the assembly stage (`embed`): the scene comes from the timeline selection
+// (`focusSceneId`), and either one compact shot card (`focusShotId`) or the
+// scene tools (no shot) are rendered — no scene nav, no header, no footer.
+export default function Stage5({ project, update, settings, onSettings, onProjectSettings, genLang, styles, imageStyle, videoStyle, library, libUpsert, libDelete, goNext, embed = false, focusSceneId = null, focusShotId = null }) {
   const { t } = useI18n();
-  const [sceneId, setSceneId] = useState(project.outline[0]?.id || null);
+  const [sceneIdState, setSceneId] = useState(project.outline[0]?.id || null);
+  const sceneId = embed ? focusSceneId || project.outline[0]?.id || null : sceneIdState;
+  // compact card: the prompt editor folds away under its head
+  const [promptOpen, setPromptOpen] = useState(true);
   const [prog, setProg] = useState(null);
   const [refPrefs, setRefPrefs] = useState({}); // shotId -> { char, loc }
   const [imgBusy, setImgBusy] = useState(null); // shotId being generated
@@ -453,6 +460,21 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       setRegenBusy(null);
     }
   };
+
+  // Compact card only: fold / unfold the prompt editor under its head.
+  const promptToggle = () =>
+    embed ? (
+      <button
+        type="button"
+        className={`prompt-fold ${promptOpen ? 'open' : ''}`}
+        title={promptOpen ? t('s5.foldPrompt') : t('s5.unfoldPrompt')}
+        aria-label={promptOpen ? t('s5.foldPrompt') : t('s5.unfoldPrompt')}
+        aria-expanded={promptOpen}
+        onClick={() => setPromptOpen((v) => !v)}
+      >
+        <Chevron size={13} />
+      </button>
+    ) : null;
 
   // Regenerate icon shown in a prompt frame's header, next to Copy.
   const regenBtn = (shot, kind) => (
@@ -1434,23 +1456,91 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     );
   }
 
-  return (
-    <section className="stage">
-      <div className="stage-head-row">
-        <h2 className="stage-h2" data-tip={t('s5.desc')}>{t('s5.title')}</h2>
+  // Location photos of the current scene — per card on the standalone stage,
+  // once in the scene panel when embedded.
+  const scenePhotosBlock = (
+    <div className="s5-scenephotos">
+      <label className="photos-label">{t('scene.photos')}</label>
+      <div className="photo-row">
+        {(scene?.photos || []).map((ph, j) => (
+          <div key={j} className="photo-thumb">
+            <img decoding="async" loading="lazy" src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
+            <button
+              className="photo-x"
+              onClick={() => updateScenePhotos((scene.photos || []).filter((_, k) => k !== j))}
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+        {(scene?.photos || []).length < 6 && (
+          <>
+            <label className="photo-add" title={t('pick.upload')} aria-label={t('pick.upload')}>
+              <Upload size={20} />
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(e) => {
+                  const fs = [...(e.target.files || [])];
+                  e.target.value = '';
+                  if (fs.length) addScenePhotos(fs);
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              className="photo-add"
+              title={t('pick.fromLib')}
+              aria-label={t('pick.fromLib')}
+              onClick={() => setPickLoc(true)}
+            >
+              <Layers size={20} />
+            </button>
+          </>
+        )}
       </div>
+    </div>
+  );
 
-      <SceneNav
-        outline={project.outline}
-        currentId={scene.id}
-        isDone={(s) => {
-          const sShots = project.sceneDetails[s.id]?.shots || [];
-          return sShots.length > 0 && sShots.every((sh) => project.shotPrompts[sh.id]);
-        }}
-        onSelect={setSceneId}
-      />
+  const Root = embed ? 'div' : 'section';
+  const focusShot = embed && focusShotId ? shots.find((sh) => sh.id === focusShotId) : null;
+  const showSceneTools = !embed || !focusShot;
+  const visibleShots = embed ? (focusShot ? [focusShot] : []) : shots;
 
-      <div className="row">
+  return (
+    <Root className={embed ? `s5-embed ${promptOpen ? '' : 'prompt-collapsed'}` : 'stage'}>
+      {!embed && (
+        <>
+          <div className="stage-head-row">
+            <h2 className="stage-h2" data-tip={t('s5.desc')}>{t('s5.title')}</h2>
+          </div>
+
+          <SceneNav
+            outline={project.outline}
+            currentId={scene.id}
+            isDone={(s) => {
+              const sShots = project.sceneDetails[s.id]?.shots || [];
+              return sShots.length > 0 && sShots.every((sh) => project.shotPrompts[sh.id]);
+            }}
+            onSelect={setSceneId}
+          />
+        </>
+      )}
+
+      {embed && showSceneTools && (
+        <div className="s5-scenehead">
+          <strong className="s5e-title">
+            {project.outline.indexOf(scene) + 1}. {scene.title || t('s4.untitled')}
+          </strong>
+          <StyleChip project={project} styles={styles} cat="image" onClick={onProjectSettings} />
+          <StyleChip project={project} styles={styles} cat="video" onClick={onProjectSettings} />
+        </div>
+      )}
+
+      {showSceneTools && (
+      <div className="row s5-scenerow">
         {shots.length > 0 && (
           <button className="btn primary" disabled={busy} onClick={generate}>
             {!hasPrompts && <Stars size={14} />} {busy && !prog ? t('gen.generating') : hasPrompts ? t('s5.regenerate') : t('s5.generate', { n: shots.length })}
@@ -1494,12 +1584,15 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         </button>
         <DynamicsVisualizer plan={project.dynamicsPlan} />
       </div>
+      )}
+      {embed && showSceneTools && scenePhotosBlock}
       <ErrorNote error={error} onSettings={onSettings} />
 
       {shots.length === 0 ? (
         <div className="note warn">{t('s5.noShots')}</div>
-      ) : (
-        shots.map((shot, i) => {
+      ) : embed && !focusShot ? null : (
+        visibleShots.map((shot) => {
+          const i = shots.indexOf(shot);
           const p = project.shotPrompts[shot.id] || { imagePrompt: '', videoPrompt: '' };
           const pref = prefFor(shot.id);
           const genImg = (project.shotImages || {})[shot.id];
@@ -1532,7 +1625,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
               ? resolveH3VideoMode(shotMode, { lastFrame: finalImg, hasRefs: !!refsOf(shot.id), hasKeyframes: hasMultiInput(project, shot.id) })
               : resolveVideoMode(shotMode, { lastFrame: finalImg, audio: shotAud });
           return (
-            <div key={shot.id} className="shot-card s5e-card">
+            <div key={shot.id} className={`shot-card s5e-card ${embed ? 's5e-compact' : ''}`}>
               {/* Card header: shot identity, timing, type and action. */}
               <div className="s5e-head s5e-cardhead">
                 <strong className="s5e-title">{t('s4.shot', { n: i + 1 })}</strong>
@@ -1650,10 +1743,11 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     <span className="prompt-tools">
                       {regenBtn(shot, 'image')}
                       <CopyButton text={p.imagePrompt} />
+                      {promptToggle()}
                     </span>
                   </div>
                   <AutoTextarea
-                    minRows={8}
+                    minRows={embed ? 4 : 8}
                     className="s5e-prompt"
                     value={p.imagePrompt}
                     placeholder={t('s5.ph')}
@@ -1874,49 +1968,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         </button>
                       </div>
                     </div>
-                    <div>
-                      <label className="photos-label">{t('scene.photos')}</label>
-                      <div className="photo-row">
-                        {(scene?.photos || []).map((ph, j) => (
-                          <div key={j} className="photo-thumb">
-                            <img decoding="async" loading="lazy" src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
-                            <button
-                              className="photo-x"
-                              onClick={() => updateScenePhotos((scene.photos || []).filter((_, k) => k !== j))}
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        ))}
-                        {(scene?.photos || []).length < 6 && (
-                          <>
-                            <label className="photo-add" title={t('pick.upload')} aria-label={t('pick.upload')}>
-                              <Upload size={20} />
-                              <input
-                                type="file"
-                                accept="image/*"
-                                multiple
-                                hidden
-                                onChange={(e) => {
-                                  const fs = [...(e.target.files || [])];
-                                  e.target.value = '';
-                                  if (fs.length) addScenePhotos(fs);
-                                }}
-                              />
-                            </label>
-                            <button
-                              type="button"
-                              className="photo-add"
-                              title={t('pick.fromLib')}
-                              aria-label={t('pick.fromLib')}
-                              onClick={() => setPickLoc(true)}
-                            >
-                              <Layers size={20} />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
+                    {!embed && scenePhotosBlock}
                   </div>
                 </div>
               </div>
@@ -1933,10 +1985,11 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       {promptEngineBadge(shot)}
                       {regenBtn(shot, 'video')}
                       <CopyButton text={p.videoPrompt} />
+                      {promptToggle()}
                     </span>
                   </div>
                   <AutoTextarea
-                    minRows={6}
+                    minRows={embed ? 4 : 6}
                     className="s5e-prompt"
                     value={p.videoPrompt}
                     placeholder={t('s5.ph')}
@@ -2132,6 +2185,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       <span className="prompt-tools">
                         {regenBtn(shot, 'audio')}
                         <CopyButton text={p.audioPrompt || ''} />
+                        {promptToggle()}
                       </span>
                     </div>
                     <AutoTextarea
@@ -2421,7 +2475,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         })
       )}
 
-      {shots.length > 0 && (
+      {!embed && shots.length > 0 && (
         <footer className="stage-footer">
           <button className="btn primary big" onClick={goNext}>
             {t('s5.continue')}
@@ -2481,6 +2535,6 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           onClose={() => setPickLoc(false)}
         />
       )}
-    </section>
+    </Root>
   );
 }

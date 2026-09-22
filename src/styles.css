@@ -3230,3 +3230,75 @@ textarea.s5e-prompt-sm { min-height: 110px; }
 .keyat input { width: 64px; font-variant-numeric: tabular-nums; }
 .keyat .mono { font-family: ui-monospace, monospace; font-size: 10px; color: var(--muted-2); font-variant-numeric: tabular-nums; }
 .take-cut-mark.key-mark { border-left-style: dotted; }
+
+/* ============ 2.5 — merged generation & assembly stage ============ */
+.asm-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+  margin: 0 0 14px;
+}
+.asm-top .asm-preview { margin: 0; height: auto; min-height: 380px; }
+/* the workbench never grows past the preview: it scrolls inside its frame */
+.asm-bench {
+  min-width: 0;
+  max-height: 560px;
+  overflow-y: auto;
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  padding: 14px 16px;
+}
+.s5-embed .s5e-card { margin: 0; padding: 0; border: none; animation: none; }
+.s5-embed .s5e-card > .s5e-action { margin: 4px 0 10px; font-size: 12px; }
+.s5-embed .s5e-cardhead .s5e-title { font-size: 12px; }
+.s5-scenehead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.s5-scenerow { margin-top: 0; }
+.s5-scenephotos { margin-top: 14px; }
+/* compact card: one column, the result above the (foldable) prompt editor */
+.s5e-compact .s5e { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.s5e-compact .s5e > .s5e-panel:first-child { order: 2; }
+.s5e-compact .s5e-prompt { min-height: 0; }
+.s5e-compact .s5e-refgrid { grid-template-columns: 1fr; }
+.prompt-fold {
+  border: none;
+  background: none;
+  color: var(--muted-2);
+  cursor: pointer;
+  padding: 0 2px;
+  margin-bottom: 6px;
+  display: inline-flex;
+  transition: transform 0.18s var(--ease), color 0.15s;
+}
+.prompt-fold:hover { color: var(--text); }
+.prompt-fold.open { transform: rotate(180deg); }
+.prompt-collapsed .s5e-compact .s5e > .s5e-panel:first-child > *:not(.prompt-head) { display: none; }
+/* selectable scene labels on the timeline */
+.asm-scene-label { cursor: pointer; }
+.asm-scene-label.selected { color: var(--accent); }
+.asm-scene-label.selected span { text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 1000px) { .asm-top { grid-template-columns: 1fr; } .asm-bench { max-height: none; } }
+/* compact card: the left preview IS the result display, so the card keeps
+   only the media's buttons (expand / download) as a small tool strip */
+.s5e-compact .s5e-imgwrap > img,
+.s5e-compact .s5e-imgwrap > video { display: none; }
+.s5e-compact .s5e-imgwrap {
+  display: flex;
+  gap: 6px;
+  border: none;
+  overflow: visible;
+  border-radius: 0;
+}
+.s5e-compact .s5e-imgwrap .s5e-dl {
+  position: static;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  color: var(--text-2);
+  border: 1px solid var(--hairline);
+}
+.s5e-compact .s5e-imgwrap .s5e-dl:hover { background: var(--hover-bg); color: var(--text); }
+.s5e-compact .s5-media-empty { min-height: 0; padding: 8px 10px; }
+.s5e-compact .s5e-audio { width: 100%; }
+.s5e-compact .s5e-panel { gap: 10px; }
+.s5e-compact .s5e-cardhead { margin-bottom: 0; }

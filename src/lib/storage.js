@@ -245,6 +245,7 @@ export function migrateProject(raw) {
   p.genres = Array.isArray(p.genres) ? p.genres.slice(0, 3) : [];
   p.ideas = Array.isArray(p.ideas) ? p.ideas : [];
   p.stage = Number(p.stage) || 1;
+  if (p.stage > 5) p.stage = 5; // 2.5 merged the old stages 5 and 6
   p.archived = !!p.archived;
   p.cover = typeof p.cover === 'string' ? p.cover : '';
   p.lang = typeof p.lang === 'string' ? p.lang : '';

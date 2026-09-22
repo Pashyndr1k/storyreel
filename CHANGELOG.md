@@ -1,5 +1,31 @@
 # Changelog
 
+## 2.5.0 — 2026-09-21
+
+**Five stages.** Generation Prompts and Final Assembly are now one workspace,
+"Generation & Assembly" (Stage 5). Projects that were on the old stage 6
+open there; project cards count out of 5.
+
+- **Split workspace above the timeline.** The left half is the preview
+  (the selected shot's video, or its first frame); the right half is the
+  shot workbench — everything that used to be a Stage 5 shot card, in a
+  compact single-column layout: Image / Video / Audio tabs, every action row,
+  the version strip, takes, references, keyframes and the voice source. The
+  prompt editor sits under the result and folds away with one click, so a
+  shot's tools fit the panel without scrolling once it is folded.
+- **Timeline selection drives the workbench.** Clicking a clip selects that
+  shot, moves the playhead to its start (so Play continues from there) and
+  loads its tools on the right. Clicking a scene label selects the scene:
+  the right panel then shows the scene's tools — generate / regenerate
+  prompts for the scene, prompts for all scenes, the engine rewrite, scene
+  media, the asset library, the dynamics plan, location photos and the
+  style chips. The selected scene label is underlined in the accent colour.
+- The timeline is divided into scenes as before (labels, drag to reorder);
+  Render, music, sound effects, smart cut, split A/V and transitions stay
+  under the timeline.
+- Location photos now live with the scene tools rather than being repeated
+  on every shot card.
+
 ## 2.2.0 — 2026-09-21
 
 Backup release before the Stage 5 / Stage 6 merge planned for 2.5.

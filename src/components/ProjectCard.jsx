@@ -33,7 +33,7 @@ export default function ProjectCard({ project, onOpen, onArchive, onRestore, onD
     year: 'numeric',
   });
   const poster = posterOf(project);
-  const stage = Math.max(1, Math.min(project.stage || 1, 6));
+  const stage = Math.max(1, Math.min(project.stage || 1, 5));
 
   const act = (fn) => (e) => {
     e.stopPropagation();
@@ -72,11 +72,11 @@ export default function ProjectCard({ project, onOpen, onArchive, onRestore, onD
           <span>{date}</span>
           <span className="pc-prog">
             <span className="pc-segs">
-              {[1, 2, 3, 4, 5, 6].map((n) => (
+              {[1, 2, 3, 4, 5].map((n) => (
                 <span key={n} className={`pc-seg ${n <= stage ? 'on' : ''}`} />
               ))}
             </span>
-            <span className="pc-count">{stage}/6</span>
+            <span className="pc-count">{stage}/5</span>
           </span>
         </div>
         <h4 className="pc-title">{project.title}</h4>

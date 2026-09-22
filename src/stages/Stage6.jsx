@@ -9,6 +9,7 @@ import { generateJSON, textKeyError } from '../lib/claude.js';
 import { stage6SmartCutPrompt } from '../lib/prompts.js';
 import { decodeMediaAudio, audioBufferToWavDataURL } from '../lib/audio.js';
 import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
+import Stage5 from './Stage5.jsx';
 import { Play, StopSq, Grip, Download, Upload, Stars, Trash, Scissors, TransitionIcon, Plus } from '../components/icons.jsx';
 
 const readFileDataURL = (file) =>
@@ -158,11 +159,16 @@ function defaultScale(project) {
 // above the timeline plays the assembly in real time, and "Render" records
 // it to a file (extra time beyond a clip's video holds the clip's last
 // frame, matching the ffmpeg render — frames are never stretched).
-export default function Stage6({ project, update, settings }) {
+// Since 2.5 this is the merged "Generation & assembly" stage: the preview on
+// the left, the per-shot / per-scene workbench (Stage5 in embed mode) on the
+// right, and the scene-divided timeline below. Timeline selection drives the
+// workbench; the remaining stage props are forwarded to it untouched.
+export default function Stage6({ project, update, settings, ...workbench }) {
   const { t, lang } = useI18n();
   const [playing, setPlaying] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [selectedId, setSelectedId] = useState(null);
+  const [selectedSceneId, setSelectedSceneId] = useState(null); // scene tools when no shot is selected
   const [rendering, setRendering] = useState(false);
   const [renderProg, setRenderProg] = useState(null);
   const trackRef = useRef(null);
@@ -1309,6 +1315,7 @@ export default function Stage6({ project, update, settings }) {
     : seconds > 120 ? 10 : seconds > 40 ? 5 : 1;
   const showPlayhead = total > 0 && (playing || elapsed > 0);
   const selected = items.find((x) => x.shot.id === selectedId);
+  const workSceneId = selected ? selected.sceneId : selectedSceneId || items[0]?.sceneId || project.outline[0]?.id || null;
   const innerWidth = zoomed ? NLE_GUT + seconds * scale : undefined; // px in zoom mode
 
   return (
@@ -1317,6 +1324,7 @@ export default function Stage6({ project, update, settings }) {
         <h2 className="stage-h2" data-tip={t('s6.desc')}>{t('s6.title')}</h2>
       </div>
 
+      <div className="asm-top">
       <div className="asm-preview">
         {cur?.video ? (
           <video key={cur.shot.id} ref={pvRef} src={cur.video} preload="auto" playsInline />
@@ -1329,6 +1337,20 @@ export default function Stage6({ project, update, settings }) {
         {playing && items[curIdx + 1]?.video && (
           <video key={`pre-${items[curIdx + 1].shot.id}`} src={items[curIdx + 1].video} preload="auto" muted playsInline style={{ display: 'none' }} />
         )}
+      </div>
+      {/* The workbench follows the timeline selection: a shot's tools, or the
+          scene's tools when only a scene label is selected. */}
+      <div className="asm-bench">
+        <Stage5
+          embed
+          project={project}
+          update={update}
+          settings={settings}
+          {...workbench}
+          focusSceneId={workSceneId}
+          focusShotId={selectedId}
+        />
+      </div>
       </div>
 
       <div className="nle">
@@ -1371,9 +1393,15 @@ export default function Stage6({ project, update, settings }) {
               }}
             >
               <div
-                className="asm-scene-label"
-                title={t('s6.dragScene')}
+                className={`asm-scene-label ${selectedSceneId === g.scene.id && !selectedId ? 'selected' : ''}`}
+                title={t('s6.sceneTip')}
                 draggable={trimId === null}
+                onClick={() => {
+                  setSelectedId(null);
+                  setSelectedSceneId(g.scene.id);
+                  const first = items.findIndex((x) => x.sceneId === g.scene.id);
+                  if (first >= 0) setElapsed(startOf(first));
+                }}
                 onDragStart={(e) => {
                   dragScene.current = gi;
                   e.dataTransfer.effectAllowed = 'move';
@@ -1399,6 +1427,7 @@ export default function Stage6({ project, update, settings }) {
                       draggable={trimId === null}
                       onClick={() => {
                         setSelectedId(it.shot.id);
+                        setSelectedSceneId(g.scene.id);
                         setElapsed(startOf(globalIdx));
                       }}
                       onDragStart={(e) => {
