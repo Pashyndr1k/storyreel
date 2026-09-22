@@ -868,6 +868,50 @@ export default function Stage6({ project, update, settings, ...workbench }) {
   // Background music via the local ACE-Step workflow: instrumental-only score
   // from genre + tempo + mood, as long as the film, dropped onto a dedicated
   // lane pinned to the BOTTOM of the audio timeline.
+  // Every piece of music gets its OWN track, appended below all the previous
+  // music tracks at the bottom of the timeline — generated or uploaded alike.
+  const addMusicLane = (clip) =>
+    update((p) => {
+      const Ls = [...(p.audioLayers || [])];
+      const n = Ls.filter(isMusicLane).length;
+      Ls.push({
+        id: `bgm_${uid()}`,
+        name: `${t('s6.musicLane')} ${n + 1}`,
+        enabled: true,
+        volume: 0.35,
+        clips: [clip],
+      });
+      return { audioLayers: Ls };
+    });
+
+  // Ready-made music from disk: lands on its own music lane at 0 s, at its
+  // real length (the Length field applies to generation only).
+  const uploadMusic = async (file) => {
+    if (!music || music.busy) return;
+    setMusic((m) => ({ ...m, busy: true }));
+    try {
+      const dataURL = await readFileDataURL(file);
+      const dur = await probeAudioDuration(dataURL);
+      if (!dur) throw new Error(t('s6.musicBadFile'));
+      addMusicLane({
+        id: uid(),
+        name: (file.name || 'music').replace(/\.[^.]+$/, '').slice(0, 30),
+        dataURL,
+        start: 0,
+        offset: 0,
+        duration: dur,
+        srcDuration: dur,
+        fadeIn: 0,
+        fadeOut: 0,
+      });
+      setMusic(null);
+      showToast(t('s6.musicUploaded'));
+    } catch (e) {
+      setMusic((m) => (m ? { ...m, busy: false } : m));
+      showToast(e.message || String(e), 'error');
+    }
+  };
+
   const runMusic = async () => {
     if (!music || music.busy) return;
     const genre = MUSIC_GENRES.find(([id]) => id === music.genre) || MUSIC_GENRES[0];
@@ -897,20 +941,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
         fadeIn: 0,
         fadeOut: 0,
       };
-      // Every generated melody gets its OWN track, appended below all the
-      // previous music tracks at the bottom of the timeline.
-      update((p) => {
-        const Ls = [...(p.audioLayers || [])];
-        const n = Ls.filter(isMusicLane).length;
-        Ls.push({
-          id: `bgm_${uid()}`,
-          name: `${t('s6.musicLane')} ${n + 1}`,
-          enabled: true,
-          volume: 0.35,
-          clips: [clip],
-        });
-        return { audioLayers: Ls };
-      });
+      addMusicLane(clip);
       setMusic(null);
       showToast(t('s6.musicDone'));
     } catch (e) {
@@ -2067,6 +2098,20 @@ export default function Stage6({ project, update, settings, ...workbench }) {
               <button className="btn small primary fixedw" disabled={music.busy} onClick={runMusic}>
                 {music.busy ? t('s6.musicBusy') : t('s6.musicRun')}
               </button>
+              <label className={`btn small file-btn ${music.busy ? 'disabled' : ''}`} title={t('s6.musicUploadTip')}>
+                <Upload size={14} /> {t('s6.musicUpload')}
+                <input
+                  type="file"
+                  accept="audio/*"
+                  hidden
+                  disabled={music.busy}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = '';
+                    if (f) uploadMusic(f);
+                  }}
+                />
+              </label>
               <button className="btn small" disabled={music.busy} onClick={() => setMusic(null)}>
                 {t('s6.close')}
               </button>
