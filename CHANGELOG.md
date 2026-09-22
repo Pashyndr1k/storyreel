@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.2.0 — 2026-09-21
+
+Backup release before the Stage 5 / Stage 6 merge planned for 2.5.
+
+- **MiniMax H3 multi-frame mode (MULTI).** A third H3 workflow next to
+  image-to-video and reference mode: one generation pinned to several stills
+  at exact seconds. The shot's first frame is Picture 1; every keyframe you add
+  is anchored on the output timeline and also handed to the text encoder as
+  Picture 2, 3… An audio take can be anchored the same way. Choosing MULTI on a
+  multi-shot take seeds the members' first frames at the take's cut times.
+  A new keyframe editor lists the anchors with their times; Stage 6 draws them
+  on the clip. Optional Lightning LoRA (4 steps) for MULTI only, off by
+  default. The prompt writer gained a six-section keyframe template with
+  exact-timestamp rules learned from MiniMax's reference workflow.
+- **LTX-2.5 for image-to-video.** The i2v workflow now runs the LTX-2.5
+  distilled transformer (half-resolution pass, latent upscale, full-size
+  refinement, native audio) at 24 fps. First/last-frame and sound-to-video keep
+  their LTX-2.3 workflows.
+- Settings fit one screen with no scrollbars: video engine, H3 options and
+  voice moved to a new **Video & voice** tab, and both model tabs use two
+  columns.
+- Main screen: an **Export project** button on every card; the Archive menu
+  icon now matches the cards' archive icon at the same size.
+
 ## 2.1.0 — 2026-08-11
 
 - Stage 6: **sound effect generation**. The new Sound FX button opens a pop-up
