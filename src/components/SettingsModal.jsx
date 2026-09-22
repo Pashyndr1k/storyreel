@@ -6,7 +6,7 @@ import { saveProjects, migrateProject } from '../lib/storage.js';
 import { loadStyles, saveStyles, mergeStyles, buildStylesExport, parseStylesFile } from '../lib/styles.js';
 import { sanitizeFolder } from '../lib/projectFiles.js';
 import { downloadText } from '../lib/exportScript.js';
-import { Archive, Key, Cpu, Sliders } from './icons.jsx';
+import { Archive, Key, Cpu, Sliders, Clapperboard } from './icons.jsx';
 
 // UI font schemes (Interface tab). Every option keeps similar proportions so
 // the hairline layout keeps its rhythm. Stacks use fonts stocked with
@@ -183,6 +183,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
     ['backups', t('set.tabBackups'), Archive],
     ['api', t('set.tabApi'), Key],
     ['models', t('set.tabModels'), Cpu],
+    ['video', t('set.tabVideo'), Clapperboard],
     ['ui', t('set.tabUI'), Sliders],
   ];
 
@@ -190,7 +191,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
   // All three bodies stay mounted (inactive ones positioned off-flow but
   // measurable); the panel height tracks the max of their content heights.
   const panelRef = useRef(null);
-  const pageRefs = { backups: useRef(null), api: useRef(null), models: useRef(null), ui: useRef(null) };
+  const pageRefs = { backups: useRef(null), api: useRef(null), models: useRef(null), video: useRef(null), ui: useRef(null) };
   const [panelH, setPanelH] = useState(null);
   useLayoutEffect(() => {
     const heights = Object.values(pageRefs).map((r) => r.current?.scrollHeight || 0);
@@ -200,7 +201,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
     const pad = cs ? parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) : 18;
     setPanelH(max + pad);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modelList, fetchErr, fetching, tab]);
+  }, [modelList, fetchErr, fetching, tab, videoEngine]);
 
   const backupsBody = (
     <>
@@ -293,84 +294,97 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
     </>
   );
 
+  // Models are split across two tabs (text & image / video & voice), each laid
+  // out in two columns, so every tab fits one screen without scrolling.
   const modelsBody = (
-    <>
-      <label>{t('set.model')}</label>
-            <select value={model} onChange={(e) => setModel(e.target.value)}>
-              {MODELS.map((m) => (
-                <option key={m.id} value={m.id}>{m.label}</option>
+    <div className="set-cols">
+      <div>
+        <label>{t('set.model')}</label>
+        <select value={model} onChange={(e) => setModel(e.target.value)}>
+          {MODELS.map((m) => (
+            <option key={m.id} value={m.id}>{m.label}</option>
+          ))}
+        </select>
+        <label>{t('set.geminiModel')}</label>
+        <input value={geminiModel} onChange={(e) => setGeminiModel(e.target.value)} placeholder="gemini-3-pro-image-preview" />
+        <div className="row" style={{ marginTop: 8 }}>
+          <button className="btn small" disabled={fetching} onClick={fetchModels}>
+            {fetching ? t('set.fetching') : t('set.fetchModels')}
+          </button>
+        </div>
+        {fetchErr && <div className="note error">{fetchErr}</div>}
+        {modelList && (modelList.length ? (
+          <>
+            <label className="sub-label">{t('set.modelsFound')}</label>
+            <select value={geminiModel} onChange={(e) => setGeminiModel(e.target.value)}>
+              {!modelList.includes(geminiModel) && <option value={geminiModel}>{geminiModel}</option>}
+              {modelList.map((m) => (
+                <option key={m} value={m}>{m}</option>
               ))}
             </select>
-            <label>{t('set.geminiModel')}</label>
-            <input value={geminiModel} onChange={(e) => setGeminiModel(e.target.value)} placeholder="gemini-3-pro-image-preview" />
-            <div className="row" style={{ marginTop: 8 }}>
-              <button className="btn small" disabled={fetching} onClick={fetchModels}>
-                {fetching ? t('set.fetching') : t('set.fetchModels')}
-              </button>
-            </div>
-            {fetchErr && <div className="note error">{fetchErr}</div>}
-            {modelList && (modelList.length ? (
-              <>
-                <label className="sub-label">{t('set.modelsFound')}</label>
-                <select value={geminiModel} onChange={(e) => setGeminiModel(e.target.value)}>
-                  {!modelList.includes(geminiModel) && <option value={geminiModel}>{geminiModel}</option>}
-                  {modelList.map((m) => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-              </>
-            ) : (
-              <div className="note warn">—</div>
-            ))}
+          </>
+        ) : (
+          <div className="note warn">—</div>
+        ))}
+      </div>
+      <div>
+        <label>{t('set.textService')}</label>
+        <select value={textService} onChange={(e) => setTextService(e.target.value)}>
+          <option value="claude">{t('set.svcClaude')}</option>
+          <option value="gemini">{t('set.svcGeminiText')}</option>
+        </select>
+        <label>{t('set.storyboardService')}</label>
+        <select value={storyboardService} onChange={(e) => setStoryboardService(e.target.value)}>
+          <option value="gemini">{t('set.svcGemini')}</option>
+          <option value="comfy">{t('set.svcComfySb')}</option>
+        </select>
+        <label>{t('set.imageService')}</label>
+        <select value={imageService} onChange={(e) => setImageService(e.target.value)}>
+          <option value="gemini">{t('set.svcGemini')}</option>
+          <option value="comfy">{t('set.svcComfyImg')}</option>
+        </select>
+      </div>
+    </div>
+  );
 
-            <h3 className="settings-section">{t('set.services')}</h3>
-            <label>{t('set.textService')}</label>
-            <select value={textService} onChange={(e) => setTextService(e.target.value)}>
-              <option value="claude">{t('set.svcClaude')}</option>
-              <option value="gemini">{t('set.svcGeminiText')}</option>
+  const videoBody = (
+    <div className="set-cols">
+      <div>
+        <label>{t('set.videoService')}</label>
+        <select value={videoService} onChange={(e) => setVideoService(e.target.value)}>
+          <option value="comfy">{t('set.svcComfyVid')}</option>
+        </select>
+        <label>{t('set.videoEngine')}</label>
+        <select value={videoEngine} onChange={(e) => setVideoEngine(e.target.value)}>
+          <option value="ltx">{t('set.engLtx')}</option>
+          <option value="minimax">{t('set.engMinimax')}</option>
+        </select>
+        <p className="hint">{t(videoEngine === 'minimax' ? 'set.engMinimaxHint' : 'set.engLtxHint')}</p>
+        <label>{t('set.voiceService')}</label>
+        <select value={voiceService} onChange={(e) => setVoiceService(e.target.value)}>
+          <option value="comfy">{t('set.svcOmniVoice')}</option>
+          <option value="gemini">{t('set.svcGeminiTts')}</option>
+        </select>
+      </div>
+      <div>
+        {videoEngine === 'minimax' && (
+          <>
+            <label>{t('set.refSize')}</label>
+            <select value={h3RefImageSize} onChange={(e) => setH3RefImageSize(e.target.value)}>
+              <option value="match">{t('set.refSizeMatch')}</option>
+              <option value="max">{t('set.refSizeMax')}</option>
             </select>
-            <label>{t('set.storyboardService')}</label>
-            <select value={storyboardService} onChange={(e) => setStoryboardService(e.target.value)}>
-              <option value="gemini">{t('set.svcGemini')}</option>
-              <option value="comfy">{t('set.svcComfySb')}</option>
-            </select>
-            <label>{t('set.imageService')}</label>
-            <select value={imageService} onChange={(e) => setImageService(e.target.value)}>
-              <option value="gemini">{t('set.svcGemini')}</option>
-              <option value="comfy">{t('set.svcComfyImg')}</option>
-            </select>
-      <label>{t('set.videoService')}</label>
-      <select value={videoService} onChange={(e) => setVideoService(e.target.value)}>
-        <option value="comfy">{t('set.svcComfyVid')}</option>
-      </select>
-      <label>{t('set.videoEngine')}</label>
-      <select value={videoEngine} onChange={(e) => setVideoEngine(e.target.value)}>
-        <option value="ltx">{t('set.engLtx')}</option>
-        <option value="minimax">{t('set.engMinimax')}</option>
-      </select>
-      <p className="hint">{t(videoEngine === 'minimax' ? 'set.engMinimaxHint' : 'set.engLtxHint')}</p>
-      {videoEngine === 'minimax' && (
-        <>
-          <label>{t('set.refSize')}</label>
-          <select value={h3RefImageSize} onChange={(e) => setH3RefImageSize(e.target.value)}>
-            <option value="match">{t('set.refSizeMatch')}</option>
-            <option value="max">{t('set.refSizeMax')}</option>
-          </select>
-          <p className="hint">{t('set.refSizeHint')}</p>
-          <label>{t('set.h3Lightning')}</label>
-          <label className="check">
-            <input type="checkbox" checked={h3Lightning} onChange={(e) => setH3Lightning(e.target.checked)} />
-            <span>{t('set.h3LightningOn')}</span>
-          </label>
-          <p className="hint">{t('set.h3LightningHint')}</p>
-        </>
-      )}
-      <label>{t('set.voiceService')}</label>
-      <select value={voiceService} onChange={(e) => setVoiceService(e.target.value)}>
-        <option value="comfy">{t('set.svcOmniVoice')}</option>
-        <option value="gemini">{t('set.svcGeminiTts')}</option>
-      </select>
-    </>
+            <p className="hint">{t('set.refSizeHint')}</p>
+            <label>{t('set.h3Lightning')}</label>
+            <label className="check-row">
+              <input type="checkbox" checked={h3Lightning} onChange={(e) => setH3Lightning(e.target.checked)} />
+              <span>{t('set.h3LightningOn')}</span>
+            </label>
+            <p className="hint">{t('set.h3LightningHint')}</p>
+          </>
+        )}
+      </div>
+    </div>
   );
 
   const uiBody = (
@@ -405,7 +419,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
     </>
   );
 
-  const bodies = { backups: backupsBody, api: apiBody, models: modelsBody, ui: uiBody };
+  const bodies = { backups: backupsBody, api: apiBody, models: modelsBody, video: videoBody, ui: uiBody };
 
   return (
     <div className="overlay" onClick={onClose}>

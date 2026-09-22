@@ -1,7 +1,7 @@
 import Dropdown from './Dropdown.jsx';
 import ThemeToggle from './ThemeToggle.jsx';
 import Logo from './Logo.jsx';
-import { Grid, Box, Cog, Globe, User, MapPin, Palette } from './icons.jsx';
+import { Grid, Archive, Cog, Globe, User, MapPin, Palette } from './icons.jsx';
 import { LANGS, useI18n } from '../lib/i18n.js';
 
 // Editorial app frame (design 5a): a hairline header bar with the ink logo
@@ -50,7 +50,7 @@ export default function AppShell({
           </div>
           <nav className="hd-nav">
             {navItem('home', <Grid size={19} />, t('nav.projects'))}
-            {navItem('archive', <Box size={19} />, t('nav.archive'))}
+            {navItem('archive', <Archive size={19} />, t('nav.archive'))}
             {navItem('characters', <User size={19} />, t('nav.characters'))}
             {navItem('locations', <MapPin size={19} />, t('nav.locations'))}
             {navItem('styles', <Palette size={19} />, t('nav.styles'))}

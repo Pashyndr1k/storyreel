@@ -2930,7 +2930,12 @@ textarea.s5e-prompt-sm { min-height: 110px; }
 .settings-io { margin-top: 6px; }
 
 /* ============ SETTINGS — tabbed layout ============ */
-.set-modal { width: 560px; max-width: 100%; }
+/* Settings never scrolls: tabs are split and laid out in two columns so the
+   tallest one fits a 720px-high window. */
+.modal.set-modal { width: 780px; max-width: 100%; max-height: none; overflow: visible; }
+.set-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; align-items: start; }
+.set-cols > div > label:first-child { margin-top: 0; }
+@media (max-width: 720px) { .set-cols { grid-template-columns: 1fr; } }
 .set-tabs {
   display: flex;
   gap: 4px;
@@ -2968,8 +2973,6 @@ textarea.s5e-prompt-sm { min-height: 110px; }
    viewport cap keeps it safe on short windows. */
 .set-panel {
   position: relative;
-  max-height: 78vh;
-  overflow-y: auto;
   padding: 16px 2px 2px;
 }
 .set-page.off {

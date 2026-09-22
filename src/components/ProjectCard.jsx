@@ -1,5 +1,6 @@
 import { useI18n, localeOf } from '../lib/i18n.js';
-import { Copy, Archive as ArchiveIcon, Trash, RestoreIcon, Star } from './icons.jsx';
+import { useState } from 'react';
+import { Copy, Archive as ArchiveIcon, Trash, RestoreIcon, Star, Download } from './icons.jsx';
 
 // Prefer the generated cover; fall back to the first reference photo.
 function posterOf(project) {
@@ -13,8 +14,19 @@ function posterOf(project) {
 // Dashboard project cell (design 5a): the whole card is the open action.
 // The still sits grayscale under a paper wash and regains full colour on
 // hover; progress is six accent segments plus a tabular counter.
-export default function ProjectCard({ project, onOpen, onArchive, onRestore, onDuplicate, onDelete, onPin }) {
+export default function ProjectCard({ project, onOpen, onArchive, onRestore, onDuplicate, onDelete, onPin, onExport }) {
   const { t, lang } = useI18n();
+  const [exporting, setExporting] = useState(false);
+  // exporting a big project takes a moment; one click per run
+  const runExport = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      await onExport();
+    } finally {
+      setExporting(false);
+    }
+  };
   const date = new Date(project.createdAt).toLocaleDateString(localeOf(lang), {
     month: '2-digit',
     day: '2-digit',
@@ -76,6 +88,18 @@ export default function ProjectCard({ project, onOpen, onArchive, onRestore, onD
         </div>
         <div className="pc-foot">
           <div className="pc-acts">
+            {onExport && (
+              <button
+                className="icon-btn"
+                title={t('card.export')}
+                aria-label={t('card.export')}
+                aria-busy={exporting}
+                disabled={exporting}
+                onClick={act(runExport)}
+              >
+                <Download size={17} />
+              </button>
+            )}
             {onDuplicate && (
               <button className="icon-btn" title={t('card.duplicate')} aria-label={t('card.duplicate')} onClick={act(onDuplicate)}>
                 <Copy size={17} />

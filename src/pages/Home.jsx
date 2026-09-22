@@ -7,7 +7,7 @@ import { Upload, Plus, Search } from '../components/icons.jsx';
 import Logo from '../components/Logo.jsx';
 import { newProject, uid, migrateProject } from '../lib/storage.js';
 import { parseProjectFile } from '../lib/exportScript.js';
-import { importProjectZip } from '../lib/projectFiles.js';
+import { importProjectZip, exportProjectZip } from '../lib/projectFiles.js';
 import { useI18n } from '../lib/i18n.js';
 
 export default function Home({
@@ -22,7 +22,7 @@ export default function Home({
   onArchivePage,
   onSettings,
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [query, setQuery] = useState('');
   // The sort choice survives navigation and restarts — Home unmounts whenever
   // a project opens, so plain component state silently reset it to "newest".
@@ -175,6 +175,7 @@ export default function Home({
               onOpen={() => onOpen(p.id)}
               onArchive={() => updateProject(p.id, { archived: true }, { touch: false })}
               onPin={() => updateProject(p.id, { pinned: !p.pinned }, { touch: false })}
+              onExport={() => exportProjectZip(p, lang).catch((e) => window.alert(e.message || String(e)))}
               onDuplicate={() => duplicate(p)}
               onDelete={() => del(p)}
             />
