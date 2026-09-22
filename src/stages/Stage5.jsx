@@ -1749,6 +1749,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                   <AutoTextarea
                     minRows={embed ? 4 : 8}
                     className="s5e-prompt"
+                    remeasure={promptOpen}
                     value={p.imagePrompt}
                     placeholder={t('s5.ph')}
                     onChange={(e) => setPrompt(shot.id, { imagePrompt: e.target.value })}
@@ -1991,6 +1992,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                   <AutoTextarea
                     minRows={embed ? 4 : 6}
                     className="s5e-prompt"
+                    remeasure={promptOpen}
                     value={p.videoPrompt}
                     placeholder={t('s5.ph')}
                     onChange={(e) => setPrompt(shot.id, { videoPrompt: e.target.value })}
@@ -2191,6 +2193,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     <AutoTextarea
                       minRows={4}
                       className="s5e-prompt s5e-prompt-sm"
+                    remeasure={promptOpen}
                       value={p.audioPrompt || ''}
                       placeholder={t('s5.audPh')}
                       onChange={(e) => setPrompt(shot.id, { audioPrompt: e.target.value })}
@@ -2229,6 +2232,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         <AutoTextarea
                           minRows={3}
                           className="s5e-prompt s5e-prompt-sm"
+                    remeasure={promptOpen}
                           value={(project.shotSpeakerNotes || {})[shot.id] || ''}
                           placeholder={t('vsrc.speakerPh')}
                           onChange={(e) =>
@@ -2255,6 +2259,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         <AutoTextarea
                           minRows={3}
                           className="s5e-prompt s5e-prompt-sm"
+                    remeasure={promptOpen}
                           value={p.voicePrompt}
                           onChange={(e) => setPrompt(shot.id, { voicePrompt: e.target.value })}
                         />
