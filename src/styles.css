@@ -3239,11 +3239,13 @@ textarea.s5e-prompt-sm { min-height: 110px; }
   align-items: stretch;
   margin: 0 0 14px;
 }
-.asm-top .asm-preview { margin: 0; height: auto; min-height: 380px; }
-/* the workbench never grows past the preview: it scrolls inside its frame */
+/* Both frames are a FIXED height so switching shots or scenes never
+   reflows the page; the workbench scrolls inside its frame instead. */
+.asm-top { --asm-top-h: 560px; }
+.asm-top .asm-preview { margin: 0; height: var(--asm-top-h); min-height: 0; }
 .asm-bench {
   min-width: 0;
-  max-height: 560px;
+  height: var(--asm-top-h);
   overflow-y: auto;
   border: 1px solid var(--hairline);
   border-radius: 3px;
@@ -3277,7 +3279,7 @@ textarea.s5e-prompt-sm { min-height: 110px; }
 .asm-scene-label { cursor: pointer; }
 .asm-scene-label.selected { color: var(--accent); }
 .asm-scene-label.selected span { text-decoration: underline; text-underline-offset: 3px; }
-@media (max-width: 1000px) { .asm-top { grid-template-columns: 1fr; } .asm-bench { max-height: none; } }
+@media (max-width: 1000px) { .asm-top { grid-template-columns: 1fr; } .asm-top .asm-preview { height: 380px; } }
 /* compact card: the left preview IS the result display, so the card keeps
    only the media's buttons (expand / download) as a small tool strip */
 .s5e-compact .s5e-imgwrap > img,
