@@ -3304,3 +3304,14 @@ textarea.s5e-prompt-sm { min-height: 110px; }
 .s5e-compact .s5e-audio { width: 100%; }
 .s5e-compact .s5e-panel { gap: 10px; }
 .s5e-compact .s5e-cardhead { margin-bottom: 0; }
+/* compact card: the version strip flows inside the tool strip instead of
+   hovering over an image box that no longer exists there */
+.s5e-compact .s5e-imgwrap { flex-wrap: wrap; align-items: center; }
+.s5e-compact .s5e-imgwrap .s5e-vers-overlay {
+  position: static;
+  flex-wrap: wrap;
+  margin-left: 6px;
+  z-index: auto;
+}
+.s5e-compact .s5e-imgwrap .s5e-vers-overlay > span:first-child { color: var(--muted); text-shadow: none; font-size: 11px; }
+.s5e-compact .s5e-ver { width: 56px; height: 34px; }
