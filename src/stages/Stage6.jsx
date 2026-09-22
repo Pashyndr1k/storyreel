@@ -169,6 +169,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
   const [elapsed, setElapsed] = useState(0);
   const [selectedId, setSelectedId] = useState(null);
   const [selectedSceneId, setSelectedSceneId] = useState(null); // scene tools when no shot is selected
+  const [benchTab, setBenchTab] = useState('image'); // the workbench's active tab for the selected shot
   const [rendering, setRendering] = useState(false);
   const [renderProg, setRenderProg] = useState(null);
   const trackRef = useRef(null);
@@ -1357,13 +1358,17 @@ export default function Stage6({ project, update, settings, ...workbench }) {
 
       <div className="asm-top">
       <div className="asm-preview">
-        {cur?.video ? (
-          <video key={cur.shot.id} ref={pvRef} src={cur.video} preload="auto" playsInline />
-        ) : cur?.image ? (
-          <img decoding="async" loading="lazy" src={cur.image} alt="" />
-        ) : (
-          <div className="asm-blank">{cur ? t('s4.shot', { n: curIdx + 1 }) : ''}</div>
-        )}
+        {/* Idle with a shot selected: mirror the workbench — the Image tab
+            shows the current image version, the Video tab the shot's video.
+            Playing: follow the playhead through the timeline as before. */}
+        {(() => {
+          const idleSel = !playing && selected;
+          const pv = idleSel ? selected : cur;
+          const wantVideo = idleSel ? benchTab === 'video' && !!pv?.video : !!pv?.video;
+          if (wantVideo) return <video key={pv.shot.id} ref={pvRef} src={pv.video} preload="auto" playsInline />;
+          if (pv?.image) return <img decoding="async" loading="lazy" src={pv.image} alt="" />;
+          return <div className="asm-blank">{pv ? t('s4.shot', { n: items.indexOf(pv) + 1 }) : ''}</div>;
+        })()}
         {/* warm the decoder for the next clip so the boundary switch doesn't stall */}
         {playing && items[curIdx + 1]?.video && (
           <video key={`pre-${items[curIdx + 1].shot.id}`} src={items[curIdx + 1].video} preload="auto" muted playsInline style={{ display: 'none' }} />
@@ -1380,6 +1385,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
           {...workbench}
           focusSceneId={workSceneId}
           focusShotId={selectedId}
+          onTabChange={setBenchTab}
         />
       </div>
       </div>

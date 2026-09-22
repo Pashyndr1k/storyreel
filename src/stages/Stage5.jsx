@@ -168,12 +168,13 @@ function CopyButton({ text }) {
 // the assembly stage (`embed`): the scene comes from the timeline selection
 // (`focusSceneId`), and either one compact shot card (`focusShotId`) or the
 // scene tools (no shot) are rendered — no scene nav, no header, no footer.
-export default function Stage5({ project, update, settings, onSettings, onProjectSettings, genLang, styles, imageStyle, videoStyle, library, libUpsert, libDelete, goNext, embed = false, focusSceneId = null, focusShotId = null }) {
+export default function Stage5({ project, update, settings, onSettings, onProjectSettings, genLang, styles, imageStyle, videoStyle, library, libUpsert, libDelete, goNext, embed = false, focusSceneId = null, focusShotId = null, onTabChange }) {
   const { t } = useI18n();
   const [sceneIdState, setSceneId] = useState(project.outline[0]?.id || null);
   const sceneId = embed ? focusSceneId || project.outline[0]?.id || null : sceneIdState;
   // compact card: the prompt editor folds away under its head
   const [promptOpen, setPromptOpen] = useState(true);
+
   const [prog, setProg] = useState(null);
   const [refPrefs, setRefPrefs] = useState({}); // shotId -> { char, loc }
   const [imgBusy, setImgBusy] = useState(null); // shotId being generated
@@ -193,6 +194,11 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const [tweakBusy, setTweakBusy] = useState(null); // `${shotId}:${kind}` in flight
   const [regenBusy, setRegenBusy] = useState(null); // `${shotId}:${kind}` single-prompt regen in flight
   const [shotTab, setShotTab] = useState({}); // shotId -> 'image' | 'video' | 'audio'
+  // The host preview mirrors the focused shot's tab (image vs video).
+  const focusTab = embed && focusShotId ? shotTab[focusShotId] || 'image' : null;
+  useEffect(() => {
+    if (embed && onTabChange) onTabChange(focusTab);
+  }, [embed, focusTab, focusShotId, onTabChange]);
 
   // Always-fresh project reference: generation handlers (and especially the
   // scene-media queue, which runs across many state updates) must read prompts

@@ -1176,7 +1176,7 @@ label {
 /* ============ STAGE STRIP (design 5b): six hairline cells ============ */
 .stg-bar {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   border: 1px solid var(--hairline);
   margin: 0 0 26px;
 }
