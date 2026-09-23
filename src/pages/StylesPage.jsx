@@ -84,12 +84,12 @@ export default function StylesPage({ styles, setStyles, settings, setSettings, o
           </div>
           <label className="btn file-btn">
             {t('styles.import')}
-            <input type="file" accept=".json,application/json" onChange={importStyles} hidden />
+            <input type="file" accept=".json,application/json" onChange={importStyles} className="sr-only" />
           </label>
           <button className="btn" onClick={exportStyles}>{t('styles.export')}</button>
           <button className="btn" onClick={() => setEditing(newStyle())}>{t('styles.add')}</button>
           <button className="btn primary" onClick={() => setAssist(true)}>
-            <Stars size={15} /> {t('sa.button')}
+            <Stars size={14} />{t('sa.button')}
           </button>
         </div>
       </div>

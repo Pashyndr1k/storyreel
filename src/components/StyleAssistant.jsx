@@ -40,7 +40,7 @@ export default function StyleAssistant({ settings, category, onSave, onClose, on
     <div className="overlay" onClick={onClose}>
       <div className="modal wide" onClick={(e) => e.stopPropagation()}>
         <h2>
-          <Stars size={17} /> {t('sa.title')}
+          <Stars size={16} />{t('sa.title')}
         </h2>
         <p className="hint">{t('sa.intro')}</p>
 

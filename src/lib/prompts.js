@@ -47,7 +47,7 @@ function characterBlock(project) {
 const STAGE1_PRODUCTION_CONSTRAINTS = `PRODUCTION CONSTRAINTS (AI video generation limits — every pitched idea MUST be realizable within them):
 - Do NOT propose sequences designed as a single continuous take ("oner", long unbroken tracking shots). Stories must break into discrete, cuttable shots.
 - Do NOT propose split-screen, picture-in-picture, multi-panel or any layout showing more than one video frame at once.
-- No single shot may run longer than 15 seconds — ideally 10 seconds or less. Plan action in short beats that cut well.
+- No single shot may run longer than 10 seconds (every shot is 2–10 seconds). Plan action in short beats that cut well.
 - Every shot is exactly one video frame captured by one camera — no composites, no simultaneous viewpoints, no in-shot montages.`;
 
 // Default Stage-1 plot-generation persona, used when no randomization method
@@ -353,7 +353,7 @@ Return exactly one entry per shot, in order.`,
 // Stage 5 audio prompts: one per shot, written for an EXTERNAL audio-generation
 // model. Each prompt maps the shot's sound chronologically — every spoken line
 // verbatim with precise in-shot timing and delivery directions, plus pauses and
-// essential ambience/effects. Stage 6's voice-over script window aggregates
+// essential ambience/effects. The assembly stage's voice-over script window aggregates
 // these across the whole film.
 export function stage5AudioPrompt(project, scene, shots, block) {
   const chars = (project.storyline?.characters || [])
@@ -399,7 +399,7 @@ Return exactly one entry per shot, in order.`,
   };
 }
 
-// Stage 6 "Smart cut": Claude acts as a film editor re-cutting the assembled
+// Assembly "Smart cut": Claude acts as a film editor re-cutting the assembled
 // timeline per a plain-language instruction ("more dynamic", "slow down
 // scene 2"). It may change shot durations and the transitions between shots;
 // the total runtime is free to change. Shots whose voice audio is already

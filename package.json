@@ -3,7 +3,7 @@
   "productName": "StoryReel",
   "version": "2.6.0",
   "private": true,
-  "description": "AI assistant for writing short videos: from plot idea to per-shot image & video generation prompts.",
+  "description": "AI assistant for writing short videos: from plot idea to an assembled short film.",
   "author": "StoryReel",
   "main": "electron/main.cjs",
   "scripts": {

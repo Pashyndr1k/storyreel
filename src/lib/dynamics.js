@@ -1,7 +1,8 @@
+import { SHOT_MIN_SEC, SHOT_MAX_SEC } from './config.js';
 // Action Dynamics Plan engine. The plan is generated at Stage 3 alongside the
 // scene outline, then trickles down: Stage 4 constrains shot durations by the
 // block's shot_density, Stage 5 cites the block's parameters in generation
-// payloads (with the +3s padding rule), and Stage 6 uses it as the source of
+// payloads (with the +3s padding rule), and the assembly timeline uses it as the source of
 // truth for trims and transitions.
 import config from '../data/dynamics_config.json';
 
@@ -55,7 +56,7 @@ export function blockForScene(plan, sceneNumber) {
 // Allowed shot duration range (seconds) for a block, inside the global 2-10s rule.
 export function densityRange(block) {
   const d = config.shot_density_duration_map[block?.shot_density] || config.shot_density_duration_map.medium;
-  return { min: Math.max(2, d.min_sec), max: Math.min(10, d.max_sec) };
+  return { min: Math.max(SHOT_MIN_SEC, d.min_sec), max: Math.min(SHOT_MAX_SEC, d.max_sec) };
 }
 
 export const energyClass = (level) => (level >= config.energy_high_threshold ? 'high' : 'low');
@@ -97,7 +98,7 @@ function dialogueRhythm(volume) {
   return 'near_silent';
 }
 
-// ---- assembly (Stage 6) ------------------------------------------------------
+// ---- assembly (Stage 5) ------------------------------------------------------
 export function trimSeconds() {
   const t = config.global_trim_rules;
   return {

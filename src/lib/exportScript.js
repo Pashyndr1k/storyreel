@@ -1,4 +1,4 @@
-import { createT } from './i18n.js';
+import { createT, localeOf } from './i18n.js';
 
 function fmt(sec) {
   const m = Math.floor(sec / 60);
@@ -11,7 +11,7 @@ export function buildScriptMarkdown(project, lang = 'en') {
   const L = [];
   L.push(`# ${project.title}`);
   if (project.genres.length) L.push(`**${t('exp.genres')}:** ${project.genres.join(', ')}`);
-  L.push(`**${t('exp.created')}:** ${new Date(project.createdAt).toLocaleDateString(lang === 'ru' ? 'ru-RU' : 'en-US')}`);
+  L.push(`**${t('exp.created')}:** ${new Date(project.createdAt).toLocaleDateString(localeOf(lang))}`);
   L.push('');
 
   if (project.logline) {

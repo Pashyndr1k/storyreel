@@ -140,9 +140,9 @@ export default function Home({
           </div>
           <Dropdown value={sort} options={sortOptions} onChange={setSort} title={t('home.newest')} />
           <label className="btn file-btn">
-            <Upload size={15} />
+            <Upload size={14} />
             {t('home.import')}
-            <input type="file" accept=".zip,.md,.json,application/zip,text/markdown,application/json" hidden onChange={importProject} />
+            <input type="file" accept=".zip,.md,.json,application/zip,text/markdown,application/json" className="sr-only" onChange={importProject} />
           </label>
           <button className="btn primary" onClick={() => setShowNew(true)}>
             <Plus size={14} />

@@ -1,3 +1,4 @@
+import { SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC } from '../lib/config.js';
 import { useEffect, useRef, useState } from 'react';
 import { generateStoryboardImage } from '../lib/gemini.js';
 import { generateComfyStoryboard, saveToLocalOutputs } from '../lib/comfy.js';
@@ -39,7 +40,7 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
   const trackRef = useRef(null);
   const [trimId, setTrimId] = useState(null);
 
-  const clampDur = (d) => Math.max(2, Math.min(10, d));
+  const clampDur = (d) => Math.max(SHOT_MIN_SEC, Math.min(SHOT_MAX_SEC, d));
 
   // Nudge the selected clip's duration in 0.5s steps (footer − / + buttons) —
   // a click alternative to edge-dragging that works in both directions.
@@ -319,16 +320,16 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
             <button
               type="button"
               title={t('sb.shorter')}
-              disabled={(shots.find((s) => s.id === selectedId)?.duration || 0) <= 2}
-              onClick={() => nudge(-0.5)}
+              disabled={(shots.find((s) => s.id === selectedId)?.duration || 0) <= SHOT_MIN_SEC}
+              onClick={() => nudge(-SHOT_STEP_SEC)}
             >
               −0.5s
             </button>
             <button
               type="button"
               title={t('sb.longer')}
-              disabled={(shots.find((s) => s.id === selectedId)?.duration || 0) >= 10}
-              onClick={() => nudge(0.5)}
+              disabled={(shots.find((s) => s.id === selectedId)?.duration || 0) >= SHOT_MAX_SEC}
+              onClick={() => nudge(SHOT_STEP_SEC)}
             >
               +0.5s
             </button>
@@ -338,15 +339,15 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
       </div>
 
       <div className="row">
-        <button className="btn small" disabled={busy} onClick={generate}>
-          {busy ? t('gen.generating') : t('sb.generate')}
-        </button>
         <button
-          className="btn small primary"
+          className="btn small primary fixedw"
           disabled={busy || total <= 0}
           onClick={() => setPlaying((v) => !v)}
         >
-          {playing ? <><Pause size={14} /> {t('sb.pause')}</> : <><Play size={14} /> {t('sb.play')}</>}
+          {playing ? <><Pause size={14} />{t('sb.pause')}</> : <><Play size={14} />{t('sb.play')}</>}
+        </button>
+        <button className="btn small" disabled={busy} onClick={generate}>
+          {busy ? t('gen.generating') : t('sb.generate')}
         </button>
         {playing && (
           <button
@@ -357,7 +358,7 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
               setElapsed(0);
             }}
           >
-            <StopSq size={14} /> {t('sb.stop')}
+            <StopSq size={14} />{t('sb.stop')}
           </button>
         )}
         {prog && <span className="total-badge">{t('sb.progress', { a: prog.a, b: prog.b })}</span>}

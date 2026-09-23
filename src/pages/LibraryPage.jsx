@@ -127,7 +127,7 @@ export default function LibraryPage({ kind, library, libUpsert, libDelete, setti
                   <input
                     type="file"
                     accept="image/*"
-                    hidden
+                    className="sr-only"
                     onChange={(e) => {
                       const f = e.target.files?.[0];
                       e.target.value = '';

@@ -20,7 +20,7 @@ export default function ThemeToggle({ theme, setTheme }) {
       aria-label={label}
       onClick={() => setTheme(next)}
     >
-      <Icon size={18} />
+      <Icon size={16} />
     </button>
   );
 }

@@ -18,8 +18,8 @@ import h3MultiTemplate from '../data/comfy/minimax_h3_mfr_api.json';
 import aceTemplate from '../data/comfy/ace_step_api.json';
 import sfxTemplate from '../data/comfy/stable_audio_sfx_api.json';
 
-export const DEFAULT_COMFY_URL = 'http://127.0.0.1:8000';
-export const DEFAULT_OUTPUT_DIR = 'D:\\Claude work\\ComfyUI\\Output';
+import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIR, SHOT_MIN_SEC, SHOT_MAX_SEC } from './config.js';
+export { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIR };
 
 function base(settings) {
   // In Electron the main-process bridge talks to ComfyUI directly (no CORS);
@@ -550,9 +550,9 @@ export async function generateComfyVideo(
   const [w, h] = engine === 'minimax'
     ? h3Dims(aspectRatio, resolution)
     : videoDims(aspectRatio, resolution);
-  // Shots are 2-10s on the timeline, but generation requests carry the +2s
-  // dynamics padding (head/tail get trimmed in assembly) — allow up to 12.
-  const dur = Math.max(2, Math.min(12, Math.round(durationSec || 4)));
+  // Shots are SHOT_MIN..SHOT_MAX on the timeline, but generation requests
+  // carry the +2s dynamics padding (head/tail get trimmed in assembly).
+  const dur = Math.max(SHOT_MIN_SEC, Math.min(SHOT_MAX_SEC + 2, Math.round(durationSec || 4)));
   const stamp = Date.now();
   const useMode = resolveVideoMode(mode, { lastFrame, audio });
   let graph;
@@ -591,7 +591,7 @@ export async function generateComfyVideo(
     const audExt = /^data:audio\/wav/i.test(audio) ? 'wav' : 'mp3';
     graph['276'].inputs.audio = await uploadInput(settings, audio, `storyreel_${stamp}_voice.${audExt}`);
     graph['340:319'].inputs.value = prompt;
-    graph['340:331'].inputs.value = Math.max(2, Math.min(12, durationSec || 4));
+    graph['340:331'].inputs.value = Math.max(SHOT_MIN_SEC, Math.min(SHOT_MAX_SEC + 2, durationSec || 4));
     graph['340:330'].inputs.value = w;
     graph['340:324'].inputs.value = h;
     graph['340:286'].inputs.noise_seed = rndSeed();
@@ -762,7 +762,7 @@ export async function generateComfyVoice(settings, { srt, instruct, narrator, la
   return { dataURL: await blobToDataURL(blob), filename: aud.filename };
 }
 
-// ---- Stage 6: background music via ACE-Step 1.5 XL Turbo --------------------
+// ---- Stage 5 (assembly): background music via ACE-Step 1.5 XL Turbo --------------------
 // Instrumental-only score for the film: `tags` is the ACE caption (style,
 // instruments, emotion, texture — comma-separated dimensions per the ACE-Step
 // guide), the lyrics track is pinned to "[Instrumental]" so no vocals ever

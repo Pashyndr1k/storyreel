@@ -1,3 +1,4 @@
+import { SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC } from '../lib/config.js';
 import { useRef, useState } from 'react';
 import { Grip, Stars } from '../components/icons.jsx';
 import { useGenerate } from '../lib/useGenerate.js';
@@ -32,12 +33,12 @@ export function sceneStartTime(project, sceneId) {
 
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, Number(n) || lo));
 
-const mapShots = (rawShots, range = { min: 2, max: 10 }) =>
+const mapShots = (rawShots, range = { min: SHOT_MIN_SEC, max: SHOT_MAX_SEC }) =>
   (rawShots || []).map((s) => ({
     id: uid(),
     // Dynamics-plan blocks narrow the allowed range; the global 2-10s rule
     // is the outer bound either way.
-    duration: clamp(clamp(s.duration_sec, range.min, range.max), 2, 10),
+    duration: clamp(clamp(s.duration_sec, range.min, range.max), SHOT_MIN_SEC, SHOT_MAX_SEC),
     shotType: s.shot_type || '',
     location: s.location || '',
     action: s.action || '',
@@ -254,9 +255,9 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
                 <label>{t('s4.duration')}</label>
                 <input
                   type="number"
-                  min={2}
-                  max={10}
-                  step={0.5}
+                  min={SHOT_MIN_SEC}
+                  max={SHOT_MAX_SEC}
+                  step={SHOT_STEP_SEC}
                   value={shot.duration}
                   onChange={(e) => updateShot(shot.id, { duration: clamp(e.target.value, 2, 10) })}
                 />

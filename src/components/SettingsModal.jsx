@@ -1,3 +1,4 @@
+import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIR, DEFAULT_PROJECTS_DIR, DEFAULT_IMAGE_MODEL } from '../lib/config.js';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { MODELS } from '../lib/claude.js';
 import { listImageModels } from '../lib/gemini.js';
@@ -29,7 +30,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
   const [apiKey, setApiKey] = useState(settings.apiKey);
   const [model, setModel] = useState(settings.model);
   const [geminiKey, setGeminiKey] = useState(settings.geminiKey || '');
-  const [geminiModel, setGeminiModel] = useState(settings.geminiModel || 'gemini-3-pro-image-preview');
+  const [geminiModel, setGeminiModel] = useState(settings.geminiModel || DEFAULT_IMAGE_MODEL);
   const [textService, setTextService] = useState(settings.textService || 'claude');
   const [storyboardService, setStoryboardService] = useState(settings.storyboardService || 'gemini');
   const [imageService, setImageService] = useState(settings.imageService || 'gemini');
@@ -38,9 +39,9 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
   const [h3RefImageSize, setH3RefImageSize] = useState(settings.h3RefImageSize || 'match');
   const [h3Lightning, setH3Lightning] = useState(!!settings.h3Lightning);
   const [voiceService, setVoiceService] = useState(settings.voiceService || 'comfy');
-  const [comfyUrl, setComfyUrl] = useState(settings.comfyUrl || 'http://127.0.0.1:8000');
-  const [comfyOutputDir, setComfyOutputDir] = useState(settings.comfyOutputDir || 'D:\\Claude work\\ComfyUI\\Output');
-  const [projectsDir, setProjectsDir] = useState(settings.projectsDir || 'D:\\Claude work\\StoryReel Projects');
+  const [comfyUrl, setComfyUrl] = useState(settings.comfyUrl || DEFAULT_COMFY_URL);
+  const [comfyOutputDir, setComfyOutputDir] = useState(settings.comfyOutputDir || DEFAULT_OUTPUT_DIR);
+  const [projectsDir, setProjectsDir] = useState(settings.projectsDir || DEFAULT_PROJECTS_DIR);
   const [hideStaleToast, setHideStaleToast] = useState(!!settings.hideStaleToast);
   const [uiFont, setUiFont] = useState(settings.uiFont || 'default');
 
@@ -113,7 +114,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
       apiKey: apiKey.trim(),
       model,
       geminiKey: geminiKey.trim(),
-      geminiModel: geminiModel.trim() || 'gemini-3-pro-image-preview',
+      geminiModel: geminiModel.trim() || DEFAULT_IMAGE_MODEL,
       textService,
       storyboardService,
       imageService,
@@ -122,9 +123,9 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
       h3RefImageSize,
       h3Lightning,
       voiceService,
-      comfyUrl: comfyUrl.trim() || 'http://127.0.0.1:8000',
-      comfyOutputDir: comfyOutputDir.trim() || 'D:\\Claude work\\ComfyUI\\Output',
-      projectsDir: projectsDir.trim() || 'D:\\Claude work\\StoryReel Projects',
+      comfyUrl: comfyUrl.trim() || DEFAULT_COMFY_URL,
+      comfyOutputDir: comfyOutputDir.trim() || DEFAULT_OUTPUT_DIR,
+      projectsDir: projectsDir.trim() || DEFAULT_PROJECTS_DIR,
       hideStaleToast,
       uiFont,
     });
@@ -212,7 +213,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
           <button className="btn small" onClick={exportProjects}>{t('set.export')}</button>
           <label className="btn small file-btn">
             {t('set.import')}
-            <input type="file" accept=".json,application/json" onChange={importProjects} hidden />
+            <input type="file" accept=".json,application/json" onChange={importProjects} className="sr-only" />
           </label>
         </div>
       </div>
@@ -223,7 +224,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
           <button className="btn small" onClick={exportStyles}>{t('set.export')}</button>
           <label className="btn small file-btn">
             {t('set.import')}
-            <input type="file" accept=".json,application/json" onChange={importStyles} hidden />
+            <input type="file" accept=".json,application/json" onChange={importStyles} className="sr-only" />
           </label>
         </div>
       </div>
@@ -234,7 +235,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
           <input
             value={projectsDir}
             onChange={(e) => setProjectsDir(e.target.value)}
-            placeholder="D:\Claude work\StoryReel Projects"
+            placeholder={DEFAULT_PROJECTS_DIR}
           />
           {hasFolderIO && (
             <>
@@ -277,10 +278,10 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
               <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">aistudio.google.com</a>.
             </p>
             <label>{t('set.comfyUrl')}</label>
-            <input value={comfyUrl} onChange={(e) => setComfyUrl(e.target.value)} placeholder="http://127.0.0.1:8000" />
+            <input value={comfyUrl} onChange={(e) => setComfyUrl(e.target.value)} placeholder={DEFAULT_COMFY_URL} />
             <label>{t('set.comfyOutputDir')}</label>
             <div className="dir-row">
-              <input value={comfyOutputDir} onChange={(e) => setComfyOutputDir(e.target.value)} placeholder="D:\Claude work\ComfyUI\Output" />
+              <input value={comfyOutputDir} onChange={(e) => setComfyOutputDir(e.target.value)} placeholder={DEFAULT_OUTPUT_DIR} />
               {hasFolderIO && (
                 <button
                   className="btn small"
@@ -306,7 +307,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
           ))}
         </select>
         <label>{t('set.geminiModel')}</label>
-        <input value={geminiModel} onChange={(e) => setGeminiModel(e.target.value)} placeholder="gemini-3-pro-image-preview" />
+        <input value={geminiModel} onChange={(e) => setGeminiModel(e.target.value)} placeholder={DEFAULT_IMAGE_MODEL} />
         <div className="row" style={{ marginTop: 8 }}>
           <button className="btn small" disabled={fetching} onClick={fetchModels}>
             {fetching ? t('set.fetching') : t('set.fetchModels')}

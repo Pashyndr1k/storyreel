@@ -1,3 +1,4 @@
+import { STAGE_COUNT } from '../lib/config.js';
 import { useState } from 'react';
 import Stage1 from '../stages/Stage1.jsx';
 import Stage2 from '../stages/Stage2.jsx';
@@ -16,12 +17,12 @@ import { LANGS } from '../lib/i18n.js';
 
 export default function Project({ project, updateProject, settings, setSettings, styles, setStyles, library, libUpsert, libDelete, onBack, onSettings }) {
   const { t, lang } = useI18n();
-  const [view, setView] = useState(Math.min(project.stage, 5));
+  const [view, setView] = useState(Math.min(project.stage, STAGE_COUNT));
   const [showProjectSettings, setShowProjectSettings] = useState(false);
   const [showSmartEdit, setShowSmartEdit] = useState(false);
   const [staleFrom, setStaleFrom] = useState(null);
 
-  const STAGES = [1, 2, 3, 4, 5].map((n) => ({ n, label: t(`stages.${n}`) }));
+  const STAGES = Array.from({ length: STAGE_COUNT }, (_, i) => i + 1).map((n) => ({ n, label: t(`stages.${n}`) }));
 
   // One global language drives both the UI and script generation (prompts for
   // image/video generation stay English). Already-generated text is untouched.
@@ -38,7 +39,7 @@ export default function Project({ project, updateProject, settings, setSettings,
   };
 
   const goNext = () => {
-    const next = Math.min(view + 1, 5);
+    const next = Math.min(view + 1, STAGE_COUNT);
     update((p) => ({ stage: Math.max(p.stage, next) }));
     setView(next);
   };
@@ -126,16 +127,16 @@ export default function Project({ project, updateProject, settings, setSettings,
           />
           <ThemeToggle theme={settings.theme || 'dark'} setTheme={(th) => setSettings({ ...settings, theme: th })} />
           <button className="icon-btn h44" title={t('edit.button')} aria-label={t('edit.button')} onClick={() => setShowSmartEdit(true)}>
-            <Stars size={18} />
+            <Stars size={16} />
           </button>
           <button className="icon-btn h44" title={t('proj.export')} aria-label={t('proj.export')} onClick={exportScript}>
-            <Download size={18} />
+            <Download size={16} />
           </button>
           <button className="icon-btn h44" title={t('proj.settings')} aria-label={t('proj.settings')} onClick={() => setShowProjectSettings(true)}>
-            <Sliders size={18} />
+            <Sliders size={16} />
           </button>
           <button className="icon-btn h44" title={t('set.title')} aria-label={t('set.title')} onClick={onSettings}>
-            <Cog size={18} />
+            <Cog size={16} />
           </button>
         </div>
       </header>
@@ -162,7 +163,7 @@ export default function Project({ project, updateProject, settings, setSettings,
         />
       )}
 
-      <nav className="stg-bar">
+      <nav className="stg-bar" style={{ '--stage-count': STAGE_COUNT }}>
         {STAGES.map((s) => {
           const sel = view === s.n;
           const done = s.n < project.stage;
@@ -196,11 +197,11 @@ export default function Project({ project, updateProject, settings, setSettings,
             <button
               className="btn small primary"
               onClick={() => {
-                setView(Math.min(staleFrom + 1, 5));
+                setView(Math.min(staleFrom + 1, STAGE_COUNT));
                 setStaleFrom(null);
               }}
             >
-              {t('stale.go', { n: Math.min(staleFrom + 1, 5) })}
+              {t('stale.go', { n: Math.min(staleFrom + 1, STAGE_COUNT) })}
             </button>
             <button className="btn small" onClick={() => setStaleFrom(null)}>
               {t('stale.dismiss')}

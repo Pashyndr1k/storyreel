@@ -4,8 +4,8 @@ import { ChartLine } from './icons.jsx';
 
 // Action Dynamics Plan visualizer: a dual step-line graph over the film's
 // runtime — violet for kinetic energy (motion), magenta for audio rhythm
-// (dialogue/sound density). Hidden by default: stages 3–6 show only a small
-// chart-icon button; clicking it opens the graph in a pop-up. Stage 6 passes
+// (dialogue/sound density). Hidden by default: stages 3–5 show only a small
+// chart-icon button; clicking it opens the graph in a pop-up. The assembly timeline passes
 // `playhead` (seconds) to sync a cursor with the timeline.
 const W = 720;
 const H = 96;
@@ -46,7 +46,7 @@ export default function DynamicsVisualizer({ plan, playhead = null }) {
         aria-label={t('dyn.title')}
         onClick={() => setOpen(true)}
       >
-        <ChartLine size={18} />
+        <ChartLine size={16} />
       </button>
       {open && (
         <div className="overlay" onClick={() => setOpen(false)}>
@@ -62,14 +62,14 @@ export default function DynamicsVisualizer({ plan, playhead = null }) {
               <svg viewBox={`0 0 ${W} ${H + 18}`} preserveAspectRatio="none" aria-hidden="true">
                 {[1, 5, 10].map((lv) => (
                   <g key={lv}>
-                    <line x1={PAD_X} y1={y(lv)} x2={W - PAD_X} y2={y(lv)} stroke="rgba(255,255,255,0.07)" strokeWidth="1" />
+                    <line x1={PAD_X} y1={y(lv)} x2={W - PAD_X} y2={y(lv)} stroke="var(--hairline-soft)" strokeWidth="1" />
                     <text x={PAD_X - 6} y={y(lv) + 3} textAnchor="end" fontSize="8" fill="var(--muted-3)">{lv}</text>
                   </g>
                 ))}
                 {blocks.map((b, i) => (
                   <g key={b.block_id}>
                     {i > 0 && (
-                      <line x1={x(b.timestamp_start)} y1={PAD_Y} x2={x(b.timestamp_start)} y2={H - PAD_Y} stroke="rgba(255,255,255,0.1)" strokeDasharray="2 3" strokeWidth="1" />
+                      <line x1={x(b.timestamp_start)} y1={PAD_Y} x2={x(b.timestamp_start)} y2={H - PAD_Y} stroke="var(--hairline)" strokeDasharray="2 3" strokeWidth="1" />
                     )}
                     <text x={(x(b.timestamp_start) + x(b.timestamp_start + b.intended_duration_sec)) / 2} y={H + 12} textAnchor="middle" fontSize="8" fill="var(--muted-2)">
                       {b.block_id} · {b.shot_density}

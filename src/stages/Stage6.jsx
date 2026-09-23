@@ -1,3 +1,4 @@
+import { DEFAULT_OUTPUT_DIR, SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC } from '../lib/config.js';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useI18n } from '../lib/i18n.js';
 import { uid } from '../lib/storage.js';
@@ -10,7 +11,8 @@ import { stage6SmartCutPrompt } from '../lib/prompts.js';
 import { decodeMediaAudio, audioBufferToWavDataURL } from '../lib/audio.js';
 import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
 import Stage5 from './Stage5.jsx';
-import { Play, Pause, SkipBack, StopSq, Grip, Download, Upload, Stars, Trash, Scissors, TransitionIcon, Plus } from '../components/icons.jsx';
+import { Play, Pause, SkipBack, StopSq, Grip, Download, Upload, Stars, Trash, Scissors, TransitionIcon, Plus, Expand } from '../components/icons.jsx';
+import Lightbox from '../components/Lightbox.jsx';
 
 const readFileDataURL = (file) =>
   new Promise((resolve, reject) => {
@@ -119,12 +121,12 @@ const CUT_FFMPEG = {
   directional_crossfade: { xfade: 'smoothleft', dur: 0.48 },
   soft_cut: { xfade: 'fade', dur: 0.3 },
   rest_cut: { xfade: 'fadeblack', dur: 0.5 },
-  dissolve: { xfade: 'dissolve', dur: 0.5 },
+  dissolve: { xfade: 'dissolve', dur: 0.48 },
   dip_to_black: { xfade: 'fadeblack', dur: 0.6 },
-  dip_to_white: { xfade: 'fadewhite', dur: 0.5 },
+  dip_to_white: { xfade: 'fadewhite', dur: 0.48 },
   wipe_left: { xfade: 'wipeleft', dur: 0.4 },
   slide_left: { xfade: 'slideleft', dur: 0.4 },
-  circle_open: { xfade: 'circleopen', dur: 0.5 },
+  circle_open: { xfade: 'circleopen', dur: 0.48 },
   whip_pan: { xfade: 'slideleft', dur: 0.24 },
 };
 
@@ -161,7 +163,8 @@ function defaultScale(project) {
   return SCALES.find((s) => s >= MIN_CLIP_PX / minDur) || SCALES[SCALES.length - 1];
 }
 
-// Stage 6 — Final Assembly. The whole script becomes one timeline (same NLE
+// Stage 5 — Generation & Assembly (file kept as Stage6.jsx since the 2.5
+// merge). The whole script becomes one timeline (same NLE
 // design as the Stage-4 preview): every shot is a clip, grouped by scene.
 // A shot's clip shows its generated video (preferred), else its first-frame
 // image, else a numbered placeholder. Scenes and shots can be reordered by
@@ -193,6 +196,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
   const [geom, setGeom] = useState([]); // measured clip rects — see the layout effect below
   const [scrubbing, setScrubbing] = useState(false); // playhead being dragged
   const [pvState, setPvState] = useState({ playing: false, rate: 1 }); // idle preview transport
+  const [lightbox, setLightbox] = useState(null); // full-size pop-up of the previewed video
   const pvRef = useRef(null);
   const cancelRef = useRef(false);
   const [scale, setScale] = useState(() => defaultScale(project));
@@ -400,7 +404,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
   const [laneMenu, setLaneMenu] = useState(null); // { layerId, x, y }
   const openCutMenu = (idx, e) => {
     const r = e.currentTarget.getBoundingClientRect();
-    setCutMenu({ idx, x: Math.min(r.left, window.innerWidth - 230), y: r.bottom + 6 });
+    setCutMenu({ idx, x: Math.min(r.left, window.innerWidth - 230), y: Math.min(r.bottom + 6, window.innerHeight - 340) });
   };
   const pickCut = (idx, type) => {
     update((p) => ({
@@ -648,7 +652,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
       return { sceneDetails: details };
     });
 
-  const clampDur = (d) => Math.max(2, Math.min(10, d));
+  const clampDur = (d) => Math.max(SHOT_MIN_SEC, Math.min(SHOT_MAX_SEC, d));
   const setShotDuration = (sceneId, shotId, d) =>
     update((p) => ({
       sceneDetails: {
@@ -820,7 +824,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
           const locked = !!(p.shotAudios || {})[it.shot.id];
           const d = Number(ch.duration);
           if (!locked && Number.isFinite(d)) {
-            const dur = Math.max(2, Math.min(10, Math.round(d * 10) / 10));
+            const dur = Math.max(SHOT_MIN_SEC, Math.min(SHOT_MAX_SEC, Math.round(d * 10) / 10));
             if (dur !== (it.shot.duration || 0)) {
               details[it.sceneId] = {
                 shots: (details[it.sceneId]?.shots || []).map((s) =>
@@ -1055,7 +1059,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
       return CUT_FFMPEG[c?.transition_type] || { xfade: 'cut' };
     });
     const safe = (project.title || 'storyreel').replace(/[^\w\d\- ]+/g, '').trim().replace(/\s+/g, '-') || 'storyreel';
-    const outDir = (settings.comfyOutputDir || '').replace(/[\\/]+$/, '');
+    const outDir = (settings.comfyOutputDir || DEFAULT_OUTPUT_DIR).replace(/[\\/]+$/, '');
     const outPath = `${outDir || '.'}/${safe}-final.mp4`;
     // Audio timeline: every clip of every ENABLED layer mixes over the
     // per-shot clip audio (with its trims, fades and the layer volume).
@@ -1499,6 +1503,22 @@ export default function Stage6({ project, update, settings, ...workbench }) {
   const pvCmd = (cmd) => {
     const v = pvRef.current;
     if (!v) return;
+    if (cmd === 'expand') {
+      setLightbox({ kind: 'vid', src: v.src });
+      return;
+    }
+    if (cmd === 'download') {
+      // same file naming as the workbench used to offer
+      const safe = (project.title || 'shot').replace(/[^\w\d]+/g, '-');
+      const n = selected ? items.indexOf(selected) + 1 : 0;
+      const a = document.createElement('a');
+      a.href = v.src;
+      a.download = `${safe}-shot${n}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      return;
+    }
     if (cmd === 'rewind' || cmd === 'pause') {
       if (cmd === 'rewind') {
         try {
@@ -1581,6 +1601,13 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                     </button>
                     <button type="button" title={t('pv.pause')} aria-label={t('pv.pause')} onClick={() => pvCmd('pause')}>
                       <Pause size={14} />
+                    </button>
+                    <span className="pv-sep" aria-hidden="true" />
+                    <button type="button" title={t('vid.expand')} aria-label={t('vid.expand')} onClick={() => pvCmd('expand')}>
+                      <Expand size={14} />
+                    </button>
+                    <button type="button" title={t('vid.download')} aria-label={t('vid.download')} onClick={() => pvCmd('download')}>
+                      <Download size={14} />
                     </button>
                   </div>
                 )}
@@ -1676,7 +1703,15 @@ export default function Stage6({ project, update, settings, ...workbench }) {
             >
               <div
                 className={`asm-scene-label ${selectedSceneId === g.scene.id && !selectedId ? 'selected' : ''}`}
-                title={t('s6.sceneTip')}
+                title={`${g.scene.title || t('s4.untitled')} — ${t('s6.sceneTip')}`}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.currentTarget.click();
+                  }
+                }}
                 draggable={trimId === null}
                 onClick={() => {
                   setSelectedId(null);
@@ -1704,6 +1739,14 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                     <div
                       key={it.shot.id}
                       data-shot={it.shot.id}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          e.currentTarget.click();
+                        }
+                      }}
                       className={`nle-clip ${selectedId === it.shot.id ? 'selected' : ''} ${overIns?.sceneId === g.scene.id && overIns.idx === si ? 'ins-before' : ''} ${overIns?.sceneId === g.scene.id && overIns.idx === g.shots.length && si === g.shots.length - 1 ? 'ins-after' : ''} ${trimId === it.shot.id ? 'trimming' : ''}`}
                       style={zoomed ? { flex: 'none', width: (it.shot.duration || 1) * scale } : { flexGrow: Math.max(0.5, it.shot.duration || 1) }}
                       title={`${globalIdx + 1} · ${it.shot.duration}s · ${it.shot.shotType || ''} — ${t('s6.dragShot')}`}
@@ -1829,7 +1872,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                   onClick={(e) => {
                     const r = e.currentTarget.getBoundingClientRect();
                     setLaneMenu((m) =>
-                      m?.layerId === L.id ? null : { layerId: L.id, x: Math.min(r.left, window.innerWidth - 250), y: r.bottom + 6 }
+                      m?.layerId === L.id ? null : { layerId: L.id, x: Math.min(r.left, window.innerWidth - 218), y: Math.min(r.bottom + 6, window.innerHeight - 260) }
                     );
                   }}
                 >
@@ -1926,12 +1969,12 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                 />
                 <div className="lane-menu-row">
                   <label className="icon-btn sq36" title={t('s6.addClip')} aria-label={t('s6.addClip')}>
-                    <Upload size={15} />
+                    <Upload size={16} />
                     <input
                       type="file"
                       accept="audio/*"
                       multiple
-                      hidden
+                      className="sr-only"
                       onChange={(e) => {
                         const fs = [...(e.target.files || [])];
                         e.target.value = '';
@@ -1950,7 +1993,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                       setLaneMenu(null);
                     }}
                   >
-                    <Trash size={15} />
+                    <Trash size={16} />
                   </button>
                 </div>
               </div>
@@ -2010,6 +2053,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
        </div>
       </div>
 
+      <Lightbox item={lightbox} onClose={() => setLightbox(null)} />
       <div className="nle-footer">
         <span className="nle-nudge nle-scale" title={zoomed ? t('s6.scrollHint') : ''}>
           {t('s6.scale')}
@@ -2033,10 +2077,10 @@ export default function Stage6({ project, update, settings, ...workbench }) {
         {selected && (
           <span className="nle-nudge">
             {t('s4.shot', { n: items.findIndex((x) => x.shot.id === selectedId) + 1 })}
-            <button type="button" title={t('sb.shorter')} disabled={(selected.shot.duration || 0) <= 2} onClick={() => nudge(-0.5)}>
+            <button type="button" title={t('sb.shorter')} disabled={(selected.shot.duration || 0) <= SHOT_MIN_SEC} onClick={() => nudge(-SHOT_STEP_SEC)}>
               −0.5s
             </button>
-            <button type="button" title={t('sb.longer')} disabled={(selected.shot.duration || 0) >= 10} onClick={() => nudge(0.5)}>
+            <button type="button" title={t('sb.longer')} disabled={(selected.shot.duration || 0) >= SHOT_MAX_SEC} onClick={() => nudge(SHOT_STEP_SEC)}>
               +0.5s
             </button>
             {selected.video && (
@@ -2126,10 +2170,10 @@ export default function Stage6({ project, update, settings, ...workbench }) {
             setPlaying((v) => !v);
           }}
         >
-          {playing ? <><StopSq size={14} /> {t('sb.stop')}</> : <><Play size={14} /> {t('sb.play')}</>}
+          {playing ? <><StopSq size={14} />{t('sb.stop')}</> : <><Play size={14} />{t('sb.play')}</>}
         </button>
         <button className="btn small fixedw" disabled={rendering} onClick={doRender}>
-          <Download size={14} /> {rendering ? t('s6.rendering') : t('s6.render')}
+          <Download size={14} />{rendering ? t('s6.rendering') : t('s6.render')}
         </button>
         <button
           className="btn small"
@@ -2211,7 +2255,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
       {showCuts && (
         <div className="overlay" onClick={() => setShowCuts(false)}>
           <div className="modal cuts-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>{t('s6.cutsTitle')}</h3>
+            <h2>{t('s6.cutsTitle')}</h2>
             <p className="hint">{t('s6.cutsHint')}</p>
             <table className="cuts-table">
               <thead>
@@ -2255,7 +2299,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                 })}
               </tbody>
             </table>
-            <div className="row">
+            <div className="modal-actions">
               <button className="btn small" onClick={() => setShowCuts(false)}>{t('s6.close')}</button>
             </div>
           </div>
@@ -2266,7 +2310,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
       {music && (
         <div className="overlay" onClick={() => !music.busy && setMusic(null)}>
           <div className="modal music-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>{t('s6.musicTitle')}</h3>
+            <h2>{t('s6.musicTitle')}</h2>
             <p className="hint">{t('s6.musicHint')}</p>
             <div className="music-grid music-grid-4">
               <div className="s5e-vsel">
@@ -2324,16 +2368,16 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                 </div>
               </div>
             </div>
-            <div className="row">
-              <button className="btn small primary fixedw" disabled={music.busy} onClick={runMusic}>
-                {music.busy ? t('s6.musicBusy') : t('s6.musicRun')}
+            <div className="modal-actions">
+              <button className="btn small" disabled={music.busy} onClick={() => setMusic(null)}>
+                {t('s6.close')}
               </button>
               <label className={`btn small file-btn ${music.busy ? 'disabled' : ''}`} title={t('s6.musicUploadTip')}>
-                <Upload size={14} /> {t('s6.musicUpload')}
+                <Upload size={14} />{t('s6.musicUpload')}
                 <input
                   type="file"
                   accept="audio/*"
-                  hidden
+                  className="sr-only"
                   disabled={music.busy}
                   onChange={(e) => {
                     const f = e.target.files?.[0];
@@ -2342,8 +2386,8 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                   }}
                 />
               </label>
-              <button className="btn small" disabled={music.busy} onClick={() => setMusic(null)}>
-                {t('s6.close')}
+              <button className="btn small primary fixedw" disabled={music.busy} onClick={runMusic}>
+                {music.busy ? t('s6.musicBusy') : t('s6.musicRun')}
               </button>
             </div>
           </div>
@@ -2354,7 +2398,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
       {sfx && (
         <div className="overlay" onClick={() => !sfx.busy && setSfx(null)}>
           <div className="modal music-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>{t('s6.sfxTitle')}</h3>
+            <h2>{t('s6.sfxTitle')}</h2>
             <p className="hint">{t('s6.sfxHint')}</p>
             <textarea
               rows={2}
@@ -2384,12 +2428,12 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                 <i>{t('s6.musicLenS')}</i>
               </div>
             </div>
-            <div className="row">
-              <button className="btn small primary fixedw" disabled={sfx.busy || !(sfx.prompt || '').trim()} onClick={runSfx}>
-                {sfx.busy ? t('s6.musicBusy') : t('s6.sfxRun')}
-              </button>
+            <div className="modal-actions">
               <button className="btn small" disabled={sfx.busy} onClick={() => setSfx(null)}>
                 {t('s6.close')}
+              </button>
+              <button className="btn small primary fixedw" disabled={sfx.busy || !(sfx.prompt || '').trim()} onClick={runSfx}>
+                {sfx.busy ? t('s6.musicBusy') : t('s6.sfxRun')}
               </button>
             </div>
           </div>
@@ -2400,7 +2444,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
       {smartCut && (
         <div className="overlay" onClick={() => !smartCut.busy && setSmartCut(null)}>
           <div className="modal smartcut-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>{t('s6.smartCutTitle')}</h3>
+            <h2>{t('s6.smartCutTitle')}</h2>
             <p className="hint">{t('s6.smartCutHint')}</p>
             <textarea
               rows={3}
@@ -2430,16 +2474,16 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                 </ul>
               </div>
             )}
-            <div className="row">
+            <div className="modal-actions">
+              <button className="btn small" disabled={smartCut.busy} onClick={() => setSmartCut(null)}>
+                {t('s6.close')}
+              </button>
               <button
                 className="btn small primary"
                 disabled={smartCut.busy || !smartCut.text.trim()}
                 onClick={runSmartCut}
               >
-                <Stars size={14} /> {smartCut.busy ? t('s6.smartCutBusy') : t('s6.smartCutRun')}
-              </button>
-              <button className="btn small" disabled={smartCut.busy} onClick={() => setSmartCut(null)}>
-                {t('s6.close')}
+                <Stars size={14} />{smartCut.busy ? t('s6.smartCutBusy') : t('s6.smartCutRun')}
               </button>
             </div>
           </div>

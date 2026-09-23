@@ -1,3 +1,4 @@
+import { STAGE_COUNT } from '../lib/config.js';
 import { useI18n, localeOf } from '../lib/i18n.js';
 import { useState } from 'react';
 import { Copy, Archive as ArchiveIcon, Trash, RestoreIcon, Star, Download } from './icons.jsx';
@@ -13,7 +14,7 @@ function posterOf(project) {
 
 // Dashboard project cell (design 5a): the whole card is the open action.
 // The still sits grayscale under a paper wash and regains full colour on
-// hover; progress is six accent segments plus a tabular counter.
+// hover; progress is five accent segments plus a tabular counter.
 export default function ProjectCard({ project, onOpen, onArchive, onRestore, onDuplicate, onDelete, onPin, onExport }) {
   const { t, lang } = useI18n();
   const [exporting, setExporting] = useState(false);
@@ -33,7 +34,7 @@ export default function ProjectCard({ project, onOpen, onArchive, onRestore, onD
     year: 'numeric',
   });
   const poster = posterOf(project);
-  const stage = Math.max(1, Math.min(project.stage || 1, 5));
+  const stage = Math.max(1, Math.min(project.stage || 1, STAGE_COUNT));
 
   const act = (fn) => (e) => {
     e.stopPropagation();
@@ -72,11 +73,11 @@ export default function ProjectCard({ project, onOpen, onArchive, onRestore, onD
           <span>{date}</span>
           <span className="pc-prog">
             <span className="pc-segs">
-              {[1, 2, 3, 4, 5].map((n) => (
+              {Array.from({ length: STAGE_COUNT }, (_, i) => i + 1).map((n) => (
                 <span key={n} className={`pc-seg ${n <= stage ? 'on' : ''}`} />
               ))}
             </span>
-            <span className="pc-count">{stage}/5</span>
+            <span className="pc-count">{stage}/{STAGE_COUNT}</span>
           </span>
         </div>
         <h4 className="pc-title">{project.title}</h4>
@@ -97,26 +98,26 @@ export default function ProjectCard({ project, onOpen, onArchive, onRestore, onD
                 disabled={exporting}
                 onClick={act(runExport)}
               >
-                <Download size={17} />
+                <Download size={16} />
               </button>
             )}
             {onDuplicate && (
               <button className="icon-btn" title={t('card.duplicate')} aria-label={t('card.duplicate')} onClick={act(onDuplicate)}>
-                <Copy size={17} />
+                <Copy size={16} />
               </button>
             )}
             {onArchive && (
               <button className="icon-btn" title={t('card.archive')} aria-label={t('card.archive')} onClick={act(onArchive)}>
-                <ArchiveIcon size={17} />
+                <ArchiveIcon size={16} />
               </button>
             )}
             {onRestore && (
               <button className="icon-btn" title={t('card.restore')} aria-label={t('card.restore')} onClick={act(onRestore)}>
-                <RestoreIcon size={17} />
+                <RestoreIcon size={16} />
               </button>
             )}
             <button className="icon-btn danger" title={t('card.delete')} aria-label={t('card.delete')} onClick={act(onDelete)}>
-              <Trash size={17} />
+              <Trash size={16} />
             </button>
           </div>
         </div>

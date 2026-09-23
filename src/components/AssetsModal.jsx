@@ -113,7 +113,7 @@ export default function AssetsModal({ library, libUpsert, libDelete, onClose }) 
                   <input
                     type="file"
                     accept="image/*"
-                    hidden
+                    className="sr-only"
                     onChange={(e) => {
                       const f = e.target.files?.[0];
                       e.target.value = '';

@@ -2,7 +2,8 @@ import { dataURLToInline, resizeDataURL } from './images.js';
 import { withRetry } from './retry.js';
 
 // "Nano Banana 2" (Gemini 3 Pro Image). Overridable in Settings if the id changes.
-export const DEFAULT_IMAGE_MODEL = 'gemini-3-pro-image-preview';
+import { DEFAULT_IMAGE_MODEL } from './config.js';
+export { DEFAULT_IMAGE_MODEL };
 
 const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
 

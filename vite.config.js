@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import pkg from './package.json';
+import { DEFAULT_COMFY_URL } from './src/lib/config.js';
 
 export default defineConfig({
   base: './',
@@ -14,7 +15,7 @@ export default defineConfig({
       // carrying a foreign Origin. The packaged Electron app talks to ComfyUI
       // directly (its main process strips the Origin header instead).
       '/comfy': {
-        target: 'http://127.0.0.1:8000',
+        target: process.env.COMFY_URL || DEFAULT_COMFY_URL,
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/comfy/, ''),
         configure: (proxy) => {

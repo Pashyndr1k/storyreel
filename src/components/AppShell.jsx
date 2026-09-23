@@ -49,11 +49,11 @@ export default function AppShell({
             <span className="hd-ver">v{__APP_VERSION__}</span>
           </div>
           <nav className="hd-nav">
-            {navItem('home', <Grid size={19} />, t('nav.projects'))}
-            {navItem('archive', <Archive size={19} />, t('nav.archive'))}
-            {navItem('characters', <User size={19} />, t('nav.characters'))}
-            {navItem('locations', <MapPin size={19} />, t('nav.locations'))}
-            {navItem('styles', <Palette size={19} />, t('nav.styles'))}
+            {navItem('home', <Grid size={18} />, t('nav.projects'))}
+            {navItem('archive', <Archive size={18} />, t('nav.archive'))}
+            {navItem('characters', <User size={18} />, t('nav.characters'))}
+            {navItem('locations', <MapPin size={18} />, t('nav.locations'))}
+            {navItem('styles', <Palette size={18} />, t('nav.styles'))}
           </nav>
           <div className="hd-right">
             <Dropdown

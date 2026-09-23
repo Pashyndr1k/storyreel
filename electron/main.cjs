@@ -9,7 +9,13 @@ const { resolveProjectDir, listStrayDirs, deleteDirs } = require('./projectDirs.
 // an Origin header that ComfyUI rejects with HTTP 403.
 ipcMain.handle('comfy-request', (_e, opts) => comfyRequest(opts));
 
-// FFmpeg assembly engine: renders the Stage-6 timeline into an H.264 mp4 in
+// The renderer derives its default folders from the OS Documents folder
+// instead of a path baked into the source (see src/lib/config.js).
+ipcMain.on('app-paths', (e) => {
+  e.returnValue = { documents: app.getPath('documents'), sep: path.sep };
+});
+
+// FFmpeg assembly engine: renders the assembly (Stage 5) timeline into an H.264 mp4 in
 // the main process (native binary), streaming progress back to the renderer.
 // Renderer clipboard APIs are focus/permission-sensitive; the main-process
 // clipboard always works, so the Copy buttons route through here in the app.

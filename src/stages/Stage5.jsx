@@ -1,3 +1,4 @@
+import { SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC, MAX_IMAGE_VERSIONS } from '../lib/config.js';
 import { useEffect, useRef, useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage, generateGeminiVoice, GEMINI_VOICES } from '../lib/gemini.js';
@@ -478,7 +479,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         aria-expanded={promptOpen}
         onClick={() => setPromptOpen((v) => !v)}
       >
-        <Chevron size={13} />
+        <Chevron size={14} />
       </button>
     ) : null;
 
@@ -492,7 +493,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       disabled={!!regenBusy}
       onClick={() => regenPrompt(shot, kind)}
     >
-      <RestoreIcon size={13} />
+      <RestoreIcon size={14} />
     </button>
   );
 
@@ -566,7 +567,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   };
 
   // Per-shot timing straight from Stage 5 (same 2–10s / 0.5s-step rules as the
-  // Stage 4 and Stage 6 timelines; writes into the shared sceneDetails).
+  // Stage 4 and assembly timelines; writes into the shared sceneDetails).
   const patchShot = (shotId, patch) =>
     update((p) => ({
       sceneDetails: {
@@ -577,7 +578,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         },
       },
     }));
-  const setShotDur = (shotId, d) => patchShot(shotId, { duration: Math.max(2, Math.min(10, Math.round(d * 2) / 2)) });
+  const setShotDur = (shotId, d) => patchShot(shotId, { duration: Math.max(SHOT_MIN_SEC, Math.min(SHOT_MAX_SEC, Math.round(d / SHOT_STEP_SEC) * SHOT_STEP_SEC)) });
   // The Stage-4 action text stays editable here — it is what the prompts and
   // the first-frame timing rule are written from.
   const setShotAction = (shotId, action) => patchShot(shotId, { action });
@@ -687,7 +688,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     }
   };
 
-  // Upload a finished shot video; its real duration is probed so the Stage-6
+  // Upload a finished shot video; its real duration is probed so the assembly
   // trim rules know how much raw material exists.
   const uploadShotVideo = async (shot, file) => {
     try {
@@ -742,7 +743,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         shotImages: { ...p.shotImages, [shotId]: img },
         shotImageHistory: {
           ...(p.shotImageHistory || {}),
-          [shotId]: list.includes(img) ? list : [...list, img].slice(-6),
+          [shotId]: list.includes(img) ? list : [...list, img].slice(-MAX_IMAGE_VERSIONS),
         },
       };
     });
@@ -795,13 +796,22 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
               tabIndex={0}
               title={isCur ? t('ver.current') : t('ver.restore')}
               onClick={act}
-              onKeyDown={(e) => e.key === 'Enter' && act()}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); act(); } }}
             >
               <img decoding="async" loading="lazy" src={v} alt="" />
               <span
                 className="s5e-ver-x"
                 role="button"
+                tabIndex={0}
                 title={t('ver.delete')}
+                aria-label={t('ver.delete')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    deleteVersion(shot.id, vi);
+                  }
+                }}
                 onClick={(e) => {
                   e.stopPropagation();
                   deleteVersion(shot.id, vi);
@@ -1043,7 +1053,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     setImgBusy(`${shot.id}:vid`);
     setImgErr(null);
     // +3s padding rule (silent workflows only): generate longer than the
-    // timeline needs; Stage 6 trims 15 frames from head and tail to mask AI
+    // timeline needs; the assembly timeline trims 15 frames from head and tail to mask AI
     // ramp-up and tail degradation. Voice-synced shots render at the exact
     // duration so assembly never trims into synced speech — and H3 counts as
     // voice-synced, because it generates its own dialogue, effects and score.
@@ -1090,7 +1100,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       saveToLocalOutputs(settings, filename, dataURL); // best-effort local copy
       // H3 clips carry a full native mix (dialogue, effects, score). Detach it
       // onto the "H3 mix" lane NLE-style — video muted, audio on its own lane
-      // at the same volume — so Stage 6 can keep, kill or duck it.
+      // at the same volume — so the assembly timeline can keep, kill or duck it.
       let mixBuf = null;
       if (isH3) {
         try {
@@ -1270,7 +1280,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const audioSrcOf = (p, shotId) => (p.shotAudioSrc || {})[shotId] || (p.shotAudios || {})[shotId] || null;
 
   // Voice source (H3 dialogue shots only): 'tts' keeps the TTS pipeline —
-  // H3 renders the delivery silently and the take is laid on in Stage 6;
+  // H3 renders the delivery silently and the take is laid on the assembly timeline;
   // 'native' hands the line to H3's own voice, driven by the speaker notes.
   const voiceSourceOf = (shotId) => ((project.shotVoiceSources || {})[shotId] === 'native' ? 'native' : 'tts');
   const setVoiceSource = (shotId, v) =>
@@ -1502,7 +1512,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                 type="file"
                 accept="image/*"
                 multiple
-                hidden
+                className="sr-only"
                 onChange={(e) => {
                   const fs = [...(e.target.files || [])];
                   e.target.value = '';
@@ -1591,7 +1601,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
             disabled={busy || !!mediaProg || !!imgBusy}
             onClick={processSceneMedia}
           >
-            <Zap size={18} />
+            <Zap size={16} />
           </button>
         )}
         <button
@@ -1601,7 +1611,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           aria-label={t('asset.libBtn')}
           onClick={() => setShowAssets(true)}
         >
-          <Grid size={18} />
+          <Grid size={16} />
         </button>
         <DynamicsVisualizer plan={project.dynamicsPlan} />
       </div>
@@ -1651,11 +1661,11 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
               <div className="s5e-head s5e-cardhead">
                 <strong className="s5e-title">{t('s4.shot', { n: i + 1 })}</strong>
                 <span className="s5e-step" title={t('s5.durTip')}>
-                  <button type="button" title={t('sb.shorter')} disabled={dur <= 2} onClick={() => setShotDur(shot.id, dur - 0.5)}>
+                  <button type="button" title={t('sb.shorter')} disabled={dur <= SHOT_MIN_SEC} onClick={() => setShotDur(shot.id, dur - SHOT_STEP_SEC)}>
                     −
                   </button>
                   <i>{dur.toFixed(1)}s</i>
-                  <button type="button" title={t('sb.longer')} disabled={dur >= 10} onClick={() => setShotDur(shot.id, dur + 0.5)}>
+                  <button type="button" title={t('sb.longer')} disabled={dur >= SHOT_MAX_SEC} onClick={() => setShotDur(shot.id, dur + SHOT_STEP_SEC)}>
                     +
                   </button>
                 </span>
@@ -1909,7 +1919,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       <input
                         type="file"
                         accept="image/*"
-                        hidden
+                        className="sr-only"
                         onChange={(e) => {
                           const f = e.target.files?.[0];
                           e.target.value = '';
@@ -1935,7 +1945,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         <input
                           type="file"
                           accept="image/*"
-                          hidden
+                          className="sr-only"
                           onChange={(e) => {
                             const f = e.target.files?.[0];
                             e.target.value = '';
@@ -1978,7 +1988,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                           <input
                             type="file"
                             accept="image/*"
-                            hidden
+                            className="sr-only"
                             onChange={(e) => {
                               const f = e.target.files?.[0];
                               e.target.value = '';
@@ -2029,20 +2039,24 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                 </div>
                 <div className="s5e-panel">
                   {shotVid ? (
-                    <div className="s5e-imgwrap vid-wrap">
-                      <video src={shotVid} controls preload="metadata" />
-                      <button
-                        type="button"
-                        className="s5e-dl s5e-dl2"
-                        title={t('vid.expand')}
-                        onClick={() => setLightbox({ kind: 'vid', src: shotVid })}
-                      >
-                        <Expand size={14} />
-                      </button>
-                      <button type="button" className="s5e-dl" title={t('vid.download')} onClick={() => downloadVideo(shot, i)}>
-                        <Download size={14} />
-                      </button>
-                    </div>
+                    // Embedded: the preview frame's transport carries expand /
+                    // download, so the card shows no media strip at all.
+                    !embed && (
+                      <div className="s5e-imgwrap vid-wrap">
+                        <video src={shotVid} controls preload="metadata" />
+                        <button
+                          type="button"
+                          className="s5e-dl s5e-dl2"
+                          title={t('vid.expand')}
+                          onClick={() => setLightbox({ kind: 'vid', src: shotVid })}
+                        >
+                          <Expand size={14} />
+                        </button>
+                        <button type="button" className="s5e-dl" title={t('vid.download')} onClick={() => downloadVideo(shot, i)}>
+                          <Download size={14} />
+                        </button>
+                      </div>
+                    )
                   ) : (
                     <div className="s5-media-empty">
                       {effMode === 'r2v'
@@ -2081,7 +2095,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       <input
                         type="file"
                         accept="video/*"
-                        hidden
+                        className="sr-only"
                         onChange={(e) => {
                           const f = e.target.files?.[0];
                           e.target.value = '';
@@ -2089,12 +2103,10 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         }}
                       />
                     </label>
-                  </div>
-                  {/* Generation parameters on one compact line: resolution +
-                      workflow. Auto picks the richest workflow the shot's
-                      material allows; a pinned choice overrides it. Options
-                      whose material is missing stay disabled. */}
-                  <div className="s5e-params">
+                    {/* Generation parameters share the Generate row: resolution +
+                        workflow. Auto picks the richest workflow the shot's
+                        material allows; a pinned choice overrides it. Options
+                        whose material is missing stay disabled. */}
                     <span className="seg seg-tall seg-compact" title={t('s5.resTip')}>
                       {VIDEO_RESOLUTIONS.map((r) => (
                         <button
@@ -2451,6 +2463,24 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       >
                         {audBusy ? t('aud.generating') : shotAud ? t('aud.regenerate') : t('aud.generate')}
                       </button>
+                      <label
+                        className={`s5e-ico file-btn ${anyBusy || recording ? 'disabled' : ''}`}
+                        title={t('aud.upload')}
+                        aria-label={t('aud.upload')}
+                      >
+                        <Upload size={16} />
+                        <input
+                          type="file"
+                          accept="audio/*"
+                          className="sr-only"
+                          disabled={anyBusy || !!recording}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            e.target.value = '';
+                            if (f) uploadAudio(shot, f);
+                          }}
+                        />
+                      </label>
                       <button
                         type="button"
                         className="s5e-ico"
@@ -2471,24 +2501,6 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       >
                         {recording === shot.id ? <StopSq size={16} /> : <Mic size={16} />}
                       </button>
-                      <label
-                        className={`s5e-ico file-btn ${anyBusy || recording ? 'disabled' : ''}`}
-                        title={t('aud.upload')}
-                        aria-label={t('aud.upload')}
-                      >
-                        <Upload size={16} />
-                        <input
-                          type="file"
-                          accept="audio/*"
-                          hidden
-                          disabled={anyBusy || !!recording}
-                          onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            e.target.value = '';
-                            if (f) uploadAudio(shot, f);
-                          }}
-                        />
-                      </label>
                       {shotAud && (
                         <button
                           type="button"

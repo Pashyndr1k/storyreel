@@ -1,3 +1,4 @@
+import { DEFAULT_CLAUDE_MODEL } from '../lib/config.js';
 import { useEffect, useRef, useState } from 'react';
 import { generateJSON, textKeyError } from '../lib/claude.js';
 import { smartEditPrompt } from '../lib/prompts.js';
@@ -133,7 +134,7 @@ export default function SmartEditModal({ project, update, settings, genLang, onC
     try {
       // Smart edit runs on the standard Sonnet 5 model, ungoverned by styles.
       // The prompt carries ONLY the project's text (no images/videos).
-      const editSettings = { ...settings, model: 'claude-sonnet-5' };
+      const editSettings = { ...settings, model: DEFAULT_CLAUDE_MODEL };
       const data = await generateJSON(editSettings, smartEditPrompt(project, instruction.trim(), genLang), {
         signal: controller.signal,
       });
@@ -178,7 +179,7 @@ export default function SmartEditModal({ project, update, settings, genLang, onC
           <div className="note error">{t('err.failed')} {error}</div>
         ) : null}
         {result !== null && (
-          <div className={`note ${result > 0 ? 'warn' : ''}`} style={result > 0 ? { color: 'var(--violet-text)', borderColor: 'rgba(139,92,246,0.4)', background: 'rgba(139,92,246,0.1)' } : {}}>
+          <div className={`note ${result > 0 ? 'warn' : ''}`} style={result > 0 ? { color: 'var(--accent)', borderColor: 'rgba(var(--accent-rgb), 0.4)', background: 'rgba(var(--accent-rgb), 0.1)' } : {}}>
             {result > 0 ? t('edit.done', { n: result }) : t('edit.none')}
           </div>
         )}

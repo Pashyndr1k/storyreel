@@ -2,13 +2,13 @@
 // scene into a single H3 generation: the model renders the internal cuts
 // itself (no crossfade seam, continuity modelled across the cut). The first
 // member is the take's lead — its prompt, first frame / references, video slot
-// and Stage-6 clip stand for the whole take.
+// and assembly-timeline clip stand for the whole take.
 import { h3Frames } from './comfy.js';
 
 // The field guide's generation ceiling is 15s; the largest valid 17n+5 frame
 // count inside it is 345 (14.375s), because the next grid point (362) rounds
 // past 15s.
-export const MAX_TAKE_FRAMES = 360;
+export const MAX_TAKE_FRAMES = 345;
 
 export function takeOf(project, shotId) {
   for (const g of Object.values(project.shotGroups || {})) {

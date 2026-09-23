@@ -57,8 +57,8 @@
   --r-frame: 0;
   --r-panel: 3px;
   --r-card: 0;
-  --r-btn: 2px;
-  --r-btn-sm: 2px;
+  --r-btn: 3px;
+  --r-btn-sm: 3px;
 }
 
 /* medium ("newsprint") — warm grey paper, ink text */
@@ -259,8 +259,8 @@ h1, h2, h3 { margin: 0; }
 .hd-ver { font-size: 9.5px; letter-spacing: 0.06em; color: var(--muted-2); }
 .hd-nav { display: flex; gap: 4px; margin-left: 12px; }
 .hd-ico {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border: none;
   background: transparent;
   color: var(--muted-2);
@@ -328,8 +328,9 @@ label {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: 6px;
   height: 32px;
+  margin: 0; /* labels used as buttons inherit the global label margin otherwise */
   background: transparent;
   color: var(--text);
   border: none;
@@ -361,9 +362,9 @@ label {
   color: var(--accent);
 }
 .btn.danger:hover:not(:disabled) { color: var(--accent-deep); }
-.btn.small { height: 28px; padding: 0 7px; font-size: 11px; }
+.btn.small { height: 32px; padding: 0 8px; font-size: 11px; }
 .btn.tiny { height: 24px; padding: 0 6px; font-size: 10.5px; }
-.btn.big { height: 36px; padding: 0 10px; font-size: 12px; }
+.btn.big { height: 38px; padding: 0 10px; font-size: 12px; }
 /* dual-state buttons (Play/Stop, Generate/Generating…) hold ONE width */
 .btn.fixedw { min-width: 118px; }
 .btn.fixedw-lg { min-width: 168px; }
@@ -382,6 +383,7 @@ label {
 .icon-btn {
   width: 32px;
   height: 32px;
+  margin: 0;
   flex: none;
   border-radius: var(--r-btn-sm);
   background: transparent;
@@ -421,7 +423,7 @@ label {
   transition: color 0.15s;
 }
 .copy-link:hover:not(:disabled) { color: var(--accent); }
-.copy-link:disabled { opacity: 0.4; cursor: not-allowed; }
+.copy-link:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .file-btn { cursor: pointer; margin: 0; }
 
@@ -934,16 +936,16 @@ label {
 .field.grow2 { flex: 2; }
 .field label { margin: 10px 0 4px; font-size: 12px; }
 .shot-summary { color: var(--muted-2); font-size: 13.5px; margin: 4px 0 8px; }
-.prompt-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; }
-.prompt-head label { margin-bottom: 4px; }
-.prompt-head .copy-link { margin-bottom: 6px; }
+.prompt-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.prompt-head label { margin: 0; }
+.prompt-head .copy-link { margin-bottom: 0; }
 /* regenerate + copy tools in a prompt frame's header */
 .prompt-tools { display: inline-flex; align-items: center; gap: 8px; }
-.prompt-tools .copy-link { margin-bottom: 6px; }
+.prompt-tools .copy-link { margin-bottom: 0; }
 .prompt-regen {
-  width: 22px;
-  height: 22px;
-  margin-bottom: 3px;
+  width: 24px;
+  height: 24px;
+  margin-bottom: 0;
   border: none;
   border-radius: 3px;
   background: none;
@@ -1149,11 +1151,11 @@ label {
 /* Overlay icon actions on generated images: small white icons on round
    semi-transparent black chips, pinned to the image's top-right corner. */
 .img-wrap { position: relative; display: inline-block; max-width: 100%; }
-.img-actions { position: absolute; top: 6px; right: 6px; display: flex; gap: 0; }
+.img-actions { position: absolute; top: 6px; right: 6px; display: flex; gap: 4px; }
 .img-icon-btn {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  border-radius: 3px;
   border: none;
   padding: 0;
   background: rgba(0, 0, 0, 0.3);
@@ -1164,7 +1166,7 @@ label {
   cursor: pointer;
 }
 .img-icon-btn:hover:not(:disabled) { background: rgba(var(--accent-rgb), 0.9); }
-.img-icon-btn:disabled { opacity: 0.45; cursor: default; }
+.img-icon-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* FLF pair: first frame + final frame side by side, identical size. */
 .frame-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 360px)); gap: 10px; width: 100%; }
@@ -1173,7 +1175,7 @@ label {
 .frame-pair img { width: 100%; max-width: none; max-height: none; height: auto; }
 .frame-pair figcaption { font-size: 11px; color: var(--muted-2); letter-spacing: 0.02em; }
 
-/* ============ STAGE STRIP (design 5b): six hairline cells ============ */
+/* ============ STAGE STRIP (design 5b): five hairline cells ============ */
 .stg-bar {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -1326,15 +1328,15 @@ label {
 .voice-btn { flex: none; }
 /* "refine text" — small square button, white wand icon, under the mic */
 .groom-btn {
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   border-radius: 3px;
   background: rgba(var(--ink-rgb), 0.06);
   border: 1px solid var(--hairline);
   color: var(--text);
 }
 .groom-btn:hover:not(:disabled) { background: rgba(var(--ink-rgb), 0.11); border-color: var(--ink); }
-.groom-btn:disabled { opacity: 0.5; }
+.groom-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .voice-btn.rec {
   background: rgba(var(--accent-rgb), 0.16);
   border-color: var(--danger);
@@ -1395,7 +1397,7 @@ label {
 .ver-thumb:hover { border-color: rgba(var(--accent-rgb), 0.6); }
 .ver-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 /* tweak/refine rows stretch to the full width of the frame above them */
-.refine-row { margin-top: 8px; width: 100%; }
+.refine-row { width: 100%; align-items: center; }
 .refine-row input { flex: 1; min-width: 0; }
 
 /* storyboard timeline (Stage 4) */
@@ -1416,7 +1418,7 @@ label {
   max-width: 420px;
   flex: none;
   aspect-ratio: 16 / 9;
-  background: #000;
+  background: var(--tl-bg);
   border-radius: 3px;
   overflow: hidden;
   border: 1px solid var(--glass-border);
@@ -1603,7 +1605,7 @@ label {
 .cut-desc { color: var(--text-2); line-height: 1.4; font-size: 11.5px; }
 .cut-eff { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px; color: var(--muted-2); white-space: normal; }
 
-/* transient toast — the only notification surface on Stage 6 */
+/* transient toast — the only notification surface on the assembly stage */
 .s6-toast {
   position: fixed;
   right: 24px;
@@ -1628,10 +1630,10 @@ label {
   to { transform: none; opacity: 1; }
 }
 
-/* Stage 6 control row sits 30px lower, clear of the timeline footer.
+/* Assembly control row sits 30px lower, clear of the timeline footer.
    Every control shares one 32px height and a quiet fill so spacing reads even. */
 .row.s6-controls { margin-top: 42px; gap: 10px; }
-.s6-controls .btn { height: 32px; background: rgba(var(--ink-rgb), 0.06); border-radius: 3px; padding: 0 12px; }
+.s6-controls .btn { background: rgba(var(--ink-rgb), 0.06); padding: 0 12px; }
 .s6-controls .btn:hover:not(:disabled) { background: rgba(var(--ink-rgb), 0.11); }
 .s6-controls .btn.primary { background: rgba(var(--accent-rgb), 0.09); }
 .s6-controls .btn.primary:hover:not(:disabled) { background: rgba(var(--accent-rgb), 0.16); }
@@ -1709,7 +1711,7 @@ label {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #5a566e;
+  color: var(--muted-2);
   font-size: 13px;
   font-weight: 700;
 }
@@ -1754,7 +1756,7 @@ label {
   cursor: pointer;
 }
 .nle-nudge button:hover:not(:disabled) { background: rgba(var(--accent-rgb), 0.35); border-color: var(--accent); }
-.nle-nudge button:disabled { opacity: 0.35; cursor: default; }
+.nle-nudge button:disabled { opacity: 0.45; cursor: not-allowed; }
 .nle-trim::before {
   content: '';
   position: absolute;
@@ -1816,7 +1818,7 @@ label {
 .vid-wrap { max-width: 480px; width: 100%; }
 .vid-wrap video { display: block; width: 100%; border-radius: 3px; border: 1px solid var(--glass-border); background: #000; }
 
-/* ============ STAGE 6 — final assembly ============ */
+/* ============ STAGE 5 — assembly (preview / timeline) ============ */
 .asm-preview {
   position: relative;
   height: 420px;
@@ -1841,7 +1843,7 @@ label {
   color: var(--tl-text-dim);
   font-size: 14px;
   font-weight: 700;
-  background: #000;
+  background: var(--tl-bg);
 }
 .asm-track { height: 96px; gap: 0; padding: 6px 6px 6px 0; }
 /* strips must start exactly at var(--nle-gut) so the playhead math matches */
@@ -1875,7 +1877,7 @@ label {
 .asm-scene-label span { overflow: hidden; text-overflow: ellipsis; }
 .asm-clips { display: flex; flex: 1; gap: 2px; min-height: 0; }
 
-/* Stage 6 timeline zoom + horizontal scroll. The scale control lives in the
+/* Assembly timeline zoom + horizontal scroll. The scale control lives in the
    footer, styled exactly like the shot-length nudge control next to it. */
 .nle-scroll { overflow-x: auto; overflow-y: hidden; }
 .nle-scroll.zoomed { cursor: grab; }
@@ -1979,7 +1981,7 @@ label {
   color: var(--violet-text, var(--accent));
   border: 1px solid rgba(var(--accent-rgb), 0.4);
   background: rgba(var(--accent-rgb), 0.1);
-  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
 /* ============ DYNAMICS VISUALIZER ============ */
@@ -2274,7 +2276,7 @@ label {
 .seg {
   display: inline-flex;
   padding: 0;
-  border-radius: 2px;
+  border-radius: 3px;
   background: transparent;
   border: 1px solid var(--hairline);
 }
@@ -2390,7 +2392,7 @@ label {
   transition: color 0.15s;
 }
 .s5e-step button:hover:not(:disabled) { color: var(--accent); }
-.s5e-step button:disabled { opacity: 0.4; cursor: default; }
+.s5e-step button:disabled { opacity: 0.45; cursor: not-allowed; }
 .s5e-step i { font-style: normal; font-size: 11px; font-weight: 700; color: var(--text); padding: 4px 2px; }
 /* standardized style chips in shot-card headers (stages 4/5) */
 .style-chip {
@@ -2444,7 +2446,7 @@ textarea.s5e-prompt-sm { min-height: 110px; }
   gap: 6px;
   background: var(--glass-input);
   border: 1px solid var(--glass-border);
-  border-radius: 2px;
+  border-radius: 3px;
   padding: 5px 10px;
   cursor: pointer;
   font-family: inherit;
@@ -2492,7 +2494,7 @@ textarea.s5e-prompt-sm { min-height: 110px; }
   right: 12px;
   width: 32px;
   height: 32px;
-  border-radius: 2px;
+  border-radius: 3px;
   border: none;
   background: rgba(10, 10, 10, 0.55);
   color: #f0efec;
@@ -2568,7 +2570,7 @@ textarea.s5e-prompt-sm { min-height: 110px; }
 
 /* aligned control rows: primary + equal-height icon-only squares */
 .s5e-btnrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.s5e-btnrow .btn.small { height: 38px; border-radius: 3px; }
+.s5e-btnrow .btn.small { height: 38px; }
 .btn.hl,
 .s5e-gen,
 .btn.fixedw,
@@ -2661,7 +2663,7 @@ textarea.s5e-prompt-sm { min-height: 110px; }
   z-index: 2;
 }
 .s5e-ver:hover .s5e-ver-x { display: flex; }
-.s5e-ver-x:hover { background: rgba(200, 40, 70, 0.9); }
+.s5e-ver-x:hover { background: rgba(var(--accent-rgb), 0.9); }
 
 /* reference material grid */
 .s5e-refgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -2710,7 +2712,7 @@ textarea.s5e-prompt-sm { min-height: 110px; }
 }
 .lightbox-x:hover { background: rgba(255, 255, 255, 0.22); }
 
-/* ============ STAGE 6 AUDIO LANES ============ */
+/* ============ ASSEMBLY AUDIO LANES ============ */
 /* Audio timeline: one lane per layer, clips positioned on the film clock. */
 .audio-lanes { border-top: 1px solid var(--tl-border); background: var(--tl-lanes); }
 .audio-lane {
@@ -2731,7 +2733,7 @@ textarea.s5e-prompt-sm { min-height: 110px; }
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: none;
-  color: #3a3552;
+  color: var(--tl-chip);
   font-size: 9px;
   line-height: 1;
   cursor: pointer;
@@ -2776,7 +2778,7 @@ textarea.s5e-prompt-sm { min-height: 110px; }
   cursor: pointer;
   padding: 0;
 }
-.lane-x:hover { color: #fff; background: rgba(200, 40, 70, 0.8); }
+.lane-x:hover { color: #fff; background: rgba(var(--accent-rgb), 0.8); }
 .lane-strip { position: relative; flex: 1; height: 100%; min-width: 0; }
 .aclip {
   position: absolute;
@@ -2840,7 +2842,7 @@ textarea.s5e-prompt-sm { min-height: 110px; }
   justify-content: center;
 }
 .aclip-btn:hover { background: rgba(0, 0, 0, 0.6); }
-.aclip-btn.on { background: rgba(200, 40, 70, 0.75); }
+.aclip-btn.on { background: rgba(var(--accent-rgb), 0.75); }
 .aclip-h {
   position: absolute;
   top: 0;
@@ -2932,12 +2934,13 @@ textarea.s5e-prompt-sm { min-height: 110px; }
 /* ============ SETTINGS — tabbed layout ============ */
 /* Settings never scrolls: tabs are split and laid out in two columns so the
    tallest one fits a 720px-high window. */
-.modal.set-modal { width: 780px; max-width: 100%; max-height: none; overflow: visible; }
+.modal.set-modal { width: 780px; max-width: 100%; max-height: calc(100vh - 40px); overflow: auto; }
 .set-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; align-items: start; }
 .set-cols > div > label:first-child { margin-top: 0; }
 @media (max-width: 720px) { .set-cols { grid-template-columns: 1fr; } }
 .set-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   margin: 14px 0 0;
   border-bottom: 1px solid var(--hairline);
@@ -3054,8 +3057,8 @@ textarea.s5e-prompt-sm { min-height: 110px; }
   margin-top: 8px;
 }
 .s5e-refthumb {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   object-fit: cover;
   border-radius: 3px;
   border: 1px solid var(--hairline);
@@ -3119,7 +3122,7 @@ textarea.s5e-prompt-sm { min-height: 110px; }
 .refpick-item.on i { color: var(--text); }
 .total-badge.warn { color: var(--accent); }
 
-/* Stage 5 take controls + Stage 6 internal cut marks (H3 multi-shot takes) */
+/* Workbench take controls + timeline internal cut marks (H3 multi-shot takes) */
 .s5e-takebtns {
   display: inline-flex;
   align-items: center;
@@ -3152,7 +3155,7 @@ textarea.s5e-prompt-sm { min-height: 110px; }
   pointer-events: none;
 }
 
-/* Take chips: same look as the Stage 6 scale −/+ buttons under the timeline */
+/* Take chips: same look as the timeline scale −/+ buttons under the timeline */
 .s5e-takebtns .s5e-eyebrow { margin: 0; line-height: 1; }
 .take-btn {
   padding: 2px 10px;
@@ -3168,9 +3171,9 @@ textarea.s5e-prompt-sm { min-height: 110px; }
   transition: background 0.15s, border-color 0.15s;
 }
 .take-btn:hover:not(:disabled) { background: rgba(var(--accent-rgb), 0.35); border-color: var(--accent); }
-.take-btn:disabled { opacity: 0.35; cursor: default; }
-/* refs-row square button matches the 34px ref thumbnails it sits beside */
-.s5e-refbtn { width: 34px; height: 34px; min-width: 34px; }
+.take-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+/* refs-row square button matches the 32px ref thumbnails it sits beside */
+.s5e-refbtn { width: 32px; height: 32px; min-width: 32px; }
 
 /* Music modal: 2x2 option grid with the editable length field */
 .music-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -3241,7 +3244,7 @@ textarea.s5e-prompt-sm { min-height: 110px; }
 }
 /* Both frames are a FIXED height so switching shots or scenes never
    reflows the page; the workbench scrolls inside its frame instead. */
-.asm-top { --asm-top-h: 560px; }
+.asm-top { --asm-top-h: clamp(360px, 62vh, 560px); }
 .asm-top .asm-preview { margin: 0; height: var(--asm-top-h); min-height: 0; }
 .asm-bench {
   min-width: 0;
@@ -3279,7 +3282,7 @@ textarea.s5e-prompt-sm { min-height: 110px; }
 .asm-scene-label { cursor: pointer; }
 .asm-scene-label.selected { color: var(--accent); }
 .asm-scene-label.selected span { text-decoration: underline; text-underline-offset: 3px; }
-@media (max-width: 1000px) { .asm-top { grid-template-columns: 1fr; } .asm-top .asm-preview { height: 380px; } }
+@media (max-width: 1000px) { .asm-top { grid-template-columns: 1fr; } .asm-top .asm-preview { height: 380px; } .asm-top .asm-bench { height: auto; max-height: 50vh; } }
 /* compact card: the left preview IS the result display, so the card keeps
    only the media's buttons (expand / download) as a small tool strip */
 .s5e-compact .s5e-imgwrap > img,
@@ -3377,13 +3380,13 @@ textarea.s5e-prompt-sm { min-height: 110px; }
   z-index: 3;
 }
 .pv-ctrl button {
-  width: 30px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: none;
-  border-radius: 2px;
+  border-radius: 3px;
   background: transparent;
   color: #f0efec;
   font-family: inherit;
@@ -3424,11 +3427,70 @@ textarea.s5e-action-edit:focus { outline: none; border-bottom-color: var(--accen
 /* ---- 2.6: image+ styles ------------------------------------------------- */
 .sr-tag.plus-tag {
   margin-left: 8px;
+  padding: 1px 6px;
+  border: 1px solid rgba(var(--accent-rgb), 0.5);
+  border-radius: 2px;
   color: var(--accent);
-  border-color: rgba(var(--accent-rgb), 0.5);
   background: rgba(var(--accent-rgb), 0.08);
   vertical-align: middle;
 }
 .check-row.style-plus { margin: 12px 0 4px; align-items: flex-start; }
 .check-row.style-plus span { display: flex; flex-direction: column; gap: 2px; }
 .check-row.style-plus em { font-style: normal; color: var(--muted-2); font-size: 12px; }
+
+/* ---- 2.6 audit: one control system ---------------------------------------- */
+/* Text controls centre their content like the icon buttons do. */
+.take-btn, .seg-btn, .nle-nudge button, .s5e-step button, .chip, .photo-x, .lane-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+/* One disabled treatment for every control, including the ones that had none. */
+.seg-btn:disabled, .photo-add:disabled, .glass-btn:disabled, label.btn.disabled, label.file-btn.disabled,
+.icon-btn.busy, input:disabled, select:disabled, textarea:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.seg-btn:disabled:hover { color: var(--muted-2); }
+/* Eyebrow labels sit on the row's centre line in every row. */
+.s5e-refrow .s5e-eyebrow, .s5e-vsrc .s5e-eyebrow, .s5e-btnrow .s5e-eyebrow { margin: 0; }
+.prompt-fold { margin-bottom: 0; }
+/* Version thumbs no longer sit on an image in the compact card — a themed border. */
+.s5e-compact .s5e-ver { border-color: var(--hairline); }
+/* Native controls (audio/video controls, number spinners, range) follow the theme. */
+:root { color-scheme: dark; }
+:root[data-theme='light'], :root[data-theme='medium'] { color-scheme: light; }
+/* Upload controls: the file input is focusable (not hidden), so Tab reaches
+   it and Enter/Space open the picker; the label shows the ring. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+label:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.s5e-ver:focus-within .s5e-ver-x, .s5e-ver-x:focus-visible { display: flex; }
+/* Long user text never breaks a row or hides behind a generic tooltip. */
+.style-chip-name { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+.s5e-title { min-width: 0; overflow-wrap: anywhere; }
+.s5e-castnames { white-space: normal; }
+.modal h2 { overflow-wrap: anywhere; }
+.style-item-body strong { overflow-wrap: anywhere; }
+.style-item-body span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+/* Rows that can hold many items wrap instead of overflowing the window. */
+.nle-footer { flex-wrap: wrap; gap: 8px 14px; }
+.sr-actions { flex-wrap: wrap; }
+.s5e-voicegrid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+/* Stage bar cells follow the stage count set from JS. */
+.stg-bar { grid-template-columns: repeat(var(--stage-count, 5), 1fr); }
+/* Video params share the Generate row: same 38px height as its buttons. */
+.s5e-btnrow .seg.seg-compact { height: 38px; }
+.s5e-btnrow .seg.seg-compact .seg-btn { padding: 0 7px; font-size: 9.5px; letter-spacing: 0.03em; }
+.s5e-btnrow > .hint { flex-basis: 100%; margin: 0; }
+/* Preview transport: a hairline separates playback from the file tools. */
+.pv-ctrl .pv-sep { width: 1px; height: 18px; margin: 0 3px; background: rgba(255, 255, 255, 0.22); align-self: center; }

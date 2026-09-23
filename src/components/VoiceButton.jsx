@@ -82,7 +82,7 @@ export default function VoiceButton({ settings, onText, getText, onReplace }) {
         disabled={busy}
         onClick={rec ? stop : start}
       >
-        {busy ? <span className="voice-dots">…</span> : <Mic size={15} />}
+        {busy ? <span className="voice-dots">…</span> : <Mic size={16} />}
       </button>
       {getText && onReplace && (
         <button

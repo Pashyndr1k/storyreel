@@ -1,3 +1,4 @@
+import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIR, DEFAULT_PROJECTS_DIR, DEFAULT_CLAUDE_MODEL, DEFAULT_IMAGE_MODEL, STAGE_COUNT, MAX_IMAGE_VERSIONS } from './config.js';
 import { idbGetAll, idbPutMany, idbDeleteMany } from './idb.js';
 import { isValidAspect } from './aspect.js';
 import { sanitizeMethods } from './randomization.js';
@@ -8,6 +9,7 @@ const SETTINGS_KEY = 'storyreel.settings.v1';
 // Bump when the project shape changes. Used only to tag exports; import/load
 // tolerate any older shape via migrateProject below.
 export const SCHEMA_VERSION = 2;
+export const IMAGE_VERSION_CAP = MAX_IMAGE_VERSIONS;
 
 export function uid() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -118,11 +120,11 @@ function revealKey(value) {
 export function loadSettings() {
   const defaults = {
     apiKey: '',
-    model: 'claude-sonnet-5',
+    model: DEFAULT_CLAUDE_MODEL,
     lang: 'en',
     theme: 'dark',
     geminiKey: '',
-    geminiModel: 'gemini-3-pro-image-preview',
+    geminiModel: DEFAULT_IMAGE_MODEL,
     textService: 'claude', // 'claude' | 'gemini' — plots, scripts and prompts
     storyboardService: 'gemini', // 'gemini' | 'comfy' — Stage-4 storyboard frames
     videoService: 'comfy', // shot video generation (only ComfyUI for now)
@@ -130,9 +132,9 @@ export function loadSettings() {
     h3NoticeShown: true, // one-time "H3 is now the default" notice (false only for pre-2.0 installs)
     h3RefImageSize: 'match', // ref2va identity strength: 'match' | 'max' (max = stronger identity lock)
     h3Lightning: false, // MULTI mode only: 4-step Lightning LoRA instead of the 20-step default
-    comfyUrl: 'http://127.0.0.1:8000',
-    comfyOutputDir: 'D:\\Claude work\\ComfyUI\\Output',
-    projectsDir: 'D:\\Claude work\\StoryReel Projects', // per-project folders (project.md + media files)
+    comfyUrl: DEFAULT_COMFY_URL,
+    comfyOutputDir: DEFAULT_OUTPUT_DIR,
+    projectsDir: DEFAULT_PROJECTS_DIR, // per-project folders (project.md + media files)
     uiFont: 'default', // UI font scheme (see FONT_SCHEMES in SettingsModal)
   };
   try {
@@ -184,7 +186,7 @@ function projectDefaults() {
     stage: 1,
     cover: '', // generated project cover image (data URL)
     shotImages: {}, // shotId -> current generated image (data URL)
-    shotImageHistory: {}, // shotId -> older versions, newest first (max 5)
+    shotImageHistory: {}, // shotId -> every first-frame version in creation order (max MAX_IMAGE_VERSIONS)
     shotFinalImages: {}, // shotId -> generated FINAL frame (data URL), paired with shotImages
     shotVideos: {}, // shotId -> generated shot video (data URL, ComfyUI LTX-2)
     shotAudios: {}, // shotId -> voice audio actually used (data URL; padded when pads are set)
@@ -194,7 +196,7 @@ function projectDefaults() {
     dynamicsPlan: null, // Action Dynamics Plan generated at Stage 3 (see lib/dynamics.js)
     videoGenDurations: {}, // shotId -> raw seconds requested from the video model (+2s padding)
     shotVideoModes: {}, // shotId -> pinned video workflow: 'auto' | 'i2v' | 'flf2v' | 'si2v'
-    shotVideoEngines: {}, // shotId -> engine that rendered it: 'ltx' | 'minimax' (drives Stage 6 trim)
+    shotVideoEngines: {}, // shotId -> engine that rendered it: 'ltx' | 'minimax' (drives assembly trim)
     shotPromptEngines: {}, // shotId -> engine the video prompt was WRITTEN for: 'ltx' | 'minimax'
     shotVoiceSources: {}, // shotId -> 'tts' (default, both engines) | 'native' (H3 speaks the line itself)
     shotSpeakerNotes: {}, // shotId -> voice identity/timbre/delivery notes fed into the H3 prompt
@@ -202,7 +204,7 @@ function projectDefaults() {
     shotGroups: {}, // leadShotId -> { shotIds: [lead, ...members] } — H3 multi-shot takes (2-3 consecutive shots, one generation)
     shotKeyframes: {}, // shotId -> [{ kind: 'image'|'audio', src, label, at }] — H3 MULTI mode anchors on the output timeline (seconds)
     shotTrims: {}, // shotId -> { head, tail } seconds — manual overrides of the 15-frame rule
-    // Multi-layer audio timeline (Stage 6). Each layer is its own track lane:
+    // Multi-layer audio timeline (Stage 5 assembly). Each layer is its own track lane:
     // { id, name, enabled, volume, clips: [{ id, name, dataURL, start, offset,
     //   duration, srcDuration, fadeIn, fadeOut }] } — times in seconds,
     // `start` film-absolute, `offset` the trim inside the source file.
@@ -245,7 +247,7 @@ export function migrateProject(raw) {
   p.genres = Array.isArray(p.genres) ? p.genres.slice(0, 3) : [];
   p.ideas = Array.isArray(p.ideas) ? p.ideas : [];
   p.stage = Number(p.stage) || 1;
-  if (p.stage > 5) p.stage = 5; // 2.5 merged the old stages 5 and 6
+  if (p.stage > STAGE_COUNT) p.stage = STAGE_COUNT; // 2.5 merged the old stages 5 and 6
   p.archived = !!p.archived;
   p.cover = typeof p.cover === 'string' ? p.cover : '';
   p.lang = typeof p.lang === 'string' ? p.lang : '';

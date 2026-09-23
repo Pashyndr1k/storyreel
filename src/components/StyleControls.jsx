@@ -50,7 +50,7 @@ export function StyleChip({ project, styles, cat, onClick }) {
   return (
     <button type="button" className="style-chip" title={t('stind.open')} onClick={onClick}>
       <span className="style-chip-cat">{catLabel(styles, cat, project[ID_FIELD[cat]], t)}</span>
-      <span className="style-chip-name">{styleNameOf(styles, cat, project[ID_FIELD[cat]], t)}</span>
+      <span className="style-chip-name" title={styleNameOf(styles, cat, project[ID_FIELD[cat]], t)}>{styleNameOf(styles, cat, project[ID_FIELD[cat]], t)}</span>
     </button>
   );
 }

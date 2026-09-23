@@ -1,4 +1,4 @@
-// Audio helpers for the Stage-6 timeline: decode any browser-supported media
+// Audio helpers for the assembly timeline: decode any browser-supported media
 // (mp4/webm/mp3/wav data URLs) into an AudioBuffer, and pack an AudioBuffer
 // into a WAV data URL so it can live as a clip on the audio timeline, play in
 // the preview and feed ffmpeg.

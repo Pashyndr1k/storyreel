@@ -1,5 +1,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+// OS folders the renderer's defaults are built from (read once at startup).
+contextBridge.exposeInMainWorld('appPaths', ipcRenderer.sendSync('app-paths'));
+
 // Synchronous bridge to safeStorage in the main process. Payloads are two short
 // API-key strings read once at startup, so sendSync is fine here.
 contextBridge.exposeInMainWorld('secureStore', {

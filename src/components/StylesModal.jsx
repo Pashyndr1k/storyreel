@@ -127,7 +127,7 @@ export default function StylesModal({ styles, setStyles, settings, onSettings, i
               <button className="btn small" onClick={() => setEditing(newStyle())}>{t('styles.add')}</button>
               {settings && (
                 <button className="btn small primary" onClick={() => setAssist(true)}>
-                  <Stars size={14} /> {t('sa.button')}
+                  <Stars size={14} />{t('sa.button')}
                 </button>
               )}
             </div>
@@ -140,7 +140,7 @@ export default function StylesModal({ styles, setStyles, settings, onSettings, i
             <button className="btn small" onClick={exportStyles}>{t('styles.export')}</button>
             <label className="btn small file-btn">
               {t('styles.import')}
-              <input type="file" accept=".json,application/json" onChange={importStyles} hidden />
+              <input type="file" accept=".json,application/json" onChange={importStyles} className="sr-only" />
             </label>
           </div>
         </div>

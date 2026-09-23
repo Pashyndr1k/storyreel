@@ -1,8 +1,9 @@
+import { DEFAULT_CLAUDE_MODEL } from './config.js';
 import { withRetry } from './retry.js';
 import { generateGeminiText } from './gemini.js';
 
 export const MODELS = [
-  { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 (recommended)' },
+  { id: DEFAULT_CLAUDE_MODEL, label: 'Claude Sonnet 5 (recommended)' },
   { id: 'claude-opus-4-8', label: 'Claude Opus 4.8 (highest quality)' },
   { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (fastest)' },
 ];

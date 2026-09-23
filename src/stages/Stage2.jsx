@@ -321,7 +321,7 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
                       <input
                         type="file"
                         accept="image/*"
-                        hidden
+                        className="sr-only"
                         onChange={(e) => {
                           const f = e.target.files?.[0];
                           e.target.value = '';
@@ -352,7 +352,7 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
                 )}
                 {(c.photos || []).length > 0 && (
                   <button className="btn small" disabled={busy} onClick={() => extract(c)}>
-                    <Stars size={14} /> {busy ? t('gen.generating') : t('char.extract')}
+                    <Stars size={14} />{busy ? t('gen.generating') : t('char.extract')}
                   </button>
                 )}
               </div>

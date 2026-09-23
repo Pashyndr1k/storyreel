@@ -29,6 +29,61 @@
   under the Generate button.
 - A single generated first frame now appears in the version strip as the
   sole (selected) option.
+- **Preview transport carries the file tools.** Open large preview and
+  Download video moved from the shot card into the preview's transport,
+  next to the playback buttons; the card's video tab keeps only Generate,
+  Upload and — on the same row — the resolution and workflow switches.
+
+**Audit (terminology, hardcoded values, styles, layout, controls).**
+See `docs/ui-audit-backlog.md` for what was found and left for later.
+
+- Terminology: every leftover "Stage 6" / "Final Assembly" / "Generation
+  Prompts" string, tooltip, README line and code comment now describes the
+  five-stage flow (the merged stage is Stage 5 · Generation & Assembly; the
+  shot tools are "the shot workbench"). Orphaned keys (`stages.6`,
+  `s5.continue`, `card.stage` "{n}/6") removed.
+- Hardcoded values: a new `src/lib/config.js` is the single source for the
+  default folders (now derived from the OS Documents folder via Electron —
+  no more path baked in from one developer's machine), the ComfyUI URL
+  (default is ComfyUI's own port 8188; the dev proxy follows it or
+  `COMFY_URL`), the Claude/Gemini model ids, the stage count, the 2–10 s /
+  0.5 s shot-duration rule and the six-version cap. Fifteen copies of the
+  duration limits, ten copies of the folder/URL/model literals and ten
+  copies of the stage count now read from it; the stage bar's column count
+  follows it too.
+- Drifts fixed: the script rules said "no shot longer than 15 s" while every
+  timeline clamps to 10; three transition durations were 0.5 s for a
+  12-frame overlap (0.48 s); the take ceiling was 360 frames while the
+  largest valid count is 345; Ukrainian export dates used the en-US
+  locale; Smart Edit's model and the SmartEdit result colour were literals;
+  pop-up menus could open below the window edge.
+- Styles: hard-coded colours that ignored the light/medium themes
+  (preview blank, storyboard preview, clip numbers, lane eye, version
+  thumb border, crimson hover) now use tokens; `color-scheme` follows the
+  theme so native audio/video/number/range controls stop drawing light
+  chrome on dark; the image+ tag renders as a real tag.
+- Controls: one scale — radius 3 everywhere; 32 px default (`.btn.small`
+  was 28), 38 px for the prominent action rows, 24 px for inline micro
+  controls; header, refs, groom, preview-transport and overlay chips resized
+  to it; icon sizes by role (14 in text/overlay, 16 icon-only, 18 nav);
+  icon-to-text spacing via the button gap alone; one disabled treatment for
+  every control (segments, tiles, upload labels and form fields had none);
+  text controls centre like icon buttons; prompt headers and tweak rows
+  align on the centre line.
+- Positioning: the audio row follows the image/video order (Generate,
+  Upload, extras, Download); Stage 4's transport puts Play first like Stage
+  5; the music, sound-FX, smart-cut and transitions pop-ups use the standard
+  modal footer (Close, then the primary action, right-aligned) and h2 titles.
+- Keyboard: timeline clips and scene labels are focusable and respond to
+  Enter/Space; every upload control is reachable by Tab (the file input is
+  visually hidden, not `hidden`) and shows the focus ring; version delete
+  badges are focusable and revealed on focus.
+- Layout: the preview/workbench height follows the window
+  (`clamp(360px, 62vh, 560px)`; stacked layout caps the bench at 50 vh);
+  the settings panel scrolls on short windows; long style names, scene
+  titles, cast lists, modal headings and style texts wrap or clip with a
+  tooltip; the timeline footer, style actions and voice grid wrap instead
+  of overflowing; scene labels show the scene name in their tooltip.
 
 ## 2.5.0 — 2026-09-21
 
