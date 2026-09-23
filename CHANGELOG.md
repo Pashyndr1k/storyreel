@@ -17,6 +17,11 @@
   queue through the scenes. While it runs, the same button becomes
   "Stop a/b" and halts the queue (the job already on the GPU finishes
   first).
+- **"Palette from previous scene" lives on Shot 1.** The switch moved from
+  the scene panel into the first shot's Apply row, in place of the plain
+  "Palette" switch (which has nothing to inherit there — Shot 1 is the
+  scene's palette source). Shots 2+ keep the "Palette" switch and follow
+  the scene's own first frame once it exists.
 
 ## 2.6.1 — 2026-09-22
 

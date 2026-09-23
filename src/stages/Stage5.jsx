@@ -298,7 +298,6 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     : null;
   const prevSrcImg = prevSrcShot ? project.shotImages[prevSrcShot.id] : null;
   const [prevPalette, setPrevPalette] = useState(null); // { src: shotId, colors: [] } of the previous scene
-  const usePrevPalette = !!scene?.palettePrev && !!prevPalette;
   const setScenePalettePrev = (on) =>
     update((p) => ({ outline: p.outline.map((s) => (s.id === scene.id ? { ...s, palettePrev: on } : s)) }));
   useEffect(() => {
@@ -329,9 +328,12 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prevSrcImg, scene?.id]);
-  // the palette every shot of this scene is graded to
-  const scenePalette = usePrevPalette ? prevPalette : palette;
-  paletteRef.current = scenePalette;
+  // Shot 1 may follow the previous scene's palette (the scene's palettePrev
+  // flag); every later shot follows this scene's own first frame.
+  paletteRef.current = palette;
+  const prevPaletteRef = useRef(prevPalette);
+  prevPaletteRef.current = prevPalette;
+  const isFirstShot = (shot) => shots[0]?.id === shot.id;
 
   // Scene location references (same data Stage 4 edits: scene.photos).
   const updateScenePhotos = (photos) =>
@@ -638,8 +640,13 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const shotAssets = take(pref.asset ? assetsFor(shot.id) : []);
     const useAssets = shotAssets.map((a) => a.photos[0]);
     const images = [...useChar, ...useLoc, ...useAssets];
-    const pal = paletteRef.current;
-    const usePalette = pref.palette && pal?.colors?.length && shot.id !== pal.src;
+    // Shot 1: the previous scene's palette when the scene asks for it (no
+    // own palette exists yet — it IS the source). Later shots: this scene's
+    // first frame, toggleable per shot.
+    const pal = isFirstShot(shot)
+      ? (projectRef.current.outline.find((s) => s.id === scene.id)?.palettePrev ? prevPaletteRef.current : null)
+      : paletteRef.current;
+    const usePalette = !!pal?.colors?.length && (isFirstShot(shot) || (pref.palette && shot.id !== pal.src));
 
     let text = '';
     if (imageStyle?.trim()) {
@@ -1614,27 +1621,6 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           </strong>
           <StyleChip project={project} styles={styles} cat="image" onClick={onProjectSettings} />
           <StyleChip project={project} styles={styles} cat="video" onClick={onProjectSettings} />
-          {/* Scene option: grade this scene's frames (its first one included)
-              to the previous scene's palette. Off for the first scene, and
-              until the previous scene has a generated frame. */}
-          {prevScene && (
-            <SwitchPill
-              on={!!scene.palettePrev}
-              disabled={!prevPalette}
-              title={prevPalette ? t('scene.palettePrevTip', { n: sceneIdx }) : t('scene.palettePrevNone', { n: sceneIdx })}
-              label={t('scene.palettePrev')}
-              extra={
-                prevPalette ? (
-                  <span className="pal-swatches">
-                    {prevPalette.colors.map((c) => (
-                      <i key={c} style={{ background: c }} />
-                    ))}
-                  </span>
-                ) : null
-              }
-              onToggle={() => setScenePalettePrev(!scene.palettePrev)}
-            />
-          )}
         </div>
       )}
 
@@ -1886,22 +1872,47 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         label={t('apply.assets')}
                         onToggle={() => setPref(shot.id, { asset: !pref.asset })}
                       />
-                      <SwitchPill
-                        on={pref.palette}
-                        disabled={!scenePalette || scenePalette.src === shot.id}
-                        title={scenePalette?.fromPrev ? t('img.paletteTipPrev') : t('img.paletteTip')}
-                        label={scenePalette?.fromPrev ? t('apply.palettePrev') : t('apply.palette')}
-                        extra={
-                          scenePalette ? (
-                            <span className="pal-swatches">
-                              {scenePalette.colors.map((c) => (
-                                <i key={c} style={{ background: c }} />
-                              ))}
-                            </span>
-                          ) : null
-                        }
-                        onToggle={() => setPref(shot.id, { palette: !pref.palette })}
-                      />
+                      {/* Shot 1 of a scene: "palette from the previous scene"
+                          (a scene flag; nothing to inherit in the first
+                          scene). Later shots: this scene's first-frame
+                          palette, toggleable per shot. */}
+                      {isFirstShot(shot) ? (
+                        prevScene && (
+                          <SwitchPill
+                            on={!!scene.palettePrev}
+                            disabled={!prevPalette}
+                            title={prevPalette ? t('scene.palettePrevTip', { n: sceneIdx }) : t('scene.palettePrevNone', { n: sceneIdx })}
+                            label={t('scene.palettePrev')}
+                            extra={
+                              prevPalette ? (
+                                <span className="pal-swatches">
+                                  {prevPalette.colors.map((c) => (
+                                    <i key={c} style={{ background: c }} />
+                                  ))}
+                                </span>
+                              ) : null
+                            }
+                            onToggle={() => setScenePalettePrev(!scene.palettePrev)}
+                          />
+                        )
+                      ) : (
+                        <SwitchPill
+                          on={pref.palette}
+                          disabled={!palette || palette.src === shot.id}
+                          title={t('img.paletteTip')}
+                          label={t('apply.palette')}
+                          extra={
+                            palette ? (
+                              <span className="pal-swatches">
+                                {palette.colors.map((c) => (
+                                  <i key={c} style={{ background: c }} />
+                                ))}
+                              </span>
+                            ) : null
+                          }
+                          onToggle={() => setPref(shot.id, { palette: !pref.palette })}
+                        />
+                      )}
                     </div>
                   </div>
                 </div>
