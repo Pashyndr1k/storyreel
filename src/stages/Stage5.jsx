@@ -169,7 +169,7 @@ function CopyButton({ text }) {
 // the assembly stage (`embed`): the scene comes from the timeline selection
 // (`focusSceneId`), and either one compact shot card (`focusShotId`) or the
 // scene tools (no shot) are rendered — no scene nav, no header, no footer.
-export default function Stage5({ project, update, settings, onSettings, onProjectSettings, genLang, styles, imageStyle, videoStyle, library, libUpsert, libDelete, goNext, embed = false, focusSceneId = null, focusShotId = null, onTabChange, imageStylePlus = false }) {
+export default function Stage5({ project, update, settings, onSettings, onProjectSettings, genLang, styles, imageStyle, videoStyle, library, libUpsert, libDelete, goNext, embed = false, focusSceneId = null, focusShotId = null, onTabChange, imageStylePlus = false, onQueueApi = null }) {
   const { t } = useI18n();
   const [sceneIdState, setSceneId] = useState(project.outline[0]?.id || null);
   const sceneId = embed ? focusSceneId || project.outline[0]?.id || null : sceneIdState;
@@ -985,7 +985,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   // a time (the GPU and the image API both prefer it). Reads state through
   // projectRef between jobs, so each video sees the frame generated just
   // before it. Failures are skipped; the queue continues.
-  const processSceneMedia = async () => {
+  // `silent` skips the confirm (the assembly stage's auto queue confirms once
+  // for the whole project); `onStep` reports each finished item to it.
+  const processSceneMedia = async ({ silent = false, onStep = null } = {}) => {
     mediaCancel.current = false;
     const list = shots;
     const planned =
@@ -993,7 +995,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       list.filter((s) => !(projectRef.current.shotVideos || {})[s.id] && projectRef.current.shotPrompts[s.id]?.videoPrompt?.trim()).length;
     if (!planned) return;
     // Each job occupies the GPU for minutes — never start the queue silently.
-    if (!window.confirm(t('s5.genMediaConfirm', { n: planned }))) return;
+    if (!silent && !window.confirm(t('s5.genMediaConfirm', { n: planned }))) return;
     let done = 0;
     setMediaProg({ a: 0, b: planned });
     for (const shot of list) {
@@ -1003,6 +1005,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         await genImage(shot);
         done++;
         setMediaProg({ a: done, b: planned });
+        onStep?.();
       }
     }
     for (const [i, shot] of list.entries()) {
@@ -1017,10 +1020,22 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         await genVideo(shot, i);
         done++;
         setMediaProg({ a: done, b: planned });
+        onStep?.();
       }
     }
     setMediaProg(null);
   };
+  // The assembly stage's auto queue drives this scene queue scene by scene;
+  // it needs the current scene's run/cancel every render (fresh closures).
+  useEffect(() => {
+    onQueueApi?.({
+      sceneId: scene?.id || null,
+      run: processSceneMedia,
+      cancel: () => {
+        mediaCancel.current = true;
+      },
+    });
+  });
 
   const downloadImage = (shot, i, final) => {
     const img = final ? (project.shotFinalImages || {})[shot.id] : project.shotImages[shot.id];

@@ -4,14 +4,14 @@ import { useI18n } from '../lib/i18n.js';
 import { uid } from '../lib/storage.js';
 import { videoDims, saveToLocalOutputs, generateComfyMusic, generateComfySfx } from '../lib/comfy.js';
 import { blockForScene, defaultTrim, transitionFor, overlapSeconds } from '../lib/dynamics.js';
-import { takeOf, takeTotal, takeCutTimes } from '../lib/takes.js';
+import { takeOf, takeTotal, takeCutTimes, isTakeMember } from '../lib/takes.js';
 import { keyframesOf } from '../lib/h3multi.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
 import { stage6SmartCutPrompt } from '../lib/prompts.js';
 import { decodeMediaAudio, audioBufferToWavDataURL } from '../lib/audio.js';
 import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
 import Stage5 from './Stage5.jsx';
-import { Play, Pause, SkipBack, StopSq, Grip, Download, Upload, Stars, Trash, Scissors, TransitionIcon, Plus, Expand } from '../components/icons.jsx';
+import { Play, Pause, SkipBack, StopSq, Grip, Download, Upload, Stars, Trash, Scissors, TransitionIcon, Plus, Expand, Zap } from '../components/icons.jsx';
 import Lightbox from '../components/Lightbox.jsx';
 
 const readFileDataURL = (file) =>
@@ -197,6 +197,10 @@ export default function Stage6({ project, update, settings, ...workbench }) {
   const [scrubbing, setScrubbing] = useState(false); // playhead being dragged
   const [pvState, setPvState] = useState({ playing: false, rate: 1 }); // idle preview transport
   const [lightbox, setLightbox] = useState(null); // full-size pop-up of the previewed video
+  const [stripLeft, setStripLeft] = useState(NLE_GUT); // px from .nle-inner's left edge to where clips start
+  const [queue, setQueue] = useState(null); // auto queue progress { a, b } | null
+  const queueApi = useRef(null); // the embedded workbench's per-scene media queue
+  const queueCancel = useRef(false);
   const pvRef = useRef(null);
   const cancelRef = useRef(false);
   const [scale, setScale] = useState(() => defaultScale(project));
@@ -294,8 +298,16 @@ export default function Stage6({ project, update, settings, ...workbench }) {
     } catch {
       /* best-effort */
     }
+    // pointer delta → seconds through the measured clip geometry (falls back
+    // to the proportional scale before the first measurement)
+    const secDelta = (xa, xb) => {
+      const inner = innerRef.current;
+      if (!geom.length || !inner) return (xb - xa) / pps;
+      const L = inner.getBoundingClientRect().left;
+      return secAtX(xb - L) - secAtX(xa - L);
+    };
     const move = (ev) => {
-      const d = Math.round(((ev.clientX - x0) / pps) * 10) / 10;
+      const d = Math.round(secDelta(x0, ev.clientX) * 10) / 10;
       if (mode === 'move') {
         patchClip(layer.id, clip.id, { start: Math.max(0, Math.min(Math.max(0, total - 0.2), c0.start + d)) });
       } else if (mode === 'end') {
@@ -674,6 +686,73 @@ export default function Stage6({ project, update, settings, ...workbench }) {
   // Effective pixels-per-second: the fixed zoom scale, or (in fit mode) the
   // measured track width divided by the total duration.
   const pxPerSec = () => (zoomed ? scale : trackRef.current ? trackRef.current.clientWidth / total : 0);
+
+  // ---- Auto queue: every missing first frame and video, one after another ----
+  // Available only when every shot already has both prompts; existing media
+  // is never regenerated. The workbench (Stage5, embedded) owns the per-scene
+  // generators, so the queue walks the scenes by selecting each one in turn
+  // and running the workbench's own scene queue there.
+  const allShots = project.outline.flatMap((sc) => (project.sceneDetails[sc.id]?.shots || []).map((sh) => ({ sh, sceneId: sc.id })));
+  const noPromptCount = allShots.filter(
+    ({ sh }) => !(project.shotPrompts[sh.id]?.imagePrompt || '').trim() || !(project.shotPrompts[sh.id]?.videoPrompt || '').trim()
+  ).length;
+  const queuePlan = allShots.reduce(
+    (acc, { sh }) => {
+      const hasImg = !!(project.shotImages || {})[sh.id];
+      if (!hasImg) acc.images++;
+      if (!(project.shotVideos || {})[sh.id] && !isTakeMember(project, sh.id)) acc.videos++;
+      return acc;
+    },
+    { images: 0, videos: 0 }
+  );
+  const queueTotal = queuePlan.images + queuePlan.videos;
+  const queueReason = noPromptCount
+    ? t('s6.autoQueueNoPrompts', { n: noPromptCount })
+    : !queueTotal
+      ? t('s6.autoQueueNothing')
+      : t('s6.autoQueueTip', { i: queuePlan.images, v: queuePlan.videos });
+  const tick = () => new Promise((r) => { const ch = new MessageChannel(); ch.port1.onmessage = () => r(); ch.port2.postMessage(0); });
+  const runAutoQueue = async () => {
+    if (queue || noPromptCount || !queueTotal) return;
+    if (!window.confirm(t('s6.autoQueueConfirm', { i: queuePlan.images, v: queuePlan.videos }))) return;
+    queueCancel.current = false;
+    let done = 0;
+    setQueue({ a: 0, b: queueTotal });
+    setPlaying(false);
+    for (const sc of project.outline) {
+      if (queueCancel.current) break;
+      const shots = project.sceneDetails[sc.id]?.shots || [];
+      const needs = shots.some(
+        (sh) => !(project.shotImages || {})[sh.id] || (!(project.shotVideos || {})[sh.id] && !isTakeMember(project, sh.id))
+      );
+      if (!needs) continue;
+      // bring the workbench onto this scene and wait for it to report in
+      setSelectedId(null);
+      setSelectedSceneId(sc.id);
+      const t0 = performance.now();
+      while (queueApi.current?.sceneId !== sc.id && performance.now() - t0 < 3000) await tick();
+      if (queueApi.current?.sceneId !== sc.id) break;
+      try {
+        await queueApi.current.run({
+          silent: true,
+          onStep: () => {
+            done++;
+            setQueue({ a: done, b: queueTotal });
+          },
+        });
+      } catch (e) {
+        // a scene's generator failed outright — the workbench shows the
+        // error; keep walking so one bad shot doesn't strand the queue
+        showToast(String(e?.message || e), 'error');
+      }
+    }
+    setQueue(null);
+    showToast(queueCancel.current ? t('s6.autoQueueStopped', { n: done }) : t('s6.autoQueueDone', { n: done }));
+  };
+  const cancelAutoQueue = () => {
+    queueCancel.current = true;
+    queueApi.current?.cancel?.();
+  };
 
   // Edge-trim with pointer capture (same interaction as the Stage-4 timeline).
   const startTrim = (e, it) => {
@@ -1415,6 +1494,9 @@ export default function Stage6({ project, update, settings, ...workbench }) {
         }
         acc += dur;
       }
+      // audio lanes start where the video clips start (after the track head)
+      const tr = trackRef.current;
+      if (tr) setStripLeft(tr.getBoundingClientRect().left - r0.left);
       setGeom((prev) =>
         prev.length === next.length &&
         prev.every(
@@ -1627,6 +1709,9 @@ export default function Stage6({ project, update, settings, ...workbench }) {
       <div className="asm-bench">
         <Stage5
           embed
+          onQueueApi={(api) => {
+            queueApi.current = api;
+          }}
           project={project}
           update={update}
           settings={settings}
@@ -1885,12 +1970,17 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                     key={c.id}
                     className={`aclip aclip-${li % 4} ${selAudio?.clipId === c.id ? 'selected' : ''} ${c.muted ? 'aclip-muted' : ''}`}
                     style={
-                      zoomed
-                        ? { left: c.start * scale, width: Math.max(10, c.duration * scale) }
-                        : {
-                            left: `${(c.start / Math.max(0.1, total)) * 100}%`,
-                            width: `${Math.max(0.8, (c.duration / Math.max(0.1, total)) * 100)}%`,
-                          }
+                      // Audio clips sit exactly under the video clips: same
+                      // measured geometry as the playhead, so the clip/scene
+                      // gaps can never push the sound off its picture.
+                      geom.length
+                        ? { left: xAtSec(c.start) - stripLeft, width: Math.max(10, xAtSec(c.start + c.duration) - xAtSec(c.start)) }
+                        : zoomed
+                          ? { left: c.start * scale, width: Math.max(10, c.duration * scale) }
+                          : {
+                              left: `${(c.start / Math.max(0.1, total)) * 100}%`,
+                              width: `${Math.max(0.8, (c.duration / Math.max(0.1, total)) * 100)}%`,
+                            }
                     }
                     title={`${c.name} · ${c.duration.toFixed(1)}s`}
                     onPointerDown={(e) => startClipDrag(e, L, c, 'move')}
@@ -2175,6 +2265,20 @@ export default function Stage6({ project, update, settings, ...workbench }) {
         <button className="btn small fixedw" disabled={rendering} onClick={doRender}>
           <Download size={14} />{rendering ? t('s6.rendering') : t('s6.render')}
         </button>
+        {/* Auto queue: every missing first frame and video, one after another */}
+        <button
+          className="btn small fixedw"
+          disabled={rendering || !!queue || !!noPromptCount || !queueTotal}
+          title={queueReason}
+          onClick={runAutoQueue}
+        >
+          <Zap size={14} />{queue ? t('s6.autoQueueProg', { a: queue.a, b: queue.b }) : t('s6.autoQueue')}
+        </button>
+        {queue && (
+          <button className="btn small danger" onClick={cancelAutoQueue}>
+            {t('s6.cancel')}
+          </button>
+        )}
         <button
           className="btn small"
           disabled={total <= 0}

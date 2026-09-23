@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.7.0 — 2026-09-22
+
+- **Audio clips sit exactly under their video.** Audio-lane clips (the H3
+  mix detached after a video generation, voice, music, effects) were placed
+  proportionally while the video clips carry gaps and minimum widths, so a
+  clip appeared shifted backwards from its picture — more so further right.
+  They now use the same measured clip geometry as the playhead, and dragging
+  a clip maps the pointer through it too.
+- **Auto queue.** A button under the timeline generates every missing first
+  frame and every missing video, one after another, scene by scene, with a
+  running count and a Cancel. It is enabled only when every shot already
+  has both prompts (the tooltip says how many still lack one) and there is
+  something to generate; existing images and videos are never regenerated.
+  One confirmation for the whole project, then the workbench follows the
+  queue through the scenes.
+
 ## 2.6.1 — 2026-09-22
 
 - **Palette from the previous scene.** A scene option in the Stage 5 scene
