@@ -2266,19 +2266,16 @@ export default function Stage6({ project, update, settings, ...workbench }) {
           <Download size={14} />{rendering ? t('s6.rendering') : t('s6.render')}
         </button>
         {/* Auto queue: every missing first frame and video, one after another */}
+        {/* One dual-state button: Auto queue → Stop a/b (halts after the
+            job currently on the GPU finishes) */}
         <button
-          className="btn small fixedw"
-          disabled={rendering || !!queue || !!noPromptCount || !queueTotal}
-          title={queueReason}
-          onClick={runAutoQueue}
+          className={`btn small fixedw ${queue ? 'danger' : ''}`}
+          disabled={rendering || (!queue && (!!noPromptCount || !queueTotal))}
+          title={queue ? t('s6.autoQueueStopTip') : queueReason}
+          onClick={queue ? cancelAutoQueue : runAutoQueue}
         >
-          <Zap size={14} />{queue ? t('s6.autoQueueProg', { a: queue.a, b: queue.b }) : t('s6.autoQueue')}
+          {queue ? <><StopSq size={14} />{t('s6.autoQueueStop', { a: queue.a, b: queue.b })}</> : <><Zap size={14} />{t('s6.autoQueue')}</>}
         </button>
-        {queue && (
-          <button className="btn small danger" onClick={cancelAutoQueue}>
-            {t('s6.cancel')}
-          </button>
-        )}
         <button
           className="btn small"
           disabled={total <= 0}

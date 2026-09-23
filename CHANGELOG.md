@@ -14,7 +14,9 @@
   has both prompts (the tooltip says how many still lack one) and there is
   something to generate; existing images and videos are never regenerated.
   One confirmation for the whole project, then the workbench follows the
-  queue through the scenes.
+  queue through the scenes. While it runs, the same button becomes
+  "Stop a/b" and halts the queue (the job already on the GPU finishes
+  first).
 
 ## 2.6.1 — 2026-09-22
 
