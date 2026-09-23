@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.6.1 — 2026-09-22
+
+- **Palette from the previous scene.** A scene option in the Stage 5 scene
+  panel (next to the style chips). When it is on, the scene's first frame —
+  and every frame after it — is graded to the palette extracted from the
+  previous scene's first frame, so the cut between scenes keeps one
+  continuous look. Off for the first scene, and unavailable until the
+  previous scene has a generated frame (the tooltip says which scene). The
+  per-shot "Palette" switch then reads "Prev. palette" and shows those
+  swatches; the prompt sent to the image model names the previous scene as
+  the source.
+
 ## 2.6.0 — 2026-09-22
 
 - **Timeline playhead is exact.** The red playhead, the range markers and

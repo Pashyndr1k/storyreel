@@ -286,22 +286,52 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
 
   // Scene palette: quantized from the scene's FIRST generated frame; applied
   // to later frames (toggleable per shot) to keep the grading consistent.
-  const paletteSrcShot = shots.find((s) => (project.shotImages || {})[s.id]);
-  const paletteSrcImg = paletteSrcShot ? project.shotImages[paletteSrcShot.id] : null;
+  // With the scene's "palette from the previous scene" option on, the source
+  // is the PREVIOUS scene's first frame instead — so this scene's first frame
+  // (and the rest) carry the grading across the cut.
+  const ownSrcShot = shots.find((s) => (project.shotImages || {})[s.id]);
+  const ownSrcImg = ownSrcShot ? project.shotImages[ownSrcShot.id] : null;
+  const sceneIdx = project.outline.findIndex((s) => s.id === scene?.id);
+  const prevScene = sceneIdx > 0 ? project.outline[sceneIdx - 1] : null;
+  const prevSrcShot = prevScene
+    ? (project.sceneDetails[prevScene.id]?.shots || []).find((s) => (project.shotImages || {})[s.id]) || null
+    : null;
+  const prevSrcImg = prevSrcShot ? project.shotImages[prevSrcShot.id] : null;
+  const [prevPalette, setPrevPalette] = useState(null); // { src: shotId, colors: [] } of the previous scene
+  const usePrevPalette = !!scene?.palettePrev && !!prevPalette;
+  const setScenePalettePrev = (on) =>
+    update((p) => ({ outline: p.outline.map((s) => (s.id === scene.id ? { ...s, palettePrev: on } : s)) }));
   useEffect(() => {
     let alive = true;
-    if (!paletteSrcImg) {
+    if (!ownSrcImg) {
       setPalette(null);
       return undefined;
     }
-    extractPalette(paletteSrcImg, 5).then((colors) => {
-      if (alive) setPalette(colors.length ? { src: paletteSrcShot.id, colors } : null);
+    extractPalette(ownSrcImg, 5).then((colors) => {
+      if (alive) setPalette(colors.length ? { src: ownSrcShot.id, colors } : null);
     });
     return () => {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paletteSrcImg, scene?.id]);
+  }, [ownSrcImg, scene?.id]);
+  useEffect(() => {
+    let alive = true;
+    if (!prevSrcImg) {
+      setPrevPalette(null);
+      return undefined;
+    }
+    extractPalette(prevSrcImg, 5).then((colors) => {
+      if (alive) setPrevPalette(colors.length ? { src: prevSrcShot.id, colors, fromPrev: true } : null);
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prevSrcImg, scene?.id]);
+  // the palette every shot of this scene is graded to
+  const scenePalette = usePrevPalette ? prevPalette : palette;
+  paletteRef.current = scenePalette;
 
   // Scene location references (same data Stage 4 edits: scene.photos).
   const updateScenePhotos = (photos) =>
@@ -643,7 +673,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       }
     }
     if (usePalette) {
-      text += `\n\nSCENE COLOR PALETTE — grade this frame to match the scene's established palette (extracted from its first frame): ${pal.colors.join(', ')}. Keep hues, color temperature and overall tone consistent with that frame, unless the shot's action explicitly changes the lighting.`;
+      text += pal.fromPrev
+        ? `\n\nSCENE COLOR PALETTE — grade this frame to the palette of the PREVIOUS scene's first frame, so the cut between the scenes keeps one continuous look: ${pal.colors.join(', ')}. Keep hues, color temperature and overall tone consistent with that palette, unless the shot's action explicitly changes the lighting.`
+        : `\n\nSCENE COLOR PALETTE — grade this frame to match the scene's established palette (extracted from its first frame): ${pal.colors.join(', ')}. Keep hues, color temperature and overall tone consistent with that frame, unless the shot's action explicitly changes the lighting.`;
     }
     const ratio = project.aspectRatio || '16:9';
     text += `\n\nRender in ${aspectDescription(ratio)} (${ratio}) aspect ratio.\n\n${FULL_FRAME_RULE}`;
@@ -1567,6 +1599,27 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           </strong>
           <StyleChip project={project} styles={styles} cat="image" onClick={onProjectSettings} />
           <StyleChip project={project} styles={styles} cat="video" onClick={onProjectSettings} />
+          {/* Scene option: grade this scene's frames (its first one included)
+              to the previous scene's palette. Off for the first scene, and
+              until the previous scene has a generated frame. */}
+          {prevScene && (
+            <SwitchPill
+              on={!!scene.palettePrev}
+              disabled={!prevPalette}
+              title={prevPalette ? t('scene.palettePrevTip', { n: sceneIdx }) : t('scene.palettePrevNone', { n: sceneIdx })}
+              label={t('scene.palettePrev')}
+              extra={
+                prevPalette ? (
+                  <span className="pal-swatches">
+                    {prevPalette.colors.map((c) => (
+                      <i key={c} style={{ background: c }} />
+                    ))}
+                  </span>
+                ) : null
+              }
+              onToggle={() => setScenePalettePrev(!scene.palettePrev)}
+            />
+          )}
         </div>
       )}
 
@@ -1820,13 +1873,13 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       />
                       <SwitchPill
                         on={pref.palette}
-                        disabled={!palette || palette.src === shot.id}
-                        title={t('img.paletteTip')}
-                        label={t('apply.palette')}
+                        disabled={!scenePalette || scenePalette.src === shot.id}
+                        title={scenePalette?.fromPrev ? t('img.paletteTipPrev') : t('img.paletteTip')}
+                        label={scenePalette?.fromPrev ? t('apply.palettePrev') : t('apply.palette')}
                         extra={
-                          palette ? (
+                          scenePalette ? (
                             <span className="pal-swatches">
-                              {palette.colors.map((c) => (
+                              {scenePalette.colors.map((c) => (
                                 <i key={c} style={{ background: c }} />
                               ))}
                             </span>
