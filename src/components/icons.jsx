@@ -341,3 +341,10 @@ export const Sun = (p) => (
     <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4" />
   </S>
 );
+
+export const SkipBack = (p) => (
+  <S {...p}>
+    <path d="M19 20 9 12l10-8z" />
+    <path d="M5 19V5" />
+  </S>
+);

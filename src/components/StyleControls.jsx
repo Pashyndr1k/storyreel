@@ -11,6 +11,14 @@ function styleNameOf(styles, cat, id, t) {
   return s?.name || t('pset.styleNone');
 }
 
+// "image+" styles (strict, literal application) are marked wherever a style
+// name is listed, so the choice is visible without opening the library.
+export const styleLabel = (s, t) => (s?.plus ? `${s.name} · ${t('styles.plusTag')}` : s?.name || '');
+const catLabel = (styles, cat, id, t) => {
+  const s = (styles?.[cat] || []).find((x) => x.id === id);
+  return cat === 'image' && s?.plus ? t('stind.imagePlus') : t(`stind.${cat}`);
+};
+
 // Compact style selectors (Stage 2, next to the cover) — one select per
 // category, mirroring the project settings.
 export function StylePicker({ project, update, styles }) {
@@ -26,7 +34,7 @@ export function StylePicker({ project, update, styles }) {
           >
             <option value="">{t('pset.styleNone')}</option>
             {(styles?.[cat] || []).map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
+              <option key={s.id} value={s.id}>{styleLabel(s, t)}</option>
             ))}
           </select>
         </div>
@@ -41,7 +49,7 @@ export function StyleChip({ project, styles, cat, onClick }) {
   const { t } = useI18n();
   return (
     <button type="button" className="style-chip" title={t('stind.open')} onClick={onClick}>
-      <span className="style-chip-cat">{t(`stind.${cat}`)}</span>
+      <span className="style-chip-cat">{catLabel(styles, cat, project[ID_FIELD[cat]], t)}</span>
       <span className="style-chip-name">{styleNameOf(styles, cat, project[ID_FIELD[cat]], t)}</span>
     </button>
   );
@@ -55,7 +63,7 @@ export function StyleIndicator({ project, styles, cats, onClick }) {
     <div className="style-ind-row">
       {cats.map((cat) => (
         <button key={cat} type="button" className="style-ind" title={t('stind.open')} onClick={onClick}>
-          <span className="style-ind-cat">{t(`stind.${cat}`)}:</span>
+          <span className="style-ind-cat">{catLabel(styles, cat, project[ID_FIELD[cat]], t)}:</span>
           <span className="style-ind-name">{styleNameOf(styles, cat, project[ID_FIELD[cat]], t)}</span>
         </button>
       ))}

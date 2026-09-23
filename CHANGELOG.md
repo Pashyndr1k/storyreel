@@ -1,5 +1,35 @@
 # Changelog
 
+## 2.6.0 — 2026-09-22
+
+- **Timeline playhead is exact.** The red playhead, the range markers and
+  scrubbing now map time through the measured clip positions instead of a
+  proportional formula, so the gaps between clips and scenes no longer push
+  the playhead off the shot — the drift grew with every shot and was worst
+  at the end of long stories.
+- **Scrub by dragging the playhead.** Drag the red bar (or its cap) to move
+  through the film; playback stops and the preview follows the playhead,
+  seeking a clip's video frame by frame. The playhead is always shown, so
+  it can be grabbed at zero.
+- **Drag-and-drop reordering, anywhere.** A shot can be dropped between any
+  two clips — in its own scene or in another scene — and a scene label can
+  be dropped before or after any scene; an accent bar shows the exact slot
+  while dragging. Multi-shot takes move as one block.
+- **Preview transport.** With the Video tab open, a minimal panel at the
+  bottom centre of the preview plays the shot's clip: to start, play, half
+  speed, pause — independent of timeline playback.
+- **Image+ styles.** An image style can be marked "image+" (strict). The
+  prompt builders then treat it as a binding style sheet: image prompts must
+  reuse many of its exact terms, every "Avoid" item is a hard prohibition,
+  and image generation / the cover follow the same rule. Marked styles show
+  an image+ tag in the library, the selectors and the style chip.
+- **Editable shot action.** The action text from Shot Breakdown is editable
+  right in the shot's workbench card.
+- **Compact video parameters.** Resolution and workflow sit on one line
+  under the Generate button.
+- A single generated first frame now appears in the version strip as the
+  sole (selected) option.
+
 ## 2.5.0 — 2026-09-21
 
 **Five stages.** Generation Prompts and Final Assembly are now one workspace,

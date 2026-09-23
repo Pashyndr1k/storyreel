@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useI18n } from '../lib/i18n.js';
 import { uid } from '../lib/storage.js';
 import { videoDims, saveToLocalOutputs, generateComfyMusic, generateComfySfx } from '../lib/comfy.js';
@@ -10,7 +10,7 @@ import { stage6SmartCutPrompt } from '../lib/prompts.js';
 import { decodeMediaAudio, audioBufferToWavDataURL } from '../lib/audio.js';
 import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
 import Stage5 from './Stage5.jsx';
-import { Play, StopSq, Grip, Download, Upload, Stars, Trash, Scissors, TransitionIcon, Plus } from '../components/icons.jsx';
+import { Play, Pause, SkipBack, StopSq, Grip, Download, Upload, Stars, Trash, Scissors, TransitionIcon, Plus } from '../components/icons.jsx';
 
 const readFileDataURL = (file) =>
   new Promise((resolve, reject) => {
@@ -141,6 +141,17 @@ const MIN_CLIP_PX = 48; // a shot narrower than this is hard to grab
 // strips starting at the exact same timeline zero. Mirrors --nle-gut in CSS.
 const NLE_GUT = 92;
 
+// Insertion slot under the pointer among a scene's rendered clips: the number
+// of clips whose midpoint lies left of the pointer.
+function insIdxAt(sceneEl, clientX) {
+  let n = 0;
+  sceneEl.querySelectorAll('.nle-clip').forEach((el) => {
+    const r = el.getBoundingClientRect();
+    if (clientX > r.left + r.width / 2) n++;
+  });
+  return n;
+}
+
 // Below 13 shots the fit view stays comfortable; past that, auto-zoom to a
 // scale that keeps even the shortest shot at least MIN_CLIP_PX wide.
 function defaultScale(project) {
@@ -176,7 +187,12 @@ export default function Stage6({ project, update, settings, ...workbench }) {
   const [trimId, setTrimId] = useState(null);
   const dragScene = useRef(null);
   const dragShot = useRef(null); // { sceneId, idx }
-  const [overKey, setOverKey] = useState(null);
+  // Drop indicator: { sceneId, idx } = slot among a scene's clips for a shot
+  // drag; { sceneIdx } = slot among the scenes for a scene drag.
+  const [overIns, setOverIns] = useState(null);
+  const [geom, setGeom] = useState([]); // measured clip rects — see the layout effect below
+  const [scrubbing, setScrubbing] = useState(false); // playhead being dragged
+  const [pvState, setPvState] = useState({ playing: false, rate: 1 }); // idle preview transport
   const pvRef = useRef(null);
   const cancelRef = useRef(false);
   const [scale, setScale] = useState(() => defaultScale(project));
@@ -429,7 +445,9 @@ export default function Stage6({ project, update, settings, ...workbench }) {
     const toSec = (clientX) => {
       const r = inner.getBoundingClientRect();
       const x = clientX - r.left - NLE_GUT;
-      const sec = zoomed ? x / scale : (x / Math.max(1, r.width - NLE_GUT)) * total;
+      const sec = geom.length
+        ? secAtX(clientX - r.left)
+        : zoomed ? x / scale : (x / Math.max(1, r.width - NLE_GUT)) * total;
       return Math.round(Math.max(0, Math.min(total, sec)) * 10) / 10;
     };
     const move = (ev) => {
@@ -523,6 +541,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
         }
       };
       v.muted = !!cur.muted; // per-shot audio mute
+      v.playbackRate = 1; // the idle transport's half speed never leaks into playback
       if (v.readyState >= 1) seekPlay();
       else v.addEventListener('loadedmetadata', seekPlay, { once: true });
       // Watchdogs: if the clip still isn't running shortly after (slow
@@ -593,20 +612,40 @@ export default function Stage6({ project, update, settings, ...workbench }) {
   }, [elapsed, playing, layers]);
 
   // ---- write-backs (shared source of truth with Stages 3–5) ----------------
+  // Scene reorder: `to` is an INSERTION slot in the current order (0 = before
+  // the first scene, outline.length = after the last).
   const moveScene = (from, to) =>
     update((p) => {
       const next = [...p.outline];
       const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
+      next.splice(to > from ? to - 1 : to, 0, moved);
       return { outline: next };
     });
 
-  const moveShot = (sceneId, from, to) =>
+  // Shot move — within its scene or into another one. `toIdx` is an insertion
+  // slot among the target scene's STORED shots. A multi-shot take travels as
+  // one block so its members stay consecutive. Every other sceneDetails field
+  // of both scenes is preserved.
+  const moveShotTo = (shotId, fromSceneId, toSceneId, toIdx) =>
     update((p) => {
-      const shots = [...(p.sceneDetails[sceneId]?.shots || [])];
-      const [moved] = shots.splice(from, 1);
-      shots.splice(to, 0, moved);
-      return { sceneDetails: { ...p.sceneDetails, [sceneId]: { shots } } };
+      const take = takeOf(p, shotId);
+      const block = take ? take.shotIds : [shotId];
+      const src = [...(p.sceneDetails[fromSceneId]?.shots || [])];
+      const moved = src.filter((s) => block.includes(s.id));
+      if (!moved.length) return {};
+      const srcRest = src.filter((s) => !block.includes(s.id));
+      const same = fromSceneId === toSceneId;
+      const dst = same ? srcRest : [...(p.sceneDetails[toSceneId]?.shots || [])];
+      // the slot was counted in the original target list — drop the moved
+      // block's own positions that sat before it
+      let at = toIdx;
+      if (same) at -= src.slice(0, toIdx).filter((s) => block.includes(s.id)).length;
+      at = Math.max(0, Math.min(dst.length, at));
+      dst.splice(at, 0, ...moved);
+      if (same && dst.every((s, i) => s.id === src[i].id)) return {}; // dropped onto its own slot
+      const details = { ...p.sceneDetails, [toSceneId]: { ...(p.sceneDetails[toSceneId] || {}), shots: dst } };
+      if (!same) details[fromSceneId] = { ...(p.sceneDetails[fromSceneId] || {}), shots: srcRest };
+      return { sceneDetails: details };
     });
 
   const clampDur = (d) => Math.max(2, Math.min(10, d));
@@ -1345,10 +1384,148 @@ export default function Stage6({ project, update, settings, ...workbench }) {
   const labelEvery = zoomed
     ? Math.max(1, Math.ceil(40 / scale))
     : seconds > 120 ? 10 : seconds > 40 ? 5 : 1;
-  const showPlayhead = total > 0 && (playing || elapsed > 0);
+  const showPlayhead = total > 0; // always grabbable (scrubbing), even at zero
   const selected = items.find((x) => x.shot.id === selectedId);
   const workSceneId = selected ? selected.sceneId : selectedSceneId || items[0]?.sceneId || project.outline[0]?.id || null;
   const innerWidth = zoomed ? NLE_GUT + seconds * scale : undefined; // px in zoom mode
+
+  // Measure where each clip actually sits (px inside .nle-inner) after every
+  // layout change. The playhead, the range markers and scrubbing all map
+  // time↔x through these rects, so the 2px clip gaps, 6px scene gaps and
+  // min widths can never drift them away from the clips (the further right,
+  // the worse it used to get in long stories).
+  const geomKey = items.map((it) => `${it.shot.id}:${it.shot.duration}`).join('|');
+  useLayoutEffect(() => {
+    const inner = innerRef.current;
+    if (!inner) return undefined;
+    const measure = () => {
+      const r0 = inner.getBoundingClientRect();
+      let acc = 0;
+      const next = [];
+      for (const it of items) {
+        const el = inner.querySelector(`.nle-clip[data-shot="${it.shot.id}"]`);
+        const dur = it.shot.duration || 0;
+        if (el) {
+          const r = el.getBoundingClientRect();
+          next.push({ id: it.shot.id, start: acc, dur, left: r.left - r0.left, width: r.width });
+        }
+        acc += dur;
+      }
+      setGeom((prev) =>
+        prev.length === next.length &&
+        prev.every(
+          (g, i) =>
+            g.id === next[i].id &&
+            g.start === next[i].start &&
+            g.dur === next[i].dur &&
+            Math.abs(g.left - next[i].left) < 0.5 &&
+            Math.abs(g.width - next[i].width) < 0.5
+        )
+          ? prev
+          : next
+      );
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(measure);
+    ro.observe(inner);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geomKey, scale]);
+
+  // time → x: read off the clip that contains the second (null before the
+  // first measurement); x → time is the inverse (a gap maps to the next
+  // clip's start).
+  const xAtSec = (sec) => {
+    if (!geom.length) return null;
+    const g = geom.find((c) => sec < c.start + c.dur) || geom[geom.length - 1];
+    const f = g.dur > 0 ? Math.max(0, Math.min(1, (sec - g.start) / g.dur)) : 0;
+    return g.left + f * g.width;
+  };
+  const secAtX = (x) => {
+    if (!geom.length || total <= 0) return 0;
+    for (const g of geom) {
+      if (x < g.left) return g.start;
+      if (x <= g.left + g.width) return g.start + (g.width > 0 ? (x - g.left) / g.width : 0) * g.dur;
+    }
+    return total;
+  };
+  // CSS `left` for a second: measured when possible, proportional until then.
+  const leftAt = (sec) => {
+    const x = xAtSec(sec);
+    if (x != null) return x;
+    return zoomed
+      ? NLE_GUT + sec * scale
+      : `calc(${NLE_GUT}px + (100% - ${NLE_GUT}px) * ${Math.min(1, sec / Math.max(0.1, total))})`;
+  };
+
+  // Drag the playhead to scrub: playback stops and the preview follows the
+  // playhead (a clip's video is seeked, paused, to that instant).
+  const startScrub = (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const inner = innerRef.current;
+    if (!inner || total <= 0) return;
+    setPlaying(false);
+    setScrubbing(true);
+    const toSec = (clientX) => Math.max(0, Math.min(total, secAtX(clientX - inner.getBoundingClientRect().left)));
+    const move = (ev) => setElapsed(toSec(ev.clientX));
+    const up = () => {
+      setScrubbing(false);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  };
+  useEffect(() => {
+    if (!scrubbing) return;
+    const v = pvRef.current;
+    if (!v || !cur?.video) return;
+    v.pause();
+    try {
+      v.currentTime = (cur.trim?.head || 0) + Math.max(0, curOffset);
+    } catch {
+      /* not seekable yet */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scrubbing, elapsed, curShotId]);
+
+  // Idle preview transport (Video tab of the selected shot): to start / play /
+  // half speed / pause on the shot's own clip, independent of the timeline.
+  const pvCmd = (cmd) => {
+    const v = pvRef.current;
+    if (!v) return;
+    if (cmd === 'rewind' || cmd === 'pause') {
+      if (cmd === 'rewind') {
+        try {
+          v.currentTime = 0;
+        } catch {
+          /* not seekable yet */
+        }
+      }
+      v.pause();
+      return;
+    }
+    const rate = cmd === 'slow' ? 0.5 : 1;
+    v.playbackRate = rate;
+    v.muted = false;
+    setPvState((s) => ({ ...s, rate }));
+    if (v.ended || (v.duration && v.currentTime >= v.duration - 0.05)) {
+      try {
+        v.currentTime = 0;
+      } catch {
+        /* not seekable yet */
+      }
+    }
+    v.play().catch(() => {
+      v.muted = true;
+      v.play().catch(() => {});
+    });
+  };
 
   return (
     <section className="stage">
@@ -1362,10 +1539,54 @@ export default function Stage6({ project, update, settings, ...workbench }) {
             shows the current image version, the Video tab the shot's video.
             Playing: follow the playhead through the timeline as before. */}
         {(() => {
-          const idleSel = !playing && selected;
+          const idleSel = !playing && !scrubbing && selected;
           const pv = idleSel ? selected : cur;
           const wantVideo = idleSel ? benchTab === 'video' && !!pv?.video : !!pv?.video;
-          if (wantVideo) return <video key={pv.shot.id} ref={pvRef} src={pv.video} preload="auto" playsInline />;
+          if (wantVideo) {
+            return (
+              <>
+                <video
+                  key={pv.shot.id}
+                  ref={pvRef}
+                  src={pv.video}
+                  preload="auto"
+                  playsInline
+                  onPlay={() => setPvState((s) => ({ ...s, playing: true }))}
+                  onPause={() => setPvState((s) => ({ ...s, playing: false }))}
+                />
+                {/* Minimal transport for the shot's own clip while its Video
+                    tab is open; timeline playback has its own Play button. */}
+                {idleSel && (
+                  <div className="pv-ctrl" onPointerDown={(e) => e.stopPropagation()}>
+                    <button type="button" title={t('pv.rewind')} aria-label={t('pv.rewind')} onClick={() => pvCmd('rewind')}>
+                      <SkipBack size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      className={pvState.playing && pvState.rate === 1 ? 'on' : ''}
+                      title={t('pv.play')}
+                      aria-label={t('pv.play')}
+                      onClick={() => pvCmd('play')}
+                    >
+                      <Play size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      className={`pv-slow ${pvState.playing && pvState.rate < 1 ? 'on' : ''}`}
+                      title={t('pv.slow')}
+                      aria-label={t('pv.slow')}
+                      onClick={() => pvCmd('slow')}
+                    >
+                      ½×
+                    </button>
+                    <button type="button" title={t('pv.pause')} aria-label={t('pv.pause')} onClick={() => pvCmd('pause')}>
+                      <Pause size={14} />
+                    </button>
+                  </div>
+                )}
+              </>
+            );
+          }
           if (pv?.image) return <img decoding="async" loading="lazy" src={pv.image} alt="" />;
           return <div className="asm-blank">{pv ? t('s4.shot', { n: items.indexOf(pv) + 1 }) : ''}</div>;
         })()}
@@ -1412,21 +1633,45 @@ export default function Stage6({ project, update, settings, ...workbench }) {
             return (
             <div
               key={g.scene.id}
-              className={`asm-scene ${overKey === `scene-${gi}` ? 'drag-over' : ''}`}
+              className={`asm-scene ${overIns?.sceneIdx === gi ? 'ins-before' : ''} ${overIns?.sceneIdx === gi + 1 && gi === scenes.length - 1 ? 'ins-after' : ''} ${overIns?.sceneId === g.scene.id && g.shots.length === 0 ? 'drag-over' : ''}`}
               style={zoomed ? { flex: 'none', width: Math.max(1, sceneDur) * scale } : { flexGrow: Math.max(0.5, sceneDur) }}
               onDragOver={(e) => {
-                if (dragScene.current === null) return;
-                e.preventDefault();
-                if (overKey !== `scene-${gi}`) setOverKey(`scene-${gi}`);
+                // The whole scene block is the drop zone — for a scene being
+                // dragged (before/after by the pointer half) and for a shot
+                // (slot between its clips, into ANY scene).
+                if (dragScene.current !== null) {
+                  e.preventDefault();
+                  const r = e.currentTarget.getBoundingClientRect();
+                  const idx = e.clientX < r.left + r.width / 2 ? gi : gi + 1;
+                  if (overIns?.sceneIdx !== idx) setOverIns({ sceneIdx: idx });
+                } else if (dragShot.current) {
+                  e.preventDefault();
+                  const idx = insIdxAt(e.currentTarget, e.clientX);
+                  if (overIns?.sceneId !== g.scene.id || overIns?.idx !== idx) setOverIns({ sceneId: g.scene.id, idx });
+                }
               }}
-              onDragLeave={() => setOverKey((v) => (v === `scene-${gi}` ? null : v))}
+              onDragLeave={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget)) setOverIns(null);
+              }}
               onDrop={(e) => {
-                if (dragScene.current === null) return;
                 e.preventDefault();
-                setOverKey(null);
-                const from = dragScene.current;
-                dragScene.current = null;
-                if (from !== gi) moveScene(from, gi);
+                setOverIns(null);
+                if (dragScene.current !== null) {
+                  const from = dragScene.current;
+                  dragScene.current = null;
+                  const r = e.currentTarget.getBoundingClientRect();
+                  const to = e.clientX < r.left + r.width / 2 ? gi : gi + 1;
+                  if (to !== from && to !== from + 1) moveScene(from, to);
+                } else if (dragShot.current) {
+                  const d = dragShot.current;
+                  dragShot.current = null;
+                  // slot among the rendered clips → slot among the stored
+                  // shots (folded take members are not rendered)
+                  const k = insIdxAt(e.currentTarget, e.clientX);
+                  const stored = project.sceneDetails[g.scene.id]?.shots || [];
+                  const at = k < g.shots.length ? stored.findIndex((s) => s.id === g.shots[k].shot.id) : stored.length;
+                  moveShotTo(d.shotId, d.sceneId, g.scene.id, at < 0 ? stored.length : at);
+                }
               }}
             >
               <div
@@ -1446,7 +1691,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                 }}
                 onDragEnd={() => {
                   dragScene.current = null;
-                  setOverKey(null);
+                  setOverIns(null);
                 }}
               >
                 <Grip size={12} />
@@ -1458,9 +1703,10 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                   return (
                     <div
                       key={it.shot.id}
-                      className={`nle-clip ${selectedId === it.shot.id ? 'selected' : ''} ${overKey === `shot-${it.shot.id}` ? 'drag-over' : ''} ${trimId === it.shot.id ? 'trimming' : ''}`}
+                      data-shot={it.shot.id}
+                      className={`nle-clip ${selectedId === it.shot.id ? 'selected' : ''} ${overIns?.sceneId === g.scene.id && overIns.idx === si ? 'ins-before' : ''} ${overIns?.sceneId === g.scene.id && overIns.idx === g.shots.length && si === g.shots.length - 1 ? 'ins-after' : ''} ${trimId === it.shot.id ? 'trimming' : ''}`}
                       style={zoomed ? { flex: 'none', width: (it.shot.duration || 1) * scale } : { flexGrow: Math.max(0.5, it.shot.duration || 1) }}
-                      title={`${globalIdx + 1} · ${it.shot.duration}s · ${it.shot.shotType || ''}`}
+                      title={`${globalIdx + 1} · ${it.shot.duration}s · ${it.shot.shotType || ''} — ${t('s6.dragShot')}`}
                       draggable={trimId === null}
                       onClick={() => {
                         setSelectedId(it.shot.id);
@@ -1473,29 +1719,13 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                           return;
                         }
                         e.stopPropagation();
-                        dragShot.current = { sceneId: g.scene.id, idx: si };
+                        dragShot.current = { shotId: it.shot.id, sceneId: g.scene.id };
                         e.dataTransfer.effectAllowed = 'move';
                         e.dataTransfer.setData('text/plain', it.shot.id);
                       }}
                       onDragEnd={() => {
                         dragShot.current = null;
-                        setOverKey(null);
-                      }}
-                      onDragOver={(e) => {
-                        if (!dragShot.current || dragShot.current.sceneId !== g.scene.id) return;
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (overKey !== `shot-${it.shot.id}`) setOverKey(`shot-${it.shot.id}`);
-                      }}
-                      onDragLeave={() => setOverKey((v) => (v === `shot-${it.shot.id}` ? null : v))}
-                      onDrop={(e) => {
-                        if (!dragShot.current || dragShot.current.sceneId !== g.scene.id) return;
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setOverKey(null);
-                        const from = dragShot.current.idx;
-                        dragShot.current = null;
-                        if (from !== si) moveShot(g.scene.id, from, si);
+                        setOverIns(null);
                       }}
                     >
                       {it.video ? (
@@ -1727,14 +1957,14 @@ export default function Stage6({ project, update, settings, ...workbench }) {
             </>
           );
         })()}
+        {/* The playhead sits exactly where the clips are (measured), and can
+            be dragged to scrub through the assembly. */}
         {showPlayhead && (
           <div
-            className="nle-playhead"
-            style={
-              zoomed
-                ? { left: NLE_GUT + elapsed * scale }
-                : { left: `calc(${NLE_GUT}px + (100% - ${NLE_GUT}px) * ${Math.min(1, elapsed / Math.max(0.1, total))})` }
-            }
+            className={`nle-playhead ${scrubbing ? 'scrubbing' : ''}`}
+            style={{ left: leftAt(elapsed) }}
+            title={t('s6.scrubTip')}
+            onPointerDown={startScrub}
           >
             <span className="nle-playhead-cap" />
           </div>
@@ -1747,12 +1977,14 @@ export default function Stage6({ project, update, settings, ...workbench }) {
               <div
                 className="nle-range"
                 style={
-                  zoomed
-                    ? { left: NLE_GUT + effIn * scale, width: (effOut - effIn) * scale }
-                    : {
-                        left: `calc(${NLE_GUT}px + (100% - ${NLE_GUT}px) * ${effIn / Math.max(0.1, total)})`,
-                        width: `calc((100% - ${NLE_GUT}px) * ${(effOut - effIn) / Math.max(0.1, total)})`,
-                      }
+                  geom.length
+                    ? { left: leftAt(effIn), width: Math.max(0, xAtSec(effOut) - xAtSec(effIn)) }
+                    : zoomed
+                      ? { left: NLE_GUT + effIn * scale, width: (effOut - effIn) * scale }
+                      : {
+                          left: `calc(${NLE_GUT}px + (100% - ${NLE_GUT}px) * ${effIn / Math.max(0.1, total)})`,
+                          width: `calc((100% - ${NLE_GUT}px) * ${(effOut - effIn) / Math.max(0.1, total)})`,
+                        }
                 }
               />
             )}
@@ -1761,11 +1993,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
               className="nle-rmark"
               title={t('s6.rangeIn')}
               aria-label={t('s6.rangeIn')}
-              style={
-                zoomed
-                  ? { left: NLE_GUT + effIn * scale }
-                  : { left: `calc(${NLE_GUT}px + (100% - ${NLE_GUT}px) * ${effIn / Math.max(0.1, total)})` }
-              }
+              style={{ left: leftAt(effIn) }}
               onPointerDown={dragRangeMark('in')}
             />
             <button
@@ -1773,11 +2001,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
               className="nle-rmark"
               title={t('s6.rangeOut')}
               aria-label={t('s6.rangeOut')}
-              style={
-                zoomed
-                  ? { left: NLE_GUT + effOut * scale }
-                  : { left: `calc(${NLE_GUT}px + (100% - ${NLE_GUT}px) * ${effOut / Math.max(0.1, total)})` }
-              }
+              style={{ left: leftAt(effOut) }}
               onPointerDown={dragRangeMark('out')}
             />
           </>

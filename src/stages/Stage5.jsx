@@ -168,7 +168,7 @@ function CopyButton({ text }) {
 // the assembly stage (`embed`): the scene comes from the timeline selection
 // (`focusSceneId`), and either one compact shot card (`focusShotId`) or the
 // scene tools (no shot) are rendered — no scene nav, no header, no footer.
-export default function Stage5({ project, update, settings, onSettings, onProjectSettings, genLang, styles, imageStyle, videoStyle, library, libUpsert, libDelete, goNext, embed = false, focusSceneId = null, focusShotId = null, onTabChange }) {
+export default function Stage5({ project, update, settings, onSettings, onProjectSettings, genLang, styles, imageStyle, videoStyle, library, libUpsert, libDelete, goNext, embed = false, focusSceneId = null, focusShotId = null, onTabChange, imageStylePlus = false }) {
   const { t } = useI18n();
   const [sceneIdState, setSceneId] = useState(project.outline[0]?.id || null);
   const sceneId = embed ? focusSceneId || project.outline[0]?.id || null : sceneIdState;
@@ -372,7 +372,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const sceneShots = project.sceneDetails[s.id]?.shots || [];
     const block = blockForScene(project.dynamicsPlan, sceneArg.number);
     const specs = [
-      stage5Prompt(project, sceneArg, sceneShots, genLang, imageStyle),
+      stage5Prompt(project, sceneArg, sceneShots, genLang, imageStyle, imageStylePlus),
       curEngine === 'minimax'
         ? stage5H3VideoPrompt(project, sceneArg, sceneShots, videoStyle, block)
         : stage5VideoPrompt(project, sceneArg, sceneShots, videoStyle, block),
@@ -439,7 +439,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const block = blockForScene(cur.dynamicsPlan, sceneArg.number);
     const spec =
       kind === 'image'
-        ? stage5Prompt(cur, sceneArg, sceneShots, genLang, imageStyle)
+        ? stage5Prompt(cur, sceneArg, sceneShots, genLang, imageStyle, imageStylePlus)
         : kind === 'video'
           ? settings.videoEngine === 'minimax'
             ? stage5H3VideoPrompt(cur, sceneArg, sceneShots, videoStyle, block)
@@ -567,19 +567,20 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
 
   // Per-shot timing straight from Stage 5 (same 2–10s / 0.5s-step rules as the
   // Stage 4 and Stage 6 timelines; writes into the shared sceneDetails).
-  const setShotDur = (shotId, d) => {
-    const dur = Math.max(2, Math.min(10, Math.round(d * 2) / 2));
+  const patchShot = (shotId, patch) =>
     update((p) => ({
       sceneDetails: {
         ...p.sceneDetails,
         [scene.id]: {
-          shots: (p.sceneDetails[scene.id]?.shots || []).map((s) =>
-            s.id === shotId ? { ...s, duration: dur } : s
-          ),
+          ...(p.sceneDetails[scene.id] || {}),
+          shots: (p.sceneDetails[scene.id]?.shots || []).map((s) => (s.id === shotId ? { ...s, ...patch } : s)),
         },
       },
     }));
-  };
+  const setShotDur = (shotId, d) => patchShot(shotId, { duration: Math.max(2, Math.min(10, Math.round(d * 2) / 2)) });
+  // The Stage-4 action text stays editable here — it is what the prompts and
+  // the first-frame timing rule are written from.
+  const setShotAction = (shotId, action) => patchShot(shotId, { action });
 
   // Generate the shot image via Gemini, attaching reference photos per the
   // checkboxes. Prompts and frames are read through projectRef so queued or
@@ -610,7 +611,13 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const usePalette = pref.palette && pal?.colors?.length && shot.id !== pal.src;
 
     let text = '';
-    if (imageStyle?.trim()) text += `Visual style: ${imageStyle.trim()}\n\n`;
+    if (imageStyle?.trim()) {
+      // image+ styles are binding style sheets: the model renders them
+      // literally instead of treating them as a loose mood reference.
+      text += imageStylePlus
+        ? `Visual style (image+ — STRICT, apply literally and exhaustively; every listed medium, lighting, lens, palette, texture and reference term must be visible in the result, every "Avoid" item is prohibited): ${imageStyle.trim()}\n\n`
+        : `Visual style: ${imageStyle.trim()}\n\n`;
+    }
     text += prompt;
     if (images.length) {
       // Describe each reference group by its exact position in the list so the
@@ -771,7 +778,8 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   // zooms it; ✕ deletes any version.
   const renderVersions = (shot, genImg, cls) => {
     const list = versionList(project, shot.id);
-    if (!genImg || list.length < 2) return null;
+    // A single generated frame is still shown — as the sole (selected) option.
+    if (!genImg || list.length < 1) return null;
     const curIdx = list.indexOf(genImg);
     return (
       <div className={cls}>
@@ -1710,7 +1718,14 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                 <StyleChip project={project} styles={styles} cat="image" onClick={onProjectSettings} />
                 <StyleChip project={project} styles={styles} cat="video" onClick={onProjectSettings} />
               </div>
-              <p className="s5e-action">{shot.action}</p>
+              <AutoTextarea
+                minRows={1}
+                className="s5e-action s5e-action-edit"
+                value={shot.action || ''}
+                placeholder={t('s5.actionPh')}
+                title={t('s5.actionTip')}
+                onChange={(e) => setShotAction(shot.id, e.target.value)}
+              />
 
               {/* Generation tabs: image / video / audio in one frame. */}
               <div className="s5e-tabs" role="tablist">
@@ -2074,7 +2089,13 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         }}
                       />
                     </label>
-                    <span className="seg seg-tall" title={t('s5.resTip')}>
+                  </div>
+                  {/* Generation parameters on one compact line: resolution +
+                      workflow. Auto picks the richest workflow the shot's
+                      material allows; a pinned choice overrides it. Options
+                      whose material is missing stay disabled. */}
+                  <div className="s5e-params">
+                    <span className="seg seg-tall seg-compact" title={t('s5.resTip')}>
                       {VIDEO_RESOLUTIONS.map((r) => (
                         <button
                           key={r}
@@ -2086,10 +2107,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         </button>
                       ))}
                     </span>
-                    {/* Workflow: Auto picks the richest one the shot's material
-                        allows; a pinned choice overrides it. Options whose
-                        material is missing stay disabled. */}
-                    <span className="seg seg-tall" title={t('vid.wfTip')}>
+                    <span className="seg seg-tall seg-compact" title={t('vid.wfTip')}>
                       {(curEngine === 'minimax' ? H3_VIDEO_MODES : VIDEO_MODES).map((m) => {
                         const avail =
                           m === 'si2v' ? !!shotAud

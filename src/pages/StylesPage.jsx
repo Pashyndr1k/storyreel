@@ -122,6 +122,7 @@ export default function StylesPage({ styles, setStyles, settings, setSettings, o
                 <div className="sr-body-main">
                   <h3 className="sr-title">{s.name}</h3>
                   {s.builtin && <span className="sr-tag muted">{t('styles.builtin')}</span>}
+                  {s.plus && <span className="sr-tag plus-tag">{t('styles.plusTag')}</span>}
                   <p className="style-card-text" title={s.instructions}>{s.instructions}</p>
                 </div>
               </div>
@@ -167,6 +168,15 @@ export default function StylesPage({ styles, setStyles, settings, setSettings, o
               placeholder={t('styles.instrPh')}
               onChange={(e) => setEditing({ ...editing, instructions: e.target.value })}
             />
+            {cat === 'image' && (
+              <label className="check-row style-plus">
+                <input type="checkbox" checked={!!editing.plus} onChange={(e) => setEditing({ ...editing, plus: e.target.checked })} />
+                <span>
+                  <strong>{t('styles.plus')}</strong>
+                  <em>{t('styles.plusHint')}</em>
+                </span>
+              </label>
+            )}
             <div className="modal-actions">
               <button className="btn" onClick={() => setEditing(null)}>{t('styles.cancel')}</button>
               <button

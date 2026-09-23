@@ -3315,3 +3315,120 @@ textarea.s5e-prompt-sm { min-height: 110px; }
 }
 .s5e-compact .s5e-imgwrap .s5e-vers-overlay > span:first-child { color: var(--muted); text-shadow: none; font-size: 11px; }
 .s5e-compact .s5e-ver { width: 56px; height: 34px; }
+
+/* ---- 2.6: timeline drag-and-drop insertion markers ---------------------- */
+/* A shot or scene being dragged shows WHERE it will land: an accent bar on
+   the left edge of the clip / scene it drops before (or the right edge of
+   the last one). */
+.nle-clip.ins-before::before,
+.nle-clip.ins-after::after,
+.asm-scene.ins-before::before,
+.asm-scene.ins-after::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 3px;
+  background: var(--accent);
+  box-shadow: 0 0 6px rgba(var(--accent-rgb), 0.8);
+  border-radius: 2px;
+  z-index: 4;
+  pointer-events: none;
+}
+.nle-clip.ins-before::before,
+.asm-scene.ins-before::before { left: -2px; }
+.nle-clip.ins-after::after,
+.asm-scene.ins-after::after { right: -2px; }
+.asm-scene { position: relative; }
+.asm-scene.drag-over { box-shadow: inset 0 0 0 2px rgba(var(--accent-rgb), 0.6); border-radius: 3px; }
+
+/* ---- 2.6: draggable playhead (scrub) ------------------------------------ */
+.nle-playhead {
+  pointer-events: auto;
+  cursor: ew-resize;
+  touch-action: none;
+  z-index: 5;
+}
+.nle-playhead::before {
+  /* wider invisible grab area than the 2px bar */
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -6px;
+  right: -6px;
+}
+.nle-playhead-cap { cursor: ew-resize; pointer-events: auto; }
+.nle-playhead.scrubbing { box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.95); }
+
+/* ---- 2.6: idle preview transport (Video tab) ---------------------------- */
+.pv-ctrl {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(6px);
+  z-index: 3;
+}
+.pv-ctrl button {
+  width: 30px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  color: #f0efec;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.pv-ctrl button:hover { background: rgba(255, 255, 255, 0.14); }
+.pv-ctrl button.on { background: var(--accent); color: #fff; }
+
+/* ---- 2.6: editable shot action in the compact card ---------------------- */
+textarea.s5e-action-edit {
+  width: 100%;
+  min-height: 0;
+  padding: 2px 0;
+  border: none;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  resize: none;
+  font-family: inherit;
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--text-2);
+  transition: border-color 0.15s;
+}
+textarea.s5e-action-edit:hover { border-bottom-color: var(--hairline); }
+textarea.s5e-action-edit:focus { outline: none; border-bottom-color: var(--accent); color: var(--text); }
+
+/* ---- 2.6: video parameters on one line --------------------------------- */
+.s5e-params { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.s5e-params .hint { flex-basis: 100%; margin: 0; }
+.seg.seg-compact { height: 30px; }
+.seg.seg-compact .seg-btn { padding: 0 8px; font-size: 10px; letter-spacing: 0.04em; }
+
+/* ---- 2.6: image+ styles ------------------------------------------------- */
+.sr-tag.plus-tag {
+  margin-left: 8px;
+  color: var(--accent);
+  border-color: rgba(var(--accent-rgb), 0.5);
+  background: rgba(var(--accent-rgb), 0.08);
+  vertical-align: middle;
+}
+.check-row.style-plus { margin: 12px 0 4px; align-items: flex-start; }
+.check-row.style-plus span { display: flex; flex-direction: column; gap: 2px; }
+.check-row.style-plus em { font-style: normal; color: var(--muted-2); font-size: 12px; }

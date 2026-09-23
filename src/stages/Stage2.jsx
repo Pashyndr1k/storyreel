@@ -16,7 +16,7 @@ import LibraryPicker from '../components/LibraryPicker.jsx';
 import { StylePicker } from '../components/StyleControls.jsx';
 import { RestoreIcon, Upload, Layers } from '../components/icons.jsx';
 
-export default function Stage2({ project, update, rawUpdate, settings, goNext, onSettings, genLang, styles, scriptStyle, imageStyle, library, libUpsert }) {
+export default function Stage2({ project, update, rawUpdate, settings, goNext, onSettings, genLang, styles, scriptStyle, imageStyle, imageStylePlus = false, library, libUpsert }) {
   const [pickFor, setPickFor] = useState(null); // character id awaiting a library pick
   const { t } = useI18n();
   const [lightbox, setLightbox] = useState(null); // full-size photo pop-up
@@ -56,7 +56,7 @@ export default function Stage2({ project, update, rawUpdate, settings, goNext, o
     setCoverBusy(true);
     setCoverErr('');
     try {
-      const promptData = await generateJSON(settings, coverPromptSpec(project, genLang, imageStyle));
+      const promptData = await generateJSON(settings, coverPromptSpec(project, genLang, imageStyle, imageStylePlus));
       let coverPrompt = '';
       if (imageStyle?.trim()) coverPrompt += `Visual style: ${imageStyle.trim()}\n\n`;
       coverPrompt += `${promptData.image_prompt}\n\nRender in 16:9 widescreen aspect ratio.`;

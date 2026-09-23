@@ -61,6 +61,8 @@ export default function Project({ project, updateProject, settings, setSettings,
   // Resolve the project's selected styles into instruction text for the prompts.
   const scriptStyle = resolveStyleText(styles, 'script', project.scriptStyleId);
   const imageStyle = resolveStyleText(styles, 'image', project.imageStyleId);
+  // "image+" styles are applied strictly and literally by the prompt builders.
+  const imageStylePlus = !!(styles?.image || []).find((s) => s.id === project.imageStyleId)?.plus;
   const videoStyle = resolveStyleText(styles, 'video', project.videoStyleId);
 
   const stageProps = {
@@ -77,6 +79,7 @@ export default function Project({ project, updateProject, settings, setSettings,
     styles,
     scriptStyle,
     imageStyle,
+    imageStylePlus,
     videoStyle,
     library,
     libUpsert,

@@ -86,6 +86,15 @@ export default function StylesModal({ styles, setStyles, settings, onSettings, i
               placeholder={t('styles.instrPh')}
               onChange={(e) => setEditing({ ...editing, instructions: e.target.value })}
             />
+            {cat === 'image' && (
+              <label className="check-row style-plus">
+                <input type="checkbox" checked={!!editing.plus} onChange={(e) => setEditing({ ...editing, plus: e.target.checked })} />
+                <span>
+                  <strong>{t('styles.plus')}</strong>
+                  <em>{t('styles.plusHint')}</em>
+                </span>
+              </label>
+            )}
             <div className="row">
               <button
                 className="btn primary small"
@@ -104,7 +113,7 @@ export default function StylesModal({ styles, setStyles, settings, onSettings, i
               {list.map((s) => (
                 <div key={s.id} className="style-item">
                   <div className="style-item-body">
-                    <strong>{s.name}</strong>
+                    <strong>{s.name}{s.plus && <span className="sr-tag plus-tag">{t('styles.plusTag')}</span>}</strong>
                     <span>{s.instructions}</span>
                   </div>
                   <div className="style-item-actions">

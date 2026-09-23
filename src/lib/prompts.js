@@ -206,14 +206,29 @@ FRAME CONTINUITY (STATE TRACKING): The shots of a scene form one continuous, rea
 // Stage 5 runs as TWO separate calls per scene: image prompts (first frames,
 // full static detail) and video prompts (motion only, via the Video Motion
 // instruction below) — one call could never satisfy both rule sets at once.
-export function stage5Prompt(project, scene, shots, lang, imageStyle) {
+// `imageStylePlus` marks an "image+" style: a detailed, binding style sheet
+// that the prompts must reproduce literally (many of its exact terms) rather
+// than paraphrase as a mood.
+export function stage5Prompt(project, scene, shots, lang, imageStyle, imageStylePlus = false) {
   const envNote = scene.photos?.length
     ? `\n\nAttached are reference photos of this scene's environment. Ground the image prompts in what these photos show: architecture, interior details, colors, lighting and atmosphere.`
     : '';
   const img = (imageStyle || '').trim();
   const ratio = project.aspectRatio || '16:9';
   const aspectNote = `\n\nASPECT RATIO — every "image_prompt" MUST explicitly state the framing as ${aspectDescription(ratio)} (${ratio}), and compose for that frame. The scene must FILL the whole frame edge to edge (100% of the canvas) — never describe or imply black bars, letterboxing, borders or empty margins at the edges.`;
-  const styleNote = img ? `\n\nVISUAL STYLE — bake this into EVERY "image_prompt": ${img}` : '';
+  const styleNote = !img
+    ? ''
+    : imageStylePlus
+      ? `\n\nVISUAL STYLE (image+ — STRICT) — this is a binding style sheet, not a mood hint:
+"""
+${img}
+"""
+Apply it literally and exhaustively to EVERY "image_prompt":
+- Reuse its specific vocabulary VERBATIM — the medium, rendering technique, lighting setup, lens and camera terms, palette, textures, era and named references. Each prompt must carry at least 8–12 concrete style terms lifted directly from the sheet, spread through the description (subject, environment, lighting, camera), not collected in one tail clause.
+- Do not paraphrase, soften, generalize or replace its terms with near-synonyms; do not add stylistic terms that contradict it.
+- Every "Avoid:" item is a hard prohibition — never describe those qualities, even implicitly.
+- When the shot's content and the style pull in different directions, keep the shot's content (staging, characters, action) but render it fully in this style without diluting it.`
+      : `\n\nVISUAL STYLE — bake this into EVERY "image_prompt": ${img}`;
   return {
     system: system(lang) + FRAME_CONTINUITY_SYSTEM,
     maxTokens: 6000,
@@ -639,9 +654,11 @@ JSON schema:
 
 // Asks Claude to pick the key visual from the synopsis and write an English
 // image prompt for the project cover (poster). Returns { image_prompt }.
-export function coverPromptSpec(project, lang, imageStyle) {
+export function coverPromptSpec(project, lang, imageStyle, imageStylePlus = false) {
   const styleReq = (imageStyle || '').trim()
-    ? `\n- Render it in this visual style: ${imageStyle.trim()}`
+    ? imageStylePlus
+      ? `\n- Render it STRICTLY in this image+ visual style, reusing its exact terms (medium, lighting, lens, palette, textures, references) and honoring every "Avoid" item: ${imageStyle.trim()}`
+      : `\n- Render it in this visual style: ${imageStyle.trim()}`
     : '';
   return {
     system: system(lang),

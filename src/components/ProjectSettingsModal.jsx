@@ -3,6 +3,7 @@ import { useI18n } from '../lib/i18n.js';
 import { STYLE_CATEGORIES } from '../lib/styles.js';
 import StylesModal from './StylesModal.jsx';
 import AspectSelector from './AspectSelector.jsx';
+import { styleLabel } from './StyleControls.jsx';
 
 export default function ProjectSettingsModal({ project, update, styles, setStyles, settings, onSettings, onClose }) {
   const { t } = useI18n();
@@ -22,7 +23,7 @@ export default function ProjectSettingsModal({ project, update, styles, setStyle
         >
           <option value="">{t('pset.styleNone')}</option>
           {(styles[cat] || []).map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
+            <option key={s.id} value={s.id}>{styleLabel(s, t)}</option>
           ))}
         </select>
         <button className="btn small" onClick={() => setManageCat(cat)}>{t('pset.manage')}</button>
