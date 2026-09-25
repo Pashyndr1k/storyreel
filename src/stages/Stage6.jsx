@@ -11,7 +11,7 @@ import { stage6SmartCutPrompt } from '../lib/prompts.js';
 import { decodeMediaAudio, audioBufferToWavDataURL } from '../lib/audio.js';
 import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
 import Stage5 from './Stage5.jsx';
-import { Play, Pause, SkipBack, StopSq, Grip, Download, Upload, Stars, Trash, Scissors, TransitionIcon, Plus, Expand, Zap } from '../components/icons.jsx';
+import { Play, Pause, SkipBack, StopSq, Grip, Download, Upload, Stars, Trash, Scissors, TransitionIcon, Plus, Expand, Zap, RestoreIcon } from '../components/icons.jsx';
 import Lightbox from '../components/Lightbox.jsx';
 
 const readFileDataURL = (file) =>
@@ -851,6 +851,37 @@ export default function Stage6({ project, update, settings, ...workbench }) {
     } finally {
       setSplitBusy(false);
     }
+  };
+
+  // Sync a lane to the video: every shot-linked clip on it (H3 mixes `h3_*`,
+  // split A/V `av_*`) moves back under its shot's CURRENT slot — after shots
+  // were dragged, reordered or retimed — and takes the shot's trim/length
+  // again. Music, effects and uploaded clips carry no shot link and stay.
+  const shotOfClip = (c) => {
+    const m = /^(?:h3|av)_(.+)$/.exec(String(c.id));
+    return m ? m[1] : null;
+  };
+  const laneShotClips = (L) => (L.clips || []).filter((c) => shotOfClip(c));
+  const syncLaneToVideo = (layerId) => {
+    const L = layers.find((x) => x.id === layerId);
+    if (!L) return;
+    let moved = 0;
+    const clips = (L.clips || []).map((c) => {
+      const sid = shotOfClip(c);
+      if (!sid) return c;
+      const idx = items.findIndex((it) => it.shot.id === sid);
+      if (idx < 0) return c; // shot deleted or folded into a take — leave it where it is
+      const it = items[idx];
+      const start = startOf(idx);
+      const offset = String(c.id).startsWith('av_') ? it.trim?.head || 0 : c.offset || 0;
+      const src = c.srcDuration || c.duration;
+      const duration = Math.min(it.shot.duration || c.duration, Math.max(0.1, src - offset));
+      if (Math.abs(start - c.start) < 0.005 && Math.abs(duration - c.duration) < 0.005 && offset === (c.offset || 0)) return c;
+      moved++;
+      return { ...c, start, offset, duration };
+    });
+    if (moved) patchLayer(layerId, { clips });
+    showToast(moved ? t('s6.laneSyncDone', { n: moved }) : t('s6.laneSyncSame'));
   };
 
   // Smart cut: Claude re-cuts the timeline per a plain-language instruction —
@@ -2057,6 +2088,20 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                   value={L.volume ?? 1}
                   onChange={(e) => patchLayer(L.id, { volume: Number(e.target.value) })}
                 />
+                {/* Re-align this track's shot clips under their shots (after
+                    clips were moved, reordered or retimed). */}
+                <button
+                  type="button"
+                  className="btn small lane-sync"
+                  disabled={!laneShotClips(L).length}
+                  title={laneShotClips(L).length ? t('s6.laneSyncTip') : t('s6.laneSyncNone')}
+                  onClick={() => {
+                    syncLaneToVideo(L.id);
+                    setLaneMenu(null);
+                  }}
+                >
+                  <RestoreIcon size={14} />{t('s6.laneSync')}
+                </button>
                 <div className="lane-menu-row">
                   <label className="icon-btn sq36" title={t('s6.addClip')} aria-label={t('s6.addClip')}>
                     <Upload size={16} />

@@ -3494,3 +3494,7 @@ label:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 .s5e-btnrow > .hint { flex-basis: 100%; margin: 0; }
 /* Preview transport: a hairline separates playback from the file tools. */
 .pv-ctrl .pv-sep { width: 1px; height: 18px; margin: 0 3px; background: rgba(255, 255, 255, 0.22); align-self: center; }
+
+/* ---- 2.7.1: track menu "Sync to video" ---------------------------------- */
+.lane-menu .btn.lane-sync { width: 100%; justify-content: flex-start; margin: 4px 0 8px; padding: 0 8px; background: rgba(var(--ink-rgb), 0.06); }
+.lane-menu .btn.lane-sync:hover:not(:disabled) { background: rgba(var(--ink-rgb), 0.11); }

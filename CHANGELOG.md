@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.7.1 — 2026-09-24
+
+- **Sync to video** in the audio track menu (⋯ on a track head). One click
+  moves the track's shot-linked clips — H3 mixes and split A/V clips — back
+  under their shots after shots were dragged, reordered or retimed, and
+  re-applies the shot's trim and length. Music, effects and uploaded clips
+  have no shot to follow and stay where they are; the button is disabled
+  on such tracks, and a toast reports how many clips moved.
+
 ## 2.7.0 — 2026-09-22
 
 - **Audio clips sit exactly under their video.** Audio-lane clips (the H3
