@@ -3498,3 +3498,6 @@ label:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* ---- 2.7.1: track menu "Sync to video" ---------------------------------- */
 .lane-menu .btn.lane-sync { width: 100%; justify-content: flex-start; margin: 4px 0 8px; padding: 0 8px; background: rgba(var(--ink-rgb), 0.06); }
 .lane-menu .btn.lane-sync:hover:not(:disabled) { background: rgba(var(--ink-rgb), 0.11); }
+
+/* ---- 2.7.2: number of character references a shot will use -------------- */
+.cast-count { min-width: 16px; padding: 0 4px; border-radius: 3px; background: rgba(var(--ink-rgb), 0.1); font-size: 10px; font-weight: 700; line-height: 16px; text-align: center; font-variant-numeric: tabular-nums; }

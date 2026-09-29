@@ -1,4 +1,5 @@
-import { SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC, MAX_IMAGE_VERSIONS } from '../lib/config.js';
+import { SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC, MAX_IMAGE_VERSIONS, MAX_CHARACTER_REFS } from '../lib/config.js';
+import { shotCastRefs } from '../lib/castRefs.js';
 import { useEffect, useRef, useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage, generateGeminiVoice, GEMINI_VOICES } from '../lib/gemini.js';
@@ -216,10 +217,8 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const hasPrompts = shots.some((s) => project.shotPrompts[s.id]);
 
   // Reference photos available for this scene.
-  const charRefs = (project.storyline?.characters || [])
-    .map((c) => c.photos?.[0])
-    .filter(Boolean)
-    .slice(0, 3);
+  // Character references are picked per shot (lib/castRefs.js): the people
+  // the shot names, up to MAX_CHARACTER_REFS.
   const locRefs = (scene?.photos || []).slice(0, 6);
   const videoRes = VIDEO_RESOLUTIONS.includes(project.videoResolution) ? project.videoResolution : 'HD';
 
@@ -635,7 +634,10 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       budget -= out.length;
       return out;
     };
-    const useChar = take(pref.char ? charRefs : []);
+    // Characters: the people THIS shot names (or, if it names nobody, the
+    // cast in list order) — each reference keeps its name for the prompt.
+    const useCast = take(pref.char ? shotCastRefs(projectRef.current, shot) : []);
+    const useChar = useCast.map((c) => c.photo);
     const useLoc = take(pref.loc ? locRefs : []);
     const shotAssets = take(pref.asset ? assetsFor(shot.id) : []);
     const useAssets = shotAssets.map((a) => a.photos[0]);
@@ -664,7 +666,11 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       let off = 0;
       const range = (n) => (n === 1 ? `image ${off + 1}` : `images ${off + 1}–${off + n}`);
       if (useChar.length) {
-        text += ` The main character(s) appear in ${range(useChar.length)} — reproduce their faces and appearance faithfully and keep them consistent.`;
+        // Name every face: with several people in frame the model must know
+        // WHICH reference is WHO, not just that characters are attached.
+        const who = useCast.map((c, k) => `image ${off + k + 1} is ${c.name || `character ${k + 1}`}`).join(', ');
+        text += ` Character reference photos — ${who}. Reproduce each person's face, hair and appearance faithfully from their own photo, keep them clearly distinct from one another, and do not blend features between them.`;
+        if (useCast[0]?.named) text += ' Only these characters appear in the frame (plus any unnamed background people the prompt describes).';
         off += useChar.length;
       }
       if (useLoc.length) {
@@ -917,7 +923,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         .filter((c) => wanted.includes((c.name || '').toLowerCase()))
         .map((c) => ({ name: c.name, photo: c.photos?.[0] }))
         .filter((c) => c.photo)
-        .slice(0, useComfyImg ? 1 : 3);
+        .slice(0, useComfyImg ? 1 : MAX_CHARACTER_REFS);
 
       const ratio = project.aspectRatio || '16:9';
       let text = `${data.image_prompt}\n\nThe FIRST attached image is the shot's first frame — edit it: keep the location, environment, lighting, camera angle and framing exactly as they are, and keep every character's appearance identical.`;
@@ -1853,9 +1859,18 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     <div className="s5e-applyrow">
                       <SwitchPill
                         on={pref.char}
-                        disabled={!charRefs.length}
-                        title={t('img.useChar')}
+                        disabled={!shotCastRefs(project, shot).length}
+                        title={
+                          shotCastRefs(project, shot).length
+                            ? `${t('img.useChar')} — ${shotCastRefs(project, shot).map((c) => c.name || '?').join(', ')}`
+                            : t('img.useChar')
+                        }
                         label={t('apply.char')}
+                        extra={
+                          shotCastRefs(project, shot).length ? (
+                            <span className="cast-count">{shotCastRefs(project, shot).length}</span>
+                          ) : null
+                        }
                         onToggle={() => setPref(shot.id, { char: !pref.char })}
                       />
                       <SwitchPill

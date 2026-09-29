@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.7.2 — 2026-09-29
+
+- **Character references are picked per shot, up to four people.** A first
+  frame used to get the first photo of the first three characters in the
+  cast list, whoever was in the shot. Now the references are the characters
+  the shot actually names in its action, dialogue or notes — in order of
+  first mention, inflected forms included ("Анна" finds "Анны", "Tom" finds
+  "Tom's") — and only those, so a face that is not in the shot is never
+  suggested to the image model. A shot that names nobody falls back to the
+  cast list order. The cap is four (was three); the final frame follows it.
+- The image prompt now says which reference is who ("image 1 is Anna, image
+  2 is Tom"), and asks to keep the faces distinct.
+- The Characters switch shows how many references the shot will use; its
+  tooltip lists their names.
+- Local image generation (Flux.2 Klein) still takes two reference images in
+  total — that is the model's limit.
+
 ## 2.7.1 — 2026-09-24
 
 - **Sync to video** in the audio track menu (⋯ on a track head). One click
