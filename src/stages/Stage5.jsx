@@ -1240,7 +1240,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         .map((s) => ({ speaker: String(s.speaker || '').trim(), voiceName: String(s.voice || s.voiceName || '').trim() }))
         .filter((s) => s.voiceName)
         .slice(0, 2);
-      const params = { ...prev, speakers };
+      const params = { ...prev, speakers, forDuration: Number(shot.duration) || 0 }; // paced for THIS length
       setPrompt(shot.id, { voicePrompt: text, voiceParams: params });
       return { text, ...params };
     }
@@ -1257,6 +1257,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       ...prev,
       instruct: manualInstruct || String(data.voice_instruct || '').trim(),
       narrator: manualNarrator || String(data.narrator_voice || '').trim(),
+      forDuration: Number(shot.duration) || 0, // the SRT is timed to THIS length
     };
     setPrompt(shot.id, { voicePrompt: text, voiceParams: params });
     return { text, ...params };
@@ -1285,7 +1286,11 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const draftedForService = useGeminiVoice
       ? (sp.voiceParams?.speakers || []).length > 0
       : !!(sp.voiceParams?.instruct || '').trim();
-    let voice = (sp.voicePrompt || '').trim() && draftedForService
+    // …and for the shot's CURRENT length: the SRT timestamps / pacing were
+    // written for the duration at drafting time, so a retimed shot gets a
+    // fresh draft instead of speech that ends early or overruns.
+    const draftedForLength = Number(sp.voiceParams?.forDuration) === (Number(shot.duration) || 0);
+    let voice = (sp.voicePrompt || '').trim() && draftedForService && draftedForLength
       ? { text: sp.voicePrompt.trim(), ...(sp.voiceParams || {}) }
       : null;
     if (!voice) {
@@ -2101,7 +2106,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         </button>
                       </div>
                     </div>
-                    {!embed && scenePhotosBlock}
+                    {/* Scene location photos, in the card next to the assets
+                        (same tiles) — the scene panel shows them too. */}
+                    {scenePhotosBlock}
                   </div>
                 </div>
               </div>

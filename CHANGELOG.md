@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.7.3 — 2026-09-29
+
+- **Location photos are back on the shot card.** Since 2.5 the scene's
+  location photos (upload / pick from the library) were only shown when a
+  scene label was selected; the shot card showed Assets alone. The card now
+  shows Location next to Assets with the same tiles; the scene panel keeps
+  its copy.
+- **Voice generation follows the shot's current length.** A saved voice
+  prompt (SRT timings for OmniVoice, pacing for Gemini TTS) is written for
+  the shot length at drafting time; regenerating after the shot was retimed
+  reused it, so the speech ignored the new timing. The prompt now remembers
+  the length it was timed for and is redrafted when the shot's duration
+  changed.
+
 ## 2.7.2 — 2026-09-29
 
 - **Character references are picked per shot, up to four people.** A first
