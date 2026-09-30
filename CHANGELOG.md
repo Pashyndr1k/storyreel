@@ -18,6 +18,12 @@
   no place to appear. The card now shows a final-frame thumb next to its
   tools; clicking it puts the final frame into the preview (click again to
   enlarge), and picking any first-frame version switches the preview back.
+- **The final frame keeps the shot's assets.** Final-frame generation only
+  attached the first frame and any missing character, so a specific prop
+  (a particular car, for instance) came back as a generic look-alike. The
+  shot's asset photos are now attached as well, with the instruction to keep
+  each one exactly as shown; with local Flux.2 Klein (two references) a
+  missing character takes the slot before an asset.
 
 ## 2.7.2 — 2026-09-29
 

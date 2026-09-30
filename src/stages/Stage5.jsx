@@ -932,17 +932,30 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         .map((c) => ({ name: c.name, photo: c.photos?.[0] }))
         .filter((c) => c.photo)
         .slice(0, useComfyImg ? 1 : MAX_CHARACTER_REFS);
+      // The shot's assets travel with the final frame too: the edit must keep
+      // the SAME specific objects (a generic look-alike is exactly the failure
+      // this prevents). Flux.2 Klein has one slot beside the first frame —
+      // a missing character wins it over an asset.
+      const pref = prefFor(shot.id);
+      const assetRefs = pref.asset ? assetsFor(shot.id).filter((a) => a.photos?.[0]) : [];
+      const room = useComfyImg ? Math.max(0, 1 - missingRefs.length) : Number.POSITIVE_INFINITY;
+      const useAssets = assetRefs.slice(0, room);
 
       const ratio = project.aspectRatio || '16:9';
       let text = `${data.image_prompt}\n\nThe FIRST attached image is the shot's first frame — edit it: keep the location, environment, lighting, camera angle and framing exactly as they are, and keep every character's appearance identical.`;
       if (missingRefs.length) {
         text += ` The ${missingRefs.length === 1 ? 'next attached image is a reference photo' : `next ${missingRefs.length} attached images are reference photos`} of ${missingRefs.map((c) => c.name).join(', ')} — these characters appear in the final frame; reproduce their faces and appearance faithfully.`;
       }
+      if (useAssets.length) {
+        const off = 1 + missingRefs.length;
+        const names = useAssets.map((a) => (a.description ? `${a.name} (${a.description})` : a.name)).join('; ');
+        text += ` ${useAssets.length === 1 ? `Attached image ${off + 1} shows` : `Attached images ${off + 1}–${off + useAssets.length} show`} the exact assets/props of this shot — ${names}. Keep each one precisely as shown in its photo: the same specific object with the same shape, color, markings and details, never a generic substitute of the same kind.`;
+      }
       text += `\n\nRender in ${aspectDescription(ratio)} (${ratio}) aspect ratio, matching the first frame's dimensions.\n\n${FULL_FRAME_RULE}`;
 
       const img = await runImageGen({
         prompt: text,
-        images: [first, ...missingRefs.map((c) => c.photo)],
+        images: [first, ...missingRefs.map((c) => c.photo), ...useAssets.map((a) => a.photos[0])],
         ratio,
         name: `${(project.title || 'project').slice(0, 24)}_shot${shots.indexOf(shot) + 1}_final`,
       });
