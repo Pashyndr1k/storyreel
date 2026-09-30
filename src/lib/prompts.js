@@ -350,55 +350,6 @@ Return exactly one entry per shot, in order.`,
   };
 }
 
-// Stage 5 audio prompts: one per shot, written for an EXTERNAL audio-generation
-// model. Each prompt maps the shot's sound chronologically — every spoken line
-// verbatim with precise in-shot timing and delivery directions, plus pauses and
-// essential ambience/effects. The assembly stage's voice-over script window aggregates
-// these across the whole film.
-export function stage5AudioPrompt(project, scene, shots, block) {
-  const chars = (project.storyline?.characters || [])
-    .map((c) => `${c.name}${c.role ? ` (${c.role})` : ''}: ${c.description || ''}`)
-    .join('\n');
-  const shotList = shots.map((s, i) => ({
-    shot: i + 1,
-    duration_sec: s.duration,
-    action: s.action,
-    dialogue: s.dialogue,
-    notes: s.notes,
-  }));
-  const rhythmNote = block
-    ? `\nThis scene's dialogue rhythm target: dialogue volume ${block.dialogue_volume}/10 — pace the lines and pauses accordingly.`
-    : '';
-  return {
-    system: `You are a dialogue director and sound designer preparing per-shot audio prompts for an external AI audio-generation model.
-
-Rules:
-- Respond with VALID JSON ONLY. No markdown, no code fences, no commentary outside the JSON.
-- Every "audio_prompt" is written in English, EXCEPT the characters' spoken lines, which are kept VERBATIM in their original language inside double quotes.
-- MANDATORY: for every shot whose "dialogue" field is non-empty, the "audio_prompt" MUST reproduce each spoken line WORD FOR WORD (verbatim, in its original language) inside double quotes. Never omit, shorten, paraphrase, translate or merely summarise a spoken line — the exact words must appear.
-- Map each shot's audio chronologically with precise timings inside the shot (start–end in seconds, e.g. 0.4s–2.1s): every spoken line (speaker name, the exact line, delivery/tone), meaningful pauses, and essential ambient sound or effects.
-- Voice directions must be concrete: approximate age, gender, energy, emotional tone, pacing.
-- Timings must fit within the shot's duration and follow the action's chronology.
-- A shot with no dialogue still gets an "audio_prompt" describing its ambience and effects with timings.
-- Character names always in Latin letters.`,
-    maxTokens: 5000,
-    user: `Characters:
-${chars || '—'}
-
-Scene ${scene.number}: "${scene.title}" — ${scene.summary}${rhythmNote}
-
-Shots of this scene:
-${JSON.stringify(shotList, null, 2)}
-
-Write one "audio_prompt" per shot.
-
-JSON schema:
-{"prompts":[{"shot":1,"audio_prompt":"0.0s–1.2s: ..."}]}
-
-Return exactly one entry per shot, in order.`,
-  };
-}
-
 // Assembly "Smart cut": Claude acts as a film editor re-cutting the assembled
 // timeline per a plain-language instruction ("more dynamic", "slow down
 // scene 2"). It may change shot durations and the transitions between shots;

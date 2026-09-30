@@ -29,6 +29,11 @@
   and the voice-service setting) is removed. The audio tab shows the Gemini
   TTS prompt, the voice selector and the director's cast; voice prompts
   drafted for OmniVoice are redrafted on the next generation.
+- **The "Audio prompt (external audio model)" frame is gone.** It was a
+  per-shot sound-design brief for tools outside the app that nothing in the
+  app consumed. The audio tab now holds only the Gemini TTS prompt and its
+  voice controls; scene prompt generation no longer produces audio prompts
+  (existing ones stay in the project data, unused).
 
 ## 2.7.2 — 2026-09-29
 

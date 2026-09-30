@@ -5,7 +5,7 @@ import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage, generateGeminiVoice, GEMINI_VOICES } from '../lib/gemini.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
 import { generateComfyVideo, generateComfyRefVideo, generateComfyMultiVideo, generateComfyImage, saveToLocalOutputs, VIDEO_RESOLUTIONS, VIDEO_MODES, H3_VIDEO_MODES, resolveVideoMode, resolveH3VideoMode, h3Seconds } from '../lib/comfy.js';
-import { stage5Prompt, stage5VideoPrompt, stage5H3VideoPrompt, h3ComposePrompt, stage5AudioPrompt, stage5GeminiVoicePrompt, finalFramePrompt, tweakPromptSpec } from '../lib/prompts.js';
+import { stage5Prompt, stage5VideoPrompt, stage5H3VideoPrompt, h3ComposePrompt, stage5GeminiVoicePrompt, finalFramePrompt, tweakPromptSpec } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
 import { aspectDescription } from '../lib/aspect.js';
 import ErrorNote from '../components/ErrorNote.jsx';
@@ -41,24 +41,6 @@ const readFileDataURL = (file) =>
 // compare against the model's audio prompt with case/punctuation ignored; any
 // spoken line the model dropped is appended verbatim so the dialogue is never
 // lost even if the LLM omits it.
-const spokenLines = (dialogue) =>
-  String(dialogue || '')
-    .split(/\r?\n+/)
-    .map((l) => l.replace(/^\s*[^:]{1,40}:\s*/, '').trim()) // strip a leading "NAME:" label
-    .filter(Boolean);
-const normWords = (s) => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
-const ensureDialogueInAudioPrompt = (audioPrompt, dialogue) => {
-  const lines = spokenLines(dialogue);
-  if (!lines.length) return audioPrompt;
-  const haystack = normWords(audioPrompt);
-  const missing = lines.filter((l) => {
-    const n = normWords(l);
-    return n && !haystack.includes(n);
-  });
-  if (!missing.length) return audioPrompt;
-  const quoted = missing.map((l) => `"${l}"`).join(' ');
-  return `${(audioPrompt || '').trim()}\n\nRequired dialogue (verbatim): ${quoted}`.trim();
-};
 
 // Appended to every image-generation prompt: the described scene must fill the
 // whole canvas — no black bars / letterboxing / empty margins at any edge.
@@ -370,15 +352,10 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         const shot = sceneShots[(Number(pr.shot) || 1) - 1];
         if (!shot) return;
         const cur = next[shot.id] || {};
-        // A shot's dialogue is always guaranteed into its audio prompt, even if
-        // the model drops it (deterministic safety net over the prompt rule).
-        const audioPrompt =
-          pr.audio_prompt != null ? ensureDialogueInAudioPrompt(pr.audio_prompt, shot.dialogue) : null;
         next[shot.id] = {
           ...cur,
           imagePrompt: pr.image_prompt != null ? pr.image_prompt : cur.imagePrompt || '',
           videoPrompt: pr.video_prompt != null ? pr.video_prompt : cur.videoPrompt || '',
-          ...(audioPrompt != null ? { audioPrompt } : {}),
         };
         if (pr.video_prompt != null) engines[shot.id] = curEngine;
       });
@@ -395,9 +372,6 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         ? stage5H3VideoPrompt(project, sceneArg, sceneShots, videoStyle, block)
         : stage5VideoPrompt(project, sceneArg, sceneShots, videoStyle, block),
     ];
-    if (sceneShots.some((sh) => (sh.dialogue || '').trim())) {
-      specs.push(stage5AudioPrompt(project, sceneArg, sceneShots, block));
-    }
     return specs;
   };
 
@@ -462,19 +436,17 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           ? settings.videoEngine === 'minimax'
             ? stage5H3VideoPrompt(cur, sceneArg, sceneShots, videoStyle, block)
             : stage5VideoPrompt(cur, sceneArg, sceneShots, videoStyle, block)
-          : stage5AudioPrompt(cur, sceneArg, sceneShots, block);
+          : null;
+    if (!spec) return;
     setRegenBusy(`${shot.id}:${kind}`);
     setImgErr(null);
     try {
       const data = await generateJSON(settings, spec);
       const idx = sceneShots.findIndex((s) => s.id === shot.id);
       const pr = (data.prompts || []).find((x) => (Number(x.shot) || 0) === idx + 1);
-      const text = kind === 'image' ? pr?.image_prompt : kind === 'video' ? pr?.video_prompt : pr?.audio_prompt;
+      const text = kind === 'image' ? pr?.image_prompt : pr?.video_prompt;
       if (typeof text !== 'string' || !text.trim()) throw new Error('The response held no prompt for this shot.');
-      setPrompt(shot.id, {
-        [kind === 'image' ? 'imagePrompt' : kind === 'video' ? 'videoPrompt' : 'audioPrompt']:
-          kind === 'audio' ? ensureDialogueInAudioPrompt(text, shot.dialogue) : text,
-      });
+      setPrompt(shot.id, { [kind === 'image' ? 'imagePrompt' : 'videoPrompt']: text });
       if (kind === 'video') {
         update((p) => ({ shotPromptEngines: { ...(p.shotPromptEngines || {}), [shot.id]: curEngine } }));
       }
@@ -1674,7 +1646,6 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           // has audio material).
           const hasAudioTab = !!(
             (shot.dialogue || '').trim() ||
-            (p.audioPrompt || '').trim() ||
             (p.voicePrompt || '').trim() ||
             shotAud
           );
@@ -2306,25 +2277,6 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
               {/* Audio tab — prompt left, voice generation right. */}
               {tab === 'audio' && (
                 <div className="s5e">
-                  <div className="s5e-panel">
-                    <div className="prompt-head">
-                      <label>{t('s5.aud')}</label>
-                      <span className="prompt-tools">
-                        {regenBtn(shot, 'audio')}
-                        <CopyButton text={p.audioPrompt || ''} />
-                        {promptToggle()}
-                      </span>
-                    </div>
-                    <AutoTextarea
-                      minRows={4}
-                      className="s5e-prompt s5e-prompt-sm"
-                    remeasure={promptOpen}
-                      value={p.audioPrompt || ''}
-                      placeholder={t('s5.audPh')}
-                      onChange={(e) => setPrompt(shot.id, { audioPrompt: e.target.value })}
-                    />
-                  </div>
-
                   {/* Voice generation (Gemini TTS): player, the editable
                       voice text drafted by the voice director, controls. On
                       H3, a dialogue shot can instead hand the line to the
