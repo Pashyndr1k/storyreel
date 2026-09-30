@@ -170,7 +170,7 @@ function CopyButton({ text }) {
 // the assembly stage (`embed`): the scene comes from the timeline selection
 // (`focusSceneId`), and either one compact shot card (`focusShotId`) or the
 // scene tools (no shot) are rendered — no scene nav, no header, no footer.
-export default function Stage5({ project, update, settings, onSettings, onProjectSettings, genLang, styles, imageStyle, videoStyle, library, libUpsert, libDelete, goNext, embed = false, focusSceneId = null, focusShotId = null, onTabChange, imageStylePlus = false, onQueueApi = null }) {
+export default function Stage5({ project, update, settings, onSettings, onProjectSettings, genLang, styles, imageStyle, videoStyle, library, libUpsert, libDelete, goNext, embed = false, focusSceneId = null, focusShotId = null, onTabChange, imageStylePlus = false, onQueueApi = null, onPreviewFrame = null, previewFrame = 'first' }) {
   const { t } = useI18n();
   const [sceneIdState, setSceneId] = useState(project.outline[0]?.id || null);
   const sceneId = embed ? focusSceneId || project.outline[0]?.id || null : sceneIdState;
@@ -832,7 +832,15 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         <span>{t('ver.label')}</span>
         {list.map((v, vi) => {
           const isCur = vi === curIdx;
-          const act = () => (isCur ? setLightbox({ kind: 'img', src: v }) : selectVersion(shot.id, v));
+          const act = () => {
+            // a version click always brings the FIRST frame back into the preview
+            if (previewFrame !== 'first') {
+              onPreviewFrame?.('first');
+              if (isCur) return;
+            }
+            if (isCur) setLightbox({ kind: 'img', src: v });
+            else selectVersion(shot.id, v);
+          };
           return (
             <span
               key={vi}
@@ -1954,6 +1962,20 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         <figure>
                           <div className="s5e-imgwrap">
                             <img decoding="async" loading="lazy" src={finalImg} alt="" className="zoomable" onClick={() => setLightbox({ kind: 'img', src: finalImg })} />
+                            {/* Embedded: the picture is hidden here, so a thumb
+                                puts the final frame into the preview (click
+                                again to enlarge). */}
+                            {embed && (
+                              <button
+                                type="button"
+                                className={`s5e-final-thumb ${previewFrame === 'final' ? 'cur' : ''}`}
+                                title={t('img.finalPreview')}
+                                aria-label={t('img.finalPreview')}
+                                onClick={() => (previewFrame === 'final' ? setLightbox({ kind: 'img', src: finalImg }) : onPreviewFrame?.('final'))}
+                              >
+                                <img decoding="async" loading="lazy" src={finalImg} alt="" />
+                              </button>
+                            )}
                             <div className="img-actions">
                               <IconAction title={t('img.finalRegen')} disabled={anyBusy} onClick={() => genFinalFrame(shot)}>
                                 <RestoreIcon size={14} />

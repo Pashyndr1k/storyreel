@@ -184,6 +184,11 @@ export default function Stage6({ project, update, settings, ...workbench }) {
   const [selectedId, setSelectedId] = useState(null);
   const [selectedSceneId, setSelectedSceneId] = useState(null); // scene tools when no shot is selected
   const [benchTab, setBenchTab] = useState('image'); // the workbench's active tab for the selected shot
+  const [benchFrame, setBenchFrame] = useState('first'); // Image tab preview: 'first' | 'final' frame
+  // a new shot or tab always starts on the first frame
+  useEffect(() => {
+    setBenchFrame('first');
+  }, [selectedId, benchTab]);
   const [rendering, setRendering] = useState(false);
   const [renderProg, setRenderProg] = useState(null);
   const trackRef = useRef(null);
@@ -381,6 +386,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
             takeCuts,
             keyMarks,
             image: (project.shotImages || {})[shot.id] || null,
+            final: (project.shotFinalImages || {})[shot.id] || null,
             muted: !!(project.shotMutes || {})[shot.id],
           };
         })
@@ -1727,7 +1733,9 @@ export default function Stage6({ project, update, settings, ...workbench }) {
               </>
             );
           }
-          if (pv?.image) return <img decoding="async" loading="lazy" src={pv.image} alt="" />;
+          // Image tab: the first frame, or the final frame when its thumb was clicked
+          const still = idleSel && benchFrame === 'final' && pv.final ? pv.final : pv?.image;
+          if (still) return <img decoding="async" loading="lazy" src={still} alt="" />;
           return <div className="asm-blank">{pv ? t('s4.shot', { n: items.indexOf(pv) + 1 }) : ''}</div>;
         })()}
         {/* warm the decoder for the next clip so the boundary switch doesn't stall */}
@@ -1743,6 +1751,8 @@ export default function Stage6({ project, update, settings, ...workbench }) {
           onQueueApi={(api) => {
             queueApi.current = api;
           }}
+          previewFrame={benchFrame}
+          onPreviewFrame={setBenchFrame}
           project={project}
           update={update}
           settings={settings}

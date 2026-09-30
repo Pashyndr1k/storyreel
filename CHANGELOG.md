@@ -13,6 +13,11 @@
   reused it, so the speech ignored the new timing. The prompt now remembers
   the length it was timed for and is redrafted when the shot's duration
   changed.
+- **The final frame is visible again.** The compact card hides pictures and
+  the preview showed only the first frame, so a generated final frame had
+  no place to appear. The card now shows a final-frame thumb next to its
+  tools; clicking it puts the final frame into the preview (click again to
+  enlarge), and picking any first-frame version switches the preview back.
 
 ## 2.7.2 — 2026-09-29
 
