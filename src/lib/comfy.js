@@ -10,7 +10,6 @@ import i2vTemplate from '../data/comfy/ltx25_i2v_api.json';
 import flf2vTemplate from '../data/comfy/ltx_flf2v_api.json';
 import t2iTemplate from '../data/comfy/krea2_t2i_api.json';
 import flux2Template from '../data/comfy/flux2_klein_edit_api.json';
-import ttsTemplate from '../data/comfy/omnivoice_tts_api.json';
 import si2vTemplate from '../data/comfy/ltx_si2v_api.json';
 import h3Template from '../data/comfy/minimax_h3_i2v_api.json';
 import h3RefTemplate from '../data/comfy/minimax_h3_r2v_api.json';
@@ -586,7 +585,7 @@ export async function generateComfyVideo(
     // the audio sync), so assembly plays it as-is.
     graph = clone(si2vTemplate);
     graph['269'].inputs.image = await uploadInput(settings, firstFrame, `storyreel_${stamp}_first.png`);
-    // Voice audio arrives as mp3 (OmniVoice) or wav (Gemini TTS) — name the
+    // Voice audio arrives as wav (Gemini TTS) or mp3/wav when uploaded — name the
     // upload by its actual container so ComfyUI decodes it correctly.
     const audExt = /^data:audio\/wav/i.test(audio) ? 'wav' : 'mp3';
     graph['276'].inputs.audio = await uploadInput(settings, audio, `storyreel_${stamp}_voice.${audExt}`);
@@ -676,90 +675,6 @@ export async function generateComfyImage(settings, { prompt, images = [], aspect
   if (!img) throw new Error('ComfyUI finished but returned no image file.');
   const blob = await fetchOutputBlob(settings, img);
   return { dataURL: await blobToDataURL(blob), filename: img.filename };
-}
-
-// ---- Stage 5: shot voice audio via OmniVoice TTS ----------------------------
-// OmniVoice (TTS Audio Suite) designs the voice reference-free from a tag
-// instruction ("female, young adult, moderate pitch, british accent") and
-// speaks SRT subtitle blocks, natively targeting each block's duration — the
-// voice director times lines to the shot's events and the engine hits them.
-const OMNI_LANG = { en: 'English', ru: 'Russian', uk: 'Ukrainian' };
-
-// OmniVoice voice-design vocabulary (the model rejects unknown instruction
-// tags, so the UI offers exactly these) and the engine-language menu shown in
-// the audio tab. The design string joins the chosen tags in this slot order.
-export const OMNI_VOICE_TAGS = {
-  gender: ['male', 'female'],
-  age: ['child', 'teenager', 'young adult', 'middle-aged', 'elderly'],
-  pitch: ['very low pitch', 'low pitch', 'moderate pitch', 'high pitch', 'very high pitch'],
-  style: ['whisper'],
-  accent: [
-    'american accent',
-    'british accent',
-    'australian accent',
-    'canadian accent',
-    'indian accent',
-    'chinese accent',
-    'korean accent',
-    'japanese accent',
-    'portuguese accent',
-    'russian accent',
-  ],
-};
-export const OMNI_VOICE_SLOTS = ['gender', 'age', 'pitch', 'style', 'accent'];
-
-// Real voice library (TTS Audio Suite voices_examples): every entry has a
-// reference transcript next to its wav, which is what OmniVoice needs for
-// zero-shot CLONING — a far more stable character voice than tag design.
-// `tag` is the [voice_name] used inside SRT text to switch speakers;
-// `file` is the narrator_voice enum value of the Unified TTS SRT node.
-export const VOICE_LIBRARY = [
-  { tag: 'Clint_Eastwood CC3 (enhanced2)', file: 'voices_examples/Clint_Eastwood CC3 (enhanced2).wav', label: 'Clint (elderly male)', desc: 'elderly male, dry, gravelly, weathered' },
-  { tag: 'David_Attenborough CC3', file: 'voices_examples/David_Attenborough CC3.wav', label: 'David (narrator)', desc: 'elderly male, refined, gentle, documentary narrator' },
-  { tag: 'Morgan_Freeman CC3', file: 'voices_examples/Morgan_Freeman CC3.wav', label: 'Morgan (deep male)', desc: 'mature male, deep, warm, calm authority' },
-  { tag: 'Sophie_Anderson CC3', file: 'voices_examples/Sophie_Anderson CC3.wav', label: 'Sophie (warm female)', desc: 'adult female, warm, expressive' },
-  { tag: 'female_01', file: 'voices_examples/female/female_01.wav', label: 'Female 1 (neutral)', desc: 'adult female, neutral, clear' },
-  { tag: 'female_02', file: 'voices_examples/female/female_02.wav', label: 'Female 2 (young)', desc: 'young female, bright, energetic' },
-  { tag: 'male_01', file: 'voices_examples/male/male_01.wav', label: 'Male 1 (neutral)', desc: 'adult male, neutral, even' },
-  { tag: 'male_02', file: 'voices_examples/male/male_02.wav', label: 'Male 2 (firm)', desc: 'adult male, deeper, firm' },
-];
-export const OMNI_LANGUAGES = [
-  'Auto',
-  'English',
-  'Russian',
-  'Ukrainian',
-  'German',
-  'French',
-  'Spanish',
-  'Italian',
-  'Portuguese',
-  'Polish',
-  'Chinese',
-  'Japanese',
-  'Korean',
-];
-
-// Speak a shot's dialogue on the local OmniVoice TTS workflow. `srt` is
-// standard SRT text (timestamps inside the shot's duration; [voice_name]
-// speaker tags and angle non-verbal tags like <sigh> allowed); `narrator` is
-// a VOICE_LIBRARY file to CLONE (fallback voice for untagged lines) — with
-// 'none' the voice is designed from `instruct` instead. An explicit
-// `language` (from the audio tab's selector) overrides the script-language
-// default. Returns the audio as a data URL plus filename.
-export async function generateComfyVoice(settings, { srt, instruct, narrator, lang, language, name }) {
-  const graph = clone(ttsTemplate);
-  graph['1'].inputs.language = language || OMNI_LANG[lang] || 'Auto';
-  graph['1'].inputs.instruct = String(instruct || '').trim();
-  graph['2'].inputs.srt_content = srt;
-  graph['2'].inputs.narrator_voice = VOICE_LIBRARY.some((v) => v.file === narrator) ? narrator : 'none';
-  graph['2'].inputs.seed = Math.floor(Math.random() * 4294967295);
-  graph['3'].inputs.filename_prefix = `StoryReel/${sanitize(name)}`;
-
-  const outputs = await runGraph(settings, graph, { timeoutMs: 10 * 60 * 1000 });
-  const aud = collectFiles(outputs).find((f) => /\.(mp3|flac|wav|ogg|opus)$/i.test(f.filename));
-  if (!aud) throw new Error('ComfyUI finished but returned no audio file.');
-  const blob = await fetchOutputBlob(settings, aud);
-  return { dataURL: await blobToDataURL(blob), filename: aud.filename };
 }
 
 // ---- Stage 5 (assembly): background music via ACE-Step 1.5 XL Turbo --------------------

@@ -38,7 +38,6 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
   const [videoEngine, setVideoEngine] = useState(settings.videoEngine || 'minimax');
   const [h3RefImageSize, setH3RefImageSize] = useState(settings.h3RefImageSize || 'match');
   const [h3Lightning, setH3Lightning] = useState(!!settings.h3Lightning);
-  const [voiceService, setVoiceService] = useState(settings.voiceService || 'comfy');
   const [comfyUrl, setComfyUrl] = useState(settings.comfyUrl || DEFAULT_COMFY_URL);
   const [comfyOutputDir, setComfyOutputDir] = useState(settings.comfyOutputDir || DEFAULT_OUTPUT_DIR);
   const [projectsDir, setProjectsDir] = useState(settings.projectsDir || DEFAULT_PROJECTS_DIR);
@@ -122,7 +121,6 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
       videoEngine,
       h3RefImageSize,
       h3Lightning,
-      voiceService,
       comfyUrl: comfyUrl.trim() || DEFAULT_COMFY_URL,
       comfyOutputDir: comfyOutputDir.trim() || DEFAULT_OUTPUT_DIR,
       projectsDir: projectsDir.trim() || DEFAULT_PROJECTS_DIR,
@@ -361,11 +359,6 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
           <option value="minimax">{t('set.engMinimax')}</option>
         </select>
         <p className="hint">{t(videoEngine === 'minimax' ? 'set.engMinimaxHint' : 'set.engLtxHint')}</p>
-        <label>{t('set.voiceService')}</label>
-        <select value={voiceService} onChange={(e) => setVoiceService(e.target.value)}>
-          <option value="comfy">{t('set.svcOmniVoice')}</option>
-          <option value="gemini">{t('set.svcGeminiTts')}</option>
-        </select>
       </div>
       <div>
         {videoEngine === 'minimax' && (

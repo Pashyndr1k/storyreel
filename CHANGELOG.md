@@ -24,6 +24,11 @@
   shot's asset photos are now attached as well, with the instruction to keep
   each one exactly as shown; with local Flux.2 Klein (two references) a
   missing character takes the slot before an asset.
+- **Gemini TTS is the only voice engine.** The local OmniVoice / Chatterbox
+  path (ComfyUI TTS workflow, voice library, design tags, language selector
+  and the voice-service setting) is removed. The audio tab shows the Gemini
+  TTS prompt, the voice selector and the director's cast; voice prompts
+  drafted for OmniVoice are redrafted on the next generation.
 
 ## 2.7.2 — 2026-09-29
 
