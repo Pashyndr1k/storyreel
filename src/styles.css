@@ -3609,6 +3609,7 @@ select.prompt-model:hover:not(:disabled) { border-color: var(--ink); color: var(
 
 /* ---- 2.9: actor groups (Stage 2) ----------------------------------------- */
 .char-card.group-card { border-left: 2px solid var(--accent); }
+.section-actions { display: inline-flex; align-items: center; gap: 10px; }
 .grp-members { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0 2px; }
 .grp-member {
   display: inline-flex;

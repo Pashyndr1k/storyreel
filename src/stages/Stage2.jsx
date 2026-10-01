@@ -317,7 +317,11 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
 
           <div className="section-head">
             <label>{t('s2.characters')}</label>
-            <button className="btn small" onClick={addChar}>{t('s2.addChar')}</button>
+            <span className="section-actions">
+              <button className="btn small" onClick={addChar}>{t('s2.addChar')}</button>
+              {/* what a group is lives in the hover hint, not on the page */}
+              <button className="btn small" title={t('grp.hint')} onClick={addGroup}>{t('grp.add')}</button>
+            </span>
           </div>
           {storyline.characters.map((c) => (
             <div key={c.id} className="char-card">
@@ -397,11 +401,11 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
 
           {/* Actor groups: characters that appear as ONE entity. A shot that
               names the group gets every member's photo as a reference. */}
-          <div className="section-head">
-            <label>{t('grp.title')}</label>
-            <button className="btn small" onClick={addGroup}>{t('grp.add')}</button>
-          </div>
-          {groups.length === 0 && <p className="hint">{t('grp.hint')}</p>}
+          {groups.length > 0 && (
+            <div className="section-head">
+              <label title={t('grp.hint')}>{t('grp.title')}</label>
+            </div>
+          )}
           {groups.map((g) => {
             const members = (g.memberIds || []).map((id) => storyline.characters.find((c) => c.id === id)).filter(Boolean);
             return (
