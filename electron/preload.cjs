@@ -29,6 +29,13 @@ contextBridge.exposeInMainWorld('comfyBridge', {
   request: (opts) => ipcRenderer.invoke('comfy-request', opts),
 });
 
+// alert() / confirm() shown by the main process, so the page keeps keyboard
+// focus afterwards (see 'dialog-message' in main.cjs).
+contextBridge.exposeInMainWorld('nativeDialogs', {
+  alert: (message, ok) => ipcRenderer.sendSync('dialog-message', { kind: 'alert', message, ok }),
+  confirm: (message, ok, cancel) => ipcRenderer.sendSync('dialog-message', { kind: 'confirm', message, ok, cancel }),
+});
+
 // Cloud APIs that send no CORS headers (Kling) via the main process.
 contextBridge.exposeInMainWorld('netBridge', {
   request: (opts) => ipcRenderer.invoke('net-request', opts),

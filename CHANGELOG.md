@@ -20,6 +20,13 @@
   Groups are included in the script export; deleting a character removes it
   from its groups; regenerating the storyline keeps the groups but empties
   their member lists (the cast is new).
+- **Fixed: text fields that would not take typing.** After any confirmation
+  or warning box ("replace the prompts?", "switch the model?", a missing-key
+  notice…) the window could come back without keyboard focus on the page:
+  no caret in any field, no typing, until the window was switched away and
+  back. Those boxes are now shown by the app's main process, which hands
+  focus back to the page, and the page also takes the keyboard whenever the
+  window is activated.
 
 ## 2.8.0 — 2026-09-30
 

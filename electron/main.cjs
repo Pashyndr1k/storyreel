@@ -10,6 +10,35 @@ const { resolveProjectDir, listStrayDirs, deleteDirs } = require('./projectDirs.
 // an Origin header that ComfyUI rejects with HTTP 403.
 ipcMain.handle('comfy-request', (_e, opts) => comfyRequest(opts));
 
+// alert() / confirm() from the page. Chromium's own boxes leave the window
+// without keyboard focus on Windows — text fields then show no caret and take
+// no typing until the window is re-activated. The renderer redirects both
+// here: a message box parented to the window, then focus is handed back to
+// the page explicitly.
+ipcMain.on('dialog-message', (e, { kind, message, ok, cancel } = {}) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  let choice = 0;
+  try {
+    choice = dialog.showMessageBoxSync(win || undefined, {
+      type: kind === 'confirm' ? 'question' : 'info',
+      title: 'StoryReel',
+      message: String(message ?? ''),
+      buttons: kind === 'confirm' ? [ok || 'OK', cancel || 'Cancel'] : [ok || 'OK'],
+      defaultId: 0,
+      cancelId: kind === 'confirm' ? 1 : 0,
+      noLink: true,
+    });
+  } catch {
+    choice = 1;
+  } finally {
+    if (win && !win.isDestroyed()) {
+      win.focus();
+      win.webContents.focus();
+    }
+  }
+  e.returnValue = kind === 'confirm' ? choice === 0 : true;
+});
+
 // Cloud video APIs without CORS headers (Kling) are called from here too.
 ipcMain.handle('net-request', (_e, opts) => netRequest(opts));
 
@@ -161,6 +190,13 @@ function createWindow() {
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.cjs'),
     },
+  });
+
+  // Safety net for the same focus problem: whenever the window is activated
+  // (after any native dialog, file picker or Alt-Tab), the page gets the
+  // keyboard — a focused window whose page has no focus cannot be typed into.
+  win.on('focus', () => {
+    if (!win.isDestroyed()) win.webContents.focus();
   });
 
   if (process.env.VITE_DEV) {
