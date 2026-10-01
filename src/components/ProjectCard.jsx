@@ -1,3 +1,4 @@
+import { scenePhotos } from '../lib/sceneLocations.js';
 import { STAGE_COUNT } from '../lib/config.js';
 import { useI18n, localeOf } from '../lib/i18n.js';
 import { useState } from 'react';
@@ -6,7 +7,7 @@ import { Copy, Archive as ArchiveIcon, Trash, RestoreIcon, Star, Download } from
 // Prefer the generated cover; fall back to the first reference photo.
 function posterOf(project) {
   if (project.cover) return project.cover;
-  const scenePhoto = project.outline?.find((s) => s.photos?.length)?.photos?.[0];
+  const scenePhoto = (project.outline || []).map((s) => scenePhotos(s, 1)[0]).find(Boolean);
   if (scenePhoto) return scenePhoto;
   const charPhoto = project.storyline?.characters?.find((c) => c.photos?.length)?.photos?.[0];
   return charPhoto || null;

@@ -7,6 +7,7 @@ import Stage4 from '../stages/Stage4.jsx';
 import Stage6 from '../stages/Stage6.jsx';
 import { exportProjectZip } from '../lib/projectFiles.js';
 import { useI18n } from '../lib/i18n.js';
+import { useLibrarySync } from '../lib/useLibrarySync.js';
 import { resolveStyleText } from '../lib/styles.js';
 import ProjectSettingsModal from '../components/ProjectSettingsModal.jsx';
 import SmartEditModal from '../components/SmartEditModal.jsx';
@@ -17,6 +18,8 @@ import { LANGS } from '../lib/i18n.js';
 
 export default function Project({ project, updateProject, settings, setSettings, styles, setStyles, library, libUpsert, libDelete, onBack, onSettings }) {
   const { t, lang } = useI18n();
+  // character and location cards edited in the project update their library cards
+  useLibrarySync(project, library, libUpsert);
   const [view, setView] = useState(Math.min(project.stage, STAGE_COUNT));
   const [showProjectSettings, setShowProjectSettings] = useState(false);
   const [showSmartEdit, setShowSmartEdit] = useState(false);

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import AppShell from '../components/AppShell.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import { useI18n, localeOf } from '../lib/i18n.js';
-import { newLibraryEntry, sortLibrary, CHARACTER_TYPES, LOCATION_TYPES } from '../lib/library.js';
+import { newLibraryEntry, sortLibrary, libraryPhotoCap, CHARACTER_TYPES, LOCATION_TYPES } from '../lib/library.js';
 import { fileToResizedDataURL } from '../lib/images.js';
 import Lightbox from '../components/Lightbox.jsx';
 
@@ -23,7 +23,7 @@ export default function LibraryPage({ kind, library, libUpsert, libDelete, setti
   const addPhoto = async (file) => {
     try {
       const url = await fileToResizedDataURL(file);
-      setEditing((ed) => ({ ...ed, photos: [...ed.photos, url].slice(0, 3) }));
+      setEditing((ed) => ({ ...ed, photos: [...ed.photos, url].slice(0, libraryPhotoCap(kind)) }));
     } catch (err) {
       window.alert(err.message);
     }
@@ -121,7 +121,7 @@ export default function LibraryPage({ kind, library, libUpsert, libDelete, setti
                   </button>
                 </div>
               ))}
-              {editing.photos.length < 3 && (
+              {editing.photos.length < libraryPhotoCap(kind) && (
                 <label className="btn small file-btn" title={t('pick.upload')}>
                   {t('char.addPhoto')}
                   <input

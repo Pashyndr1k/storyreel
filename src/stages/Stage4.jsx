@@ -1,3 +1,4 @@
+import { scenePhotos } from '../lib/sceneLocations.js';
 import { SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC } from '../lib/config.js';
 import { useRef, useState } from 'react';
 import { Grip, Stars } from '../components/icons.jsx';
@@ -113,11 +114,6 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
       { id: uid(), duration: 4, shotType: '', location: '', action: '', dialogue: '', notes: '' },
     ]);
 
-  const updateScenePhotos = (photos) =>
-    update((p) => ({
-      outline: p.outline.map((s) => (s.id === scene.id ? { ...s, photos } : s)),
-    }));
-
   if (!project.outline.length) {
     return (
       <section className="stage">
@@ -156,19 +152,13 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
         <p>{scene.summary}</p>
         {/* Environment references are managed at Stage 5; Stage 4 only shows
             the ones the scene already carries. */}
-        {(scene.photos || []).length > 0 && (
+        {scenePhotos(scene, Number.POSITIVE_INFINITY).length > 0 && (
           <>
             <label className="photos-label">{t('scene.photos')}</label>
             <div className="photo-row">
-              {(scene.photos || []).map((ph, i) => (
+              {scenePhotos(scene, Number.POSITIVE_INFINITY).map((ph, i) => (
                 <div key={i} className="photo-thumb">
                   <img decoding="async" loading="lazy" src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
-                  <button title={t('tip.removePhoto')}
-                    className="photo-x"
-                    onClick={() => updateScenePhotos((scene.photos || []).filter((_, j) => j !== i))}
-                  >
-                    ✕
-                  </button>
                 </div>
               ))}
             </div>

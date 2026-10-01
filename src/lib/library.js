@@ -3,6 +3,9 @@
 // created from reference photos inside a project are auto-added here.
 import { idbLibGetAll, idbLibPut, idbLibDelete } from './idb.js';
 import { uid } from './storage.js';
+import { MAX_LOCATION_PHOTOS, MAX_LIBRARY_PHOTOS } from './config.js';
+
+export const libraryPhotoCap = (kind) => (kind === 'location' ? MAX_LOCATION_PHOTOS : MAX_LIBRARY_PHOTOS);
 
 export const CHARACTER_TYPES = ['male', 'female', 'child', 'animal', 'robot', 'other'];
 export const LOCATION_TYPES = ['interior', 'exterior', 'urban', 'nature', 'fantasy', 'other'];
@@ -20,7 +23,7 @@ export function newLibraryEntry(kind) {
     name: '',
     type: 'other',
     description: '',
-    photos: [], // resized data URLs, max 3
+    photos: [], // resized data URLs, up to libraryPhotoCap(kind)
     projectId: '',
     projectTitle: '',
     createdAt: Date.now(),
@@ -36,7 +39,7 @@ function normalizeEntry(e) {
     ...e,
     kind,
     type: types.includes(e.type) ? e.type : 'other',
-    photos: Array.isArray(e.photos) ? e.photos.slice(0, 3) : [],
+    photos: Array.isArray(e.photos) ? e.photos.slice(0, libraryPhotoCap(kind)) : [],
     createdAt: e.createdAt || Date.now(),
   };
 }

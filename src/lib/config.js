@@ -31,6 +31,10 @@ export const MAX_CHARACTER_REFS = 4;
 // …raised when the shot names an actor group (a band, a crew): its members
 // are attached one photo each.
 export const MAX_GROUP_REFS = 6;
+// Reference photos one location holds (a scene may have any number of locations).
+export const MAX_LOCATION_PHOTOS = 6;
+// Photos a character or asset card holds in the library.
+export const MAX_LIBRARY_PHOTOS = 3;
 
 // First-frame versions kept per shot (oldest drops off).
 export const MAX_IMAGE_VERSIONS = 6;

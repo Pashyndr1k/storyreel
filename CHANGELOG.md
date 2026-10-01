@@ -14,7 +14,24 @@
 - **A conflicting request is not started.** A message in the center of the
   screen explains the refusal and quotes the rule it conflicts with. When the
   check itself cannot run (no text API key, no network), generation is
-  blocked as well and the message says why.
+  blocked as well and the message says why. A refusal also stops the scene
+  queue and the automatic queue — the remaining items are not started.
+- **Any number of locations per scene.** A scene is no longer limited to one
+  set of environment photos: it holds a list of named locations, each with up
+  to 6 photos. New locations come from uploaded photos or from the library
+  (scene panel and shot card). On a shot card the scene's locations are tiles,
+  like the assets — click one to switch it on or off for that shot; a shot
+  uses the scene's first location until told otherwise. Frame prompts name
+  each location with its reference images. Existing projects keep their
+  photos as the scene's first location.
+- **Fix: library cards follow the project.** Editing a character in a project
+  (name, description, removing or adding photos, Extract, undo) now updates
+  its card in the character library — before, the card changed only when a
+  photo was added. The same applied to locations (renames and removed photos
+  never reached the library; a library location also lost photos 4–6 on
+  restart) and is fixed the same way. A card's type and, for locations, its
+  description set in the library are no longer overwritten. Assets were not
+  affected: shots use the library asset itself, not a copy.
 
 ## 2.9.0 — 2026-10-01
 

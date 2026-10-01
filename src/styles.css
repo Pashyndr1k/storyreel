@@ -3267,6 +3267,14 @@ textarea.s5e-prompt-sm { min-height: 110px; }
 .s5-scenehead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
 .s5-scenerow { margin-top: 0; }
 .s5-scenephotos { margin-top: 14px; }
+.loc-row { margin-top: 10px; }
+.loc-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.loc-head .loc-name { flex: 1 1 auto; min-width: 0; max-width: 280px; height: 28px; padding: 2px 8px; font-size: 12px; }
+.loc-new-label { display: block; margin-bottom: 6px; font-size: 12px; color: var(--muted-2); }
+button.loc-tile { padding: 0; background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--muted-2); opacity: 0.45; }
+button.loc-tile img { cursor: pointer; }
+button.loc-tile.on { opacity: 1; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+button.loc-tile:hover { opacity: 1; }
 /* compact card: one column, the result above the (foldable) prompt editor */
 .s5e-compact .s5e { grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .s5e-compact .s5e > .s5e-panel:first-child { order: 2; }

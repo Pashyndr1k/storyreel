@@ -60,7 +60,15 @@ export function splitProjectMedia(project) {
   }
   lite.outline = (project.outline || []).map((s) => ({
     ...s,
-    photos: (s.photos || []).map((v, i) => (isDataURL(v) ? put(v, `scene_${s.id}_${i}.${extFor(v, 'jpg')}`) : v)),
+    ...(s.photos ? { photos: s.photos.map((v, i) => (isDataURL(v) ? put(v, `scene_${s.id}_${i}.${extFor(v, 'jpg')}`) : v)) } : {}),
+    ...(s.locations
+      ? {
+          locations: s.locations.map((l) => ({
+            ...l,
+            photos: (l.photos || []).map((v, i) => (isDataURL(v) ? put(v, `scene_${s.id}_${l.id}_${i}.${extFor(v, 'jpg')}`) : v)),
+          })),
+        }
+      : {}),
   }));
   for (const key of ['musicTrack', 'voiceTrack']) {
     const trk = project[key];
@@ -106,7 +114,11 @@ export function mergeProjectMedia(lite, getDataURL) {
       characters: (p.storyline.characters || []).map((c) => ({ ...c, photos: (c.photos || []).map(get).filter(Boolean) })),
     };
   }
-  p.outline = (p.outline || []).map((s) => ({ ...s, photos: (s.photos || []).map(get).filter(Boolean) }));
+  p.outline = (p.outline || []).map((s) => ({
+    ...s,
+    ...(s.photos ? { photos: s.photos.map(get).filter(Boolean) } : {}),
+    ...(s.locations ? { locations: s.locations.map((l) => ({ ...l, photos: (l.photos || []).map(get).filter(Boolean) })) } : {}),
+  }));
   for (const key of ['musicTrack', 'voiceTrack']) {
     if (p[key]?.dataURL) p[key] = { ...p[key], dataURL: get(p[key].dataURL) };
   }

@@ -1,6 +1,7 @@
 import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIR, DEFAULT_PROJECTS_DIR, DEFAULT_CLAUDE_MODEL, DEFAULT_IMAGE_MODEL, DEFAULT_KLING_MODEL, STAGE_COUNT, MAX_IMAGE_VERSIONS } from './config.js';
 import { idbGetAll, idbPutMany, idbDeleteMany } from './idb.js';
 import { isValidAspect } from './aspect.js';
+import { normalizeSceneLocations } from './sceneLocations.js';
 import { sanitizeMethods } from './randomization.js';
 
 const LEGACY_PROJECTS_KEY = 'storyreel.projects.v1'; // pre-1.3.0 localStorage store
@@ -198,6 +199,7 @@ function projectDefaults() {
     shotAudioSrc: {}, // shotId -> unpadded source clip (generated / uploaded / recorded)
     shotAudioPads: {}, // shotId -> { lead, tail } seconds of silence around the clip
     shotAssets: {}, // shotId -> [assetId] referencing the global asset library
+    shotLocations: {}, // shotId -> [locationId] of the scene's locations the shot uses (unset = the first)
     dynamicsPlan: null, // Action Dynamics Plan generated at Stage 3 (see lib/dynamics.js)
     videoGenDurations: {}, // shotId -> raw seconds requested from the video model (+2s padding)
     shotVideoModes: {}, // shotId -> pinned video workflow: 'auto' | 'i2v' | 'flf2v' | 'si2v'
@@ -270,6 +272,7 @@ export function migrateProject(raw) {
   p.shotFinalImages = p.shotFinalImages && typeof p.shotFinalImages === 'object' ? p.shotFinalImages : {};
   p.shotVideos = p.shotVideos && typeof p.shotVideos === 'object' ? p.shotVideos : {};
   p.shotAssets = p.shotAssets && typeof p.shotAssets === 'object' ? p.shotAssets : {};
+  p.shotLocations = p.shotLocations && typeof p.shotLocations === 'object' ? p.shotLocations : {};
   p.dynamicsPlan = p.dynamicsPlan && typeof p.dynamicsPlan === 'object' ? p.dynamicsPlan : null;
   p.videoGenDurations = p.videoGenDurations && typeof p.videoGenDurations === 'object' ? p.videoGenDurations : {};
   p.updatedAt = Number(p.updatedAt) || Number(p.createdAt) || Date.now();
@@ -317,14 +320,19 @@ export function migrateProject(raw) {
       : null;
 
   p.outline = Array.isArray(p.outline)
-    ? p.outline.map((s) => ({
-        ...s,
-        id: s.id || uid(),
-        title: s.title || '',
-        summary: s.summary || '',
-        duration: Number(s.duration) || 0,
-        photos: Array.isArray(s.photos) ? s.photos : [],
-      }))
+    ? p.outline.map((s) =>
+        // scene.photos (one location per scene, pre-2.10) becomes scene.locations
+        normalizeSceneLocations(
+          {
+            ...s,
+            id: s.id || uid(),
+            title: s.title || '',
+            summary: s.summary || '',
+            duration: Number(s.duration) || 0,
+          },
+          p.id
+        )
+      )
     : [];
 
   const sd = {};

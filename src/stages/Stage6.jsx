@@ -1,3 +1,4 @@
+import { POLICY_EVENT } from '../lib/policy.js';
 import { DEFAULT_OUTPUT_DIR, SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC } from '../lib/config.js';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useI18n } from '../lib/i18n.js';
@@ -764,6 +765,15 @@ export default function Stage6({ project, update, settings, ...workbench }) {
     queueCancel.current = true;
     queueApi.current?.cancel?.();
   };
+  // A content-policy refusal stops the automatic queue as well.
+  useEffect(() => {
+    const stop = () => {
+      queueCancel.current = true;
+      queueApi.current?.cancel?.();
+    };
+    window.addEventListener(POLICY_EVENT, stop);
+    return () => window.removeEventListener(POLICY_EVENT, stop);
+  }, []);
 
   // Trim a shot from BOTH sides: `head` is the in-point inside the shot's
   // source clip, `duration` its length from there (so the out-point is

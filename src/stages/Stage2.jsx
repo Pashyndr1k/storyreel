@@ -145,32 +145,16 @@ export default function Stage2({ project, update, rawUpdate, settings, goNext, o
       };
     });
 
-  // Keep the global character library in sync: any character that gets photos
-  // is auto-added (or updated) as a library entry.
-  const syncToLibrary = (char, photos) => {
-    if (!libUpsert || !photos.length) return;
-    const entryId = char.libId || `libc_${project.id}_${char.id}`;
-    libUpsert({
-      id: entryId,
-      kind: 'character',
-      name: char.name || '',
-      type: 'other',
-      description: char.description || '',
-      photos,
-      projectId: project.id,
-      projectTitle: project.title,
-      createdAt: Date.now(),
-    });
-    if (!char.libId) updateChar(char.id, { libId: entryId });
-  };
+  // A character with photos has a card in the global library; the project's
+  // useLibrarySync mirrors every later edit (name, description, photos) to it.
+  const libIdFor = (char) => (char.libId ? {} : { libId: `libc_${project.id}_${char.id}` });
 
   const addPhoto = async (id, file) => {
     try {
       const dataURL = await fileToResizedDataURL(file);
       const char = project.storyline.characters.find((c) => c.id === id);
       const photos = [...(char?.photos || []), dataURL].slice(0, 3);
-      updateChar(id, { photos });
-      if (char) syncToLibrary(char, photos);
+      updateChar(id, { photos, ...(char ? libIdFor(char) : {}) });
     } catch (e) {
       window.alert(e.message);
     }
@@ -215,8 +199,7 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
       const raw = await generateImage(settings, { prompt, aspectRatio: '1:1', imageSize: '1K' });
       const dataURL = await resizeDataURL(raw, 640 * 640, 0.8); // reference-photo size
       const photos = [...(c.photos || []), dataURL].slice(0, 3);
-      updateChar(c.id, { photos });
-      syncToLibrary(c, photos);
+      updateChar(c.id, { photos, ...libIdFor(c) });
     } catch (e) {
       window.alert(e.message || String(e));
     } finally {

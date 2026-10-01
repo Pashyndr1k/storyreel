@@ -1,6 +1,8 @@
 import { generateKlingVideo, klingModelOf, klingSeconds, KLING_VIDEO_MODES, resolveKlingMode } from '../lib/kling.js';
-import { SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC, MAX_IMAGE_VERSIONS, MAX_CHARACTER_REFS } from '../lib/config.js';
+import { SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC, MAX_IMAGE_VERSIONS, MAX_CHARACTER_REFS, MAX_LOCATION_PHOTOS } from '../lib/config.js';
 import { shotCastRefs } from '../lib/castRefs.js';
+import { POLICY_EVENT } from '../lib/policy.js';
+import { locationsOf, shotLocations, shotLocationRefs, locationLibId } from '../lib/sceneLocations.js';
 import { useEffect, useRef, useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage, generateGeminiVoice, GEMINI_VOICES } from '../lib/gemini.js';
@@ -156,7 +158,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const [locSaved, setLocSaved] = useState(null); // shotId whose location ref was just saved
   const [showAssets, setShowAssets] = useState(false); // asset library manager
   const [assetPickFor, setAssetPickFor] = useState(null); // shotId choosing an asset
-  const [pickLoc, setPickLoc] = useState(false); // scene location picker
+  const [pickLoc, setPickLoc] = useState(null); // library picker for a new location: { shotId } (shotId null = scene panel)
   const [mediaProg, setMediaProg] = useState(null); // { a, b } scene-media queue
   const mediaCancel = useRef(false);
   const [palette, setPalette] = useState(null); // { src: shotId, colors: [] } for this scene
@@ -190,7 +192,6 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   // Reference photos available for this scene.
   // Character references are picked per shot (lib/castRefs.js): the people
   // the shot names, up to MAX_CHARACTER_REFS.
-  const locRefs = (scene?.photos || []).slice(0, 6);
   const videoRes = VIDEO_RESOLUTIONS.includes(project.videoResolution) ? project.videoResolution : 'HD';
 
   // Assets attached to a shot, resolved from the global library (dropping any
@@ -303,32 +304,66 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   prevPaletteRef.current = prevPalette;
   const isFirstShot = (shot) => shots[0]?.id === shot.id;
 
-  // Scene location references (same data Stage 4 edits: scene.photos).
-  const updateScenePhotos = (photos) =>
+  // ---- scene locations. A scene holds any number of named locations; each
+  // shot picks the ones it uses (the scene's first one unless chosen
+  // otherwise). The library cards follow through useLibrarySync.
+  const locations = locationsOf(scene);
+  const setLocations = (fn) =>
     update((p) => ({
-      outline: p.outline.map((s) => (s.id === scene.id ? { ...s, photos } : s)),
+      outline: p.outline.map((s) => (s.id === scene.id ? { ...s, locations: fn(locationsOf(s)) } : s)),
     }));
-  const syncLocationToLibrary = (photos) => {
-    if (!libUpsert || !photos.length) return;
-    libUpsert({
-      id: `libl_${project.id}_${scene.id}`,
-      kind: 'location',
-      name: scene.title || '',
-      type: 'other',
-      description: scene.summary || '',
-      photos,
-      projectId: project.id,
-      projectTitle: project.title,
-      createdAt: Date.now(),
+  const patchLocation = (locId, patch) =>
+    setLocations((ls) => ls.map((l) => (l.id === locId ? { ...l, ...(typeof patch === 'function' ? patch(l) : patch) } : l)));
+  const usedLocIds = (shotId) => shotLocations(project, scene, shotId).map((l) => l.id);
+  const toggleShotLocation = (shotId, locId) =>
+    update((p) => {
+      const sc = p.outline.find((s) => s.id === scene.id);
+      const cur = shotLocations(p, sc, shotId).map((l) => l.id);
+      const next = cur.includes(locId) ? cur.filter((id) => id !== locId) : [...cur, locId];
+      return { shotLocations: { ...(p.shotLocations || {}), [shotId]: next } };
+    });
+  // A new location; when added from a shot card that shot starts using it.
+  const addLocation = ({ name, photos, libId }, shotId = null) => {
+    const id = `loc_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    update((p) => {
+      const sc = p.outline.find((s) => s.id === scene.id);
+      const list = locationsOf(sc);
+      const loc = {
+        id,
+        name: name || t('loc.defaultName', { n: list.length + 1 }),
+        photos: photos.slice(0, MAX_LOCATION_PHOTOS),
+        libId: libId || locationLibId(p.id, sc, id),
+      };
+      const patch = { outline: p.outline.map((s) => (s.id === scene.id ? { ...s, locations: [...list, loc] } : s)) };
+      if (shotId) {
+        // the first location of a scene is every shot's default already
+        const cur = list.length ? shotLocations(p, sc, shotId).map((l) => l.id) : [];
+        patch.shotLocations = { ...(p.shotLocations || {}), [shotId]: [...cur, id] };
+      }
+      return patch;
     });
   };
-  const addScenePhotos = async (files) => {
+  const removeLocation = (loc) => {
+    if (!window.confirm(t('loc.removeConfirm', { name: loc.name || t('loc.unnamed') }))) return;
+    setLocations((ls) => ls.filter((l) => l.id !== loc.id));
+  };
+  const filesToPhotos = async (files) => {
+    const urls = [];
+    for (const f of files) urls.push(await fileToResizedDataURL(f));
+    return urls;
+  };
+  const addLocationFromFiles = async (files, shotId = null) => {
     try {
-      const urls = [];
-      for (const f of files) urls.push(await fileToResizedDataURL(f));
-      const photos = [...(scene.photos || []), ...urls].slice(0, 6);
-      updateScenePhotos(photos);
-      syncLocationToLibrary(photos);
+      const name = (files[0]?.name || '').replace(/\.[^.]+$/, '').slice(0, 40);
+      addLocation({ name, photos: await filesToPhotos(files) }, shotId);
+    } catch (e) {
+      window.alert(e.message);
+    }
+  };
+  const addLocationPhotos = async (locId, files) => {
+    try {
+      const urls = await filesToPhotos(files);
+      patchLocation(locId, (l) => ({ photos: [...(l.photos || []), ...urls].slice(0, MAX_LOCATION_PHOTOS) }));
     } catch (e) {
       window.alert(e.message);
     }
@@ -641,7 +676,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     // cast in list order) — each reference keeps its name for the prompt.
     const useCast = take(pref.char ? shotCastRefs(projectRef.current, shot) : []);
     const useChar = useCast.map((c) => c.photo);
-    const useLoc = take(pref.loc ? locRefs : []);
+    // Locations: the ones THIS shot uses, photos grouped per location.
+    const locGroups = pref.loc ? shotLocationRefs(projectRef.current, projectRef.current.outline.find((s) => s.id === scene.id), shot.id) : [];
+    const useLoc = take(locGroups.flatMap((g) => g.photos));
     const shotAssets = take(pref.asset ? assetsFor(shot.id) : []);
     const useAssets = shotAssets.map((a) => a.photos[0]);
     const images = [...useChar, ...useLoc, ...useAssets];
@@ -685,8 +722,26 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         off += useChar.length;
       }
       if (useLoc.length) {
-        text += ` The location/environment is shown in ${range(useLoc.length)} — match its architecture, colors and lighting.`;
-        off += useLoc.length;
+        // budget-trimmed groups (Flux takes two references in total)
+        let left = useLoc.length;
+        const shown = locGroups
+          .map((g) => {
+            const n = Math.min(g.photos.length, left);
+            left -= n;
+            return { name: g.name, n };
+          })
+          .filter((g) => g.n);
+        if (shown.length === 1) {
+          text += ` The location/environment is shown in ${range(useLoc.length)} — match its architecture, colors and lighting.`;
+          off += useLoc.length;
+        } else {
+          const parts = shown.map((g) => {
+            const part = `${g.name ? `"${g.name}"` : 'a location'} in ${range(g.n)}`;
+            off += g.n;
+            return part;
+          });
+          text += ` The shot's locations/environments are shown as follows: ${parts.join('; ')}. Match each one's architecture, colors and lighting where the prompt places it.`;
+        }
       }
       if (useAssets.length) {
         const names = shotAssets
@@ -999,25 +1054,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         ratio,
         name: `${(project.title || 'project').slice(0, 24)}_shot${shots.indexOf(shot) + 1}_locref`,
       });
-      update((p) => ({
-        outline: p.outline.map((s) =>
-          s.id === scene.id ? { ...s, photos: [...(s.photos || []), img].slice(-6) } : s
-        ),
-      }));
-      // Keep the global location library entry (shared with Stage 4) in sync.
-      if (libUpsert) {
-        libUpsert({
-          id: `libl_${project.id}_${scene.id}`,
-          kind: 'location',
-          name: scene.title || '',
-          type: 'other',
-          description: scene.summary || '',
-          photos: [...(scene.photos || []), img].slice(-6),
-          projectId: project.id,
-          projectTitle: project.title,
-          createdAt: Date.now(),
-        });
-      }
+      const target = shotLocations(projectRef.current, projectRef.current.outline.find((s) => s.id === scene.id), shot.id)[0];
+      if (target) patchLocation(target.id, (l) => ({ photos: [...(l.photos || []), img].slice(-MAX_LOCATION_PHOTOS) }));
+      else addLocation({ name: scene.title || '', photos: [img] }, shot.id);
       setLocSaved(shot.id);
     } catch (e) {
       setImgErr({ id: shot.id, msg: e.message || String(e) });
@@ -1070,6 +1109,14 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     }
     setMediaProg(null);
   };
+  // A content-policy refusal halts the queue: the remaining items are not started.
+  useEffect(() => {
+    const stop = () => {
+      mediaCancel.current = true;
+    };
+    window.addEventListener(POLICY_EVENT, stop);
+    return () => window.removeEventListener(POLICY_EVENT, stop);
+  }, []);
   // The assembly stage's auto queue drives this scene queue scene by scene;
   // it needs the current scene's run/cancel every render (fresh closures).
   useEffect(() => {
@@ -1562,53 +1609,114 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     );
   }
 
-  // Location photos of the current scene — per card on the standalone stage,
-  // once in the scene panel when embedded.
-  const scenePhotosBlock = (
+  // "New location" tiles: from files, or linked to a library card.
+  const newLocationTiles = (shotId) => (
+    <>
+      <label className="photo-add" title={t('loc.addUpload')} aria-label={t('loc.addUpload')}>
+        <Upload size={20} />
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          className="sr-only"
+          onChange={(e) => {
+            const fs = [...(e.target.files || [])];
+            e.target.value = '';
+            if (fs.length) addLocationFromFiles(fs, shotId);
+          }}
+        />
+      </label>
+      <button type="button" className="photo-add" title={t('loc.addLib')} aria-label={t('loc.addLib')} onClick={() => setPickLoc({ shotId })}>
+        <Layers size={20} />
+      </button>
+    </>
+  );
+
+  // Scene panel: every location of the scene with its name and photos.
+  const sceneLocationsBlock = (
     <div className="s5-scenephotos">
-      <label className="photos-label">{t('scene.photos')}</label>
-      <div className="photo-row">
-        {(scene?.photos || []).map((ph, j) => (
-          <div key={j} className="photo-thumb">
-            <img decoding="async" loading="lazy" src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
-            <button title={t('tip.removePhoto')}
-              className="photo-x"
-              onClick={() => updateScenePhotos((scene.photos || []).filter((_, k) => k !== j))}
-            >
-              ✕
+      <label className="photos-label" title={t('tip.locations')}>{t('loc.label')}</label>
+      {locations.map((loc) => (
+        <div key={loc.id} className="loc-row">
+          <div className="loc-head">
+            <input
+              className="loc-name"
+              value={loc.name}
+              placeholder={t('loc.namePh')}
+              title={t('tip.locName')}
+              onChange={(e) => patchLocation(loc.id, { name: e.target.value })}
+            />
+            <button type="button" className="s5e-ico" title={t('tip.locRemove')} aria-label={t('tip.locRemove')} onClick={() => removeLocation(loc)}>
+              <Trash size={14} />
             </button>
           </div>
-        ))}
-        {(scene?.photos || []).length < 6 && (
-          <>
-            <label className="photo-add" title={t('pick.upload')} aria-label={t('pick.upload')}>
-              <Upload size={20} />
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                className="sr-only"
-                onChange={(e) => {
-                  const fs = [...(e.target.files || [])];
-                  e.target.value = '';
-                  if (fs.length) addScenePhotos(fs);
-                }}
-              />
-            </label>
-            <button
-              type="button"
-              className="photo-add"
-              title={t('pick.fromLib')}
-              aria-label={t('pick.fromLib')}
-              onClick={() => setPickLoc(true)}
-            >
-              <Layers size={20} />
-            </button>
-          </>
-        )}
+          <div className="photo-row">
+            {(loc.photos || []).map((ph, j) => (
+              <div key={j} className="photo-thumb">
+                <img decoding="async" loading="lazy" src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
+                <button title={t('tip.removePhoto')}
+                  className="photo-x"
+                  onClick={() => patchLocation(loc.id, (l) => ({ photos: (l.photos || []).filter((_, k) => k !== j) }))}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            {(loc.photos || []).length < MAX_LOCATION_PHOTOS && (
+              <label className="photo-add" title={t('loc.addPhoto')} aria-label={t('loc.addPhoto')}>
+                <Upload size={20} />
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="sr-only"
+                  onChange={(e) => {
+                    const fs = [...(e.target.files || [])];
+                    e.target.value = '';
+                    if (fs.length) addLocationPhotos(loc.id, fs);
+                  }}
+                />
+              </label>
+            )}
+          </div>
+        </div>
+      ))}
+      <div className="loc-row">
+        {locations.length > 0 && <span className="loc-new-label">{t('loc.new')}</span>}
+        <div className="photo-row">{newLocationTiles(null)}</div>
       </div>
     </div>
   );
+
+  // Shot card: the scene's locations as tiles (same tiles as the assets);
+  // a click switches a location on or off for this shot.
+  const shotLocationsBlock = (shot) => {
+    const used = usedLocIds(shot.id);
+    return (
+      <div>
+        <label className="photos-label" title={t('tip.locations')}>{t('loc.label')}</label>
+        <div className="photo-row">
+          {locations.map((loc) => {
+            const on = used.includes(loc.id);
+            return (
+              <button
+                key={loc.id}
+                type="button"
+                className={`photo-thumb asset-thumb-sm loc-tile ${on ? 'on' : ''}`}
+                aria-pressed={on}
+                title={`${loc.name || t('loc.unnamed')} — ${t(on ? 'tip.locOn' : 'tip.locOff')}`}
+                onClick={() => toggleShotLocation(shot.id, loc.id)}
+              >
+                {loc.photos?.[0] ? <img decoding="async" loading="lazy" src={loc.photos[0]} alt="" /> : <MapPin size={20} />}
+                <span className="asset-tag">{loc.name || t('loc.unnamed')}</span>
+              </button>
+            );
+          })}
+          {newLocationTiles(shot.id)}
+        </div>
+      </div>
+    );
+  };
 
   const Root = embed ? 'div' : 'section';
   const focusShot = embed && focusShotId ? shots.find((sh) => sh.id === focusShotId) : null;
@@ -1691,7 +1799,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         <DynamicsVisualizer plan={project.dynamicsPlan} />
       </div>
       )}
-      {embed && showSceneTools && scenePhotosBlock}
+      {embed && showSceneTools && sceneLocationsBlock}
       <ErrorNote error={error} onSettings={onSettings} />
 
       {shots.length === 0 ? (
@@ -1896,7 +2004,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       />
                       <SwitchPill
                         on={pref.loc}
-                        disabled={!locRefs.length}
+                        disabled={!shotLocationRefs(project, scene, shot.id).length}
                         title={t('img.useLoc')}
                         label={t('apply.loc')}
                         onToggle={() => setPref(shot.id, { loc: !pref.loc })}
@@ -2136,9 +2244,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         </button>
                       </div>
                     </div>
-                    {/* Scene location photos, in the card next to the assets
-                        (same tiles) — the scene panel shows them too. */}
-                    {scenePhotosBlock}
+                    {shotLocationsBlock(shot)}
                   </div>
                 </div>
               </div>
@@ -2622,11 +2728,8 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         <LibraryPicker
           kind="location"
           library={library}
-          onPick={(entry) => {
-            const photos = [...(scene.photos || []), ...entry.photos].slice(0, 6);
-            updateScenePhotos(photos);
-          }}
-          onClose={() => setPickLoc(false)}
+          onPick={(entry) => addLocation({ name: entry.name, photos: entry.photos, libId: entry.id }, pickLoc.shotId)}
+          onClose={() => setPickLoc(null)}
         />
       )}
     </Root>

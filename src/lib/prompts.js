@@ -2,6 +2,7 @@ import { dataURLToImageBlock } from './images.js';
 import { aspectDescription } from './aspect.js';
 import { buildRandomization } from './randomization.js';
 import { densityRange, buildShotPayload } from './dynamics.js';
+import { scenePhotos } from './sceneLocations.js';
 
 const LANG_NAMES = { en: 'English', ru: 'Russian', uk: 'Ukrainian' };
 
@@ -186,7 +187,7 @@ export function stage4Prompt(project, scene, lang, scriptStyle, block) {
   const outlineList = project.outline
     .map((s, i) => `${i + 1}. ${s.title} — ${s.summary} (~${s.duration}s)`)
     .join('\n');
-  const envNote = scene.photos?.length
+  const envNote = scenePhotos(scene).length
     ? `\n\nAttached are reference photos of this scene's environment. Match the locations, lighting and mood in your shot descriptions to these photos.`
     : '';
   // Action Dynamics Plan: the scene's rhythm block mathematically constrains
@@ -206,7 +207,7 @@ export function stage4Prompt(project, scene, lang, scriptStyle, block) {
   return {
     system: system(lang, scriptStyle),
     maxTokens: 5000,
-    user: withPhotos(scene.photos, `Title: ${project.title}
+    user: withPhotos(scenePhotos(scene), `Title: ${project.title}
 
 Synopsis:
 """
@@ -265,7 +266,7 @@ FRAME CONTINUITY (STATE TRACKING): The shots of a scene form one continuous, rea
 // that the prompts must reproduce literally (many of its exact terms) rather
 // than paraphrase as a mood.
 export function stage5Prompt(project, scene, shots, lang, imageStyle, imageStylePlus = false, block = null, imageModel = 'gemini') {
-  const envNote = scene.photos?.length
+  const envNote = scenePhotos(scene).length
     ? `\n\nAttached are reference photos of this scene's environment. Ground the image prompts in what these photos show: architecture, interior details, colors, lighting and atmosphere.`
     : '';
   const img = (imageStyle || '').trim();
@@ -287,7 +288,7 @@ Apply it literally and exhaustively to EVERY "image_prompt":
   return {
     system: system(lang) + FRAME_CONTINUITY_SYSTEM,
     maxTokens: 6000,
-    user: withPhotos(scene.photos, `Title: ${project.title}
+    user: withPhotos(scenePhotos(scene), `Title: ${project.title}
 Genres: ${project.genres.join(', ')}
 
 Characters (repeat their key physical details in EVERY prompt where they appear, so the generated images stay visually consistent):

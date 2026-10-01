@@ -5,6 +5,7 @@
 // ref_images slot so the text encoder can see it as <Picture N>. This module
 // owns the ordering so the graph builder (comfy.js) and the prompt writer
 // (prompts.js) can never disagree about which picture is which.
+import { scenePhotos } from './sceneLocations.js';
 import { H3_REF_CAPS, h3Frames } from './comfy.js';
 import { takeOf, takeShots, takeCutTimes } from './takes.js';
 
@@ -46,7 +47,7 @@ export function refCandidates(project, shot, t) {
     );
   }
   project.outline.forEach((sc, si) => {
-    (sc.photos || []).forEach((src, k) =>
+    scenePhotos(sc, Number.POSITIVE_INFINITY).forEach((src, k) =>
       images.push({ src, label: t('refs.scenePhoto', { n: si + 1, k: k + 1 }) })
     );
   });
