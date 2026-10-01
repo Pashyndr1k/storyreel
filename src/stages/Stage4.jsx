@@ -121,7 +121,7 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
   if (!project.outline.length) {
     return (
       <section className="stage">
-        <h2>{t('s4.title')}</h2>
+        <h2 title={t('s4.desc')}>{t('s4.title')}</h2>
         <div className="note warn">{t('s4.needOutline')}</div>
       </section>
     );
@@ -163,7 +163,7 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
               {(scene.photos || []).map((ph, i) => (
                 <div key={i} className="photo-thumb">
                   <img decoding="async" loading="lazy" src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
-                  <button
+                  <button title={t('tip.removePhoto')}
                     className="photo-x"
                     onClick={() => updateScenePhotos((scene.photos || []).filter((_, j) => j !== i))}
                   >
@@ -177,14 +177,14 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
       </div>
 
       <div className="row">
-        <button className="btn primary" disabled={busy} onClick={generate}>
+        <button title={t('tip.s4Generate')} className="btn primary" disabled={busy} onClick={generate}>
           {!shots.length && <Stars size={14} />} {busy && !prog ? t('gen.generating') : shots.length ? t('s4.regenerate') : t('s4.generate')}
         </button>
-        <button className="btn" disabled={busy} onClick={processAll}>
+        <button title={t('tip.batch4')} className="btn" disabled={busy} onClick={processAll}>
           {t('batch.run4')}
         </button>
         {prog && (
-          <span className="total-badge">{t('batch.progress', { a: prog.a, b: prog.b })}</span>
+          <span className="total-badge" title={t('ind.batchProgress')}>{t('batch.progress', { a: prog.a, b: prog.b })}</span>
         )}
         <span className="push-right" />
         <DynamicsVisualizer plan={project.dynamicsPlan} />
@@ -247,7 +247,7 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
                 >
                   <Grip size={16} />
                 </span>
-                <button className="btn danger tiny" onClick={() => removeShot(shot.id)}>✕</button>
+                <button title={t('tip.removeShot')} className="btn danger tiny" onClick={() => removeShot(shot.id)}>✕</button>
               </div>
             </div>
             <div className="shot-grid">
@@ -302,13 +302,13 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
 
       {shots.length > 0 && (
         <div className="row">
-          <button className="btn small" onClick={addShot}>{t('s4.addShot')}</button>
+          <button title={t('tip.addShot')} className="btn small" onClick={addShot}>{t('s4.addShot')}</button>
         </div>
       )}
 
       <footer className="stage-footer">
         {!allDone && <span className="hint">{t('s4.hint', { n: project.outline.length })}</span>}
-        <button className="btn primary big" disabled={!allDone} onClick={goNext}>
+        <button title={t('tip.continue')} className="btn primary big" disabled={!allDone} onClick={goNext}>
           {t('s4.continue')}
         </button>
       </footer>

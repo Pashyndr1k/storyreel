@@ -20,6 +20,20 @@
   Groups are included in the script export; deleting a character removes it
   from its groups; regenerating the storyline keeps the groups but empties
   their member lists (the cast is new).
+- **Character-profile rules, in the app.** A "?" next to Characters in Stage
+  2 opens a panel with the rules profiles follow: what each field is for,
+  the first photo versus the others, how names are matched in shots, how
+  profiles reach the prompts, groups, and the limits. The profile's fields
+  and photos carry their own hover hints (the first photo is marked as the
+  face reference, the others as extras).
+- **Hover hints everywhere.** Every button, header, selector and indicator
+  across the app now explains itself on mouse-over — about 230 elements
+  that had none: generic actions (Cancel, Save, Close, Edit, Delete…),
+  every stage's generate / batch / continue buttons, the stage bar, the
+  shot workbench (tabs, model and voice selectors, resolution, takes, trim
+  nudges), the timeline (track heads, clip lengths, timecode, music / SFX /
+  render), all Settings selectors, the pop-ups' titles, upload/import
+  buttons, project-card progress, tags and counters. In EN / RU / UA.
 - **Fixed: text fields that would not take typing.** After any confirmation
   or warning box ("replace the prompts?", "switch the model?", a missing-key
   notice…) the window could come back without keyboard focus on the page:

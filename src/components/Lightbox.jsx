@@ -1,9 +1,11 @@
 import { useEffect } from 'react';
+import { useI18n } from '../lib/i18n.js';
 
 // Full-size media pop-up shared across the app. `item` is { kind: 'img'|'vid',
 // src } or null; clicking the backdrop, the ✕ or pressing Escape closes it.
 // z-index sits above modal overlays, so thumbnails inside modals work too.
 export default function Lightbox({ item, onClose }) {
+  const { t } = useI18n();
   useEffect(() => {
     if (!item) return undefined;
     const onKey = (e) => {
@@ -32,7 +34,7 @@ export default function Lightbox({ item, onClose }) {
       ) : (
         <img src={item.src} alt="" onClick={(e) => e.stopPropagation()} />
       )}
-      <button type="button" className="lightbox-x" aria-label="close" onClick={onClose}>
+      <button type="button" className="lightbox-x" title={t('tip.close')} aria-label={t('tip.close')} onClick={onClose}>
         ✕
       </button>
     </div>

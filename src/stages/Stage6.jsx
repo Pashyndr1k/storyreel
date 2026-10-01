@@ -1547,7 +1547,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
   if (!items.length) {
     return (
       <section className="stage">
-        <h2>{t('s6.title')}</h2>
+        <h2 title={t('s6.desc')}>{t('s6.title')}</h2>
         <div className="note warn">{t('s6.empty')}</div>
       </section>
     );
@@ -1830,7 +1830,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
             and audio strips start at the exact same timeline zero. */}
         <div className="nle-track asm-track">
           <span className="nle-gut track-head">
-            <i className="trk-tag">V1</i>
+            <i className="trk-tag" title={t('ind.trackVideo')}>V1</i>
             <span className="trk-name">{t('s6.trackVideo')}</span>
           </span>
           <div className="asm-scenes" ref={trackRef}>
@@ -1961,7 +1961,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                       ) : (
                         <span className="nle-clip-num">{globalIdx + 1}</span>
                       )}
-                      <span className="nle-dur">{Number(it.shot.duration || 0).toFixed(1)}s</span>
+                      <span className="nle-dur" title={t('ind.clipDur')}>{Number(it.shot.duration || 0).toFixed(1)}s</span>
                       {it.muted && it.video && (
                         <span className="clip-mute" title={t('s6.mutedBadge')}>🔇</span>
                       )}
@@ -2054,7 +2054,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
             <div key={L.id} className={`audio-lane ${L.enabled === false ? 'lane-off' : ''}`}>
               {/* Compact head: track tag + enable + everything else in a ⋯ menu. */}
               <span className="nle-gut lane-head" title={L.name}>
-                <i className="trk-tag">A{li + 1}</i>
+                <i className="trk-tag" title={t('ind.trackAudio')}>A{li + 1}</i>
                 <button
                   type="button"
                   className={`lane-eye ${L.enabled === false ? '' : 'on'}`}
@@ -2295,7 +2295,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
           <button type="button" title={t('s6.zoomOut')} aria-label={t('s6.zoomOut')} disabled={zoomIdx === 0} onClick={zoomOut}>
             −
           </button>
-          <select
+          <select title={t('tip.zoom')}
             className="zoom-select"
             value={String(scale)}
             onChange={(e) => setScale(e.target.value === 'fit' ? 'fit' : Number(e.target.value))}
@@ -2382,22 +2382,22 @@ export default function Stage6({ project, update, settings, ...workbench }) {
           return (
             <span className="nle-nudge" title={c.name}>
               🎵 {t('s6.fadeIn')}
-              <button type="button" disabled={(c.fadeIn || 0) <= 0} onClick={() => step('fadeIn', -0.1)}>−</button>
+              <button title={t('tip.fadeInLess')} type="button" disabled={(c.fadeIn || 0) <= 0} onClick={() => step('fadeIn', -0.1)}>−</button>
               <i className="trim-val">{(c.fadeIn || 0).toFixed(1)}s</i>
-              <button type="button" onClick={() => step('fadeIn', 0.1)}>+</button>
+              <button title={t('tip.fadeInMore')} type="button" onClick={() => step('fadeIn', 0.1)}>+</button>
               · {t('s6.fadeOut')}
-              <button type="button" disabled={(c.fadeOut || 0) <= 0} onClick={() => step('fadeOut', -0.1)}>−</button>
+              <button title={t('tip.fadeOutLess')} type="button" disabled={(c.fadeOut || 0) <= 0} onClick={() => step('fadeOut', -0.1)}>−</button>
               <i className="trim-val">{(c.fadeOut || 0).toFixed(1)}s</i>
-              <button type="button" onClick={() => step('fadeOut', 0.1)}>+</button>
+              <button title={t('tip.fadeOutMore')} type="button" onClick={() => step('fadeOut', 0.1)}>+</button>
               <button type="button" title={t('s6.clipDel')} onClick={() => removeClip(L.id, c.id)}>✕</button>
             </span>
           );
         })()}
-        <span className="nle-timecode">{elapsed.toFixed(1).padStart(4, '0')} / {total.toFixed(1).padStart(4, '0')}s</span>
+        <span className="nle-timecode" title={t('ind.timecode')}>{elapsed.toFixed(1).padStart(4, '0')} / {total.toFixed(1).padStart(4, '0')}s</span>
       </div>
 
       <div className="row s6-controls">
-        <button
+        <button title={t('tip.playFilm')}
           className="btn small primary fixedw"
           disabled={rendering || total <= 0}
           onClick={() => {
@@ -2407,7 +2407,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
         >
           {playing ? <><StopSq size={14} />{t('sb.stop')}</> : <><Play size={14} />{t('sb.play')}</>}
         </button>
-        <button className="btn small fixedw" disabled={rendering} onClick={doRender}>
+        <button title={t('tip.render')} className="btn small fixedw" disabled={rendering} onClick={doRender}>
           <Download size={14} />{rendering ? t('s6.rendering') : t('s6.render')}
         </button>
         {/* Auto queue: every missing first frame and video, one after another */}
@@ -2421,14 +2421,14 @@ export default function Stage6({ project, update, settings, ...workbench }) {
         >
           {queue ? <><StopSq size={14} />{t('s6.autoQueueStop', { a: queue.a, b: queue.b })}</> : <><Zap size={14} />{t('s6.autoQueue')}</>}
         </button>
-        <button
+        <button title={t('tip.music')}
           className="btn small"
           disabled={total <= 0}
           onClick={() => setMusic({ genre: 'cinematic', tempo: 'medium', mood: 'uplifting', seconds: Math.max(10, Math.ceil(total || 60)), busy: false })}
         >
           🎵 {t('s6.musicBtn')}
         </button>
-        <button
+        <button title={t('tip.sfx')}
           className="btn small"
           disabled={total <= 0}
           onClick={() => setSfx({ prompt: '', seconds: 5, busy: false })}
@@ -2483,7 +2483,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                   : t('s6.renderProg', { a: renderProg.a, b: renderProg.b })}
               </span>
             )}
-            <button
+            <button title={t('tip.cancelRender')}
               className="btn small danger"
               onClick={() => {
                 cancelRef.current = true;
@@ -2501,7 +2501,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
       {showCuts && (
         <div className="overlay" onClick={() => setShowCuts(false)}>
           <div className="modal cuts-modal" onClick={(e) => e.stopPropagation()}>
-            <h2>{t('s6.cutsTitle')}</h2>
+            <h2 title={t('s6.cutsHint')}>{t('s6.cutsTitle')}</h2>
             <p className="hint">{t('s6.cutsHint')}</p>
             <table className="cuts-table">
               <thead>
@@ -2546,7 +2546,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
               </tbody>
             </table>
             <div className="modal-actions">
-              <button className="btn small" onClick={() => setShowCuts(false)}>{t('s6.close')}</button>
+              <button title={t('tip.close')} className="btn small" onClick={() => setShowCuts(false)}>{t('s6.close')}</button>
             </div>
           </div>
         </div>
@@ -2556,12 +2556,12 @@ export default function Stage6({ project, update, settings, ...workbench }) {
       {music && (
         <div className="overlay" onClick={() => !music.busy && setMusic(null)}>
           <div className="modal music-modal" onClick={(e) => e.stopPropagation()}>
-            <h2>{t('s6.musicTitle')}</h2>
+            <h2 title={t('s6.musicHint')}>{t('s6.musicTitle')}</h2>
             <p className="hint">{t('s6.musicHint')}</p>
             <div className="music-grid music-grid-4">
               <div className="s5e-vsel">
                 <label>{t('s6.musicGenre')}</label>
-                <select value={music.genre} disabled={music.busy} onChange={(e) => setMusic((m) => ({ ...m, genre: e.target.value }))}>
+                <select title={t('tip.musicGenre')} value={music.genre} disabled={music.busy} onChange={(e) => setMusic((m) => ({ ...m, genre: e.target.value }))}>
                   {MUSIC_GENRES.map(([id]) => (
                     <option key={id} value={id}>{t(`s6.mg_${id}`)}</option>
                   ))}
@@ -2569,7 +2569,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
               </div>
               <div className="s5e-vsel">
                 <label>{t('s6.musicTempo')}</label>
-                <select value={music.tempo} disabled={music.busy} onChange={(e) => setMusic((m) => ({ ...m, tempo: e.target.value }))}>
+                <select title={t('tip.musicTempo')} value={music.tempo} disabled={music.busy} onChange={(e) => setMusic((m) => ({ ...m, tempo: e.target.value }))}>
                   {MUSIC_TEMPOS.map(([id, bpm]) => (
                     <option key={id} value={id}>{t(`s6.mt_${id}`)} · {bpm} BPM</option>
                   ))}
@@ -2577,7 +2577,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
               </div>
               <div className="s5e-vsel">
                 <label>{t('s6.musicMood')}</label>
-                <select value={music.mood} disabled={music.busy} onChange={(e) => setMusic((m) => ({ ...m, mood: e.target.value }))}>
+                <select title={t('tip.musicMood')} value={music.mood} disabled={music.busy} onChange={(e) => setMusic((m) => ({ ...m, mood: e.target.value }))}>
                   {MUSIC_MOODS.map(([id]) => (
                     <option key={id} value={id}>{t(`s6.mm_${id}`)}</option>
                   ))}
@@ -2615,7 +2615,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
               </div>
             </div>
             <div className="modal-actions">
-              <button className="btn small" disabled={music.busy} onClick={() => setMusic(null)}>
+              <button title={t('tip.close')} className="btn small" disabled={music.busy} onClick={() => setMusic(null)}>
                 {t('s6.close')}
               </button>
               <label className={`btn small file-btn ${music.busy ? 'disabled' : ''}`} title={t('s6.musicUploadTip')}>
@@ -2632,7 +2632,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                   }}
                 />
               </label>
-              <button className="btn small primary fixedw" disabled={music.busy} onClick={runMusic}>
+              <button title={t('tip.musicRun')} className="btn small primary fixedw" disabled={music.busy} onClick={runMusic}>
                 {music.busy ? t('s6.musicBusy') : t('s6.musicRun')}
               </button>
             </div>
@@ -2644,7 +2644,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
       {sfx && (
         <div className="overlay" onClick={() => !sfx.busy && setSfx(null)}>
           <div className="modal music-modal" onClick={(e) => e.stopPropagation()}>
-            <h2>{t('s6.sfxTitle')}</h2>
+            <h2 title={t('s6.sfxHint')}>{t('s6.sfxTitle')}</h2>
             <p className="hint">{t('s6.sfxHint')}</p>
             <textarea
               rows={2}
@@ -2675,10 +2675,10 @@ export default function Stage6({ project, update, settings, ...workbench }) {
               </div>
             </div>
             <div className="modal-actions">
-              <button className="btn small" disabled={sfx.busy} onClick={() => setSfx(null)}>
+              <button title={t('tip.close')} className="btn small" disabled={sfx.busy} onClick={() => setSfx(null)}>
                 {t('s6.close')}
               </button>
-              <button className="btn small primary fixedw" disabled={sfx.busy || !(sfx.prompt || '').trim()} onClick={runSfx}>
+              <button title={t('tip.sfxRun')} className="btn small primary fixedw" disabled={sfx.busy || !(sfx.prompt || '').trim()} onClick={runSfx}>
                 {sfx.busy ? t('s6.musicBusy') : t('s6.sfxRun')}
               </button>
             </div>
@@ -2690,7 +2690,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
       {smartCut && (
         <div className="overlay" onClick={() => !smartCut.busy && setSmartCut(null)}>
           <div className="modal smartcut-modal" onClick={(e) => e.stopPropagation()}>
-            <h2>{t('s6.smartCutTitle')}</h2>
+            <h2 title={t('tip.smartCut')}>{t('s6.smartCutTitle')}</h2>
             <p className="hint">{t('s6.smartCutHint')}</p>
             <textarea
               rows={3}
@@ -2721,10 +2721,10 @@ export default function Stage6({ project, update, settings, ...workbench }) {
               </div>
             )}
             <div className="modal-actions">
-              <button className="btn small" disabled={smartCut.busy} onClick={() => setSmartCut(null)}>
+              <button title={t('tip.close')} className="btn small" disabled={smartCut.busy} onClick={() => setSmartCut(null)}>
                 {t('s6.close')}
               </button>
-              <button
+              <button title={t('tip.smartCutRun')}
                 className="btn small primary"
                 disabled={smartCut.busy || !smartCut.text.trim()}
                 onClick={runSmartCut}
@@ -2751,7 +2751,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
             }).map((ty) => {
               const cur = (project.shotTransitions || {})[items[cutMenu.idx]?.shot.id] || 'auto';
               return (
-                <button
+                <button title={t('tip.cutPick')}
                   key={ty}
                   type="button"
                   className={`cut-menu-item ${cur === ty ? 'active' : ''}`}

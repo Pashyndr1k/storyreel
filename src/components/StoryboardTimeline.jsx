@@ -212,7 +212,7 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
         {onRefFrames && (
           <span className="seg" title={t('sb.modeTip')}>
             {['sketch', 'ref'].map((m) => (
-              <button
+              <button title={t('tip.sbMode')}
                 key={m}
                 type="button"
                 className={`seg-btn ${frameMode === m ? 'on' : ''}`}
@@ -288,7 +288,7 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
               }}
             >
               {sb[s.id] ? <img decoding="async" loading="lazy" src={sb[s.id]} alt="" draggable={false} /> : <span className="nle-clip-num">{i + 1}</span>}
-              <span className="nle-dur">{Number(s.duration || 0).toFixed(1)}s</span>
+              <span className="nle-dur" title={t('ind.clipDur')}>{Number(s.duration || 0).toFixed(1)}s</span>
               {onDuration && (
                 <span
                   className="nle-trim"
@@ -335,22 +335,22 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
             </button>
           </span>
         )}
-        <span className="nle-timecode">{elapsed.toFixed(1).padStart(4, '0')} / {total.toFixed(1).padStart(4, '0')}s</span>
+        <span className="nle-timecode" title={t('ind.timecode')}>{elapsed.toFixed(1).padStart(4, '0')} / {total.toFixed(1).padStart(4, '0')}s</span>
       </div>
 
       <div className="row">
-        <button
+        <button title={t('tip.sbPlay')}
           className="btn small primary fixedw"
           disabled={busy || total <= 0}
           onClick={() => setPlaying((v) => !v)}
         >
           {playing ? <><Pause size={14} />{t('sb.pause')}</> : <><Play size={14} />{t('sb.play')}</>}
         </button>
-        <button className="btn small" disabled={busy} onClick={generate}>
+        <button title={t('tip.sbGenerate')} className="btn small" disabled={busy} onClick={generate}>
           {busy ? t('gen.generating') : t('sb.generate')}
         </button>
         {playing && (
-          <button
+          <button title={t('tip.sbStop')}
             className="btn small"
             disabled={busy}
             onClick={() => {
@@ -361,11 +361,11 @@ export default function StoryboardTimeline({ project, scene, shots, settings, on
             <StopSq size={14} />{t('sb.stop')}
           </button>
         )}
-        {prog && <span className="total-badge">{t('sb.progress', { a: prog.a, b: prog.b })}</span>}
+        {prog && <span className="total-badge" title={t('ind.sbProgress')}>{t('sb.progress', { a: prog.a, b: prog.b })}</span>}
       </div>
       {err === 'NO_GEMINI_KEY' ? (
         <div className="note warn">
-          {t('err.noGeminiKey')} <button className="btn small" onClick={onSettings}>{t('err.openSettings')}</button>
+          {t('err.noGeminiKey')} <button title={t('tip.openSettings')} className="btn small" onClick={onSettings}>{t('err.openSettings')}</button>
         </div>
       ) : err ? (
         <div className="note error">{err}</div>

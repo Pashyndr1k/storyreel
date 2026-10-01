@@ -16,7 +16,7 @@ export default function NewProjectModal({ onCreate, onClose, settings }) {
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>{t('new.title')}</h2>
+        <h2 title={t('tip.newTitle')}>{t('new.title')}</h2>
         <label>{t('new.titleLabel')}</label>
         <input
           value={title}
@@ -27,7 +27,7 @@ export default function NewProjectModal({ onCreate, onClose, settings }) {
         <label>{t('new.type')}</label>
         <div className="type-cards">
           {TYPES.map((k) => (
-            <button
+            <button title={t(`new.typeHint_${k}`)}
               key={k}
               type="button"
               className={`type-card ${type === k ? 'selected' : ''}`}
@@ -57,8 +57,8 @@ export default function NewProjectModal({ onCreate, onClose, settings }) {
           />
         </div>
         <div className="modal-actions">
-          <button className="btn" onClick={onClose}>{t('new.cancel')}</button>
-          <button
+          <button title={t('tip.cancel')} className="btn" onClick={onClose}>{t('new.cancel')}</button>
+          <button title={t('tip.create')}
             className="btn primary"
             disabled={!logline.trim()}
             onClick={() => onCreate(title, logline.trim(), type, aspect)}

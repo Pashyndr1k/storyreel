@@ -131,7 +131,7 @@ function CopyButton({ text }) {
     }
   };
   return (
-    <button type="button" className="copy-link" disabled={!text} onClick={copy}>
+    <button title={t('tip.copy')} type="button" className="copy-link" disabled={!text} onClick={copy}>
       {copied ? t('s5.copied') : t('s5.copy')}
     </button>
   );
@@ -589,7 +589,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           onChange={(e) => setTweakText((v) => ({ ...v, [key]: e.target.value }))}
           onKeyDown={(e) => e.key === 'Enter' && tweakPrompt(shot, kind)}
         />
-        <button
+        <button title={t('tip.tweak')}
           className="btn small s5e-refine"
           disabled={tweakBusy === key || !hasPrompt || !(tweakText[key] || '').trim()}
           onClick={() => tweakPrompt(shot, kind)}
@@ -1556,7 +1556,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   if (!project.outline.length) {
     return (
       <section className="stage">
-        <h2>{t('s5.title')}</h2>
+        <h2 title={t('s5.desc')}>{t('s5.title')}</h2>
         <div className="note warn">{t('s5.needOutline')}</div>
       </section>
     );
@@ -1571,7 +1571,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         {(scene?.photos || []).map((ph, j) => (
           <div key={j} className="photo-thumb">
             <img decoding="async" loading="lazy" src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
-            <button
+            <button title={t('tip.removePhoto')}
               className="photo-x"
               onClick={() => updateScenePhotos((scene.photos || []).filter((_, k) => k !== j))}
             >
@@ -1648,21 +1648,21 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       {showSceneTools && (
       <div className="row s5-scenerow">
         {shots.length > 0 && (
-          <button className="btn primary" disabled={busy} onClick={generate}>
+          <button title={t('tip.s5Generate')} className="btn primary" disabled={busy} onClick={generate}>
             {!hasPrompts && <Stars size={14} />} {busy && !prog ? t('gen.generating') : hasPrompts ? t('s5.regenerate') : t('s5.generate', { n: shots.length })}
           </button>
         )}
-        <button className="btn" disabled={busy} onClick={processAll}>{t('batch.run5')}</button>
+        <button title={t('tip.batch5')} className="btn" disabled={busy} onClick={processAll}>{t('batch.run5')}</button>
         {staleVideoPrompts && (
           <button className="btn" disabled={busy} onClick={regenVideoPrompts} title={t('s5.updateEngineTip', { e: engineName(curEngine) })}>
             {t('s5.updateEngine', { e: engineName(curEngine) })}
           </button>
         )}
-        {prog && <span className="total-badge">{t('batch.progress', { a: prog.a, b: prog.b })}</span>}
+        {prog && <span className="total-badge" title={t('ind.batchProgress')}>{t('batch.progress', { a: prog.a, b: prog.b })}</span>}
         {mediaProg && (
           <>
-            <span className="total-badge">{t('s5.mediaProg', { a: mediaProg.a, b: mediaProg.b })}</span>
-            <button className="btn small danger" onClick={() => { mediaCancel.current = true; }}>
+            <span className="total-badge" title={t('ind.mediaProgress')}>{t('s5.mediaProg', { a: mediaProg.a, b: mediaProg.b })}</span>
+            <button title={t('tip.cancelQueue')} className="btn small danger" onClick={() => { mediaCancel.current = true; }}>
               {t('s6.cancel')}
             </button>
           </>
@@ -1763,7 +1763,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       return (
                         <span className="s5e-takebtns" title={t('take.tip')}>
                           <span className="s5e-eyebrow">{t('take.label')}</span>
-                          <button
+                          <button title={t('tip.take2')}
                             type="button"
                             className="take-btn"
                             disabled={!canCombine(project, scene.id, i, 2).ok}
@@ -1771,7 +1771,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                           >
                             +1
                           </button>
-                          <button
+                          <button title={t('tip.take3')}
                             type="button"
                             className="take-btn"
                             disabled={!canCombine(project, scene.id, i, 3).ok}
@@ -1788,7 +1788,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                           <span className="take-badge" title={t('take.leadTip', { n: take.shotIds.length, s: takeTotal(project, take).toFixed(1) })}>
                             {t('take.lead', { n: take.shotIds.length })}
                           </span>
-                          <button type="button" className="btn small" onClick={() => ungroupTake(shot.id)}>
+                          <button title={t('tip.ungroup')} type="button" className="btn small" onClick={() => ungroupTake(shot.id)}>
                             {t('take.ungroup')}
                           </button>
                         </span>
@@ -1816,7 +1816,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
               {/* Generation tabs: image / video / audio in one frame. */}
               <div className="s5e-tabs" role="tablist">
                 {tabList.map((tb) => (
-                  <button
+                  <button title={t(`tip.tab_${tb}`)}
                     key={tb}
                     type="button"
                     role="tab"
@@ -1846,7 +1846,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                               ? 'err.klingNeedsApp'
                               : 'err.noGeminiKey'
                     )}{' '}
-                    <button className="btn small" onClick={onSettings}>{t('err.openSettings')}</button>
+                    <button title={t('tip.openSettings')} className="btn small" onClick={onSettings}>{t('err.openSettings')}</button>
                   </div>
                 ) : (
                   <div className="note error">{imgErr.msg}</div>
@@ -2026,7 +2026,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       onChange={(e) => setRefineText((v) => ({ ...v, [shot.id]: e.target.value }))}
                       onKeyDown={(e) => e.key === 'Enter' && refineImage(shot)}
                     />
-                    <button
+                    <button title={t('tip.refine')}
                       className="btn small s5e-refine"
                       disabled={!genImg || imgBusy === shot.id || !(refineText[shot.id] || '').trim()}
                       onClick={() => refineImage(shot)}
@@ -2036,7 +2036,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                   </div>
 
                   <div className="s5e-btnrow">
-                    <button
+                    <button title={t('tip.genImage')}
                       className="btn small primary s5e-gen fixedw-lg"
                       disabled={anyBusy || !p.imagePrompt}
                       onClick={() => genImage(shot)}
@@ -2109,7 +2109,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                           <div key={a.id} className="photo-thumb asset-thumb-sm" title={a.name}>
                             <img decoding="async" loading="lazy" src={a.photos[0]} alt="" onClick={() => setLightbox({ kind: 'img', src: a.photos[0] })} />
                             <span className="asset-tag">{a.name}</span>
-                            <button className="photo-x" onClick={() => detachAsset(shot.id, a.id)}>✕</button>
+                            <button title={t('tip.detachAsset')} className="photo-x" onClick={() => detachAsset(shot.id, a.id)}>✕</button>
                           </div>
                         ))}
                         <label className="photo-add" title={t('pick.upload')} aria-label={t('pick.upload')}>
@@ -2210,7 +2210,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     </p>
                   )}
                   <div className="s5e-btnrow">
-                    <button
+                    <button title={t('tip.genVideo')}
                       className="btn small primary s5e-gen fixedw-lg"
                       disabled={
                         anyBusy ||
@@ -2241,7 +2241,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         whose material is missing stay disabled. */}
                     <span className="seg seg-tall seg-compact" title={t('s5.resTip')}>
                       {VIDEO_RESOLUTIONS.map((r) => (
-                        <button
+                        <button title={t(`tip.res_${r}`)}
                           key={r}
                           type="button"
                           className={`seg-btn ${videoRes === r ? 'on' : ''}`}
@@ -2367,7 +2367,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         <span className="s5e-eyebrow">{t('vsrc.label')}</span>
                         <span className="seg">
                           {['tts', 'native'].map((v) => (
-                            <button
+                            <button title={t(`tip.vsrc_${v}`)}
                               key={v}
                               type="button"
                               className={`seg-btn ${voiceSourceOf(shot.id) === v ? 'on' : ''}`}
@@ -2431,7 +2431,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         <div className="s5e-voicegrid">
                           <div className="s5e-vsel">
                             <label>{t('aud.vs_voice')}</label>
-                            <select
+                            <select title={t('tip.voiceSelect')}
                               value={p.voiceParams?.geminiVoice || ''}
                               onChange={(e) =>
                                 setPrompt(shot.id, {
@@ -2491,7 +2491,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                           />
                           <i>s</i>
                         </label>
-                        <button
+                        <button title={t('tip.updateAudio')}
                           className="btn small"
                           disabled={anyBusy}
                           onClick={() => applyAudioPads(shot)}
@@ -2502,7 +2502,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     )}
 
                     <div className="s5e-btnrow">
-                      <button
+                      <button title={t('tip.genVoice')}
                         className="btn small primary s5e-gen fixedw-lg"
                         disabled={anyBusy || recording === shot.id || (!(shot.dialogue || '').trim() && !(p.voicePrompt || '').trim())}
                         onClick={() => genVoice(shot, i)}
@@ -2571,7 +2571,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
 
       {!embed && shots.length > 0 && (
         <footer className="stage-footer">
-          <button className="btn primary big" onClick={goNext}>
+          <button title={t('tip.continue')} className="btn primary big" onClick={goNext}>
             {t('s5.continue')}
           </button>
         </footer>

@@ -75,7 +75,7 @@ export default function Stage3({ project, update, settings, goNext, onSettings, 
       </div>
 
       <div className="row">
-        <button className="btn primary" disabled={busy} onClick={generate}>
+        <button title={t('tip.s3Generate')} className="btn primary" disabled={busy} onClick={generate}>
           {!outline.length && <Stars size={14} />} {busy ? t('gen.generating') : outline.length ? t('s3.regenerate') : t('s3.generate')}
         </button>
         <StyleChip project={project} styles={styles} cat="script" onClick={onProjectSettings} />
@@ -149,19 +149,19 @@ export default function Stage3({ project, update, settings, goNext, onSettings, 
             >
               <Grip size={16} />
             </span>
-            <button className="btn danger tiny" onClick={() => removeScene(s.id)}>✕</button>
+            <button title={t('tip.removeScene')} className="btn danger tiny" onClick={() => removeScene(s.id)}>✕</button>
           </div>
         </div>
       ))}
 
       {outline.length > 0 && (
         <div className="row">
-          <button className="btn small" onClick={addScene}>{t('s3.addScene')}</button>
+          <button title={t('tip.addScene')} className="btn small" onClick={addScene}>{t('s3.addScene')}</button>
         </div>
       )}
 
       <footer className="stage-footer">
-        <button className="btn primary big" disabled={!outline.length} onClick={goNext}>
+        <button title={t('tip.continue')} className="btn primary big" disabled={!outline.length} onClick={goNext}>
           {t('s3.continue')}
         </button>
       </footer>

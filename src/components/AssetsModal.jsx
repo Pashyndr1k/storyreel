@@ -35,8 +35,8 @@ export default function AssetsModal({ library, libUpsert, libDelete, onClose }) 
     <div className="overlay" onClick={onClose}>
       <div className="modal wide" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head-row">
-          <h2>{t('asset.libTitle')}</h2>
-          <button className="btn small primary" onClick={() => setEditing(newLibraryEntry('asset'))}>
+          <h2 title={t('tip.assetLib')}>{t('asset.libTitle')}</h2>
+          <button title={t('tip.assetAdd')} className="btn small primary" onClick={() => setEditing(newLibraryEntry('asset'))}>
             {t('asset.add')}
           </button>
         </div>
@@ -58,8 +58,8 @@ export default function AssetsModal({ library, libUpsert, libDelete, onClose }) 
                 <strong className="asset-name">{a.name || t('asset.untitled')}</strong>
                 {a.description && <p className="asset-desc">{a.description}</p>}
                 <div className="row">
-                  <button className="btn tiny" onClick={() => setEditing({ ...a })}>{t('styles.edit')}</button>
-                  <button
+                  <button title={t('tip.edit')} className="btn tiny" onClick={() => setEditing({ ...a })}>{t('styles.edit')}</button>
+                  <button title={t('tip.delete')}
                     className="btn tiny danger"
                     onClick={() => window.confirm(t('lib.deleteConfirm')) && libDelete(a.id)}
                   >
@@ -72,14 +72,14 @@ export default function AssetsModal({ library, libUpsert, libDelete, onClose }) 
         )}
 
         <div className="modal-actions">
-          <button className="btn" onClick={onClose}>{t('set.close')}</button>
+          <button title={t('tip.close')} className="btn" onClick={onClose}>{t('set.close')}</button>
         </div>
       </div>
 
       {editing && (
         <div className="overlay" onClick={() => setEditing(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>{editing.name || t('asset.new')}</h2>
+            <h2 title={t('tip.assetEdit')}>{editing.name || t('asset.new')}</h2>
             <label>{t('asset.name')}</label>
             <input
               value={editing.name}
@@ -99,7 +99,7 @@ export default function AssetsModal({ library, libUpsert, libDelete, onClose }) 
               {editing.photos.map((ph, i) => (
                 <div key={i} className="photo-thumb">
                   <img decoding="async" loading="lazy" src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
-                  <button
+                  <button title={t('tip.removePhoto')}
                     className="photo-x"
                     onClick={() => setEditing({ ...editing, photos: editing.photos.filter((_, j) => j !== i) })}
                   >
@@ -124,8 +124,8 @@ export default function AssetsModal({ library, libUpsert, libDelete, onClose }) 
               )}
             </div>
             <div className="modal-actions">
-              <button className="btn" onClick={() => setEditing(null)}>{t('styles.cancel')}</button>
-              <button className="btn primary" disabled={!editing.photos.length} onClick={save}>
+              <button title={t('tip.cancel')} className="btn" onClick={() => setEditing(null)}>{t('styles.cancel')}</button>
+              <button title={t('tip.save')} className="btn primary" disabled={!editing.photos.length} onClick={save}>
                 {t('styles.save')}
               </button>
             </div>

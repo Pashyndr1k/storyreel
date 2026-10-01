@@ -57,7 +57,7 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
       />
 
       <div className="row">
-        <button className="btn primary" disabled={busy || !project.logline.trim()} onClick={generate}>
+        <button title={t('tip.s1Generate')} className="btn primary" disabled={busy || !project.logline.trim()} onClick={generate}>
           {!project.ideas.length && <Stars size={14} />} {busy ? t('gen.generating') : project.ideas.length ? t('s1.regenerate') : t('s1.generate')}
         </button>
       </div>
@@ -67,7 +67,7 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
         <div className="ideas-grid">
           {project.ideas.map((idea) => (
             <div key={idea.id} className={`idea-card ${project.selectedIdeaId === idea.id ? 'selected' : ''}`}>
-              <h3>{idea.title}</h3>
+              <h3 title={idea.title}>{idea.title}</h3>
               <p>{idea.pitch}</p>
               <p className="why"><em>{idea.why_it_works}</em></p>
               {(idea.modifiers || []).length > 0 && (
@@ -78,7 +78,7 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
                     .join(' · ')}
                 </p>
               )}
-              <button className="btn small primary" onClick={() => pickIdea(idea)}>
+              <button title={t('tip.s1Pick')} className="btn small primary" onClick={() => pickIdea(idea)}>
                 {project.selectedIdeaId === idea.id ? t('s1.selected') : t('s1.develop')}
               </button>
             </div>
@@ -104,7 +104,7 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
         />
       </div>
       <div className="row">
-        <button
+        <button title={t('tip.s1Original')}
           className="btn small"
           onClick={() => update({ approvedPlot: project.logline, selectedIdeaId: null })}
         >
@@ -113,7 +113,7 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
       </div>
 
       <footer className="stage-footer">
-        <button className="btn primary big" disabled={!project.approvedPlot.trim()} onClick={goNext}>
+        <button title={t('tip.continue')} className="btn primary big" disabled={!project.approvedPlot.trim()} onClick={goNext}>
           {t('s1.continue')}
         </button>
       </footer>

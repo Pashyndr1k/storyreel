@@ -65,7 +65,7 @@ export default function RefPicker({ project, scene, shot, refs, onChange, onClos
     <div className="overlay" onClick={onClose}>
       <div className="modal wide refpick-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head-row">
-          <h3>{t('refs.title', { n: shot.number || '' })}</h3>
+          <h3 title={t('tip.refsTitle')}>{t('refs.title', { n: shot.number || '' })}</h3>
           <span className={`total-badge ${total >= H3_REF_CAPS.total ? 'warn' : ''}`}>
             {t('refs.budget', { a: total, b: H3_REF_CAPS.total })}
           </span>
@@ -75,7 +75,7 @@ export default function RefPicker({ project, scene, shot, refs, onChange, onClos
         {section('videos', t('refs.videos'))}
         {section('audios', t('refs.audios'))}
         <div className="modal-actions">
-          <button className="btn primary" onClick={onClose}>
+          <button title={t('tip.done')} className="btn primary" onClick={onClose}>
             {t('refs.done')}
           </button>
         </div>

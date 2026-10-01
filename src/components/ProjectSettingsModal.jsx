@@ -16,7 +16,7 @@ export default function ProjectSettingsModal({ project, update, styles, setStyle
       <label>{t(`pset.style_${cat}`)}</label>
       <p className="hint">{t(`pset.styleHint_${cat}`)}</p>
       <div className="row">
-        <select
+        <select title={t(`pset.styleHint_${cat}`)}
           className="grow"
           value={project[idField[cat]] || ''}
           onChange={(e) => update({ [idField[cat]]: e.target.value })}
@@ -26,7 +26,7 @@ export default function ProjectSettingsModal({ project, update, styles, setStyle
             <option key={s.id} value={s.id}>{styleLabel(s, t)}</option>
           ))}
         </select>
-        <button className="btn small" onClick={() => setManageCat(cat)}>{t('pset.manage')}</button>
+        <button title={t('tip.manageStyles')} className="btn small" onClick={() => setManageCat(cat)}>{t('pset.manage')}</button>
       </div>
     </div>
   );
@@ -34,7 +34,7 @@ export default function ProjectSettingsModal({ project, update, styles, setStyle
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal wide" onClick={(e) => e.stopPropagation()}>
-        <h2>{t('pset.title')}</h2>
+        <h2 title={t('tip.psetTitle')}>{t('pset.title')}</h2>
 
         <label>{t('pset.projectTitle')}</label>
         <input
@@ -54,7 +54,7 @@ export default function ProjectSettingsModal({ project, update, styles, setStyle
         {STYLE_CATEGORIES.map((c) => selector(c))}
 
         <div className="modal-actions">
-          <button className="btn primary" onClick={onClose}>{t('pset.done')}</button>
+          <button title={t('tip.done')} className="btn primary" onClick={onClose}>{t('pset.done')}</button>
         </div>
       </div>
 

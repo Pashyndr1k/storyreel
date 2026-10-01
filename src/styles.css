@@ -3610,6 +3610,33 @@ select.prompt-model:hover:not(:disabled) { border-color: var(--ink); color: var(
 /* ---- 2.9: actor groups (Stage 2) ----------------------------------------- */
 .char-card.group-card { border-left: 2px solid var(--accent); }
 .section-actions { display: flex; align-items: center; gap: 10px; margin: 10px 0 18px; }
+
+/* ---- 2.9: help button + the character-rules panel ------------------------ */
+.help-btn {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--muted-2);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: help;
+  transition: border-color 0.15s, color 0.15s;
+}
+.help-btn:hover { border-color: var(--accent); color: var(--accent); }
+.modal.help-modal { width: 860px; max-width: 100%; }
+.help-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 28px; margin-top: 10px; }
+@media (max-width: 760px) { .help-cols { grid-template-columns: 1fr; } }
+.help-sec h3 { margin: 12px 0 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.help-sec ul { margin: 0; padding-left: 16px; }
+.help-sec li { margin: 0 0 6px; font-size: 13px; line-height: 1.55; color: var(--text-2); }
 .grp-members { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0 2px; }
 .grp-member {
   display: inline-flex;

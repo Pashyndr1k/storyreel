@@ -28,7 +28,7 @@ export function StylePicker({ project, update, styles }) {
       {['script', 'image', 'video'].map((cat) => (
         <div className="style-pick" key={cat}>
           <label>{t(`stind.${cat}`)}</label>
-          <select
+          <select title={t(`pset.styleHint_${cat}`)}
             value={project[ID_FIELD[cat]] || ''}
             onChange={(e) => update({ [ID_FIELD[cat]]: e.target.value })}
           >

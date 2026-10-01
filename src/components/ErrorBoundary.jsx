@@ -26,14 +26,14 @@ export default class ErrorBoundary extends Component {
         <div className="app-page">
           <div className="app-frame" style={{ display: 'block' }}>
             <div className="crash">
-              <h2>Something went wrong</h2>
+              <h2 title="The view crashed; your projects are stored separately and are safe">Something went wrong</h2>
               <p className="stage-desc">
                 This view hit an unexpected error. Your projects are safe.
               </p>
               <pre className="crash-detail">{String(this.state.error?.message || this.state.error)}</pre>
               <div className="row">
-                <button className="btn primary" onClick={this.goHome}>Back to projects</button>
-                <button className="btn" onClick={() => window.location.reload()}>Reload app</button>
+                <button title="Return to the project list" className="btn primary" onClick={this.goHome}>Back to projects</button>
+                <button title="Reload the application" className="btn" onClick={() => window.location.reload()}>Reload app</button>
               </div>
             </div>
           </div>

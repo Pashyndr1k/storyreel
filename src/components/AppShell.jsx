@@ -41,12 +41,12 @@ export default function AppShell({
     <div className="app-page">
       <header className="hd">
         <div className="hd-inner">
-          <button className="hd-logo" aria-label="StoryReel" onClick={() => onNavigate('home')}>
+          <button title={t('tip.home')} className="hd-logo" aria-label="StoryReel" onClick={() => onNavigate('home')}>
             <Logo size={26} />
           </button>
           <div className="hd-brand">
             <span className="hd-name">StoryReel</span>
-            <span className="hd-ver">v{__APP_VERSION__}</span>
+            <span className="hd-ver" title={t('ind.version')}>v{__APP_VERSION__}</span>
           </div>
           <nav className="hd-nav">
             {navItem('home', <Grid size={18} />, t('nav.projects'))}

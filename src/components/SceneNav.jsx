@@ -16,6 +16,7 @@ export default function SceneNav({ outline, currentId, isDone, onSelect }) {
             key={s.id}
             type="button"
             className={`scn ${sel ? 'sel' : ''} ${done ? 'done' : ''}`}
+            title={`${i + 1}. ${s.title || t('s4.untitled')}${done ? ` — ${t('ind.sceneDone')}` : ''}`}
             onClick={() => onSelect(s.id)}
           >
             <span className="scn-num">{String(i + 1).padStart(2, '0')}</span>

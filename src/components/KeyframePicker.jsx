@@ -39,8 +39,8 @@ export default function KeyframePicker({ project, shot, durationSec, onChange, o
     <div className="overlay" onClick={onClose}>
       <div className="modal wide refpick-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head-row">
-          <h3>{t('keys.title', { n: shot.number || '' })}</h3>
-          <span className="total-badge">{t('keys.window', { s: maxAt.toFixed(1) })}</span>
+          <h3 title={t('tip.keysTitle')}>{t('keys.title', { n: shot.number || '' })}</h3>
+          <span className="total-badge" title={t('ind.keysWindow')}>{t('keys.window', { s: maxAt.toFixed(1) })}</span>
         </div>
         <p className="hint">{t('keys.hint')}</p>
 
@@ -143,7 +143,7 @@ export default function KeyframePicker({ project, shot, durationSec, onChange, o
         </div>
 
         <div className="modal-actions">
-          <button className="btn primary" onClick={onClose}>
+          <button title={t('tip.done')} className="btn primary" onClick={onClose}>
             {t('refs.done')}
           </button>
         </div>

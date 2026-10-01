@@ -70,8 +70,8 @@ export default function ProjectCard({ project, onOpen, onArchive, onRestore, onD
               <Star size={13} filled={!!project.pinned} />
             </button>
           )}
-          <span>{date}</span>
-          <span className="pc-prog">
+          <span title={t('ind.created')}>{date}</span>
+          <span className="pc-prog" title={t('ind.progress', { a: stage, b: STAGE_COUNT })}>
             <span className="pc-segs">
               {Array.from({ length: STAGE_COUNT }, (_, i) => i + 1).map((n) => (
                 <span key={n} className={`pc-seg ${n <= stage ? 'on' : ''}`} />
@@ -80,10 +80,10 @@ export default function ProjectCard({ project, onOpen, onArchive, onRestore, onD
             <span className="pc-count">{stage}/{STAGE_COUNT}</span>
           </span>
         </div>
-        <h4 className="pc-title">{project.title}</h4>
+        <h4 className="pc-title" title={project.title}>{project.title}</h4>
         <div className="pc-tags">
           {project.genres.slice(0, 3).map((g) => (
-            <span key={g} className="pc-tag">{g}</span>
+            <span key={g} className="pc-tag" title={t('ind.genre')}>{g}</span>
           ))}
           {!project.genres.length && <span className="pc-tag">{t('card.noGenre')}</span>}
         </div>

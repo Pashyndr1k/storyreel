@@ -35,7 +35,7 @@ export default function Dropdown({ value, options, onChange, icon, pill, title, 
       {open && (
         <div className="dd-menu" role="listbox">
           {options.map((o) => (
-            <button
+            <button title={String(o.label)}
               key={o.value}
               type="button"
               role="option"

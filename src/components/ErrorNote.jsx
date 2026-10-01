@@ -7,7 +7,7 @@ export default function ErrorNote({ error, onSettings }) {
     return (
       <div className="note warn">
         {t('err.noKey')}{' '}
-        <button className="btn small" onClick={onSettings}>{t('err.openSettings')}</button>
+        <button title={t('tip.openSettings')} className="btn small" onClick={onSettings}>{t('err.openSettings')}</button>
       </div>
     );
   }

@@ -51,11 +51,11 @@ export default function DynamicsVisualizer({ plan, playhead = null }) {
       {open && (
         <div className="overlay" onClick={() => setOpen(false)}>
           <div className="modal dyn-modal" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="modal-x" aria-label="close" onClick={() => setOpen(false)}>
+            <button title={t('tip.close')} type="button" className="modal-x" aria-label="close" onClick={() => setOpen(false)}>
               ✕
             </button>
-            <h2>{t('dyn.title')}</h2>
-            <p className="dyn-viz-meta">
+            <h2 title={t('tip.dyn')}>{t('dyn.title')}</h2>
+            <p className="dyn-viz-meta" title={t('ind.dynMeta')}>
               {t(`dyn.curve_${plan.global_pacing_curve}`)} · {blocks.length} {t('dyn.blocks')}
             </p>
             <div className="dyn-viz-body">

@@ -39,7 +39,7 @@ export default function StyleAssistant({ settings, category, onSave, onClose, on
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal wide" onClick={(e) => e.stopPropagation()}>
-        <h2>
+        <h2 title={t('sa.intro')}>
           <Stars size={16} />{t('sa.title')}
         </h2>
         <p className="hint">{t('sa.intro')}</p>
@@ -47,7 +47,7 @@ export default function StyleAssistant({ settings, category, onSave, onClose, on
         <label>{t('sa.category')}</label>
         <div className="style-tabs">
           {STYLE_CATEGORIES.map((c) => (
-            <button
+            <button title={t(`styles.hint_${c}`)}
               key={c}
               type="button"
               className={`chip ${cat === c ? 'active' : ''}`}
@@ -74,7 +74,7 @@ export default function StyleAssistant({ settings, category, onSave, onClose, on
 
         {!draft && (
           <div className="row" style={{ marginTop: 10 }}>
-            <button className="btn primary fixedw-lg" disabled={busy || !idea.trim()} onClick={propose}>
+            <button title={t('tip.saPropose')} className="btn primary fixedw-lg" disabled={busy || !idea.trim()} onClick={propose}>
               {busy ? t('sa.thinking') : t('sa.propose')}
             </button>
           </div>
@@ -107,10 +107,10 @@ export default function StyleAssistant({ settings, category, onSave, onClose, on
                   if (e.key === 'Enter' && refinement.trim() && !busy) refine();
                 }}
               />
-              <button className="btn small" disabled={busy || !refinement.trim()} onClick={refine}>
+              <button title={t('tip.saApply')} className="btn small" disabled={busy || !refinement.trim()} onClick={refine}>
                 {t('sa.apply')}
               </button>
-              <button className="btn small" disabled={busy} onClick={propose}>
+              <button title={t('tip.saAgain')} className="btn small" disabled={busy} onClick={propose}>
                 {t('sa.again')}
               </button>
             </div>
@@ -118,8 +118,8 @@ export default function StyleAssistant({ settings, category, onSave, onClose, on
         )}
 
         <div className="modal-actions">
-          <button className="btn" onClick={onClose}>{t('styles.cancel')}</button>
-          <button
+          <button title={t('tip.cancel')} className="btn" onClick={onClose}>{t('styles.cancel')}</button>
+          <button title={t('tip.saSave')}
             className="btn primary"
             disabled={busy || !draft?.name.trim() || !draft?.instructions.trim()}
             onClick={save}

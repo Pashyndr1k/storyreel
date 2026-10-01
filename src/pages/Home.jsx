@@ -139,12 +139,12 @@ export default function Home({
             />
           </div>
           <Dropdown value={sort} options={sortOptions} onChange={setSort} title={t('home.newest')} />
-          <label className="btn file-btn">
+          <label className="btn file-btn" title={t('tip.importProject')}>
             <Upload size={14} />
             {t('home.import')}
             <input type="file" accept=".zip,.md,.json,application/zip,text/markdown,application/json" className="sr-only" onChange={importProject} />
           </label>
-          <button className="btn primary" onClick={() => setShowNew(true)}>
+          <button title={t('tip.newProject')} className="btn primary" onClick={() => setShowNew(true)}>
             <Plus size={14} />
             {t('home.newProject')}
           </button>
@@ -157,7 +157,7 @@ export default function Home({
           {active.length === 0 ? (
             <>
               <p>{t('home.noProjects')}</p>
-              <button className="btn primary" onClick={() => setShowNew(true)}>
+              <button title={t('tip.newProject')} className="btn primary" onClick={() => setShowNew(true)}>
                 <Plus size={16} />
                 {t('home.createFirst')}
               </button>

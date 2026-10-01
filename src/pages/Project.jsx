@@ -170,7 +170,7 @@ export default function Project({ project, updateProject, settings, setSettings,
           const done = s.n < project.stage;
           const pos = sel ? 'sel' : s.n === view - 1 ? 'nb-left' : s.n === view + 1 ? 'nb-right' : 'far';
           return (
-            <button
+            <button title={s.n > project.stage ? t('tip.stageLocked') : t('tip.stageGo', { s: s.label })}
               key={s.n}
               className={`stg ${pos}`}
               disabled={s.n > project.stage}
@@ -195,7 +195,7 @@ export default function Project({ project, updateProject, settings, setSettings,
         <div className="stale-toast">
           <p>{t('stale.msg', { n: staleFrom })}</p>
           <div className="row">
-            <button
+            <button title={t('tip.staleGo')}
               className="btn small primary"
               onClick={() => {
                 setView(Math.min(staleFrom + 1, STAGE_COUNT));
@@ -204,7 +204,7 @@ export default function Project({ project, updateProject, settings, setSettings,
             >
               {t('stale.go', { n: Math.min(staleFrom + 1, STAGE_COUNT) })}
             </button>
-            <button className="btn small" onClick={() => setStaleFrom(null)}>
+            <button title={t('tip.staleDismiss')} className="btn small" onClick={() => setStaleFrom(null)}>
               {t('stale.dismiss')}
             </button>
           </div>

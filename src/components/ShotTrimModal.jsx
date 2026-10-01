@@ -138,7 +138,7 @@ export default function ShotTrimModal({ item, index, locked = false, onApply, on
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal trim-modal" onClick={(e) => e.stopPropagation()}>
-        <h2>{t('trim.title', { n: index + 1 })}</h2>
+        <h2 title={t('tip.trimTitle')}>{t('trim.title', { n: index + 1 })}</h2>
 
         <div className="trim-view">
           {hasVideo ? (
@@ -193,26 +193,26 @@ export default function ShotTrimModal({ item, index, locked = false, onApply, on
             {hasVideo && (
               <span className="nle-nudge">
                 {t('trim.in')}
-                <button type="button" disabled={locked || inP <= 0} onClick={() => setIn(inP - STEP)}>−</button>
+                <button title={t('tip.inLess')} type="button" disabled={locked || inP <= 0} onClick={() => setIn(inP - STEP)}>−</button>
                 <i className="trim-val">{fmt(inP)}</i>
-                <button type="button" disabled={locked || outP - inP <= SHOT_MIN_SEC} onClick={() => setIn(inP + STEP)}>+</button>
+                <button title={t('tip.inMore')} type="button" disabled={locked || outP - inP <= SHOT_MIN_SEC} onClick={() => setIn(inP + STEP)}>+</button>
               </span>
             )}
             <span className="nle-nudge">
               {t('trim.out')}
-              <button type="button" disabled={locked || outP - inP <= SHOT_MIN_SEC} onClick={() => setOut(outP - STEP)}>−</button>
+              <button title={t('tip.outLess')} type="button" disabled={locked || outP - inP <= SHOT_MIN_SEC} onClick={() => setOut(outP - STEP)}>−</button>
               <i className="trim-val">{fmt(outP)}</i>
-              <button type="button" disabled={locked || outP - inP >= SHOT_MAX_SEC} onClick={() => setOut(outP + STEP)}>+</button>
+              <button title={t('tip.outMore')} type="button" disabled={locked || outP - inP >= SHOT_MAX_SEC} onClick={() => setOut(outP + STEP)}>+</button>
             </span>
-            <span className="trim-len">{t('trim.len')} <b>{fmt(length)}</b></span>
+            <span className="trim-len" title={t('ind.trimLen')}>{t('trim.len')} <b>{fmt(length)}</b></span>
           </span>
         </div>
         {locked && <p className="hint">{t('trim.takeNote')}</p>}
         {!hasVideo && !locked && <p className="hint">{t('trim.noVideo')}</p>}
 
         <div className="modal-actions">
-          <button className="btn small" onClick={onClose}>{t('s6.close')}</button>
-          <button
+          <button title={t('tip.close')} className="btn small" onClick={onClose}>{t('s6.close')}</button>
+          <button title={t('tip.trimApply')}
             className="btn small primary"
             disabled={locked || !changed}
             onClick={() => {

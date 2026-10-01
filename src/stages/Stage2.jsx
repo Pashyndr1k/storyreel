@@ -11,6 +11,7 @@ import { useI18n } from '../lib/i18n.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import Lightbox from '../components/Lightbox.jsx';
+import CharacterHelp from '../components/CharacterHelp.jsx';
 import VoiceButton from '../components/VoiceButton.jsx';
 import LibraryPicker from '../components/LibraryPicker.jsx';
 import { StylePicker } from '../components/StyleControls.jsx';
@@ -20,6 +21,7 @@ export default function Stage2({ project, update, rawUpdate, settings, goNext, o
   const [pickFor, setPickFor] = useState(null); // character id awaiting a library pick
   const { t } = useI18n();
   const [lightbox, setLightbox] = useState(null); // full-size photo pop-up
+  const [charHelp, setCharHelp] = useState(false); // the character-profile rules panel
   const { busy, error, run } = useGenerate(settings);
   const storyline = project.storyline;
 
@@ -234,13 +236,13 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
     if (coverErr === 'NO_GEMINI_KEY')
       return (
         <div className="note warn">
-          {t('err.noGeminiKey')} <button className="btn small" onClick={onSettings}>{t('err.openSettings')}</button>
+          {t('err.noGeminiKey')} <button title={t('tip.openSettings')} className="btn small" onClick={onSettings}>{t('err.openSettings')}</button>
         </div>
       );
     if (coverErr === 'NO_KEY')
       return (
         <div className="note warn">
-          {t('err.noKey')} <button className="btn small" onClick={onSettings}>{t('err.openSettings')}</button>
+          {t('err.noKey')} <button title={t('tip.openSettings')} className="btn small" onClick={onSettings}>{t('err.openSettings')}</button>
         </div>
       );
     return <div className="note error">{t('err.failed')} {coverErr}</div>;
@@ -256,7 +258,7 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
       </details>
 
       <div className="row">
-        <button className="btn primary" disabled={busy} onClick={generate}>
+        <button title={t('tip.s2Generate')} className="btn primary" disabled={busy} onClick={generate}>
           {!storyline && <Stars size={14} />} {busy ? t('gen.generating') : storyline ? t('s2.regenerate') : t('s2.generate')}
         </button>
       </div>
@@ -291,7 +293,7 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
                   {coverBusy && <div className="cover-loading">{t('cover.generating')}</div>}
                 </div>
                 {!project.cover && (
-                  <button className="btn small" disabled={coverBusy} onClick={genCover}>
+                  <button title={t('tip.cover')} className="btn small" disabled={coverBusy} onClick={genCover}>
                     {!project.cover && <Stars size={14} />} {coverBusy ? t('cover.generating') : t('cover.generate')}
                   </button>
                 )}
@@ -316,7 +318,10 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
           </div>
 
           <div className="section-head">
-            <label>{t('s2.characters')}</label>
+            <label title={t('chelp.intro')}>{t('s2.characters')}</label>
+            <button type="button" className="help-btn" title={t('chelp.open')} aria-label={t('chelp.open')} onClick={() => setCharHelp(true)}>
+              ?
+            </button>
           </div>
           {storyline.characters.map((c) => (
             <div key={c.id} className="char-card">
@@ -325,28 +330,31 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
                   className="grow"
                   value={c.name}
                   placeholder={t('s2.name')}
+                  title={t('chint.name')}
                   onChange={(e) => updateChar(c.id, { name: e.target.value })}
                 />
                 <input
                   className="grow"
                   value={c.role}
                   placeholder={t('s2.role')}
+                  title={t('chint.role')}
                   onChange={(e) => updateChar(c.id, { role: e.target.value })}
                 />
-                <button className="btn danger small" onClick={() => removeChar(c.id)}>✕</button>
+                <button title={t('tip.removeChar')} className="btn danger small" onClick={() => removeChar(c.id)}>✕</button>
               </div>
               <AutoTextarea
                 minRows={3}
                 value={c.description}
                 placeholder={t('s2.charDesc')}
+                title={t('chint.desc')}
                 onChange={(e) => updateChar(c.id, { description: e.target.value })}
               />
-              <label className="photos-label">{t('char.photos')}</label>
+              <label className="photos-label" title={t('chint.photos')}>{t('char.photos')}</label>
               <div className="photo-row">
                 {(c.photos || []).map((ph, i) => (
                   <div key={i} className="photo-thumb">
-                    <img decoding="async" loading="lazy" src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
-                    <button className="photo-x" onClick={() => removePhoto(c.id, i)}>✕</button>
+                    <img decoding="async" loading="lazy" src={ph} alt="" title={t(i === 0 ? 'chint.photo1' : 'chint.photoN')} onClick={() => setLightbox({ kind: 'img', src: ph })} />
+                    <button title={t('tip.removePhoto')} className="photo-x" onClick={() => removePhoto(c.id, i)}>✕</button>
                   </div>
                 ))}
                 {(c.photos || []).length < 3 && (
@@ -386,7 +394,7 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
                   </>
                 )}
                 {(c.photos || []).length > 0 && (
-                  <button className="btn small" disabled={busy} onClick={() => extract(c)}>
+                  <button title={t('tip.extract')} className="btn small" disabled={busy} onClick={() => extract(c)}>
                     <Stars size={14} />{busy ? t('gen.generating') : t('char.extract')}
                   </button>
                 )}
@@ -399,7 +407,7 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
           {/* both add-buttons sit right after the last character; what a group
               is lives in the hover hint, not on the page */}
           <div className="section-actions">
-            <button className="btn small" onClick={addChar}>{t('s2.addChar')}</button>
+            <button title={t('tip.addChar')} className="btn small" onClick={addChar}>{t('s2.addChar')}</button>
             <button className="btn small" title={t('grp.hint')} onClick={addGroup}>{t('grp.add')}</button>
           </div>
 
@@ -466,10 +474,11 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
       )}
 
       <footer className="stage-footer">
-        <button className="btn primary big" disabled={!storyline || !storyline.synopsis.trim()} onClick={goNext}>
+        <button title={t('tip.continue')} className="btn primary big" disabled={!storyline || !storyline.synopsis.trim()} onClick={goNext}>
           {t('s2.continue')}
         </button>
       </footer>
+      {charHelp && <CharacterHelp onClose={() => setCharHelp(false)} />}
       <Lightbox item={lightbox} onClose={() => setLightbox(null)} />
     </section>
   );

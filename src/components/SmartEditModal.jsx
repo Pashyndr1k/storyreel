@@ -153,7 +153,7 @@ export default function SmartEditModal({ project, update, settings, genLang, onC
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal wide" onClick={(e) => e.stopPropagation()}>
-        <h2>{t('edit.title')}</h2>
+        <h2 title={t('edit.desc')}>{t('edit.title')}</h2>
         <p className="hint">{t('edit.desc')}</p>
         <div className="voice-row">
           <AutoTextarea
@@ -173,7 +173,7 @@ export default function SmartEditModal({ project, update, settings, genLang, onC
         {error === 'NO_KEY' || error === 'NO_GEMINI_KEY' ? (
           <div className="note warn">
             {t(error === 'NO_GEMINI_KEY' ? 'err.noGeminiKey' : 'err.noKey')}{' '}
-            <button className="btn small" onClick={onSettings}>{t('err.openSettings')}</button>
+            <button title={t('tip.openSettings')} className="btn small" onClick={onSettings}>{t('err.openSettings')}</button>
           </div>
         ) : error ? (
           <div className="note error">{t('err.failed')} {error}</div>
@@ -185,13 +185,13 @@ export default function SmartEditModal({ project, update, settings, genLang, onC
         )}
 
         <div className="modal-actions">
-          <button className="btn" onClick={onClose}>{t('set.cancel')}</button>
+          <button title={t('tip.cancel')} className="btn" onClick={onClose}>{t('set.cancel')}</button>
           {busy && (
-            <button className="btn danger" onClick={stop}>
+            <button title={t('tip.stop')} className="btn danger" onClick={stop}>
               {t('edit.stop')}
             </button>
           )}
-          <button className="btn primary" disabled={busy || !instruction.trim()} onClick={apply}>
+          <button title={t('tip.smartApply')} className="btn primary" disabled={busy || !instruction.trim()} onClick={apply}>
             {busy ? `${t('edit.applying')} ${elapsed}s` : t('edit.apply')}
           </button>
         </div>

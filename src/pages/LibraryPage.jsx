@@ -45,12 +45,12 @@ export default function LibraryPage({ kind, library, libUpsert, libDelete, setti
           <span className="count-chip">{entries.length}</span>
         </div>
         <div className="title-actions">
-          <select value={sort} onChange={(e) => setSort(e.target.value)} className="lang-select">
+          <select title={t('tip.libSort')} value={sort} onChange={(e) => setSort(e.target.value)} className="lang-select">
             <option value="date">{t('lib.sort_date')}</option>
             <option value="project">{t('lib.sort_project')}</option>
             <option value="type">{t('lib.sort_type')}</option>
           </select>
-          <button className="btn primary" onClick={() => setEditing(newLibraryEntry(kind))}>
+          <button title={t('tip.libAdd')} className="btn primary" onClick={() => setEditing(newLibraryEntry(kind))}>
             {t('lib.add')}
           </button>
         </div>
@@ -71,10 +71,10 @@ export default function LibraryPage({ kind, library, libUpsert, libDelete, setti
               </div>
               <div className="sr-body">
                 <div className="sr-body-main">
-                  <h3 className="sr-title">{e.name || t('lib.unnamed')}</h3>
+                  <h3 title={e.name || ''} className="sr-title">{e.name || t('lib.unnamed')}</h3>
                   <div className="sr-tags">
-                    <span className="sr-tag">{t(`type.${e.type}`)}</span>
-                    {e.projectTitle && <span className="sr-tag muted">{e.projectTitle}</span>}
+                    <span className="sr-tag" title={t('ind.libType')}>{t(`type.${e.type}`)}</span>
+                    {e.projectTitle && <span className="sr-tag muted" title={t('ind.libProject')}>{e.projectTitle}</span>}
                   </div>
                   <div className="card-meta">
                     <span>{new Date(e.createdAt).toLocaleDateString(localeOf(lang), { month: 'short', day: 'numeric', year: 'numeric' })}</span>
@@ -82,8 +82,8 @@ export default function LibraryPage({ kind, library, libUpsert, libDelete, setti
                 </div>
               </div>
               <div className="sr-actions">
-                <button className="btn small" onClick={() => setEditing({ ...e })}>{t('styles.edit')}</button>
-                <button className="btn danger small" onClick={() => del(e)}>{t('styles.delete')}</button>
+                <button title={t('tip.edit')} className="btn small" onClick={() => setEditing({ ...e })}>{t('styles.edit')}</button>
+                <button title={t('tip.delete')} className="btn danger small" onClick={() => del(e)}>{t('styles.delete')}</button>
               </div>
             </div>
           ))}
@@ -93,11 +93,11 @@ export default function LibraryPage({ kind, library, libUpsert, libDelete, setti
       {editing && (
         <div className="overlay" onClick={() => setEditing(null)}>
           <div className="modal wide" onClick={(e) => e.stopPropagation()}>
-            <h2>{editing.name ? editing.name : t(`lib.title_${kind}`)}</h2>
+            <h2 title={t('tip.libEdit')}>{editing.name ? editing.name : t(`lib.title_${kind}`)}</h2>
             <label>{t('lib.name')}</label>
             <input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} autoFocus />
             <label>{t('lib.type')}</label>
-            <select value={editing.type} onChange={(e) => setEditing({ ...editing, type: e.target.value })}>
+            <select title={t('tip.libType')} value={editing.type} onChange={(e) => setEditing({ ...editing, type: e.target.value })}>
               {types.map((ty) => (
                 <option key={ty} value={ty}>{t(`type.${ty}`)}</option>
               ))}
@@ -113,7 +113,7 @@ export default function LibraryPage({ kind, library, libUpsert, libDelete, setti
               {editing.photos.map((ph, i) => (
                 <div key={i} className="photo-thumb">
                   <img decoding="async" loading="lazy" src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
-                  <button
+                  <button title={t('tip.removePhoto')}
                     className="photo-x"
                     onClick={() => setEditing({ ...editing, photos: editing.photos.filter((_, j) => j !== i) })}
                   >
@@ -122,7 +122,7 @@ export default function LibraryPage({ kind, library, libUpsert, libDelete, setti
                 </div>
               ))}
               {editing.photos.length < 3 && (
-                <label className="btn small file-btn">
+                <label className="btn small file-btn" title={t('pick.upload')}>
                   {t('char.addPhoto')}
                   <input
                     type="file"
@@ -138,8 +138,8 @@ export default function LibraryPage({ kind, library, libUpsert, libDelete, setti
               )}
             </div>
             <div className="modal-actions">
-              <button className="btn" onClick={() => setEditing(null)}>{t('styles.cancel')}</button>
-              <button
+              <button title={t('tip.cancel')} className="btn" onClick={() => setEditing(null)}>{t('styles.cancel')}</button>
+              <button title={t('tip.save')}
                 className="btn primary"
                 disabled={!editing.name.trim() && !editing.photos.length}
                 onClick={() => {

@@ -213,8 +213,8 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
         <label>{t('set.backupProjects')}</label>
         <p className="hint">{t('set.backupProjectsHint')}</p>
         <div className="row">
-          <button className="btn small" onClick={exportProjects}>{t('set.export')}</button>
-          <label className="btn small file-btn">
+          <button title={t('tip.exportProjects')} className="btn small" onClick={exportProjects}>{t('set.export')}</button>
+          <label className="btn small file-btn" title={t('tip.importProjects')}>
             {t('set.import')}
             <input type="file" accept=".json,application/json" onChange={importProjects} className="sr-only" />
           </label>
@@ -224,8 +224,8 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
         <label>{t('set.backupStyles')}</label>
         <p className="hint">{t('set.backupStylesHint')}</p>
         <div className="row">
-          <button className="btn small" onClick={exportStyles}>{t('set.export')}</button>
-          <label className="btn small file-btn">
+          <button title={t('tip.exportStyles')} className="btn small" onClick={exportStyles}>{t('set.export')}</button>
+          <label className="btn small file-btn" title={t('tip.importStyles')}>
             {t('set.import')}
             <input type="file" accept=".json,application/json" onChange={importStyles} className="sr-only" />
           </label>
@@ -242,13 +242,13 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
           />
           {hasFolderIO && (
             <>
-              <button
+              <button title={t('tip.browse')}
                 className="btn small"
                 onClick={() => pickDir(projectsDir, setProjectsDir, t('set.projectsDir'))}
               >
                 {t('set.browse')}
               </button>
-              <button className="btn small" onClick={() => window.localFiles.openDirectory(projectsDir)}>
+              <button title={t('tip.openFolder')} className="btn small" onClick={() => window.localFiles.openDirectory(projectsDir)}>
                 {t('set.openFolder')}
               </button>
             </>
@@ -256,7 +256,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
         </div>
         {hasFolderIO && (
           <div className="row" style={{ marginTop: 10 }}>
-            <button className="btn small" disabled={cleaning} onClick={cleanupStrayDirs}>
+            <button title={t('tip.cleanupDirs')} className="btn small" disabled={cleaning} onClick={cleanupStrayDirs}>
               {cleaning ? t('set.cleanupBusy') : t('set.cleanupDirs')}
             </button>
             {cleanMsg && <span className="hint" style={{ margin: 0 }}>{cleanMsg}</span>}
@@ -292,7 +292,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
             <div className="dir-row">
               <input value={comfyOutputDir} onChange={(e) => setComfyOutputDir(e.target.value)} placeholder={DEFAULT_OUTPUT_DIR} />
               {hasFolderIO && (
-                <button
+                <button title={t('tip.browse')}
                   className="btn small"
                   onClick={() => pickDir(comfyOutputDir, setComfyOutputDir, t('set.comfyOutputDir'))}
                 >
@@ -310,7 +310,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
     <div className="set-cols">
       <div>
         <label>{t('set.model')}</label>
-        <select value={model} onChange={(e) => setModel(e.target.value)}>
+        <select title={t('tip.claudeModel')} value={model} onChange={(e) => setModel(e.target.value)}>
           {MODELS.map((m) => (
             <option key={m.id} value={m.id}>{m.label}</option>
           ))}
@@ -318,7 +318,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
         <label>{t('set.geminiModel')}</label>
         <input value={geminiModel} onChange={(e) => setGeminiModel(e.target.value)} placeholder={DEFAULT_IMAGE_MODEL} />
         <div className="row" style={{ marginTop: 8 }}>
-          <button className="btn small" disabled={fetching} onClick={fetchModels}>
+          <button title={t('tip.fetchModels')} className="btn small" disabled={fetching} onClick={fetchModels}>
             {fetching ? t('set.fetching') : t('set.fetchModels')}
           </button>
         </div>
@@ -326,7 +326,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
         {modelList && (modelList.length ? (
           <>
             <label className="sub-label">{t('set.modelsFound')}</label>
-            <select value={geminiModel} onChange={(e) => setGeminiModel(e.target.value)}>
+            <select title={t('tip.geminiModel')} value={geminiModel} onChange={(e) => setGeminiModel(e.target.value)}>
               {!modelList.includes(geminiModel) && <option value={geminiModel}>{geminiModel}</option>}
               {modelList.map((m) => (
                 <option key={m} value={m}>{m}</option>
@@ -339,17 +339,17 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
       </div>
       <div>
         <label>{t('set.textService')}</label>
-        <select value={textService} onChange={(e) => setTextService(e.target.value)}>
+        <select title={t('tip.textService')} value={textService} onChange={(e) => setTextService(e.target.value)}>
           <option value="claude">{t('set.svcClaude')}</option>
           <option value="gemini">{t('set.svcGeminiText')}</option>
         </select>
         <label>{t('set.storyboardService')}</label>
-        <select value={storyboardService} onChange={(e) => setStoryboardService(e.target.value)}>
+        <select title={t('tip.sbService')} value={storyboardService} onChange={(e) => setStoryboardService(e.target.value)}>
           <option value="gemini">{t('set.svcGemini')}</option>
           <option value="comfy">{t('set.svcComfySb')}</option>
         </select>
         <label>{t('set.imageService')}</label>
-        <select value={imageService} onChange={(e) => setImageService(e.target.value)}>
+        <select title={t('tip.imageService')} value={imageService} onChange={(e) => setImageService(e.target.value)}>
           <option value="gemini">{t('set.svcGemini')}</option>
           <option value="comfy">{t('set.svcComfyImg')}</option>
         </select>
@@ -361,11 +361,11 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
     <div className="set-cols">
       <div>
         <label>{t('set.videoService')}</label>
-        <select value={videoService} onChange={(e) => setVideoService(e.target.value)}>
+        <select title={t('tip.videoService')} value={videoService} onChange={(e) => setVideoService(e.target.value)}>
           <option value="comfy">{t('set.svcComfyVid')}</option>
         </select>
         <label>{t('set.videoEngine')}</label>
-        <select value={videoEngine} onChange={(e) => setVideoEngine(e.target.value)}>
+        <select title={t('tip.videoEngine')} value={videoEngine} onChange={(e) => setVideoEngine(e.target.value)}>
           <option value="ltx">{t('set.engLtx')}</option>
           <option value="minimax">{t('set.engMinimax')}</option>
           <option value="kling">{t('set.engKling')}</option>
@@ -374,7 +374,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
         {videoEngine === 'kling' && (
           <>
             <label>{t('set.klingModel')}</label>
-            <select value={klingModel} onChange={(e) => setKlingModel(e.target.value)}>
+            <select title={t('tip.klingModel')} value={klingModel} onChange={(e) => setKlingModel(e.target.value)}>
               {KLING_MODELS.map((m) => (
                 <option key={m.id} value={m.id}>{m.label}</option>
               ))}
@@ -386,7 +386,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
         {videoEngine === 'minimax' && (
           <>
             <label>{t('set.refSize')}</label>
-            <select value={h3RefImageSize} onChange={(e) => setH3RefImageSize(e.target.value)}>
+            <select title={t('tip.refSize')} value={h3RefImageSize} onChange={(e) => setH3RefImageSize(e.target.value)}>
               <option value="match">{t('set.refSizeMatch')}</option>
               <option value="max">{t('set.refSizeMax')}</option>
             </select>
@@ -407,7 +407,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
     <>
       <label>{t('set.uiFont')}</label>
       <p className="hint">{t('set.uiFontHint')}</p>
-      <select
+      <select title={t('tip.uiFont')}
         value={uiFont}
         onChange={(e) => {
           setUiFont(e.target.value);
@@ -440,11 +440,11 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal set-modal" onClick={(e) => e.stopPropagation()}>
-        <h2>{t('set.title')}</h2>
+        <h2 title={t('tip.settingsTitle')}>{t('set.title')}</h2>
 
         <div className="set-tabs" role="tablist">
           {TABS.map(([id, label, Icon]) => (
-            <button
+            <button title={label}
               key={id}
               type="button"
               role="tab"
@@ -469,8 +469,8 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
         </div>
 
         <div className="modal-actions">
-          <button className="btn" onClick={onClose}>{t('set.cancel')}</button>
-          <button className="btn primary" onClick={save}>{t('set.save')}</button>
+          <button title={t('tip.cancel')} className="btn" onClick={onClose}>{t('set.cancel')}</button>
+          <button title={t('tip.saveSettings')} className="btn primary" onClick={save}>{t('set.save')}</button>
         </div>
       </div>
     </div>

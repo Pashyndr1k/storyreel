@@ -51,11 +51,11 @@ export default function StylesModal({ styles, setStyles, settings, onSettings, i
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal wide" onClick={(e) => e.stopPropagation()}>
-        <h2>{t('styles.title')}</h2>
+        <h2 title={t('tip.stylesTitle')}>{t('styles.title')}</h2>
 
         <div className="style-tabs">
           {STYLE_CATEGORIES.map((c) => (
-            <button
+            <button title={t(`styles.hint_${c}`)}
               key={c}
               type="button"
               className={`chip ${cat === c ? 'active' : ''}`}
@@ -96,14 +96,14 @@ export default function StylesModal({ styles, setStyles, settings, onSettings, i
               </label>
             )}
             <div className="row">
-              <button
+              <button title={t('tip.save')}
                 className="btn primary small"
                 disabled={!editing.name.trim() || !editing.instructions.trim()}
                 onClick={() => upsert({ ...editing, name: editing.name.trim() })}
               >
                 {t('styles.save')}
               </button>
-              <button className="btn small" onClick={() => setEditing(null)}>{t('styles.cancel')}</button>
+              <button title={t('tip.cancel')} className="btn small" onClick={() => setEditing(null)}>{t('styles.cancel')}</button>
             </div>
           </div>
         ) : (
@@ -113,20 +113,20 @@ export default function StylesModal({ styles, setStyles, settings, onSettings, i
               {list.map((s) => (
                 <div key={s.id} className="style-item">
                   <div className="style-item-body">
-                    <strong>{s.name}{s.plus && <span className="sr-tag plus-tag">{t('styles.plusTag')}</span>}</strong>
+                    <strong>{s.name}{s.plus && <span className="sr-tag plus-tag" title={t('styles.plusHint')}>{t('styles.plusTag')}</span>}</strong>
                     <span>{s.instructions}</span>
                   </div>
                   <div className="style-item-actions">
-                    <button className="btn tiny" onClick={() => setEditing({ ...s })}>{t('styles.edit')}</button>
-                    <button className="btn danger tiny" onClick={() => remove(s.id)}>{t('styles.delete')}</button>
+                    <button title={t('tip.edit')} className="btn tiny" onClick={() => setEditing({ ...s })}>{t('styles.edit')}</button>
+                    <button title={t('tip.delete')} className="btn danger tiny" onClick={() => remove(s.id)}>{t('styles.delete')}</button>
                   </div>
                 </div>
               ))}
             </div>
             <div className="row">
-              <button className="btn small" onClick={() => setEditing(newStyle())}>{t('styles.add')}</button>
+              <button title={t('tip.styleAdd')} className="btn small" onClick={() => setEditing(newStyle())}>{t('styles.add')}</button>
               {settings && (
-                <button className="btn small primary" onClick={() => setAssist(true)}>
+                <button title={t('tip.styleAssistant')} className="btn small primary" onClick={() => setAssist(true)}>
                   <Stars size={14} />{t('sa.button')}
                 </button>
               )}
@@ -137,15 +137,15 @@ export default function StylesModal({ styles, setStyles, settings, onSettings, i
         <div className="settings-io">
           <label>{t('styles.ioLabel')}</label>
           <div className="row">
-            <button className="btn small" onClick={exportStyles}>{t('styles.export')}</button>
-            <label className="btn small file-btn">
+            <button title={t('tip.exportStyles')} className="btn small" onClick={exportStyles}>{t('styles.export')}</button>
+            <label className="btn small file-btn" title={t('tip.importStyles')}>
               {t('styles.import')}
               <input type="file" accept=".json,application/json" onChange={importStyles} className="sr-only" />
             </label>
           </div>
         </div>
         <div className="modal-actions">
-          <button className="btn primary" onClick={onClose}>{t('styles.done')}</button>
+          <button title={t('tip.done')} className="btn primary" onClick={onClose}>{t('styles.done')}</button>
         </div>
       </div>
 

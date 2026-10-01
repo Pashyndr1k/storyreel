@@ -321,7 +321,7 @@ export default function App() {
         <div className="stale-toast update-toast">
           <p>{t('h3n.msg')}</p>
           <div className="row">
-            <button
+            <button title={t('tip.h3nOpen')}
               className="btn small primary"
               onClick={() => {
                 setSettings((s) => ({ ...s, h3NoticeShown: true }));
@@ -330,7 +330,7 @@ export default function App() {
             >
               {t('h3n.open')}
             </button>
-            <button className="btn small" onClick={() => setSettings((s) => ({ ...s, h3NoticeShown: true }))}>
+            <button title={t('tip.later')} className="btn small" onClick={() => setSettings((s) => ({ ...s, h3NoticeShown: true }))}>
               {t('upd.later')}
             </button>
           </div>
@@ -343,7 +343,7 @@ export default function App() {
             <a className="btn small primary" href={updateInfo.url} target="_blank" rel="noreferrer">
               {t('upd.get')}
             </a>
-            <button className="btn small" onClick={() => setUpdateInfo(null)}>
+            <button title={t('tip.later')} className="btn small" onClick={() => setUpdateInfo(null)}>
               {t('upd.later')}
             </button>
           </div>

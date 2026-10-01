@@ -82,13 +82,13 @@ export default function StylesPage({ styles, setStyles, settings, setSettings, o
               aria-label={t('styles.searchPh')}
             />
           </div>
-          <label className="btn file-btn">
+          <label className="btn file-btn" title={t('tip.importStyles')}>
             {t('styles.import')}
             <input type="file" accept=".json,application/json" onChange={importStyles} className="sr-only" />
           </label>
-          <button className="btn" onClick={exportStyles}>{t('styles.export')}</button>
-          <button className="btn" onClick={() => setEditing(newStyle())}>{t('styles.add')}</button>
-          <button className="btn primary" onClick={() => setAssist(true)}>
+          <button title={t('tip.exportStyles')} className="btn" onClick={exportStyles}>{t('styles.export')}</button>
+          <button title={t('tip.styleAdd')} className="btn" onClick={() => setEditing(newStyle())}>{t('styles.add')}</button>
+          <button title={t('tip.styleAssistant')} className="btn primary" onClick={() => setAssist(true)}>
             <Stars size={14} />{t('sa.button')}
           </button>
         </div>
@@ -96,7 +96,7 @@ export default function StylesPage({ styles, setStyles, settings, setSettings, o
 
       <div className="style-tabs page-tabs">
         {STYLE_CATEGORIES.map((c) => (
-          <button
+          <button title={t(`styles.hint_${c}`)}
             key={c}
             type="button"
             className={`chip ${cat === c ? 'active' : ''}`}
@@ -106,7 +106,7 @@ export default function StylesPage({ styles, setStyles, settings, setSettings, o
             }}
           >
             {t(`styles.cat_${c}`)}
-            <span className="chip-count">{(styles[c] || []).length}</span>
+            <span className="chip-count" title={t('ind.count')}>{(styles[c] || []).length}</span>
           </button>
         ))}
       </div>
@@ -120,16 +120,16 @@ export default function StylesPage({ styles, setStyles, settings, setSettings, o
             <div key={s.id} className="sr-card style-card">
               <div className="sr-body">
                 <div className="sr-body-main">
-                  <h3 className="sr-title">{s.name}</h3>
-                  {s.builtin && <span className="sr-tag muted">{t('styles.builtin')}</span>}
-                  {s.plus && <span className="sr-tag plus-tag">{t('styles.plusTag')}</span>}
+                  <h3 title={s.name} className="sr-title">{s.name}</h3>
+                  {s.builtin && <span className="sr-tag muted" title={t('ind.builtin')}>{t('styles.builtin')}</span>}
+                  {s.plus && <span className="sr-tag plus-tag" title={t('styles.plusHint')}>{t('styles.plusTag')}</span>}
                   <p className="style-card-text" title={s.instructions}>{s.instructions}</p>
                 </div>
               </div>
               <div className="sr-actions">
-                <button className="btn small" onClick={() => setEditing({ ...s })}>{t('styles.edit')}</button>
-                <button className="btn small" onClick={() => duplicate(s)}>{t('styles.duplicate')}</button>
-                <button className="btn danger small" onClick={() => remove(s.id)}>{t('styles.delete')}</button>
+                <button title={t('tip.edit')} className="btn small" onClick={() => setEditing({ ...s })}>{t('styles.edit')}</button>
+                <button title={t('tip.duplicate')} className="btn small" onClick={() => duplicate(s)}>{t('styles.duplicate')}</button>
+                <button title={t('tip.delete')} className="btn danger small" onClick={() => remove(s.id)}>{t('styles.delete')}</button>
               </div>
             </div>
           ))}
@@ -153,7 +153,7 @@ export default function StylesPage({ styles, setStyles, settings, setSettings, o
       {editing && (
         <div className="overlay" onClick={() => setEditing(null)}>
           <div className="modal wide" onClick={(e) => e.stopPropagation()}>
-            <h2>{editing.name || t('styles.add')}</h2>
+            <h2 title={t('tip.styleEdit')}>{editing.name || t('styles.add')}</h2>
             <label>{t('styles.name')}</label>
             <input
               value={editing.name}
@@ -178,8 +178,8 @@ export default function StylesPage({ styles, setStyles, settings, setSettings, o
               </label>
             )}
             <div className="modal-actions">
-              <button className="btn" onClick={() => setEditing(null)}>{t('styles.cancel')}</button>
-              <button
+              <button title={t('tip.cancel')} className="btn" onClick={() => setEditing(null)}>{t('styles.cancel')}</button>
+              <button title={t('tip.save')}
                 className="btn primary"
                 disabled={!editing.name.trim() || !editing.instructions.trim()}
                 onClick={() => upsert({ ...editing, name: editing.name.trim() })}
