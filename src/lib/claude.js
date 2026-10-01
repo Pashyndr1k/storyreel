@@ -1,6 +1,7 @@
 import { DEFAULT_CLAUDE_MODEL } from './config.js';
 import { withRetry } from './retry.js';
 import { generateGeminiText } from './gemini.js';
+import { activePolicy, policySystemBlock, refuse } from './policy.js';
 
 export const MODELS = [
   { id: DEFAULT_CLAUDE_MODEL, label: 'Claude Sonnet 5 (recommended)' },
@@ -72,7 +73,11 @@ export function textKeyError(settings) {
 // All script/prompt generation funnels through here; the text service setting
 // picks the engine (Claude by default, Gemini as the alternative). An optional
 // AbortSignal cancels the Claude request mid-flight (and stops retries).
-export async function generateJSON(settings, spec, { signal } = {}) {
+export async function generateJSON(settings, spec, { signal, noPolicy } = {}) {
+  // An active content policy rides in the system prompt; the model answers
+  // with a policy_refusal object when the request itself conflicts with it.
+  const policy = noPolicy ? null : activePolicy(settings);
+  if (policy) spec = { ...spec, system: `${spec.system || ''}${policySystemBlock(policy, settings)}` };
   return withRetry(async () => {
     if (signal?.aborted) {
       const e = new Error('Aborted');
@@ -83,6 +88,8 @@ export async function generateJSON(settings, spec, { signal } = {}) {
       (settings.textService || 'claude') === 'gemini'
         ? await generateGeminiText(settings, spec)
         : await callClaude(settings, { ...spec, signal });
-    return extractJSON(text);
+    const out = extractJSON(text);
+    if (policy && out && !Array.isArray(out) && out.policy_refusal) refuse(policy, out.policy_refusal);
+    return out;
   });
 }

@@ -2930,6 +2930,13 @@ textarea.s5e-prompt-sm { min-height: 110px; }
 .modal .sub-label { font-weight: 400; color: var(--text-2); margin-top: 10px; font-size: 11px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--hairline-soft); }
 .settings-io { margin-top: 6px; }
+.policy-row { align-items: center; gap: 8px; flex-wrap: wrap; }
+.policy-row select { flex: 1 1 200px; min-width: 0; }
+.overlay.policy-overlay { z-index: 1200; }
+.modal.policy-modal { max-width: 520px; }
+.policy-modal .policy-rule { margin: 14px 0 0; padding: 10px 14px; border-left: 3px solid var(--accent); background: var(--hover-bg); white-space: pre-wrap; overflow-wrap: anywhere; }
+.policy-modal .policy-rule b { display: block; margin-bottom: 4px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted-2); }
+.policy-modal .policy-why { margin: 12px 0 0; overflow-wrap: anywhere; }
 
 /* ============ SETTINGS — tabbed layout ============ */
 /* Settings never scrolls: tabs are split and laid out in two columns so the

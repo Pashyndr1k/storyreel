@@ -18,6 +18,7 @@ import aceTemplate from '../data/comfy/ace_step_api.json';
 import sfxTemplate from '../data/comfy/stable_audio_sfx_api.json';
 
 import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIR, SHOT_MIN_SEC, SHOT_MAX_SEC } from './config.js';
+import { enforcePolicy } from './policy.js';
 export { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIR };
 
 function base(settings) {
@@ -464,6 +465,7 @@ export function buildH3MultiGraph(settings, { prompt, pictures, guides, refVideo
 }
 
 export async function generateComfyMultiVideo(settings, args, { onStatus } = {}) {
+  await enforcePolicy(settings, { kind: 'video', text: args.prompt });
   await h3Preflight(settings, h3MultiTemplate, { tag: 'mfr', lora: settings.h3Lightning ? H3_LIGHTNING_LORA : null });
   const stamp = Date.now();
   // upload every distinct media item once
@@ -492,6 +494,7 @@ export async function generateComfyRefVideo(
   { prompt, refImages = [], refVideos = [], refAudios = [], durationSec, aspectRatio, resolution, name },
   { onStatus } = {}
 ) {
+  await enforcePolicy(settings, { kind: 'video', text: prompt });
   await h3Preflight(settings, h3RefTemplate);
   const [w, h] = h3Dims(aspectRatio, resolution);
   const stamp = Date.now();
@@ -545,6 +548,7 @@ export async function generateComfyVideo(
   { prompt, firstFrame, lastFrame, audio, durationSec, aspectRatio, resolution, name, mode = 'auto' },
   { onStatus } = {}
 ) {
+  await enforcePolicy(settings, { kind: 'video', text: prompt });
   const engine = settings.videoEngine === 'minimax' ? 'minimax' : 'ltx';
   const [w, h] = engine === 'minimax'
     ? h3Dims(aspectRatio, resolution)
@@ -641,6 +645,7 @@ const imageDims = (ratio) => IMG_DIMS[ratio] || IMG_DIMS['16:9'];
 // rewired to the first chain); with none, the guider runs straight off the
 // text conditioning. Returns the image as a data URL plus its filename.
 export async function generateComfyImage(settings, { prompt, images = [], aspectRatio, name }) {
+  await enforcePolicy(settings, { kind: 'image', text: prompt });
   const graph = clone(flux2Template);
   const refs = (images || []).filter(Boolean).slice(0, 2);
   const [w, h] = imageDims(aspectRatio);
@@ -683,6 +688,7 @@ export async function generateComfyImage(settings, { prompt, images = [], aspect
 // guide), the lyrics track is pinned to "[Instrumental]" so no vocals ever
 // appear, and bpm/seconds set the tempo and length. Returns an mp3 data URL.
 export async function generateComfyMusic(settings, { tags, bpm, seconds, name }, { onStatus } = {}) {
+  await enforcePolicy(settings, { kind: 'music', text: tags });
   const graph = clone(aceTemplate);
   const dur = Math.max(5, Math.min(600, Math.round(seconds || 60)));
   const seed = rndSeed();
@@ -706,6 +712,7 @@ export async function generateComfyMusic(settings, { tags, bpm, seconds, name },
 // workflow, flattened; the optional LLM re-prompt path is skipped — StoryReel
 // sends the user's text straight to the encoder). English prompts work best.
 export async function generateComfySfx(settings, { prompt, seconds, name }, { onStatus } = {}) {
+  await enforcePolicy(settings, { kind: 'sfx', text: prompt });
   const graph = clone(sfxTemplate);
   const dur = Math.max(1, Math.min(120, Math.round((Number(seconds) || 5) * 10) / 10));
   graph['6'].inputs.text = prompt;
@@ -724,6 +731,7 @@ export async function generateComfySfx(settings, { prompt, seconds, name }, { on
 // Returns the full-resolution image as a data URL plus its filename; the
 // caller downscales for the animatic strip.
 export async function generateComfyStoryboard(settings, { prompt, aspectRatio, name }) {
+  await enforcePolicy(settings, { kind: 'image', text: prompt });
   const graph = clone(t2iTemplate);
   graph['30:19'].inputs.value = prompt;
   graph['49'].inputs.aspect_ratio = T2I_ASPECT[aspectRatio] || T2I_ASPECT['16:9'];

@@ -1,4 +1,5 @@
 import { KLING_MODELS } from '../lib/kling.js';
+import { loadPolicies, addPolicy, removePolicy } from '../lib/policy.js';
 import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIR, DEFAULT_PROJECTS_DIR, DEFAULT_IMAGE_MODEL } from '../lib/config.js';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { MODELS } from '../lib/claude.js';
@@ -46,6 +47,30 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
   const [projectsDir, setProjectsDir] = useState(settings.projectsDir || DEFAULT_PROJECTS_DIR);
   const [hideStaleToast, setHideStaleToast] = useState(!!settings.hideStaleToast);
   const [uiFont, setUiFont] = useState(settings.uiFont || 'default');
+  const [policies, setPolicies] = useState(loadPolicies);
+  const [policyId, setPolicyId] = useState(() => (loadPolicies().some((p) => p.id === settings.policyId) ? settings.policyId : ''));
+
+  // An uploaded policy is stored at once and becomes the selection; it takes
+  // effect, like every other setting, on Save.
+  const uploadPolicy = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const entry = addPolicy(file.name, await file.text());
+      setPolicies(loadPolicies());
+      setPolicyId(entry.id);
+    } catch (err) {
+      window.alert(t(err.message === 'POLICY_TOO_LARGE' ? 'set.policyTooLarge' : 'set.policyEmpty'));
+    }
+  };
+  const deletePolicy = () => {
+    const cur = policies.find((p) => p.id === policyId);
+    if (!cur || !window.confirm(t('set.policyDeleteConfirm', { name: cur.name }))) return;
+    removePolicy(cur.id);
+    setPolicies(loadPolicies());
+    setPolicyId('');
+  };
 
   // The selector previews its scheme live; when the modal closes, whatever is
   // actually saved in settings wins again (Save updates settings before close,
@@ -131,6 +156,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
       projectsDir: projectsDir.trim() || DEFAULT_PROJECTS_DIR,
       hideStaleToast,
       uiFont,
+      policyId,
     });
     onClose();
   };
@@ -205,7 +231,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
     const pad = cs ? parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) : 18;
     setPanelH(max + pad);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modelList, fetchErr, fetching, tab, videoEngine]);
+  }, [modelList, fetchErr, fetching, tab, videoEngine, policies.length]);
 
   const backupsBody = (
     <>
@@ -432,6 +458,21 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
         />
         <span>{t('set.staleToastShow')}</span>
       </label>
+      <label>{t('set.policy')}</label>
+      <p className="hint">{t('set.policyHint')}</p>
+      <div className="row policy-row">
+        <select title={t('tip.policySelect')} value={policyId} onChange={(e) => setPolicyId(e.target.value)}>
+          <option value="">{t('set.policyNone')}</option>
+          {policies.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+        <label className="btn small file-btn" title={t('tip.policyUpload')}>
+          {t('set.policyUpload')}
+          <input type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" onChange={uploadPolicy} className="sr-only" />
+        </label>
+        <button title={t('tip.policyDelete')} className="btn small" disabled={!policyId} onClick={deletePolicy}>{t('set.policyDelete')}</button>
+      </div>
     </>
   );
 

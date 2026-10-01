@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.10.0 — 2026-10-01
+
+- **Content policy (Settings → Interface).** Upload a Markdown file of rules
+  and restrictions, pick the active one from the list of uploaded policies
+  (or "No policy"), delete the ones no longer needed. A file uploaded under
+  an existing name replaces the earlier text.
+- **The policy applies to every generation at every stage.** Text generation
+  carries the policy in its instructions; image, storyboard, cover, video
+  (MiniMax H3, LTX, Kling), voice, music and sound-effect prompts are checked
+  by the text model before anything is sent — including prompts edited by
+  hand.
+- **A conflicting request is not started.** A message in the center of the
+  screen explains the refusal and quotes the rule it conflicts with. When the
+  check itself cannot run (no text API key, no network), generation is
+  blocked as well and the message says why.
+
 ## 2.9.0 — 2026-10-01
 
 - **Actor groups (Stage 2).** Several characters can be joined into a group

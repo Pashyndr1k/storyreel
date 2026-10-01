@@ -6,6 +6,7 @@
 // main process (window.netBridge, electron/netRequest.cjs). In a plain
 // browser build there is no bridge — generation reports KLING_NEEDS_APP.
 import { DEFAULT_KLING_MODEL } from './config.js';
+import { enforcePolicy } from './policy.js';
 
 export const KLING_BASE = 'https://api-singapore.klingai.com'; // the documented domain outside China
 
@@ -90,6 +91,7 @@ export async function generateKlingVideo(
   { onStatus } = {}
 ) {
   if (!(settings.klingKey || '').trim()) throw new Error('NO_KLING_KEY');
+  await enforcePolicy(settings, { kind: 'video', text: prompt });
   const model = klingModelOf(settings);
   const useLast = !!lastFrame && model.lastFrame;
   const res = resolution === 'FHD' || (useLast && model.lastFrame1080) ? '1080p' : '720p';

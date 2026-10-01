@@ -137,6 +137,7 @@ export function loadSettings() {
     comfyUrl: DEFAULT_COMFY_URL,
     comfyOutputDir: DEFAULT_OUTPUT_DIR,
     projectsDir: DEFAULT_PROJECTS_DIR, // per-project folders (project.md + media files)
+    policyId: '', // active content policy (see lib/policy.js); '' = none
     uiFont: 'default', // UI font scheme (see FONT_SCHEMES in SettingsModal)
   };
   try {

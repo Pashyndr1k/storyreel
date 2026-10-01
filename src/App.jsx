@@ -6,6 +6,8 @@ import LibraryPage from './pages/LibraryPage.jsx';
 import StylesPage from './pages/StylesPage.jsx';
 import { loadLibrary, persistLibraryEntry, deleteLibraryEntry } from './lib/library.js';
 import SettingsModal from './components/SettingsModal.jsx';
+import PolicyNotice from './components/PolicyNotice.jsx';
+import { POLICY_EVENT } from './lib/policy.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { loadProjects, saveProjects, loadSettings, saveSettings } from './lib/storage.js';
 import { loadStyles, saveStyles, absorbLegacyStyles } from './lib/styles.js';
@@ -209,6 +211,13 @@ export default function App() {
   }, []);
 
   useEffect(() => saveSettings(settings), [settings]);
+  // A generation refused by the active content policy reports here.
+  const [policyNotice, setPolicyNotice] = useState(null);
+  useEffect(() => {
+    const onPolicy = (e) => setPolicyNotice(e.detail);
+    window.addEventListener(POLICY_EVENT, onPolicy);
+    return () => window.removeEventListener(POLICY_EVENT, onPolicy);
+  }, []);
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', settings.theme || 'dark');
   }, [settings.theme]);
@@ -336,6 +345,7 @@ export default function App() {
           </div>
         </div>
       )}
+      {policyNotice && <PolicyNotice notice={policyNotice} onClose={() => setPolicyNotice(null)} />}
       {updateInfo && (
         <div className="stale-toast update-toast">
           <p>{t('upd.msg', { v: updateInfo.version })}</p>

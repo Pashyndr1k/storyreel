@@ -3,6 +3,7 @@ import { withRetry } from './retry.js';
 
 // "Nano Banana 2" (Gemini 3 Pro Image). Overridable in Settings if the id changes.
 import { DEFAULT_IMAGE_MODEL } from './config.js';
+import { enforcePolicy } from './policy.js';
 export { DEFAULT_IMAGE_MODEL };
 
 const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -27,6 +28,7 @@ function extractImage(data) {
 export async function generateImage(settings, { prompt, images = [], aspectRatio, imageSize }) {
   const key = settings.geminiKey;
   if (!key) throw new Error('NO_GEMINI_KEY');
+  await enforcePolicy(settings, { kind: 'image', text: prompt });
   const model = settings.geminiModel || DEFAULT_IMAGE_MODEL;
 
   const parts = [{ text: prompt }];
@@ -95,6 +97,7 @@ async function discoverLiteFallback(key, fallback) {
 async function liteImageCall(settings, { prompt, aspectRatio, maxPixels, quality }, _retried) {
   const key = settings.geminiKey;
   if (!key) throw new Error('NO_GEMINI_KEY');
+  await enforcePolicy(settings, { kind: 'image', text: prompt });
   const model = liteModelCache || LITE_IMAGE_MODEL;
 
   const generationConfig = { responseModalities: ['IMAGE'] };
@@ -376,6 +379,7 @@ function pcmToWavDataURL(base64, mime) {
 export async function generateGeminiVoice(settings, { prompt, speakers }, _modelIdx = 0) {
   const key = settings.geminiKey;
   if (!key) throw new Error('NO_GEMINI_KEY');
+  await enforcePolicy(settings, { kind: 'voice', text: prompt });
   const wanted = (settings.geminiTtsModel || '').trim();
   const model = _modelIdx === 0 && wanted ? wanted : GEMINI_TTS_MODELS[Math.min(_modelIdx, GEMINI_TTS_MODELS.length - 1)];
 
