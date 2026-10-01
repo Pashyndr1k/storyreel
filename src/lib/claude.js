@@ -1,13 +1,9 @@
-import { DEFAULT_CLAUDE_MODEL } from './config.js';
+import { CLAUDE_MODELS } from './config.js';
 import { withRetry } from './retry.js';
 import { generateGeminiText } from './gemini.js';
 import { activePolicy, policySystemBlock, refuse } from './policy.js';
 
-export const MODELS = [
-  { id: DEFAULT_CLAUDE_MODEL, label: 'Claude Sonnet 5 (recommended)' },
-  { id: 'claude-opus-4-8', label: 'Claude Opus 4.8 (highest quality)' },
-  { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (fastest)' },
-];
+export const MODELS = CLAUDE_MODELS;
 
 async function callClaude(settings, { system, user, maxTokens = 4096, signal }) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **Anthropic models updated.** The text-model list is now Claude Sonnet 5.5
+  (default), Opus 5.5, Fable 5.1 and Haiku 4.5. A saved choice of a retired
+  model moves over on its own: Sonnet 5 to Sonnet 5.5, Opus 4.8 to Opus 5.5.
+
 ## 2.10.0 — 2026-10-01
 
 - **Content policy (Settings → Interface).** Upload a Markdown file of rules

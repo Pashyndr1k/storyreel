@@ -132,7 +132,7 @@ export default function SmartEditModal({ project, update, settings, genLang, onC
     setError('');
     setResult(null);
     try {
-      // Smart edit runs on the standard Sonnet 5 model, ungoverned by styles.
+      // Smart edit runs on the default Sonnet model, ungoverned by styles.
       // The prompt carries ONLY the project's text (no images/videos).
       const editSettings = { ...settings, model: DEFAULT_CLAUDE_MODEL };
       const data = await generateJSON(editSettings, smartEditPrompt(project, instruction.trim(), genLang), {

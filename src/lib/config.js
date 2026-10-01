@@ -13,7 +13,16 @@ export const DEFAULT_PROJECTS_DIR = inDocuments('StoryReel Projects'); // per-pr
 export const DEFAULT_OUTPUT_DIR = inDocuments('StoryReel Outputs'); // where generated results are saved locally
 
 export const DEFAULT_COMFY_URL = 'http://127.0.0.1:8188'; // ComfyUI's own default port
-export const DEFAULT_CLAUDE_MODEL = 'claude-sonnet-5';
+export const DEFAULT_CLAUDE_MODEL = 'claude-sonnet-5-5';
+// Anthropic models offered in Settings. A saved model that is no longer
+// listed is moved to its successor (or the default) by loadSettings.
+export const CLAUDE_MODELS = [
+  { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5 (recommended)' },
+  { id: 'claude-opus-5-5', label: 'Claude Opus 5.5 (higher quality)' },
+  { id: 'claude-fable-5-1', label: 'Claude Fable 5.1 (most capable)' },
+  { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (fastest)' },
+];
+export const CLAUDE_MODEL_SUCCESSORS = { 'claude-opus-4-8': 'claude-opus-5-5' };
 export const DEFAULT_IMAGE_MODEL = 'gemini-3-pro-image-preview';
 export const DEFAULT_KLING_MODEL = 'kling-3.0'; // cloud video (first + last frame, 3–15 s)
 

@@ -1,4 +1,4 @@
-import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIR, DEFAULT_PROJECTS_DIR, DEFAULT_CLAUDE_MODEL, DEFAULT_IMAGE_MODEL, DEFAULT_KLING_MODEL, STAGE_COUNT, MAX_IMAGE_VERSIONS } from './config.js';
+import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIR, DEFAULT_PROJECTS_DIR, DEFAULT_CLAUDE_MODEL, CLAUDE_MODELS, CLAUDE_MODEL_SUCCESSORS, DEFAULT_IMAGE_MODEL, DEFAULT_KLING_MODEL, STAGE_COUNT, MAX_IMAGE_VERSIONS } from './config.js';
 import { idbGetAll, idbPutMany, idbDeleteMany } from './idb.js';
 import { isValidAspect } from './aspect.js';
 import { normalizeSceneLocations } from './sceneLocations.js';
@@ -144,6 +144,8 @@ export function loadSettings() {
   try {
     const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY));
     const s = { ...defaults, ...(raw || {}) };
+    // a retired Anthropic model moves to its successor, or to the default
+    if (!CLAUDE_MODELS.some((m) => m.id === s.model)) s.model = CLAUDE_MODEL_SUCCESSORS[s.model] || DEFAULT_CLAUDE_MODEL;
     if (s.uiFont === 'courier') s.uiFont = 'archivo-mix'; // scheme replaced in 1.19.x
     // Pre-2.0 installs: the default engine flipped to H3, but a working setup
     // is never switched under the user — they keep LTX and get a one-time
