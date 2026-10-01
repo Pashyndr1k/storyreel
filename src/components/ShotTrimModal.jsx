@@ -179,14 +179,11 @@ export default function ShotTrimModal({ item, index, locked = false, onApply, on
             <button type="button" title={t('trim.toIn')} aria-label={t('trim.toIn')} disabled={!hasVideo} onClick={() => { pause(); seek(inP); }}>
               <SkipBack size={14} />
             </button>
-            <button type="button" className={playing && rate === 1 ? 'on' : ''} title={t('pv.play')} aria-label={t('pv.play')} disabled={!hasVideo} onClick={() => play(1)}>
-              <Play size={14} />
+            <button type="button" className={`pv-play ${playing ? 'on' : ''}`} title={t(playing ? 'pv.pause' : 'pv.play')} aria-label={t(playing ? 'pv.pause' : 'pv.play')} disabled={!hasVideo} onClick={() => (playing ? pause() : play(rate))}>
+              {playing ? <Pause size={16} /> : <Play size={16} />}
             </button>
-            <button type="button" className={`pv-slow ${playing && rate < 1 ? 'on' : ''}`} title={t('pv.slow')} aria-label={t('pv.slow')} disabled={!hasVideo} onClick={() => play(0.5)}>
-              ½×
-            </button>
-            <button type="button" title={t('pv.pause')} aria-label={t('pv.pause')} disabled={!hasVideo} onClick={pause}>
-              <Pause size={14} />
+            <button type="button" className={`pv-slow ${rate < 1 ? 'on' : ''}`} aria-pressed={rate < 1} title={t('pv.slow')} aria-label={t('pv.slow')} disabled={!hasVideo} onClick={() => play(rate < 1 ? 1 : 0.5)}>
+              0.5×
             </button>
           </span>
           <span className="trim-read">

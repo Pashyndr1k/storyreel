@@ -8,6 +8,10 @@
   the prompt exists the button goes back to creating the media.
 - **Wording: Create / Recreate.** Every button, hint and confirmation that
   said Generate / Regenerate now says Create / Recreate (EN, RU, UA).
+- **Preview transport redesigned.** The video preview has one Play/Pause button
+  (the icon follows the state) instead of separate Play and Pause, and the
+  half-speed control is a readable "0.5×" toggle — on for half speed, off
+  for normal. The shot pop-up uses the same controls.
 - **Locations sit on the assets line.** On the shot card the location tiles
   share one row with the asset tiles instead of a row of their own.
 

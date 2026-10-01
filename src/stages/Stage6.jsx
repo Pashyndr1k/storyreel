@@ -1680,8 +1680,9 @@ export default function Stage6({ project, update, settings, ...workbench }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrubbing, elapsed, curShotId]);
 
-  // Idle preview transport (Video tab of the selected shot): to start / play /
-  // half speed / pause on the shot's own clip, independent of the timeline.
+  // Idle preview transport (Video tab of the selected shot): to start, one
+  // play/pause toggle and a half-speed toggle on the shot's own clip,
+  // independent of the timeline.
   const pvCmd = (cmd) => {
     const v = pvRef.current;
     if (!v) return;
@@ -1712,7 +1713,13 @@ export default function Stage6({ project, update, settings, ...workbench }) {
       v.pause();
       return;
     }
-    const rate = cmd === 'slow' ? 0.5 : 1;
+    if (cmd === 'toggle' && !v.paused && !v.ended) {
+      v.pause();
+      return;
+    }
+    // 'slow' flips the speed (and starts playback, as a play at that speed);
+    // 'toggle' plays at whatever speed is selected
+    const rate = cmd === 'slow' ? (pvState.rate < 1 ? 1 : 0.5) : pvState.rate || 1;
     v.playbackRate = rate;
     v.muted = false;
     setPvState((s) => ({ ...s, rate }));
@@ -1765,24 +1772,22 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                     </button>
                     <button
                       type="button"
-                      className={pvState.playing && pvState.rate === 1 ? 'on' : ''}
-                      title={t('pv.play')}
-                      aria-label={t('pv.play')}
-                      onClick={() => pvCmd('play')}
+                      className={`pv-play ${pvState.playing ? 'on' : ''}`}
+                      title={t(pvState.playing ? 'pv.pause' : 'pv.play')}
+                      aria-label={t(pvState.playing ? 'pv.pause' : 'pv.play')}
+                      onClick={() => pvCmd('toggle')}
                     >
-                      <Play size={14} />
+                      {pvState.playing ? <Pause size={16} /> : <Play size={16} />}
                     </button>
                     <button
                       type="button"
-                      className={`pv-slow ${pvState.playing && pvState.rate < 1 ? 'on' : ''}`}
+                      className={`pv-slow ${pvState.rate < 1 ? 'on' : ''}`}
+                      aria-pressed={pvState.rate < 1}
                       title={t('pv.slow')}
                       aria-label={t('pv.slow')}
                       onClick={() => pvCmd('slow')}
                     >
-                      ½×
-                    </button>
-                    <button type="button" title={t('pv.pause')} aria-label={t('pv.pause')} onClick={() => pvCmd('pause')}>
-                      <Pause size={14} />
+                      0.5×
                     </button>
                     <span className="pv-sep" aria-hidden="true" />
                     <button type="button" title={t('vid.expand')} aria-label={t('vid.expand')} onClick={() => pvCmd('expand')}>
