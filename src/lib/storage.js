@@ -1,4 +1,4 @@
-import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIR, DEFAULT_PROJECTS_DIR, DEFAULT_CLAUDE_MODEL, DEFAULT_IMAGE_MODEL, STAGE_COUNT, MAX_IMAGE_VERSIONS } from './config.js';
+import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIR, DEFAULT_PROJECTS_DIR, DEFAULT_CLAUDE_MODEL, DEFAULT_IMAGE_MODEL, DEFAULT_KLING_MODEL, STAGE_COUNT, MAX_IMAGE_VERSIONS } from './config.js';
 import { idbGetAll, idbPutMany, idbDeleteMany } from './idb.js';
 import { isValidAspect } from './aspect.js';
 import { sanitizeMethods } from './randomization.js';
@@ -125,10 +125,12 @@ export function loadSettings() {
     theme: 'dark',
     geminiKey: '',
     geminiModel: DEFAULT_IMAGE_MODEL,
+    klingKey: '', // Kling API key (cloud video)
+    klingModel: DEFAULT_KLING_MODEL,
     textService: 'claude', // 'claude' | 'gemini' — plots, scripts and prompts
     storyboardService: 'gemini', // 'gemini' | 'comfy' — Stage-4 storyboard frames
     videoService: 'comfy', // shot video generation (only ComfyUI for now)
-    videoEngine: 'minimax', // local video model: 'minimax' (MiniMax H3, default) | 'ltx' (LTX-2.3)
+    videoEngine: 'minimax', // video model: 'minimax' (MiniMax H3, local, default) | 'ltx' (LTX-2.3, local) | 'kling' (cloud API)
     h3NoticeShown: true, // one-time "H3 is now the default" notice (false only for pre-2.0 installs)
     h3RefImageSize: 'match', // ref2va identity strength: 'match' | 'max' (max = stronger identity lock)
     h3Lightning: false, // MULTI mode only: 4-step Lightning LoRA instead of the 20-step default
@@ -148,6 +150,7 @@ export function loadSettings() {
     if (raw && !('h3NoticeShown' in raw)) s.h3NoticeShown = false;
     s.apiKey = revealKey(s.apiKey);
     s.geminiKey = revealKey(s.geminiKey);
+    s.klingKey = revealKey(s.klingKey);
     return s;
   } catch {
     return defaults;
@@ -161,6 +164,7 @@ export function saveSettings(settings) {
       ...settings,
       apiKey: protectKey(settings.apiKey),
       geminiKey: protectKey(settings.geminiKey),
+      klingKey: protectKey(settings.klingKey),
     })
   );
 }

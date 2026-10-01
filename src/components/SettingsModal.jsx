@@ -1,3 +1,4 @@
+import { KLING_MODELS } from '../lib/kling.js';
 import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIR, DEFAULT_PROJECTS_DIR, DEFAULT_IMAGE_MODEL } from '../lib/config.js';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { MODELS } from '../lib/claude.js';
@@ -30,6 +31,8 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
   const [apiKey, setApiKey] = useState(settings.apiKey);
   const [model, setModel] = useState(settings.model);
   const [geminiKey, setGeminiKey] = useState(settings.geminiKey || '');
+  const [klingKey, setKlingKey] = useState(settings.klingKey || '');
+  const [klingModel, setKlingModel] = useState(settings.klingModel || KLING_MODELS[0].id);
   const [geminiModel, setGeminiModel] = useState(settings.geminiModel || DEFAULT_IMAGE_MODEL);
   const [textService, setTextService] = useState(settings.textService || 'claude');
   const [storyboardService, setStoryboardService] = useState(settings.storyboardService || 'gemini');
@@ -113,6 +116,8 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
       apiKey: apiKey.trim(),
       model,
       geminiKey: geminiKey.trim(),
+      klingKey: klingKey.trim(),
+      klingModel,
       geminiModel: geminiModel.trim() || DEFAULT_IMAGE_MODEL,
       textService,
       storyboardService,
@@ -275,6 +280,12 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
               {t('set.geminiKeyHint')}{' '}
               <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">aistudio.google.com</a>.
             </p>
+            <label>{t('set.klingKey')}</label>
+            <input type="password" value={klingKey} onChange={(e) => setKlingKey(e.target.value)} placeholder="Kling API key" />
+            <p className="hint">
+              {t('set.klingKeyHint')}{' '}
+              <a href="https://kling.ai/dev/api-key" target="_blank" rel="noreferrer">kling.ai/dev/api-key</a>.
+            </p>
             <label>{t('set.comfyUrl')}</label>
             <input value={comfyUrl} onChange={(e) => setComfyUrl(e.target.value)} placeholder={DEFAULT_COMFY_URL} />
             <label>{t('set.comfyOutputDir')}</label>
@@ -357,8 +368,19 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
         <select value={videoEngine} onChange={(e) => setVideoEngine(e.target.value)}>
           <option value="ltx">{t('set.engLtx')}</option>
           <option value="minimax">{t('set.engMinimax')}</option>
+          <option value="kling">{t('set.engKling')}</option>
         </select>
-        <p className="hint">{t(videoEngine === 'minimax' ? 'set.engMinimaxHint' : 'set.engLtxHint')}</p>
+        <p className="hint">{t(videoEngine === 'minimax' ? 'set.engMinimaxHint' : videoEngine === 'kling' ? 'set.engKlingHint' : 'set.engLtxHint')}</p>
+        {videoEngine === 'kling' && (
+          <>
+            <label>{t('set.klingModel')}</label>
+            <select value={klingModel} onChange={(e) => setKlingModel(e.target.value)}>
+              {KLING_MODELS.map((m) => (
+                <option key={m.id} value={m.id}>{m.label}</option>
+              ))}
+            </select>
+          </>
+        )}
       </div>
       <div>
         {videoEngine === 'minimax' && (

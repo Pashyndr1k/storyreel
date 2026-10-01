@@ -29,6 +29,11 @@ contextBridge.exposeInMainWorld('comfyBridge', {
   request: (opts) => ipcRenderer.invoke('comfy-request', opts),
 });
 
+// Cloud APIs that send no CORS headers (Kling) via the main process.
+contextBridge.exposeInMainWorld('netBridge', {
+  request: (opts) => ipcRenderer.invoke('net-request', opts),
+});
+
 // FFmpeg timeline rendering in the main process.
 contextBridge.exposeInMainWorld('ffmpegBridge', {
   check: () => ipcRenderer.invoke('ffmpeg-check'),

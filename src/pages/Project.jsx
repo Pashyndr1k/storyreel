@@ -82,6 +82,7 @@ export default function Project({ project, updateProject, settings, setSettings,
     imageStyle,
     imageStylePlus,
     videoStyle,
+    setSettings, // the shot workbench can switch the generation model
     library,
     libUpsert,
     libDelete,

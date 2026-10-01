@@ -1,3 +1,4 @@
+import { generateKlingVideo, klingModelOf, klingSeconds, KLING_VIDEO_MODES, resolveKlingMode } from '../lib/kling.js';
 import { SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC, MAX_IMAGE_VERSIONS, MAX_CHARACTER_REFS } from '../lib/config.js';
 import { shotCastRefs } from '../lib/castRefs.js';
 import { useEffect, useRef, useState } from 'react';
@@ -5,7 +6,7 @@ import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage, generateGeminiVoice, GEMINI_VOICES } from '../lib/gemini.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
 import { generateComfyVideo, generateComfyRefVideo, generateComfyMultiVideo, generateComfyImage, saveToLocalOutputs, VIDEO_RESOLUTIONS, VIDEO_MODES, H3_VIDEO_MODES, resolveVideoMode, resolveH3VideoMode, h3Seconds } from '../lib/comfy.js';
-import { stage5Prompt, stage5VideoPrompt, stage5H3VideoPrompt, h3ComposePrompt, stage5GeminiVoicePrompt, finalFramePrompt, tweakPromptSpec } from '../lib/prompts.js';
+import { stage5Prompt, stage5VideoPrompt, stage5H3VideoPrompt, stage5KlingVideoPrompt, h3ComposePrompt, stage5GeminiVoicePrompt, finalFramePrompt, tweakPromptSpec } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
 import { aspectDescription } from '../lib/aspect.js';
 import ErrorNote from '../components/ErrorNote.jsx';
@@ -140,7 +141,7 @@ function CopyButton({ text }) {
 // the assembly stage (`embed`): the scene comes from the timeline selection
 // (`focusSceneId`), and either one compact shot card (`focusShotId`) or the
 // scene tools (no shot) are rendered — no scene nav, no header, no footer.
-export default function Stage5({ project, update, settings, onSettings, onProjectSettings, genLang, styles, imageStyle, videoStyle, library, libUpsert, libDelete, goNext, embed = false, focusSceneId = null, focusShotId = null, onTabChange, imageStylePlus = false, onQueueApi = null, onPreviewFrame = null, previewFrame = 'first' }) {
+export default function Stage5({ project, update, settings, onSettings, onProjectSettings, genLang, styles, imageStyle, videoStyle, library, libUpsert, libDelete, goNext, embed = false, focusSceneId = null, focusShotId = null, onTabChange, imageStylePlus = false, onQueueApi = null, onPreviewFrame = null, previewFrame = 'first', setSettings = null }) {
   const { t } = useI18n();
   const [sceneIdState, setSceneId] = useState(project.outline[0]?.id || null);
   const sceneId = embed ? focusSceneId || project.outline[0]?.id || null : sceneIdState;
@@ -336,9 +337,24 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   // Video prompts are written in the target model's own format (H3's
   // three-field schema vs LTX's motion-only prose), so the app remembers which
   // engine each prompt was written for and flags mismatches.
-  const curEngine = settings.videoEngine === 'minimax' ? 'minimax' : 'ltx';
-  const engineName = (e) => (e === 'minimax' ? 'H3' : 'LTX');
-  const engineHintName = curEngine === 'minimax' ? 'MiniMax H3' : 'LTX-2';
+  const engineOf = (v) => (v === 'minimax' ? 'minimax' : v === 'kling' ? 'kling' : 'ltx');
+  const curEngine = engineOf(settings.videoEngine);
+  const engineName = (e) => (e === 'minimax' ? 'H3' : e === 'kling' ? 'Kling' : 'LTX');
+  const engineHintName = curEngine === 'minimax' ? 'MiniMax H3' : curEngine === 'kling' ? klingModelOf(settings).label : 'LTX-2';
+  // The video-prompt spec for an engine — each model has its own prompt
+  // format (H3's three fields, LTX's motion prose, Kling's formula).
+  const videoSpec = (engine, proj, sceneArg, sceneShots, block) =>
+    engine === 'minimax'
+      ? stage5H3VideoPrompt(proj, sceneArg, sceneShots, videoStyle, block)
+      : engine === 'kling'
+        ? stage5KlingVideoPrompt(proj, sceneArg, sceneShots, videoStyle, block, {
+            seconds: (sh) => klingSeconds(klingModelOf(settings), Number(sh.duration) || 4),
+            modelLabel: klingModelOf(settings).label,
+            lastFrame: klingModelOf(settings).lastFrame,
+          })
+        : stage5VideoPrompt(proj, sceneArg, sceneShots, videoStyle, block);
+  // image model the first-frame prompts are written for
+  const imageModel = settings.imageService === 'comfy' ? 'comfy' : 'gemini';
 
   // Each generation is up to three calls (image, video, then audio prompts for
   // scenes with dialogue), each returning only its own field — so merge into
@@ -367,10 +383,8 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const sceneShots = project.sceneDetails[s.id]?.shots || [];
     const block = blockForScene(project.dynamicsPlan, sceneArg.number);
     const specs = [
-      stage5Prompt(project, sceneArg, sceneShots, genLang, imageStyle, imageStylePlus),
-      curEngine === 'minimax'
-        ? stage5H3VideoPrompt(project, sceneArg, sceneShots, videoStyle, block)
-        : stage5VideoPrompt(project, sceneArg, sceneShots, videoStyle, block),
+      stage5Prompt(project, sceneArg, sceneShots, genLang, imageStyle, imageStylePlus, block, imageModel),
+      videoSpec(curEngine, project, sceneArg, sceneShots, block),
     ];
     return specs;
   };
@@ -402,10 +416,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const sceneArg = { ...scene, number: project.outline.indexOf(scene) + 1 };
     const sceneShots = project.sceneDetails[scene.id]?.shots || [];
     const block = blockForScene(project.dynamicsPlan, sceneArg.number);
-    const spec =
-      curEngine === 'minimax'
-        ? stage5H3VideoPrompt(project, sceneArg, sceneShots, videoStyle, block)
-        : stage5VideoPrompt(project, sceneArg, sceneShots, videoStyle, block);
+    const spec = videoSpec(curEngine, project, sceneArg, sceneShots, block);
     runMany([spec], (data) => applyPrompts(scene, data));
   };
 
@@ -421,7 +432,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   // spec runs so video prompts keep their cross-shot momentum context and the
   // audio prompt sees the whole scene's chronology — but only the target
   // shot's field is applied from the response; everything else is untouched.
-  const regenPrompt = async (shot, kind) => {
+  // `over` carries a model the user has JUST picked in the prompt header —
+  // the settings state has not re-rendered yet when the rewrite is offered.
+  const regenPrompt = async (shot, kind, over = {}) => {
     if (regenBusy) return;
     const keyErr = textKeyError(settings);
     if (keyErr) return setImgErr({ id: shot.id, msg: keyErr });
@@ -429,13 +442,12 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const sceneArg = { ...scene, number: cur.outline.indexOf(scene) + 1 };
     const sceneShots = cur.sceneDetails[scene.id]?.shots || [];
     const block = blockForScene(cur.dynamicsPlan, sceneArg.number);
+    const engine = over.engine || curEngine;
     const spec =
       kind === 'image'
-        ? stage5Prompt(cur, sceneArg, sceneShots, genLang, imageStyle, imageStylePlus)
+        ? stage5Prompt(cur, sceneArg, sceneShots, genLang, imageStyle, imageStylePlus, block, over.imageModel || imageModel)
         : kind === 'video'
-          ? settings.videoEngine === 'minimax'
-            ? stage5H3VideoPrompt(cur, sceneArg, sceneShots, videoStyle, block)
-            : stage5VideoPrompt(cur, sceneArg, sceneShots, videoStyle, block)
+          ? videoSpec(engine, cur, sceneArg, sceneShots, block)
           : null;
     if (!spec) return;
     setRegenBusy(`${shot.id}:${kind}`);
@@ -448,7 +460,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       if (typeof text !== 'string' || !text.trim()) throw new Error('The response held no prompt for this shot.');
       setPrompt(shot.id, { [kind === 'image' ? 'imagePrompt' : 'videoPrompt']: text });
       if (kind === 'video') {
-        update((p) => ({ shotPromptEngines: { ...(p.shotPromptEngines || {}), [shot.id]: curEngine } }));
+        update((p) => ({ shotPromptEngines: { ...(p.shotPromptEngines || {}), [shot.id]: engine } }));
       }
     } catch (e) {
       setImgErr({ id: shot.id, msg: e.message || String(e) });
@@ -504,6 +516,39 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       </button>
     );
   };
+
+  // Model picker in a prompt's header. The choice is the app-wide generation
+  // model (the same setting as in Settings): confirm first, then offer to
+  // rewrite THIS shot's prompt in the new model's format.
+  const IMAGE_MODELS = [['gemini', 'Nano Banana'], ['comfy', 'Flux.2 Klein']];
+  const VIDEO_ENGINES = [['minimax', 'MiniMax H3'], ['ltx', 'LTX-2'], ['kling', klingModelOf(settings).label]];
+  const pickModel = (shot, kind, value) => {
+    if (!setSettings) return;
+    const list = kind === 'image' ? IMAGE_MODELS : VIDEO_ENGINES;
+    const label = (list.find(([v]) => v === value) || [])[1] || value;
+    if (value === (kind === 'image' ? imageModel : curEngine)) return;
+    if (!window.confirm(t(kind === 'image' ? 'mdl.confirmImage' : 'mdl.confirmVideo', { m: label }))) return;
+    setSettings({ ...settings, ...(kind === 'image' ? { imageService: value } : { videoEngine: value }) });
+    const has = (project.shotPrompts[shot.id]?.[kind === 'image' ? 'imagePrompt' : 'videoPrompt'] || '').trim();
+    if (has && window.confirm(t('mdl.regenAsk', { m: label }))) {
+      regenPrompt(shot, kind, kind === 'image' ? { imageModel: value } : { engine: value });
+    }
+  };
+  const modelSelect = (shot, kind) =>
+    setSettings ? (
+      <select
+        className="prompt-model"
+        value={kind === 'image' ? imageModel : curEngine}
+        title={t(kind === 'image' ? 'mdl.imageTip' : 'mdl.videoTip')}
+        aria-label={t(kind === 'image' ? 'mdl.imageTip' : 'mdl.videoTip')}
+        disabled={!!regenBusy}
+        onChange={(e) => pickModel(shot, kind, e.target.value)}
+      >
+        {(kind === 'image' ? IMAGE_MODELS : VIDEO_ENGINES).map(([v, l]) => (
+          <option key={v} value={v}>{l}</option>
+        ))}
+      </select>
+    ) : null;
 
   // "Tweak this": the user types a plain-language adjustment and Claude
   // rewrites the underlying technical prompt — no manual jargon editing.
@@ -1075,6 +1120,8 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     // alignment header. Prompts generated for H3 are stored as JSON fields;
     // an LTX-era plain prompt is passed through so nothing breaks mid-project.
     const isH3 = settings.videoEngine === 'minimax';
+    const isKling = settings.videoEngine === 'kling'; // cloud API, first (+ last) frame
+    const kModel = klingModelOf(settings);
     const last = (cur.shotFinalImages || {})[shot.id] || null;
     const voiceAud = (cur.shotAudios || {})[shot.id] || null;
     // A pinned workflow wins over the automatic choice (and silently falls
@@ -1087,8 +1134,11 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const hasKeyframes = hasMultiInput(cur, shot.id);
     const useMode = isH3
       ? resolveH3VideoMode(mode, { lastFrame: last, hasRefs, hasKeyframes })
-      : resolveVideoMode(mode, { lastFrame: last, audio: voiceAud });
+      : isKling
+        ? resolveKlingMode(mode, { lastFrame: last, model: kModel })
+        : resolveVideoMode(mode, { lastFrame: last, audio: voiceAud });
     if (!first && useMode !== 'r2v' && useMode !== 'mfr') return; // every non-reference workflow is frame-anchored
+    if (isKling && !(settings.klingKey || '').trim()) return setImgErr({ id: shot.id, msg: 'NO_KLING_KEY' });
     setImgBusy(`${shot.id}:vid`);
     setImgErr(null);
     // +3s padding rule (silent workflows only): generate longer than the
@@ -1097,9 +1147,13 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     // duration so assembly never trims into synced speech — and H3 counts as
     // voice-synced, because it generates its own dialogue, effects and score.
     const slotDur = take && isH3 ? takeDur : Number(shot.duration || 4);
-    const genDuration = useMode === 'si2v' || isH3
-      ? slotDur
-      : Math.round(shot.duration || 4) + DYNAMICS_CONFIG.generation_padding_sec;
+    // Kling bills per second and anchors on the first frame: render the
+    // model's nearest allowed length, no padding.
+    const genDuration = isKling
+      ? klingSeconds(kModel, slotDur)
+      : useMode === 'si2v' || isH3
+        ? slotDur
+        : Math.round(shot.duration || 4) + DYNAMICS_CONFIG.generation_padding_sec;
     try {
       const sendPrompt =
         isH3 && useMode !== 'r2v' && useMode !== 'mfr'
@@ -1116,8 +1170,17 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         resolution: cur.videoResolution || 'HD',
         name: `${(project.title || 'project').slice(0, 24)}_sc${project.outline.indexOf(scene) + 1}_shot${i + 1}`,
       };
-      const { dataURL, filename } =
-        useMode === 'mfr'
+      const { dataURL, filename, seconds: klingSec } =
+        isKling
+          ? await generateKlingVideo(settings, {
+              prompt: vPrompt,
+              firstFrame: first,
+              lastFrame: useMode === 'flf2v' ? last : null,
+              durationSec: slotDur,
+              resolution: cur.videoResolution || 'HD',
+              name: genArgs.name,
+            })
+          : useMode === 'mfr'
           ? await generateComfyMultiVideo(settings, {
               ...genArgs,
               ...h3MultiPlan(cur, shot.id, { durationSec: genDuration }),
@@ -1154,9 +1217,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           shotVideos: { ...(p.shotVideos || {}), [shot.id]: dataURL },
           videoGenDurations: {
             ...(p.videoGenDurations || {}),
-            [shot.id]: isH3 ? Math.round(h3Seconds(genDuration) * 100) / 100 : genDuration,
+            [shot.id]: isKling ? klingSec || genDuration : isH3 ? Math.round(h3Seconds(genDuration) * 100) / 100 : genDuration,
           },
-          shotVideoEngines: { ...(p.shotVideoEngines || {}), [shot.id]: isH3 ? 'minimax' : 'ltx' },
+          shotVideoEngines: { ...(p.shotVideoEngines || {}), [shot.id]: isH3 ? 'minimax' : isKling ? 'kling' : 'ltx' },
         };
         if (!mixWav) return base;
         // timeline start = summed durations of every shot before this one
@@ -1657,7 +1720,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           const effMode =
             curEngine === 'minimax'
               ? resolveH3VideoMode(shotMode, { lastFrame: finalImg, hasRefs: !!refsOf(shot.id), hasKeyframes: hasMultiInput(project, shot.id) })
-              : resolveVideoMode(shotMode, { lastFrame: finalImg, audio: shotAud });
+              : curEngine === 'kling'
+                ? resolveKlingMode(shotMode, { lastFrame: finalImg, model: klingModelOf(settings) })
+                : resolveVideoMode(shotMode, { lastFrame: finalImg, audio: shotAud });
           return (
             <div key={shot.id} className={`shot-card s5e-card ${embed ? 's5e-compact' : ''}`}>
               {/* Card header: shot identity, timing, type and action. */}
@@ -1760,14 +1825,18 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
               {/* Errors surface above the tab content so they're visible from
                   any tab (image/video/audio failures all report here). */}
               {imgErr?.id === shot.id &&
-                (imgErr.msg === 'NO_GEMINI_KEY' || imgErr.msg === 'NO_KEY' || imgErr.msg === 'COMFY_UNREACHABLE' ? (
+                (['NO_GEMINI_KEY', 'NO_KEY', 'COMFY_UNREACHABLE', 'NO_KLING_KEY', 'KLING_NEEDS_APP'].includes(imgErr.msg) ? (
                   <div className="note warn">
                     {t(
                       imgErr.msg === 'NO_KEY'
                         ? 'err.noKey'
                         : imgErr.msg === 'COMFY_UNREACHABLE'
                           ? 'err.comfyDown'
-                          : 'err.noGeminiKey'
+                          : imgErr.msg === 'NO_KLING_KEY'
+                            ? 'err.noKlingKey'
+                            : imgErr.msg === 'KLING_NEEDS_APP'
+                              ? 'err.klingNeedsApp'
+                              : 'err.noGeminiKey'
                     )}{' '}
                     <button className="btn small" onClick={onSettings}>{t('err.openSettings')}</button>
                   </div>
@@ -1782,6 +1851,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                   <div className="prompt-head">
                     <label>{t('s5.img')}</label>
                     <span className="prompt-tools">
+                      {modelSelect(shot, 'image')}
                       {regenBtn(shot, 'image')}
                       <CopyButton text={p.imagePrompt} />
                       {promptToggle()}
@@ -2074,6 +2144,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                   <div className="prompt-head">
                     <label>{t('s5.vid', { d: dur })}</label>
                     <span className="prompt-tools">
+                      {modelSelect(shot, 'video')}
                       {promptEngineBadge(shot)}
                       {regenBtn(shot, 'video')}
                       <CopyButton text={p.videoPrompt} />
@@ -2173,7 +2244,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       ))}
                     </span>
                     <span className="seg seg-tall seg-compact" title={t('vid.wfTip')}>
-                      {(curEngine === 'minimax' ? H3_VIDEO_MODES : VIDEO_MODES).map((m) => {
+                      {(curEngine === 'minimax' ? H3_VIDEO_MODES : curEngine === 'kling' ? KLING_VIDEO_MODES : VIDEO_MODES).map((m) => {
                         const avail =
                           m === 'si2v' ? !!shotAud
                             : m === 'flf2v' ? !!finalImg

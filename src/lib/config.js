@@ -15,6 +15,7 @@ export const DEFAULT_OUTPUT_DIR = inDocuments('StoryReel Outputs'); // where gen
 export const DEFAULT_COMFY_URL = 'http://127.0.0.1:8188'; // ComfyUI's own default port
 export const DEFAULT_CLAUDE_MODEL = 'claude-sonnet-5';
 export const DEFAULT_IMAGE_MODEL = 'gemini-3-pro-image-preview';
+export const DEFAULT_KLING_MODEL = 'kling-3.0'; // cloud video (first + last frame, 3–15 s)
 
 // Five stages since 2.5 (Generation Prompts and Final Assembly merged).
 export const STAGE_COUNT = 5;

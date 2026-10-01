@@ -131,6 +131,46 @@ JSON schema:
   };
 }
 
+// COMPOSITION VARIETY — shared by the shot breakdown (stage 4) and the frame /
+// motion prompts (stage 5). The rule scales with the scene's intensity (the
+// rhythm block's kinetic energy): calm blocks may hold a composition, intense
+// ones must keep changing it and reach for extreme angles.
+//   mode 'breakdown' — writing shot types; 'frames' — writing first-frame
+//   image prompts; 'motion' — writing image-to-video camera/motion prompts.
+export function compositionRules(block, prevTypes = [], mode = 'breakdown') {
+  const e = Number(block?.kinetic_energy_level) || 0;
+  const tier = !block ? 'none' : e <= 3 ? 'low' : e <= 6 ? 'mid' : e <= 8 ? 'high' : 'extreme';
+  if (mode === 'motion') {
+    const m = {
+      none: 'Let camera movement follow the intensity of the action: calm moments hold still or drift slowly; intense ones move faster and change the kind of move from shot to shot.',
+      low: `Intensity is LOW (kinetic energy ${e}/10): locked-off or very slow moves are right; the same quiet camera behaviour may carry two shots in a row.`,
+      mid: `Intensity is MODERATE (kinetic energy ${e}/10): alternate the camera move at least every second shot (push-in, pan, track, static).`,
+      high: `Intensity is HIGH (kinetic energy ${e}/10): change the camera move every shot — tracking, whip pans, handheld, orbit, fast push-ins — and keep them short and decisive.`,
+      extreme: `Intensity is EXTREME (kinetic energy ${e}/10): change the camera move every shot, favour the most energetic moves (whip pans, crash zooms, handheld shake, rapid orbit), and let a tilted (Dutch) frame roll or rock on the peak moments.`,
+    }[tier];
+    return `\n\nCAMERA VARIETY: never give more than two consecutive shots the same camera move. ${m} The first frame fixes each shot's framing and angle — vary the MOVEMENT, never contradict the frame.`;
+  }
+  const t = {
+    none: 'Let composition follow the action\'s intensity: calm, low-energy moments may hold a longer static composition; as intensity rises, cut shorter, change composition more often and widen the range of angles — top-down, ground-level and, at the peak, Dutch (tilted-horizon) angles.',
+    low: `Intensity is LOW (kinetic energy ${e}/10): longer, static, carefully composed frames are right — eye-level or gently off-axis. Two consecutive similar compositions are acceptable here; unusual angles only where the story asks for them.`,
+    mid: `Intensity is MODERATE (kinetic energy ${e}/10): change the framing size or the camera angle at least every second shot; mix wide, medium and close framings, with one or two motivated low or high angles.`,
+    high: `Intensity is HIGH (kinetic energy ${e}/10): EVERY shot changes composition — no two alike in a row; keep shots short; use at least three different angle families across the scene, including a top-down (overhead) view and a ground-level or low-angle shot, plus POV or over-the-shoulder where it fits.`,
+    extreme: `Intensity is EXTREME (kinetic energy ${e}/10): EVERY shot changes composition; use the shortest shots the range allows and the widest variety of angles — top-down, ground-level, steep low and high angles, extreme close-ups — with Dutch angles (tilted horizon) reserved for the peak moments.`,
+  }[tier];
+  const prev = (prevTypes || []).filter(Boolean);
+  const carry = prev.length
+    ? `\n- The previous scene ended on: ${prev.join(' → ')}. The count of consecutive similar compositions carries across the scene boundary — do not open with a third alike.`
+    : '';
+  if (mode === 'frames') {
+    return `\n\nCOMPOSITION — every "image_prompt" must realise its shot's "shot_type" exactly: the framing size AND the camera angle/height, stated in concrete camera terms (camera height, tilt, lens, where the subject sits in frame). Never write the same or a near-identical composition for more than two consecutive shots — if neighbouring shot types are alike, differentiate the third by angle, height, lens or subject side. A top-down shot is seen from directly above, a ground-level shot from the floor, and a Dutch angle has a visibly tilted horizon — say so explicitly. ${t}`;
+  }
+  return `\n\nCOMPOSITION VARIETY (mandatory):
+- A composition = framing size (extreme wide / wide / medium / close-up / extreme close-up) + camera angle and height (eye-level, low, high, top-down, ground-level, over-the-shoulder, POV, Dutch / tilted horizon) + the side the subject is seen from.
+- NEVER use the same or a near-identical composition more than TWICE in a row. A third consecutive shot must change at least the framing size or the camera angle/height — "medium" followed by "medium, slightly closer" is not a change.
+- State the composition explicitly in every "shot_type": framing AND angle (e.g. "low-angle medium close-up", "top-down wide", "ground-level tracking", "Dutch-angle extreme close-up").
+- ${t}${carry}`;
+}
+
 export function stage4Prompt(project, scene, lang, scriptStyle, block) {
   const outlineList = project.outline
     .map((s, i) => `${i + 1}. ${s.title} — ${s.summary} (~${s.duration}s)`)
@@ -141,6 +181,10 @@ export function stage4Prompt(project, scene, lang, scriptStyle, block) {
   // Action Dynamics Plan: the scene's rhythm block mathematically constrains
   // shot lengths and dictates motion/dialogue density and camera behavior.
   const range = block ? densityRange(block) : { min: 2, max: 10 };
+  // composition count carries across the scene boundary
+  const sceneIdx = project.outline.findIndex((x) => x.id === scene.id);
+  const prevShots = sceneIdx > 0 ? project.sceneDetails?.[project.outline[sceneIdx - 1].id]?.shots || [] : [];
+  const compNote = compositionRules(block || null, prevShots.slice(-2).map((x) => x.shotType));
   const dynNote = block
     ? `\n\nACTION DYNAMICS (this scene belongs to rhythm block "${block.block_id}" — these constraints are mandatory):
 - Kinetic energy ${block.kinetic_energy_level}/10: ${block.kinetic_energy_level >= 6 ? 'stage visible physical motion in almost every shot; actions overlap and interrupt' : 'keep physical action restrained and deliberate; let stillness carry tension'}.
@@ -174,7 +218,7 @@ Requirements:
 - "location" is the specific place plus time of day / lighting condition.
 
 JSON schema:
-{"shots":[{"duration_sec":4,"shot_type":"wide / medium / close-up / POV / tracking / etc.","location":"specific location, time of day","action":"what happens and what the camera sees","dialogue":"NAME: line — or empty string","notes":"mood, lighting, sound or continuity note — may be empty"}]}` + dynNote + envNote),
+{"shots":[{"duration_sec":4,"shot_type":"framing + camera angle, e.g. low-angle medium close-up / top-down wide / eye-level medium / POV tracking","location":"specific location, time of day","action":"what happens and what the camera sees","dialogue":"NAME: line — or empty string","notes":"mood, lighting, sound or continuity note — may be empty"}]}` + dynNote + compNote + envNote),
   };
 }
 
@@ -209,7 +253,7 @@ FRAME CONTINUITY (STATE TRACKING): The shots of a scene form one continuous, rea
 // `imageStylePlus` marks an "image+" style: a detailed, binding style sheet
 // that the prompts must reproduce literally (many of its exact terms) rather
 // than paraphrase as a mood.
-export function stage5Prompt(project, scene, shots, lang, imageStyle, imageStylePlus = false) {
+export function stage5Prompt(project, scene, shots, lang, imageStyle, imageStylePlus = false, block = null, imageModel = 'gemini') {
   const envNote = scene.photos?.length
     ? `\n\nAttached are reference photos of this scene's environment. Ground the image prompts in what these photos show: architecture, interior details, colors, lighting and atmosphere.`
     : '';
@@ -243,7 +287,7 @@ Scene ${scene.number}: "${scene.title}" — ${scene.summary}
 Shots of this scene:
 ${JSON.stringify(stage5ShotList(shots), null, 2)}
 
-For EVERY shot above, write one "image_prompt" — a detailed English prompt for the Nano Banana image generation model to create the FIRST FRAME of the shot.
+For EVERY shot above, write one "image_prompt" — a detailed English prompt for the ${imageModel === 'comfy' ? 'FLUX.2 Klein' : 'Nano Banana (Gemini)'} image generation model to create the FIRST FRAME of the shot.${imageModel === 'comfy' ? ' FLUX.2 reads natural-language prose: lead with the subject and its pose, keep each prompt under about 200 words, and describe only what IS in the frame (no negative phrasing, no weights, no tag lists).' : ''}
 
 FIRST FRAME TIMING — this is the most important rule. Each shot's "action" field describes everything that happens ACROSS the shot's full duration. The first frame is the state of the scene at second zero, BEFORE that action has started to unfold. Do NOT depict the midpoint, the climax or the result of the action. Freeze the INITIAL state: where each character is, their pose, gesture and expression at the instant the shot begins. If the action ends somewhere else than it starts, show where it STARTS. Example: for the action "Anna crosses the room and picks up the phone", the first frame shows Anna at her starting position at the far side of the room, the phone still lying untouched — not Anna halfway across the room and not Anna holding the phone. That instant is still governed by your FRAME CONTINUITY rules: if the previous shot ended with Anna already walking, she is frozen mid-stride at that starting position, not standing neutrally.
 
@@ -252,7 +296,7 @@ In each prompt describe: that initial-state subject staging, each visible charac
 JSON schema:
 {"prompts":[{"shot":1,"image_prompt":"..."}]}
 
-Return exactly one entry per shot, in order.` + aspectNote + styleNote + envNote),
+Return exactly one entry per shot, in order.` + aspectNote + compositionRules(block, [], 'frames') + styleNote + envNote),
   };
 }
 
@@ -341,7 +385,7 @@ Additional rules:
 - When a shot has a "generation_directive", TRANSLATE its energy level and camera-momentum contract into concrete on-screen motion and camera language woven through the prompt — never paste the directive text itself; every sentence must describe something the camera physically sees.
 - Let the shot's core action land in the middle of the clip — never at the very first or very last second.
 - NEVER state the clip's total duration in seconds inside a "video_prompt", and never mention trimming, padding, final cuts or any editing mechanics — the video model must only see the motion itself.
-- FINAL CHECK per prompt: no character descriptions or names, no static scene description, chronological order, one camera logic, ambient audio sentence at the end.${dynNote}
+- FINAL CHECK per prompt: no character descriptions or names, no static scene description, chronological order, one camera logic, ambient audio sentence at the end.${dynNote}${compositionRules(block || null, [], 'motion')}
 
 JSON schema:
 {"prompts":[{"shot":1,"video_prompt":"..."}]}
@@ -929,7 +973,7 @@ ${inner}
     user: `FILM: ${project.title}
 SCENE ${project.outline.indexOf(scene) + 1}: ${scene.title} — ${scene.summary}
 ${chars ? `CHARACTERS:\n${chars}\n` : ''}
-DIRECTORIAL STYLE to express as concrete motion and sound: "${styleNote}"${dyn}
+DIRECTORIAL STYLE to express as concrete motion and sound: "${styleNote}"${dyn}${compositionRules(block || null, [], 'motion')}
 
 Each shot below already has a generated FIRST FRAME that will be attached to the model, so the frame carries the appearance, wardrobe, lighting and set — do NOT re-describe them. Refer to people by neutral visual handles ("the woman", "the taller man"), never by name.
 
@@ -949,5 +993,71 @@ Do NOT add an alignment header — the app prepends it (multi-frame shots need n
 
 JSON schema:
 {"prompts":[{"shot":1,"video_prompt":"integrated_multimodal_description: …\n\noverall_soundscape: …\n\nnon_diegetic_music: …"}]}${shots.some((s) => multiOf(s.id)) ? `\n\n${H3_MULTI_FORMAT}` : ''}`,
+  };
+}
+
+// Stage 5 video prompts for KLING (cloud image-to-video). Built on the prompt
+// structure Kling's own guides recommend — the image-to-video formula
+// "Subject + Movement, Background + Movement" plus camera language — and
+// their dos and don'ts: motion only (the frame carries the scene), simple
+// sentences, an action that fits the clip length, no counts, no complex
+// physics, negatives as plain sentences inside the prompt, time-coded beats
+// for longer clips, and a first → last frame bridge when the shot has a
+// final frame. Sources: kling.ai/quickstart/image-to-video-guide,
+// /text-to-video-prompt-guide, /klingai-video-3-model-user-guide,
+// /ai-video-start-end-frames.
+//   opts.seconds(shot) → the clip length Kling will render for that shot
+//   opts.modelLabel    → the model's display name
+export function stage5KlingVideoPrompt(project, scene, shots, videoStyle, block, { seconds = () => 5, modelLabel = 'Kling', lastFrame = true } = {}) {
+  const styleNote = (videoStyle || DEFAULT_VIDEO_MOTION_STYLE).trim();
+  const finals = project.shotFinalImages || {};
+  const shotList = stage5ShotList(shots).map((s, i) => ({
+    ...s,
+    clip_seconds: seconds(shots[i]),
+    end_frame: lastFrame && !!finals[shots[i].id],
+  }));
+  const dynNote = block
+    ? `\n\nACTION DYNAMICS for this scene — kinetic energy ${block.kinetic_energy_level}/10, camera momentum "${String(block.required_camera_momentum).replace(/_/g, ' ')}". Express them through how fast the subjects move and which camera move you choose — never quote these words.`
+    : '';
+  return {
+    system: `You are a director writing image-to-video prompts for the ${modelLabel} model, following the prompt structure Kling's own guides recommend. The model receives each shot's exact FIRST FRAME as an image; your prompt tells it what moves.
+
+KLING'S IMAGE-TO-VIDEO FORMULA — build every prompt from these parts, in this order:
+1. SUBJECT + MOVEMENT — who or what moves and exactly how. Name the subject by a short visual handle that is unmistakable in the frame ("the woman in the black suit", "the yellow car"), then its action. One subject may do a short sequence of actions; several subjects each get their own sentence.
+2. BACKGROUND + MOVEMENT — what the environment does (rain falls, lightning flickers, a crowd passes, smoke drifts). Leave it out only when the background is still.
+3. CAMERA LANGUAGE — ONE clear camera instruction in Kling's vocabulary: "the camera slowly pushes in", "pulls back", "pans left / right", "tilts up / down", "tracks alongside", "orbits around", "handheld follow", "static locked-off shot", "crane up". Use "first-person perspective", "aerial shot" or "close-up" only when the first frame already is that.
+4. (optional) LIGHTING / ATMOSPHERE changes that happen DURING the shot (headlights sweep across the wall, the light dims).
+
+KLING'S RULES (from the official guides — follow all of them):
+- Describe MOTION ONLY. The image already contains the scene, the characters and the visual style: never re-describe appearance, wardrobe, setting or art style, and never contradict what the frame shows — a prompt that deviates from the image makes the model cut to a different shot.
+- Use simple words and plain sentence structures. No poetry, no metaphors, no camera jargon beyond the vocabulary above.
+- The action must be completable within the clip's length ("clip_seconds") and physically plausible. One main action for a 3–5 second clip; two or three beats for longer ones. For clips of 6 seconds or more, time-code the beats in plain words: "At first …", "Around the 4th second …", "In the final 2 seconds …".
+- Avoid numbers and counts of objects ("three birds", "ten people") — the model is not sensitive to numbers. Avoid complex physics (bouncing balls, objects thrown high, liquids poured precisely).
+- End every prompt with "Single continuous shot, no cuts." — each shot is one unbroken take.
+- Negatives go INSIDE the prompt as plain sentences ("No camera shake.", "The background stays still.", "No text appears."). There is no separate negative prompt.
+- SPEECH: the clip is rendered silent and the voice is added afterwards. For a shot with dialogue, write that the speaker "speaks" or "says a few words" with natural lip movement and a fitting expression — NEVER quote the line and never format it as dialogue, or the model invents speech and subtitles.
+- When "end_frame" is true the model also receives the shot's LAST FRAME: describe the motion that carries the first frame into that end state in one continuous move. Both frames are the same scene — keep the change gradual, a large jump triggers a cut.
+- Length: 40–90 words per prompt, never above 2000 characters. English only. Character names never appear — use the visual handles.
+
+DIRECTORIAL STYLE to express through the motion and the camera move (translate it into concrete movement, never quote it): "${styleNote}"
+
+CONTINUITY: the shots of a scene play back to back. Carry momentum across the cut — a character walking at the end of one shot is still walking at the start of the next, unless the action stops them.
+
+Respond with VALID JSON ONLY. No markdown, no code fences, no commentary outside the JSON.`,
+    maxTokens: 6000,
+    user: `Characters (for your understanding only — never describe them in the prompts):
+${characterBlock(project)}
+
+Scene ${scene.number}: "${scene.title}" — ${scene.summary}
+
+Shots of this scene:
+${JSON.stringify(shotList, null, 2)}
+
+For EVERY shot above, write one "video_prompt" for ${modelLabel} using the formula.${dynNote}${compositionRules(block || null, [], 'motion')}
+
+JSON schema:
+{"prompts":[{"shot":1,"video_prompt":"..."}]}
+
+Return exactly one entry per shot, in order.`,
   };
 }

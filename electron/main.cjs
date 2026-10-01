@@ -2,12 +2,16 @@ const { app, BrowserWindow, shell, ipcMain, safeStorage, session, dialog, clipbo
 const path = require('path');
 const fs = require('fs');
 const { comfyRequest } = require('./comfyRequest.cjs');
+const { netRequest } = require('./netRequest.cjs');
 const { ffmpegVersion, renderJob, cancelActive } = require('./ffmpegRender.cjs');
 const { resolveProjectDir, listStrayDirs, deleteDirs } = require('./projectDirs.cjs');
 
 // All ComfyUI traffic goes through the main process — renderer fetches carry
 // an Origin header that ComfyUI rejects with HTTP 403.
 ipcMain.handle('comfy-request', (_e, opts) => comfyRequest(opts));
+
+// Cloud video APIs without CORS headers (Kling) are called from here too.
+ipcMain.handle('net-request', (_e, opts) => netRequest(opts));
 
 // The renderer derives its default folders from the OS Documents folder
 // instead of a path baked into the source (see src/lib/config.js).

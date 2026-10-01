@@ -13,6 +13,7 @@ import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
 import Stage5 from './Stage5.jsx';
 import { Play, Pause, SkipBack, StopSq, Grip, Download, Upload, Stars, Trash, Scissors, TransitionIcon, Plus, Expand, Zap, RestoreIcon } from '../components/icons.jsx';
 import Lightbox from '../components/Lightbox.jsx';
+import ShotTrimModal from '../components/ShotTrimModal.jsx';
 
 const readFileDataURL = (file) =>
   new Promise((resolve, reject) => {
@@ -202,6 +203,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
   const [scrubbing, setScrubbing] = useState(false); // playhead being dragged
   const [pvState, setPvState] = useState({ playing: false, rate: 1 }); // idle preview transport
   const [lightbox, setLightbox] = useState(null); // full-size pop-up of the previewed video
+  const [trimModal, setTrimModal] = useState(null); // shot id shown in the isolated trim pop-up (double-click)
   const [stripLeft, setStripLeft] = useState(NLE_GUT); // px from .nle-inner's left edge to where clips start
   const [queue, setQueue] = useState(null); // auto queue progress { a, b } | null
   const queueApi = useRef(null); // the embedded workbench's per-scene media queue
@@ -372,7 +374,8 @@ export default function Stage6({ project, update, settings, ...workbench }) {
             : null;
           const video = (project.shotVideos || {})[shot.id] || null;
           const raw = (project.videoGenDurations || {})[shot.id] || 0;
-          const nativeAudio = (project.shotVideoEngines || {})[shot.id] === 'minimax';
+          // first-frame-anchored clips (H3, Kling) trim from the tail only
+          const nativeAudio = ['minimax', 'kling'].includes((project.shotVideoEngines || {})[shot.id]);
           const trim = video
             ? (project.shotTrims || {})[shot.id]
               || defaultTrim(shot.duration || 0, raw, { tailOnly: nativeAudio })
@@ -437,7 +440,9 @@ export default function Stage6({ project, update, settings, ...workbench }) {
     const slack = Math.max(0, (it.raw || 0) - (it.shot.duration || 0));
     const cur = it.trim;
     const next = { ...cur, ...patch };
-    next.head = Math.max(0, Math.min(2, Math.round(next.head * 100) / 100));
+    // the in-point may sit anywhere the spare material allows (the slack
+    // check below bounds it); the transition allowance stays within 2s
+    next.head = Math.max(0, Math.round(next.head * 100) / 100);
     next.tail = Math.max(0, Math.min(2, Math.round(next.tail * 100) / 100));
     if (next.head + next.tail > slack) return; // can't trim more than the padding
     update((p) => ({ shotTrims: { ...(p.shotTrims || {}), [shotId]: next } }));
@@ -760,8 +765,44 @@ export default function Stage6({ project, update, settings, ...workbench }) {
     queueApi.current?.cancel?.();
   };
 
+  // Trim a shot from BOTH sides: `head` is the in-point inside the shot's
+  // source clip, `duration` its length from there (so the out-point is
+  // head + duration). The transition allowance shrinks to the material that
+  // is left, and the shot's own detached audio (H3 mix / split A/V) follows
+  // the in-point so sound and picture stay together.
+  const applyShotTrim = (it, { head, duration }) =>
+    update((p) => {
+      const d = clampDur(Math.round(duration * 10) / 10);
+      const patch = {
+        sceneDetails: {
+          ...p.sceneDetails,
+          [it.sceneId]: {
+            ...(p.sceneDetails[it.sceneId] || {}),
+            shots: (p.sceneDetails[it.sceneId]?.shots || []).map((s) => (s.id === it.shot.id ? { ...s, duration: d } : s)),
+          },
+        },
+      };
+      if (it.video) {
+        const h = Math.max(0, Math.round(head * 100) / 100);
+        const prev = (p.shotTrims || {})[it.shot.id] || it.trim || { head: 0, tail: 0 };
+        const tail = Math.max(0, Math.min(prev.tail || 0, (it.raw || 0) - h - d));
+        patch.shotTrims = { ...(p.shotTrims || {}), [it.shot.id]: { head: h, tail: Math.round(tail * 100) / 100 } };
+        patch.audioLayers = (p.audioLayers || []).map((L) => ({
+          ...L,
+          clips: (L.clips || []).map((c) =>
+            c.id === `h3_${it.shot.id}` || c.id === `av_${it.shot.id}`
+              ? { ...c, offset: h, duration: Math.min(d, Math.max(0.1, (c.srcDuration || c.duration) - h)) }
+              : c
+          ),
+        }));
+      }
+      return patch;
+    });
+
   // Edge-trim with pointer capture (same interaction as the Stage-4 timeline).
-  const startTrim = (e, it) => {
+  // side 'end' (right edge) changes the out-point; side 'start' (left edge)
+  // moves the in-point while the out-point stays.
+  const startTrim = (e, it, side = 'end') => {
     if (total <= 0) return;
     const pps = pxPerSec();
     if (!pps) return;
@@ -779,7 +820,19 @@ export default function Stage6({ project, update, settings, ...workbench }) {
       /* best-effort */
     }
     let curD = startDur;
+    const startHead = it.video ? it.trim?.head || 0 : 0;
     const move = (ev) => {
+      if (side === 'start') {
+        // dragging right cuts the beginning; dragging left gives it back —
+        // but never before the source clip starts
+        let next = clampDur(Math.round((startDur - (ev.clientX - startX) / pps) * 2) / 2);
+        if (it.video) next = Math.max(SHOT_MIN_SEC, Math.min(next, startDur + startHead));
+        if (next !== curD) {
+          curD = next;
+          applyShotTrim(it, { head: startHead + (startDur - next), duration: next });
+        }
+        return;
+      }
       const raw = startDur + (ev.clientX - startX) / pps;
       const next = clampDur(Math.round(raw * 2) / 2);
       if (next !== curD) {
@@ -879,7 +932,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
       if (idx < 0) return c; // shot deleted or folded into a take — leave it where it is
       const it = items[idx];
       const start = startOf(idx);
-      const offset = String(c.id).startsWith('av_') ? it.trim?.head || 0 : c.offset || 0;
+      const offset = it.trim?.head || 0; // the clip's audio starts at the shot's in-point
       const src = c.srcDuration || c.duration;
       const duration = Math.min(it.shot.duration || c.duration, Math.max(0.1, src - offset));
       if (Math.abs(start - c.start) < 0.005 && Math.abs(duration - c.duration) < 0.005 && offset === (c.offset || 0)) return c;
@@ -1875,12 +1928,16 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                       }}
                       className={`nle-clip ${selectedId === it.shot.id ? 'selected' : ''} ${overIns?.sceneId === g.scene.id && overIns.idx === si ? 'ins-before' : ''} ${overIns?.sceneId === g.scene.id && overIns.idx === g.shots.length && si === g.shots.length - 1 ? 'ins-after' : ''} ${trimId === it.shot.id ? 'trimming' : ''}`}
                       style={zoomed ? { flex: 'none', width: (it.shot.duration || 1) * scale } : { flexGrow: Math.max(0.5, it.shot.duration || 1) }}
-                      title={`${globalIdx + 1} · ${it.shot.duration}s · ${it.shot.shotType || ''} — ${t('s6.dragShot')}`}
+                      title={`${globalIdx + 1} · ${it.shot.duration}s · ${it.shot.shotType || ''} — ${t('s6.dragShot')} · ${t('s6.dblTrim')}`}
                       draggable={trimId === null}
                       onClick={() => {
                         setSelectedId(it.shot.id);
                         setSelectedSceneId(g.scene.id);
                         setElapsed(startOf(globalIdx));
+                      }}
+                      onDoubleClick={() => {
+                        setPlaying(false);
+                        setTrimModal(it.shot.id);
                       }}
                       onDragStart={(e) => {
                         if (trimId !== null) {
@@ -1908,11 +1965,29 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                       {it.muted && it.video && (
                         <span className="clip-mute" title={t('s6.mutedBadge')}>🔇</span>
                       )}
+                      {/* both edges trim: left = the beginning (in-point),
+                          right = the end. A take is one generation — its
+                          beginning is not trimmable here. */}
+                      {!takeOf(project, it.shot.id) && (
+                        <span
+                          className="nle-trim nle-trim-l"
+                          title={t('s6.trimStart')}
+                          draggable={false}
+                          onClick={(e) => e.stopPropagation()}
+                          onDoubleClick={(e) => e.stopPropagation()}
+                          onDragStart={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }}
+                          onPointerDown={(e) => startTrim(e, { ...it, sceneId: g.scene.id }, 'start')}
+                        />
+                      )}
                       <span
                         className="nle-trim"
                         title={t('sb.trim')}
                         draggable={false}
                         onClick={(e) => e.stopPropagation()}
+                        onDoubleClick={(e) => e.stopPropagation()}
                         onDragStart={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -2199,6 +2274,21 @@ export default function Stage6({ project, update, settings, ...workbench }) {
       </div>
 
       <Lightbox item={lightbox} onClose={() => setLightbox(null)} />
+      {/* A shot in isolation: preview, transport, in/out trim (double-click a clip) */}
+      {trimModal &&
+        (() => {
+          const it = items.find((x) => x.shot.id === trimModal);
+          if (!it) return null;
+          return (
+            <ShotTrimModal
+              item={it}
+              index={items.indexOf(it)}
+              locked={!!takeOf(project, it.shot.id)}
+              onApply={(v) => applyShotTrim(it, v)}
+              onClose={() => setTrimModal(null)}
+            />
+          );
+        })()}
       <div className="nle-footer">
         <span className="nle-nudge nle-scale" title={zoomed ? t('s6.scrollHint') : ''}>
           {t('s6.scale')}

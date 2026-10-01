@@ -1,5 +1,51 @@
 # Changelog
 
+## 2.8.0 — 2026-09-30
+
+- **Trim shots from both sides.** Every timeline clip now has a trim handle
+  on its left edge as well: dragging it cuts (or restores) the beginning of
+  the shot — the in-point moves inside the source clip while the end stays.
+  The right edge trims the end as before. The shot's own detached audio
+  (H3 mix, split A/V) follows the in-point, so sound and picture stay
+  together.
+- **Shot pop-up (double-click a clip).** One shot in isolation: a small
+  preview, its own transport (to in-point, play, half speed, pause), and a
+  trim bar over the shot's source clip with an in- and an out-handle, ±0.1 s
+  nudges and a live length readout. Dragging a handle scrubs the preview to
+  that frame; the hatched area marks where the clip's last frame would
+  hold. A shot without a video only has a length; a multi-shot take is shown
+  read-only.
+- **Kling video generation (cloud API).** Settings → API keys has a Kling
+  API key field; Settings → Video offers "Kling" as the video model with a
+  model choice (Kling 3.0, 3.0 Turbo, 2.6, 2.5 Turbo). Shots render from the
+  first frame, or first + last frame when a final frame exists and the model
+  supports it, at the model's nearest allowed length (3–15 s on 3.0, 5 / 10 s
+  on 2.x), 720p or 1080p. Uses Kling's current API (one static key); calls
+  go through the app's main process because the API cannot be reached from a
+  browser. Clips are rendered silent — voice and sound stay in the app.
+- **Kling prompts follow Kling's own structure.** With Kling selected, video
+  prompts are written to the developers' image-to-video formula — Subject +
+  Movement, Background + Movement, one camera instruction in Kling's
+  vocabulary — and their rules: motion only (the frame carries the scene),
+  simple sentences, an action that fits the clip length, time-coded beats
+  for longer clips, no counts or complex physics, negatives as plain
+  sentences, a first → last frame bridge when a final frame exists, and
+  "single continuous shot, no cuts".
+- **Model picker in the prompt header.** The image and the video prompt of a
+  shot each have a dropdown for the generation model (Nano Banana / Flux.2
+  Klein; MiniMax H3 / LTX-2 / Kling). Picking one asks for confirmation —
+  the model is an app-wide setting — and then offers to rewrite this shot's
+  prompt in the chosen model's format. Image prompts are now written for
+  the selected image model too.
+- **Composition follows the intensity curve.** Shot breakdowns (Stage 4) and
+  frame prompts (Stage 5) must not use the same or a near-identical
+  composition more than twice in a row — the count carries across scene
+  boundaries — and every shot type states framing and camera angle. Variety
+  scales with the scene's kinetic energy: calm blocks may hold longer static
+  compositions; high-energy blocks change composition every shot with
+  top-down and ground-level views; extreme peaks add Dutch angles. Video
+  prompts get the matching rule for camera moves.
+
 ## 2.7.3 — 2026-09-29
 
 - **Location photos are back on the shot card.** Since 2.5 the scene's
