@@ -2144,13 +2144,24 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                   </div>
 
                   <div className="s5e-btnrow">
-                    <button title={t('tip.genImage')}
-                      className="btn small primary s5e-gen fixedw-lg"
-                      disabled={anyBusy || !p.imagePrompt}
-                      onClick={() => genImage(shot)}
-                    >
-                      {imgBusy === shot.id ? t('img.generating') : genImg ? t('img.regenerate') : t('img.generate')}
-                    </button>
+                    {/* no prompt yet: the same button writes it first */}
+                    {(p.imagePrompt || '').trim() ? (
+                      <button title={t('tip.genImage')}
+                        className="btn small primary s5e-gen fixedw-lg"
+                        disabled={anyBusy || !!regenBusy}
+                        onClick={() => genImage(shot)}
+                      >
+                        {imgBusy === shot.id ? t('img.generating') : genImg ? t('img.regenerate') : t('img.generate')}
+                      </button>
+                    ) : (
+                      <button title={t('tip.createPrompt')}
+                        className="btn small primary s5e-gen fixedw-lg"
+                        disabled={anyBusy || !!regenBusy}
+                        onClick={() => regenPrompt(shot, 'image')}
+                      >
+                        {regenBusy === `${shot.id}:image` ? t('s5.creatingPrompt') : t('s5.createPrompt')}
+                      </button>
+                    )}
                     <label className="s5e-ico" title={t('img.uploadTip')} aria-label={t('img.uploadTip')}>
                       <Upload size={16} />
                       <input
@@ -2316,18 +2327,28 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     </p>
                   )}
                   <div className="s5e-btnrow">
-                    <button title={t('tip.genVideo')}
-                      className="btn small primary s5e-gen fixedw-lg"
-                      disabled={
-                        anyBusy ||
-                        !p.videoPrompt?.trim() ||
-                        (!genImg && effMode !== 'r2v') ||
-                        (curEngine === 'minimax' && isTakeMember(project, shot.id))
-                      }
-                      onClick={() => genVideo(shot, i)}
-                    >
-                      {vidBusy ? t('vid.generating') : shotVid ? t('vid.regenerate') : t('vid.generate')}
-                    </button>
+                    {p.videoPrompt?.trim() ? (
+                      <button title={t('tip.genVideo')}
+                        className="btn small primary s5e-gen fixedw-lg"
+                        disabled={
+                          anyBusy ||
+                          !!regenBusy ||
+                          (!genImg && effMode !== 'r2v') ||
+                          (curEngine === 'minimax' && isTakeMember(project, shot.id))
+                        }
+                        onClick={() => genVideo(shot, i)}
+                      >
+                        {vidBusy ? t('vid.generating') : shotVid ? t('vid.regenerate') : t('vid.generate')}
+                      </button>
+                    ) : (
+                      <button title={t('tip.createPrompt')}
+                        className="btn small primary s5e-gen fixedw-lg"
+                        disabled={anyBusy || !!regenBusy}
+                        onClick={() => regenPrompt(shot, 'video')}
+                      >
+                        {regenBusy === `${shot.id}:video` ? t('s5.creatingPrompt') : t('s5.createPrompt')}
+                      </button>
+                    )}
                     <label className="s5e-ico" title={t('vid.uploadTip')} aria-label={t('vid.uploadTip')}>
                       <Upload size={16} />
                       <input
@@ -2608,13 +2629,23 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     )}
 
                     <div className="s5e-btnrow">
-                      <button title={t('tip.genVoice')}
-                        className="btn small primary s5e-gen fixedw-lg"
-                        disabled={anyBusy || recording === shot.id || (!(shot.dialogue || '').trim() && !(p.voicePrompt || '').trim())}
-                        onClick={() => genVoice(shot, i)}
-                      >
-                        {audBusy ? t('aud.generating') : shotAud ? t('aud.regenerate') : t('aud.generate')}
-                      </button>
+                      {!(p.voicePrompt || '').trim() && (shot.dialogue || '').trim() ? (
+                        <button title={t('tip.createPrompt')}
+                          className="btn small primary s5e-gen fixedw-lg"
+                          disabled={anyBusy || recording === shot.id}
+                          onClick={() => redraftVoice(shot)}
+                        >
+                          {imgBusy === `${shot.id}:audp` ? t('s5.creatingPrompt') : t('s5.createPrompt')}
+                        </button>
+                      ) : (
+                        <button title={t('tip.genVoice')}
+                          className="btn small primary s5e-gen fixedw-lg"
+                          disabled={anyBusy || recording === shot.id || !(p.voicePrompt || '').trim()}
+                          onClick={() => genVoice(shot, i)}
+                        >
+                          {audBusy ? t('aud.generating') : shotAud ? t('aud.regenerate') : t('aud.generate')}
+                        </button>
+                      )}
                       <label
                         className={`s5e-ico file-btn ${anyBusy || recording ? 'disabled' : ''}`}
                         title={t('aud.upload')}

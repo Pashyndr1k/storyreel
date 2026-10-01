@@ -2666,7 +2666,10 @@ textarea.s5e-prompt-sm { min-height: 110px; }
 .s5e-ver-x:hover { background: rgba(var(--accent-rgb), 0.9); }
 
 /* reference material grid */
-.s5e-refgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+/* assets and locations share one line; the groups wrap only when it runs out */
+.s5e-refgrid { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px 20px; }
+.s5e-refgrid > div { flex: 0 1 auto; min-width: 0; }
+.s5e-refgrid .photo-row { flex-wrap: wrap; }
 .s5e-refgrid .photos-label { margin: 0 0 10px; }
 .s5e-refgrid .photo-row { margin: 0; }
 .s5e .photo-add {
@@ -3279,7 +3282,6 @@ button.loc-tile:hover { opacity: 1; }
 .s5e-compact .s5e { grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .s5e-compact .s5e > .s5e-panel:first-child { order: 2; }
 .s5e-compact .s5e-prompt { min-height: 0; }
-.s5e-compact .s5e-refgrid { grid-template-columns: 1fr; }
 .prompt-fold {
   border: none;
   background: none;

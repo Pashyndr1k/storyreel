@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- **"Create prompt" on the generation button (Stage 5).** When a shot has no
+  image, video or voice prompt yet, the Create image / Create video / Create
+  sound button turns into "Create prompt" and writes that one prompt; once
+  the prompt exists the button goes back to creating the media.
+- **Wording: Create / Recreate.** Every button, hint and confirmation that
+  said Generate / Regenerate now says Create / Recreate (EN, RU, UA).
+- **Locations sit on the assets line.** On the shot card the location tiles
+  share one row with the asset tiles instead of a row of their own.
+
 ## 2.10.2 — 2026-10-01
 
 - **Anthropic models updated.** The text-model list is now Claude Sonnet 5.5
