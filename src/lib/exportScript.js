@@ -28,6 +28,11 @@ export function buildScriptMarkdown(project, lang = 'en') {
     for (const c of project.storyline.characters) {
       L.push(`- **${c.name}** (${c.role}) — ${c.description}`);
     }
+    // actor groups: several characters acting as one entity
+    for (const g of project.storyline.groups || []) {
+      const members = (g.memberIds || []).map((id) => project.storyline.characters.find((c) => c.id === id)?.name).filter(Boolean);
+      if ((g.name || '').trim() && members.length) L.push(`- **${g.name}** [${members.join(', ')}]${g.description ? ` — ${g.description}` : ''}`);
+    }
     L.push('');
   }
 

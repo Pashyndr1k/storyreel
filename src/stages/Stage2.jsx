@@ -40,6 +40,9 @@ export default function Stage2({ project, update, rawUpdate, settings, goNext, o
             description: c.description || '',
             photos: [],
           })),
+          // groups survive a regenerated storyline, but the cast is new —
+          // their members have to be picked again
+          groups: (p.storyline?.groups || []).map((g) => ({ ...g, memberIds: [] })),
         },
         title: data.title || p.title,
         genres: Array.isArray(data.genres) && data.genres.length ? data.genres.slice(0, 3) : p.genres,
@@ -104,8 +107,41 @@ export default function Stage2({ project, update, rawUpdate, settings, goNext, o
 
   const removeChar = (id) =>
     update((p) => ({
-      storyline: { ...p.storyline, characters: p.storyline.characters.filter((c) => c.id !== id) },
+      storyline: {
+        ...p.storyline,
+        characters: p.storyline.characters.filter((c) => c.id !== id),
+        groups: (p.storyline.groups || []).map((g) => ({ ...g, memberIds: (g.memberIds || []).filter((x) => x !== id) })),
+      },
     }));
+
+  // ---- actor groups: several characters that act as ONE entity (a band, a
+  // crew, a family). Members are ordinary characters with their own photos;
+  // naming the group in a shot stands for all of them.
+  const groups = storyline?.groups || [];
+  const setGroups = (fn) => update((p) => ({ storyline: { ...p.storyline, groups: fn(p.storyline.groups || []) } }));
+  const addGroup = () => setGroups((gs) => [...gs, { id: uid(), name: '', description: '', memberIds: [] }]);
+  const patchGroup = (id, patch) => setGroups((gs) => gs.map((g) => (g.id === id ? { ...g, ...patch } : g)));
+  const removeGroup = (id) => setGroups((gs) => gs.filter((g) => g.id !== id));
+  const toggleMember = (gid, cid) =>
+    setGroups((gs) =>
+      gs.map((g) =>
+        g.id === gid
+          ? { ...g, memberIds: (g.memberIds || []).includes(cid) ? g.memberIds.filter((x) => x !== cid) : [...(g.memberIds || []), cid] }
+          : g
+      )
+    );
+  // a new character created straight into the group
+  const addMember = (gid) =>
+    update((p) => {
+      const id = uid();
+      return {
+        storyline: {
+          ...p.storyline,
+          characters: [...p.storyline.characters, { id, name: '', role: '', description: '', photos: [] }],
+          groups: (p.storyline.groups || []).map((g) => (g.id === gid ? { ...g, memberIds: [...(g.memberIds || []), id] } : g)),
+        },
+      };
+    });
 
   // Keep the global character library in sync: any character that gets photos
   // is auto-added (or updated) as a library entry.
@@ -358,6 +394,59 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
               </div>
             </div>
           ))}
+
+          {/* Actor groups: characters that appear as ONE entity. A shot that
+              names the group gets every member's photo as a reference. */}
+          <div className="section-head">
+            <label>{t('grp.title')}</label>
+            <button className="btn small" onClick={addGroup}>{t('grp.add')}</button>
+          </div>
+          {groups.length === 0 && <p className="hint">{t('grp.hint')}</p>}
+          {groups.map((g) => {
+            const members = (g.memberIds || []).map((id) => storyline.characters.find((c) => c.id === id)).filter(Boolean);
+            return (
+              <div key={g.id} className="char-card group-card">
+                <div className="row">
+                  <input
+                    className="grow"
+                    value={g.name}
+                    placeholder={t('grp.name')}
+                    onChange={(e) => patchGroup(g.id, { name: e.target.value })}
+                  />
+                  <button className="btn danger small" title={t('grp.remove')} aria-label={t('grp.remove')} onClick={() => removeGroup(g.id)}>✕</button>
+                </div>
+                <AutoTextarea
+                  minRows={2}
+                  value={g.description}
+                  placeholder={t('grp.desc')}
+                  onChange={(e) => patchGroup(g.id, { description: e.target.value })}
+                />
+                <label className="photos-label">{t('grp.members', { n: members.length })}</label>
+                <div className="grp-members">
+                  {storyline.characters.map((c) => {
+                    const on = (g.memberIds || []).includes(c.id);
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className={`grp-member ${on ? 'on' : ''}`}
+                        aria-pressed={on}
+                        title={on ? t('grp.removeMember') : t('grp.addMember')}
+                        onClick={() => toggleMember(g.id, c.id)}
+                      >
+                        {c.photos?.[0] ? <img src={c.photos[0]} alt="" /> : <span className="grp-nophoto">?</span>}
+                        <span className="grp-member-name">{c.name || t('s2.name')}</span>
+                      </button>
+                    );
+                  })}
+                  <button type="button" className="btn small" title={t('grp.newMemberTip')} onClick={() => addMember(g.id)}>
+                    {t('grp.newMember')}
+                  </button>
+                </div>
+                {members.some((c) => !c.photos?.[0]) && <p className="hint">{t('grp.noPhoto')}</p>}
+              </div>
+            );
+          })}
         </>
       )}
 

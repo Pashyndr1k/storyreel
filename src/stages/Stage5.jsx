@@ -671,8 +671,16 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       if (useChar.length) {
         // Name every face: with several people in frame the model must know
         // WHICH reference is WHO, not just that characters are attached.
-        const who = useCast.map((c, k) => `image ${off + k + 1} is ${c.name || `character ${k + 1}`}`).join(', ');
-        text += ` Character reference photos — ${who}. Reproduce each person's face, hair and appearance faithfully from their own photo, keep them clearly distinct from one another, and do not blend features between them.`;
+        const who = useCast.map((c, k) => `image ${off + k + 1} is ${c.name || `character ${k + 1}`}${c.group && c.role ? ` (${c.role})` : ''}`).join(', ');
+        // an actor group in the shot: its members are one entity, all present
+        const byGroup = {};
+        useCast.forEach((c, k) => {
+          if (c.group) (byGroup[c.group] = byGroup[c.group] || []).push(off + k + 1);
+        });
+        const groupNote = Object.entries(byGroup)
+          .map(([g, nums]) => ` Images ${nums.join(', ')} are the members of "${g}" — one group that appears together: show every one of these members in the frame, each with their own face, unless the prompt places only some of them.`)
+          .join('');
+        text += ` Character reference photos — ${who}. Reproduce each person's face, hair and appearance faithfully from their own photo, keep them clearly distinct from one another, and do not blend features between them.${groupNote}`;
         if (useCast[0]?.named) text += ' Only these characters appear in the frame (plus any unnamed background people the prompt describes).';
         off += useChar.length;
       }

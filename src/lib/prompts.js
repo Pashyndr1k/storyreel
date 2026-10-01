@@ -37,9 +37,20 @@ Rules:
 
 function characterBlock(project) {
   const chars = project.storyline?.characters || [];
-  return chars
-    .map((c) => `- ${c.name} (${c.role}): ${c.description}`)
-    .join('\n');
+  const list = chars.map((c) => `- ${c.name} (${c.role}): ${c.description}`).join('\n');
+  // Actor groups: named sets of the characters above that act as ONE entity.
+  const groups = (project.storyline?.groups || [])
+    .map((g) => {
+      const members = (g.memberIds || []).map((id) => chars.find((c) => c.id === id)?.name).filter(Boolean);
+      if (!(g.name || '').trim() || !members.length) return null;
+      return `- "${g.name}"${g.description ? ` — ${g.description}` : ''}. Members: ${members.join(', ')}.`;
+    })
+    .filter(Boolean);
+  if (!groups.length) return list;
+  return `${list}
+
+Groups (each is ONE entity made of the characters listed — when the script names the group, ALL its members are present together and act as a unit, unless a line singles one out; refer to it by the group's name, and name a member only for an individual action):
+${groups.join('\n')}`;
 }
 
 // Hard realizability rules for Stage-1 ideas: every pitched direction must be

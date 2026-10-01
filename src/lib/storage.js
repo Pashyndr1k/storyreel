@@ -303,6 +303,15 @@ export function migrateProject(raw) {
                 libId: typeof c.libId === 'string' ? c.libId : '',
               }))
             : [],
+          // actor groups: characters that act as one entity (a band, a crew)
+          groups: Array.isArray(p.storyline.groups)
+            ? p.storyline.groups.map((g) => ({
+                id: g.id || uid(),
+                name: g.name || '',
+                description: g.description || '',
+                memberIds: Array.isArray(g.memberIds) ? g.memberIds.filter((x) => typeof x === 'string') : [],
+              }))
+            : [],
         }
       : null;
 

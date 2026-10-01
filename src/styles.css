@@ -3606,3 +3606,29 @@ select.prompt-model {
   cursor: pointer;
 }
 select.prompt-model:hover:not(:disabled) { border-color: var(--ink); color: var(--text); }
+
+/* ---- 2.9: actor groups (Stage 2) ----------------------------------------- */
+.char-card.group-card { border-left: 2px solid var(--accent); }
+.grp-members { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0 2px; }
+.grp-member {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  margin: 0;
+  padding: 0 10px 0 3px;
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--muted-2);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.grp-member img, .grp-nophoto { width: 30px; height: 30px; border-radius: 2px; object-fit: cover; flex: none; }
+.grp-nophoto { display: inline-flex; align-items: center; justify-content: center; background: rgba(var(--ink-rgb), 0.08); font-weight: 700; }
+.grp-member-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.grp-member:hover { border-color: var(--ink); color: var(--text); }
+.grp-member.on { border-color: var(--accent); color: var(--text); background: rgba(var(--accent-rgb), 0.1); }
+.grp-member:not(.on) img { opacity: 0.55; }

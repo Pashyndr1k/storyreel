@@ -28,6 +28,9 @@ export const SHOT_STEP_SEC = 0.5;
 // Character face references attached to one first frame (picked per shot,
 // see lib/castRefs.js). Local Flux.2 Klein still takes two images in total.
 export const MAX_CHARACTER_REFS = 4;
+// …raised when the shot names an actor group (a band, a crew): its members
+// are attached one photo each.
+export const MAX_GROUP_REFS = 6;
 
 // First-frame versions kept per shot (oldest drops off).
 export const MAX_IMAGE_VERSIONS = 6;

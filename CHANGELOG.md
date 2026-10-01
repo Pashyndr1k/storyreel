@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.9.0 — 2026-10-01
+
+- **Actor groups (Stage 2).** Several characters can be joined into a group
+  that acts as one entity — a band, a crew, a family. A group has a name, a
+  description of how it looks together, and members picked from the cast
+  (click a character to add or remove it; "+ New member" creates a
+  character straight into the group). Each member keeps their own photo.
+- **A group named in a shot stands for all its members.** When a shot's
+  action, dialogue or notes name the group ("The Dusty Trailers walk on
+  stage"), every member's photo is attached as a face reference, and the
+  image prompt says which image is which member and that they appear
+  together. Naming one member alone attaches only that member. Inflected
+  forms and the name without its leading "The" are recognised.
+- With a group in the shot the face-reference cap rises from 4 to 6 (Gemini;
+  local Flux.2 Klein still takes two images in total).
+- The script, shot-breakdown and prompt writers get the groups in their cast
+  list, so they treat a group as one unit made of those specific people.
+  Groups are included in the script export; deleting a character removes it
+  from its groups; regenerating the storyline keeps the groups but empties
+  their member lists (the cast is new).
+
 ## 2.8.0 — 2026-09-30
 
 - **Trim shots from both sides.** Every timeline clip now has a trim handle
