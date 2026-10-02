@@ -12,7 +12,7 @@ import { stage6SmartCutPrompt } from '../lib/prompts.js';
 import { decodeMediaAudio, audioBufferToWavDataURL } from '../lib/audio.js';
 import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
 import Stage5 from './Stage5.jsx';
-import { Play, Pause, SkipBack, StopSq, Grip, Download, Upload, Stars, Trash, Scissors, TransitionIcon, Plus, Expand, Zap, RestoreIcon } from '../components/icons.jsx';
+import { Play, Pause, SkipBack, StopSq, Grip, Download, Upload, Stars, Trash, TransitionIcon, AudioPlus, Expand, Zap, RestoreIcon } from '../components/icons.jsx';
 import Lightbox from '../components/Lightbox.jsx';
 import ShotTrimModal from '../components/ShotTrimModal.jsx';
 
@@ -215,7 +215,6 @@ export default function Stage6({ project, update, settings, ...workbench }) {
   const scrollRef = useRef(null);
   const innerRef = useRef(null); // .nle-inner — coordinate space for ruler markers
   const [showCuts, setShowCuts] = useState(false); // transitions reference table
-  const [splitBusy, setSplitBusy] = useState(false);
   const [smartCut, setSmartCut] = useState(null); // { text, busy, err, result } | null
   const [music, setMusic] = useState(null); // { genre, tempo, mood, busy } | null
 
@@ -864,62 +863,6 @@ export default function Stage6({ project, update, settings, ...workbench }) {
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
-  };
-
-  // Auto-split A/V: detach the audio track of every timeline video (generated
-  // or uploaded) into clips on a dedicated audio lane — aligned to each shot's
-  // slot and trim — and mute the video's own sound, exactly like unlinking
-  // audio in a traditional NLE. Idempotent: already-split shots are skipped.
-  const splitAV = async () => {
-    if (splitBusy) return;
-    setSplitBusy(true);
-    try {
-      const laneId = 'avsplit';
-      const existing = layers.find((L) => L.id === laneId);
-      const have = new Set((existing?.clips || []).map((c) => c.id));
-      const newClips = [];
-      const muteIds = [];
-      let skipped = 0;
-      for (let i = 0; i < items.length; i++) {
-        const it = items[i];
-        if (!it.video) continue;
-        const clipId = `av_${it.shot.id}`;
-        if (have.has(clipId)) {
-          skipped++;
-          continue;
-        }
-        const buf = await decodeMediaAudio(it.video);
-        if (!buf) continue; // no audio track in this video
-        newClips.push({
-          id: clipId,
-          name: `${t('s4.shot', { n: i + 1 })}`,
-          dataURL: audioBufferToWavDataURL(buf),
-          start: startOf(i),
-          offset: it.trim?.head || 0,
-          duration: Math.min(it.shot.duration || 0, Math.max(0.1, buf.duration - (it.trim?.head || 0))),
-          srcDuration: buf.duration,
-          fadeIn: 0,
-          fadeOut: 0,
-        });
-        muteIds.push(it.shot.id);
-      }
-      if (!newClips.length) {
-        showToast(t('s6.splitNone', { m: skipped }));
-        return;
-      }
-      update((p) => {
-        let Ls = [...(p.audioLayers || [])];
-        const idx = Ls.findIndex((L) => L.id === laneId);
-        if (idx >= 0) Ls[idx] = { ...Ls[idx], clips: [...Ls[idx].clips, ...newClips] };
-        else Ls = insertAboveMusic(Ls, { id: laneId, name: t('s6.splitLane'), enabled: true, volume: 1, clips: newClips });
-        const mutes = { ...(p.shotMutes || {}) };
-        for (const id of muteIds) mutes[id] = true;
-        return { audioLayers: Ls, shotMutes: mutes };
-      });
-      showToast(t('s6.splitDone', { n: newClips.length }));
-    } finally {
-      setSplitBusy(false);
-    }
   };
 
   // Sync a lane to the video: every shot-linked clip on it (H3 mixes `h3_*`,
@@ -2462,16 +2405,6 @@ export default function Stage6({ project, update, settings, ...workbench }) {
         </button>
         <button
           type="button"
-          className={`icon-btn sq36 ${splitBusy ? 'busy' : ''}`}
-          title={splitBusy ? t('s6.splitting') : t('s6.splitAV')}
-          aria-label={t('s6.splitAV')}
-          disabled={splitBusy || total <= 0}
-          onClick={splitAV}
-        >
-          <Scissors size={16} />
-        </button>
-        <button
-          type="button"
           className="icon-btn sq36"
           title={t('s6.cutsTable')}
           aria-label={t('s6.cutsTable')}
@@ -2486,7 +2419,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
           aria-label={t('s6.addLayer')}
           onClick={addLayer}
         >
-          <Plus size={16} />
+          <AudioPlus size={16} />
         </button>
         <DynamicsVisualizer plan={project.dynamicsPlan} playhead={playing || elapsed > 0 ? elapsed : null} />
         {rendering && (

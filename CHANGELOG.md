@@ -12,6 +12,10 @@
   (the icon follows the state) instead of separate Play and Pause, and the
   half-speed control is a readable "0.5×" toggle — on for half speed, off
   for normal. The shot pop-up uses the same controls.
+- **Split A/V removed.** The button is gone from the assembly toolbar. Audio
+  lanes already split in existing projects stay as they are.
+- **Add audio layer** has an audio icon (a waveform with a plus) instead of a
+  bare plus.
 - **Locations sit on the assets line.** On the shot card the location tiles
   share one row with the asset tiles instead of a row of their own.
 

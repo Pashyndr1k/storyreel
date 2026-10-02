@@ -120,6 +120,18 @@ export const Chevron = (p) => (
   </S>
 );
 
+// "Add audio layer": a waveform with a plus
+export const AudioPlus = (p) => (
+  <S {...p}>
+    <path d="M3 10v4" />
+    <path d="M7 6v12" />
+    <path d="M11 3v18" />
+    <path d="M15 8v8" />
+    <path d="M19 14v6" />
+    <path d="M16 17h6" />
+  </S>
+);
+
 export const Plus = (p) => (
   <S {...p} sw={2}>
     <path d="M12 5v14M5 12h14" />
