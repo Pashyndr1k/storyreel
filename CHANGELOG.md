@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Fix: "The model returned an unexpected format" on text generation.** The
+  current Claude models think before answering and that thinking counts
+  against the output limit, which was sized for the answer alone — so the
+  answer was cut off or never started. Requests now leave room for the
+  thinking, run at medium effort, and repeat once with a larger limit when an
+  answer is still cut off. The error now says what happened (cut off,
+  declined, empty, or unreadable) instead of one catch-all message.
 - **Short drama template (new project).** A fourth project type next to the
   three lengths: a vertical series of 3–100 episodes, 1.5–2 minutes each.
   You set the number of episodes; the frame defaults to 9:16. Stage 1 pitches

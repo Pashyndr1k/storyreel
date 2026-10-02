@@ -5,7 +5,18 @@ import { activePolicy, policySystemBlock, refuse } from './policy.js';
 
 export const MODELS = CLAUDE_MODELS;
 
-async function callClaude(settings, { system, user, maxTokens = 4096, signal }) {
+// The current Claude models think before they answer, and that thinking is
+// billed against max_tokens together with the answer. A spec's maxTokens is
+// sized for the JSON alone, so the request adds room for the thinking on top —
+// without it the answer is cut off mid-JSON (or never starts) and cannot be
+// parsed. Haiku 4.5 does not think by default and rejects the effort setting.
+const THINKING_HEADROOM = 12000;
+const MAX_OUTPUT_TOKENS = 32000;
+const thinks = (model) => !/haiku/i.test(model || '');
+
+async function callClaude(settings, { system, user, maxTokens = 4096, signal }, _retry = false) {
+  const model = settings.model;
+  const budget = Math.min(MAX_OUTPUT_TOKENS, (_retry ? maxTokens * 2 : maxTokens) + (thinks(model) ? THINKING_HEADROOM * (_retry ? 2 : 1) : 0));
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     signal,
@@ -16,8 +27,11 @@ async function callClaude(settings, { system, user, maxTokens = 4096, signal }) 
       'anthropic-dangerous-direct-browser-access': 'true',
     },
     body: JSON.stringify({
-      model: settings.model,
-      max_tokens: maxTokens,
+      model,
+      max_tokens: budget,
+      // medium effort: enough thought for story work without spending the
+      // budget on reasoning
+      ...(thinks(model) ? { output_config: { effort: 'medium' } } : {}),
       system,
       messages: [{ role: 'user', content: user }],
     }),
@@ -37,7 +51,17 @@ async function callClaude(settings, { system, user, maxTokens = 4096, signal }) 
   }
 
   const data = await res.json();
-  return data.content
+  if (data.stop_reason === 'max_tokens') {
+    // cut off at the output limit: one more try with twice the room
+    if (!_retry) return callClaude(settings, { system, user, maxTokens, signal }, true);
+    // (worded so withRetry does not treat it as transient and repeat the pair)
+    throw new Error('The answer was cut off at the output limit before it was complete. Split the task into smaller parts (fewer shots or episodes at once) and run it again.');
+  }
+  if (data.stop_reason === 'refusal') {
+    const why = data.stop_details?.explanation ? ` ${data.stop_details.explanation}` : '';
+    throw new Error(`The model declined this request.${why}`);
+  }
+  return (data.content || [])
     .filter((b) => b.type === 'text')
     .map((b) => b.text)
     .join('\n');
@@ -47,13 +71,14 @@ function extractJSON(text) {
   const firstObj = text.indexOf('{');
   const firstArr = text.indexOf('[');
   const candidates = [firstObj, firstArr].filter((i) => i !== -1);
-  if (!candidates.length) throw new Error('The model returned an unexpected format. Please try again.');
+  if (!text.trim()) throw new Error('The model returned an empty answer. Please try again.');
+  if (!candidates.length) throw new Error('The model answered in plain text instead of the expected data. Please try again.');
   const start = Math.min(...candidates);
   const end = Math.max(text.lastIndexOf('}'), text.lastIndexOf(']'));
   try {
     return JSON.parse(text.slice(start, end + 1));
   } catch {
-    throw new Error('The model returned an unexpected format. Please try again.');
+    throw new Error('The model returned data that could not be read (incomplete or malformed). Please try again.');
   }
 }
 
