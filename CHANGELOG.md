@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.11.0 — 2026-10-01
 
 - **Fix: "The model returned an unexpected format" on text generation.** The
   current Claude models think before answering and that thinking counts
