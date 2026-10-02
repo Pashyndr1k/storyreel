@@ -9,6 +9,8 @@ import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
 import { normalizePlan } from '../lib/dynamics.js';
 import { Grip, Stars } from '../components/icons.jsx';
 import { useRef, useState } from 'react';
+import Stage3Series from './Stage3Series.jsx';
+import { isSeriesMaster } from '../lib/series.js';
 
 function fmt(sec) {
   const m = Math.floor(sec / 60);
@@ -16,7 +18,13 @@ function fmt(sec) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export default function Stage3({ project, update, settings, goNext, onSettings, onProjectSettings, genLang, styles, scriptStyle }) {
+// A series master plans episodes instead of scenes; every other project
+// (a series segment included) writes the scene outline.
+export default function Stage3(props) {
+  return isSeriesMaster(props.project) ? <Stage3Series {...props} /> : <Stage3Outline {...props} />;
+}
+
+function Stage3Outline({ project, update, settings, goNext, onSettings, onProjectSettings, genLang, styles, scriptStyle }) {
   const { t } = useI18n();
   const { busy, error, run } = useGenerate(settings);
   const outline = project.outline;
@@ -30,7 +38,9 @@ export default function Stage3({ project, update, settings, goNext, onSettings, 
         outline: (data.scenes || []).map((s, i) => ({
           id: uid(),
           number: i + 1,
-          title: s.title || `${t('s4.scene')} ${i + 1}`,
+          // a series segment labels each scene with its episode
+          title: `${project.seriesPart && Number(s.episode) ? `${t('ser.epShort', { n: Number(s.episode) })} · ` : ''}${s.title || `${t('s4.scene')} ${i + 1}`}`,
+          ...(project.seriesPart && Number(s.episode) ? { episode: Number(s.episode) } : {}),
           summary: s.summary || '',
           duration: Number(s.duration_sec) || 20,
         })),
@@ -88,6 +98,13 @@ export default function Stage3({ project, update, settings, goNext, onSettings, 
         <DynamicsVisualizer plan={project.dynamicsPlan} />
       </div>
       <ErrorNote error={error} onSettings={onSettings} />
+      {project.seriesPart && (
+        <div className="context-box static">
+          <strong>{project.seriesPart.seriesTitle}</strong> · {t('ser.partOf', { a: project.seriesPart.from, b: project.seriesPart.to, n: project.seriesPart.total })}
+          {project.seriesPart.arcTitle && <> · {project.seriesPart.arcTitle}</>}
+          <p>{t('ser.partHint')}</p>
+        </div>
+      )}
 
       {outline.map((s, i) => (
         <div

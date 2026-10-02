@@ -16,7 +16,7 @@ import ThemeToggle from '../components/ThemeToggle.jsx';
 import { ArrowLeft, Download, Sliders, Cog, Stars, Check, Globe } from '../components/icons.jsx';
 import { LANGS } from '../lib/i18n.js';
 
-export default function Project({ project, updateProject, settings, setSettings, styles, setStyles, library, libUpsert, libDelete, onBack, onSettings }) {
+export default function Project({ project, updateProject, settings, setSettings, styles, setStyles, library, libUpsert, libDelete, onBack, onSettings, addProjects, openProject, projectExists }) {
   const { t, lang } = useI18n();
   // character and location cards edited in the project update their library cards
   useLibrarySync(project, library, libUpsert);
@@ -89,6 +89,10 @@ export default function Project({ project, updateProject, settings, setSettings,
     library,
     libUpsert,
     libDelete,
+    // a series master creates its production projects at Stage 3
+    addProjects,
+    openProject,
+    projectExists,
   };
 
   const langOptions = LANGS.map((l) => ({

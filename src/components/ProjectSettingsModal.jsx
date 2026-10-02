@@ -4,6 +4,7 @@ import { STYLE_CATEGORIES } from '../lib/styles.js';
 import StylesModal from './StylesModal.jsx';
 import AspectSelector from './AspectSelector.jsx';
 import { styleLabel } from './StyleControls.jsx';
+import { isSeriesMaster, clampEpisodes, SERIES_MIN_EPISODES, SERIES_MAX_EPISODES } from '../lib/series.js';
 
 export default function ProjectSettingsModal({ project, update, styles, setStyles, settings, onSettings, onClose }) {
   const { t } = useI18n();
@@ -42,6 +43,24 @@ export default function ProjectSettingsModal({ project, update, styles, setStyle
           onChange={(e) => update({ title: e.target.value })}
           placeholder={t('pset.projectTitle')}
         />
+
+        {isSeriesMaster(project) && (
+          <>
+            <label className="section-label" htmlFor="pset-episodes">{t('new.episodes')}</label>
+            <p className="hint">{t('pset.episodesHint')}</p>
+            <input
+              id="pset-episodes"
+              key={project.episodeCount}
+              type="number"
+              className="episodes-input"
+              title={t('tip.episodes')}
+              min={SERIES_MIN_EPISODES}
+              max={SERIES_MAX_EPISODES}
+              defaultValue={project.episodeCount}
+              onBlur={(e) => update({ episodeCount: clampEpisodes(e.target.value) })}
+            />
+          </>
+        )}
 
         <label className="section-label">{t('pset.aspect')}</label>
         <p className="hint">{t('pset.aspectHint')}</p>

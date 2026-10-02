@@ -313,6 +313,9 @@ export default function App() {
           libDelete={libDelete}
           onBack={() => setRoute({ name: 'home' })}
           onSettings={() => setShowSettings(true)}
+          addProjects={(list) => setProjects((ps) => [...list, ...ps])}
+          openProject={(id) => setRoute({ name: 'project', id })}
+          projectExists={(id) => projects.some((p) => p.id === id)}
         />
       )}
       </ErrorBoundary>

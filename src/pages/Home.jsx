@@ -1,3 +1,4 @@
+import { SHORT_DRAMA_STYLE_ID } from '../lib/series.js';
 import { useState } from 'react';
 import ProjectCard from '../components/ProjectCard.jsx';
 import NewProjectModal from '../components/NewProjectModal.jsx';
@@ -54,8 +55,16 @@ export default function Home({
   };
   const sorted = [...filtered].sort((a, b) => (a.pinned === b.pinned ? order(a, b) : a.pinned ? -1 : 1));
 
-  const create = (title, logline, scriptType, aspectRatio) => {
-    const p = newProject({ title, logline, scriptType, aspectRatio });
+  const create = (title, logline, scriptType, aspectRatio, episodeCount) => {
+    // a series starts with the Short Drama Series rules from the style library
+    const p = newProject({
+      title,
+      logline,
+      scriptType,
+      aspectRatio,
+      episodeCount,
+      scriptStyleId: scriptType === 'series' ? SHORT_DRAMA_STYLE_ID : '',
+    });
     setProjects((ps) => [p, ...ps]);
     setShowNew(false);
     onOpen(p.id);

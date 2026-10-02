@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+- **Short drama template (new project).** A fourth project type next to the
+  three lengths: a vertical series of 3–100 episodes, 1.5–2 minutes each.
+  You set the number of episodes; the frame defaults to 9:16. Stage 1 pitches
+  series directions and Stage 2 writes the storyline for exactly that many
+  episodes.
+- **Short Drama Series rules in the style library.** A new script style holds
+  the full instructions for developing a concept into such a series (premise
+  and tropes, the underdog and the cast, the humiliation–reversal engine, the
+  shape of the run, the episode, dialogue, vertical staging, production
+  limits). New series projects select it; edit it on the Styles page to
+  change how series are written.
+- **Series plan (Stage 3 of a series).** The story is broken into main
+  sections, each ending on an intermediate finale, then every section into
+  episodes, each a mini-story ending on a cliffhanger the next one picks up.
+  Sections, episodes and cliffhangers are editable; one section can be
+  rewritten on its own; a stopped or failed run continues with "Create
+  missing episodes".
+- **Split into projects.** The finished plan is split into parts of 5–10
+  episodes (you pick the size; parts end on a section finale where lengths
+  allow) and a separate project is created for each. A part project gets the
+  storyline, the cast with photos and its episodes, opens at Stage 3 and
+  writes a scene outline of 1–3 scenes per episode.
 - **"Create prompt" on the generation button (Stage 5).** When a shot has no
   image, video or voice prompt yet, the Create image / Create video / Create
   sound button turns into "Create prompt" and writes that one prompt; once

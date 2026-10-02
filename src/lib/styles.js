@@ -11,10 +11,11 @@
 // Custom styles are only ever seeded on first run and are never overwritten by
 // defaults on later launches. They are also included in Settings → Backup.
 import videoMotionPresets from '../data/video_motion_presets.json';
+import { SHORT_DRAMA_STYLE, SHORT_DRAMA_STYLE_NAME } from '../data/shortDramaStyle.js';
 
 const STYLES_KEY = 'storyreel.styles.v1';
 const STYLES_BACKUP_KEY = 'storyreel.styles.corrupt'; // last unreadable value, for recovery
-export const STYLES_VERSION = 4;
+export const STYLES_VERSION = 5;
 export const STYLE_CATEGORIES = ['script', 'image', 'video'];
 
 // v2 built-ins, imported from text_styles.pdf (script) and visual styles.pdf
@@ -117,6 +118,15 @@ const V3_FACTORY_VIDEO_TEXTS = {
     "Slow mechanical motorized panning from a fixed high-angle perspective. Low framerate stutter. Subjects are entirely unaware of the camera. Completely mundane, unchoreographed actions. Distant, muffled, or inaudible speech with slow real-time pacing and no narrative cuts."
 };
 
+// v5: the rules of the "short drama series" project template. New series
+// projects select this style; editing it in the library changes how every
+// series is developed. The id is referenced by lib/series.js.
+const BUILTINS_V5 = {
+  script: [{ id: 'bi5.script.short_drama', builtin: true, name: SHORT_DRAMA_STYLE_NAME, instructions: SHORT_DRAMA_STYLE }],
+  image: [],
+  video: [],
+};
+
 function addMissingBuiltins(styles, additions) {
   const out = { ...styles };
   for (const cat of STYLE_CATEGORIES) {
@@ -196,6 +206,10 @@ function migrate(fromVersion, styles) {
           : st
       ),
     };
+  }
+  if (fromVersion < 5) {
+    // v5: add the Short Drama Series script style (idempotent by id).
+    s = addMissingBuiltins(s, BUILTINS_V5);
   }
   return s;
 }

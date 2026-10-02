@@ -1295,7 +1295,31 @@ label {
 .stale-toast .row { margin: 8px 0 0; }
 
 /* script-type cards */
-.type-cards { display: flex; gap: 8px; }
+.type-cards { display: flex; gap: 8px; flex-wrap: wrap; }
+.type-cards .type-card { flex: 1 1 110px; }
+input.episodes-input { width: 110px; }
+
+/* ---- short-drama series: the Stage 3 plan --------------------------------- */
+.arc-card { margin: 12px 0; border: 1px solid var(--glass-border); border-radius: 3px; background: var(--glass); }
+.arc-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+.arc-head input.grow { flex: 1 1 auto; min-width: 0; font-weight: 600; }
+.arc-head .scene-num { flex: none; }
+.arc-head .total-badge { flex: none; white-space: nowrap; }
+.arc-body { padding: 0 14px 14px; border-top: 1px solid var(--glass-border-soft); }
+.arc-body > label { display: block; margin: 12px 0 4px; font-size: 12px; }
+.ep-row { background: transparent; }
+.ep-cliff-label { display: block; margin: 8px 0 4px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+.seg-panel { margin: 22px 0 6px; padding: 16px; border: 1px solid var(--glass-border); border-radius: 3px; }
+.seg-panel h3 { margin: 0 0 4px; }
+.seg-size { display: inline-flex; align-items: center; gap: 8px; margin: 0; }
+.seg-size select { width: auto; }
+.seg-list { margin-top: 12px; display: grid; gap: 6px; }
+.seg-row { display: grid; grid-template-columns: 130px 40px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 6px 10px; border: 1px solid var(--glass-border-soft); border-radius: 3px; font-size: 13px; }
+.seg-row.made { border-color: rgba(var(--accent-rgb), 0.4); }
+.seg-range { font-variant-numeric: tabular-nums; font-weight: 600; }
+.seg-count { font-variant-numeric: tabular-nums; color: var(--muted-2); text-align: right; }
+.seg-arc { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seg-state { color: var(--muted-2); font-size: 12px; }
 .type-card {
   flex: 1;
   display: flex;
