@@ -6,7 +6,7 @@ import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import VoiceButton from '../components/VoiceButton.jsx';
 import RandomizationSelector from '../components/RandomizationSelector.jsx';
-import { Stars } from '../components/icons.jsx';
+import { Stars, Star, Trash } from '../components/icons.jsx';
 
 export default function Stage1({ project, update, settings, goNext, onSettings, genLang, scriptStyle }) {
   const { t } = useI18n();
@@ -30,6 +30,61 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
       approvedPlot: idea.pitch,
       title: p.title === 'Untitled project' && idea.title ? idea.title : p.title,
     }));
+
+  // Pinned directions: a saved list that survives regenerations. A pin is a
+  // copy of the idea (or of the approved plot as it reads now), so it can be
+  // returned to after any number of new variations.
+  const pinned = project.pinnedIdeas || [];
+  const isPinned = (idea) => pinned.some((p) => p.id === idea.id);
+  const togglePin = (idea) =>
+    update((p) => {
+      const list = p.pinnedIdeas || [];
+      return {
+        pinnedIdeas: list.some((x) => x.id === idea.id)
+          ? list.filter((x) => x.id !== idea.id)
+          : [...list, { id: idea.id, title: idea.title || '', pitch: idea.pitch || '', why_it_works: idea.why_it_works || '', modifiers: idea.modifiers || [], pinnedAt: Date.now() }],
+      };
+    });
+  const approved = (project.approvedPlot || '').trim();
+  const approvedPinned = !!approved && pinned.some((p) => (p.pitch || '').trim() === approved);
+  const pinApproved = () =>
+    update((p) => ({
+      pinnedIdeas: [
+        ...(p.pinnedIdeas || []),
+        { id: uid(), title: t('s1.pinnedPlotTitle', { n: (p.pinnedIdeas || []).length + 1 }), pitch: (p.approvedPlot || '').trim(), why_it_works: '', modifiers: [], pinnedAt: Date.now() },
+      ],
+    }));
+
+  const ideaCard = (idea, inPinned) => (
+    <div key={idea.id} className={`idea-card ${project.selectedIdeaId === idea.id ? 'selected' : ''} ${inPinned ? 'pinned' : ''}`}>
+      <div className="idea-head">
+        <h3 title={idea.title}>{idea.title}</h3>
+        <button
+          type="button"
+          className={`idea-pin ${inPinned || isPinned(idea) ? 'on' : ''}`}
+          aria-pressed={inPinned || isPinned(idea)}
+          title={inPinned || isPinned(idea) ? t('tip.s1Unpin') : t('tip.s1Pin')}
+          aria-label={inPinned || isPinned(idea) ? t('tip.s1Unpin') : t('tip.s1Pin')}
+          onClick={() => togglePin(idea)}
+        >
+          {inPinned ? <Trash size={15} /> : <Star size={16} filled={isPinned(idea)} />}
+        </button>
+      </div>
+      <p>{idea.pitch}</p>
+      {idea.why_it_works && <p className="why"><em>{idea.why_it_works}</em></p>}
+      {(idea.modifiers || []).length > 0 && (
+        <p className="idea-mods">
+          🎲{' '}
+          {idea.modifiers
+            .map((m) => (m.name ? `${t(`rand.name_${m.method}`)}: ${m.name}` : t(`rand.name_${m.method}`)))
+            .join(' · ')}
+        </p>
+      )}
+      <button title={t('tip.s1Pick')} className="btn small primary" onClick={() => pickIdea(idea)}>
+        {project.selectedIdeaId === idea.id ? t('s1.selected') : t('s1.develop')}
+      </button>
+    </div>
+  );
 
   return (
     <section className="stage">
@@ -63,27 +118,16 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
       </div>
       <ErrorNote error={error} onSettings={onSettings} />
 
-      {project.ideas.length > 0 && (
-        <div className="ideas-grid">
-          {project.ideas.map((idea) => (
-            <div key={idea.id} className={`idea-card ${project.selectedIdeaId === idea.id ? 'selected' : ''}`}>
-              <h3 title={idea.title}>{idea.title}</h3>
-              <p>{idea.pitch}</p>
-              <p className="why"><em>{idea.why_it_works}</em></p>
-              {(idea.modifiers || []).length > 0 && (
-                <p className="idea-mods">
-                  🎲{' '}
-                  {idea.modifiers
-                    .map((m) => (m.name ? `${t(`rand.name_${m.method}`)}: ${m.name}` : t(`rand.name_${m.method}`)))
-                    .join(' · ')}
-                </p>
-              )}
-              <button title={t('tip.s1Pick')} className="btn small primary" onClick={() => pickIdea(idea)}>
-                {project.selectedIdeaId === idea.id ? t('s1.selected') : t('s1.develop')}
-              </button>
-            </div>
-          ))}
-        </div>
+      {project.ideas.length > 0 && <div className="ideas-grid">{project.ideas.map((idea) => ideaCard(idea, false))}</div>}
+
+      {pinned.length > 0 && (
+        <>
+          <h3 className="pinned-title" title={t('s1.pinnedHint')}>
+            <Star size={14} filled /> {t('s1.pinnedTitle')} <span className="chip-count" title={t('ind.count')}>{pinned.length}</span>
+          </h3>
+          <p className="hint">{t('s1.pinnedHint')}</p>
+          <div className="ideas-grid">{pinned.map((idea) => ideaCard(idea, true))}</div>
+        </>
       )}
 
       <label>{t('s1.approvedLabel')}</label>
@@ -109,6 +153,9 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
           onClick={() => update({ approvedPlot: project.logline, selectedIdeaId: null })}
         >
           {t('s1.useOriginal')}
+        </button>
+        <button title={approvedPinned ? t('tip.s1PlotPinned') : t('tip.s1PinPlot')} className="btn small" disabled={!approved || approvedPinned} onClick={pinApproved}>
+          <Star size={13} filled={approvedPinned} /> {approvedPinned ? t('s1.plotPinned') : t('s1.pinPlot')}
         </button>
       </div>
 

@@ -227,6 +227,7 @@ function projectDefaults() {
     referenceFrames: {}, // shotId -> reference-quality frame (real image pipeline + style; feeds H3 reference mode)
     logline: '',
     ideas: [],
+    pinnedIdeas: [], // Stage-1 directions the user pinned: [{ id, title, pitch, why_it_works, modifiers, pinnedAt }] — kept across regenerations
     selectedIdeaId: null,
     approvedPlot: '',
     storyline: null, // { synopsis, characters: [{id, name, role, description, photos}] }
@@ -264,6 +265,7 @@ export function migrateProject(raw) {
   p.schemaVersion = SCHEMA_VERSION;
   p.genres = Array.isArray(p.genres) ? p.genres.slice(0, 3) : [];
   p.ideas = Array.isArray(p.ideas) ? p.ideas : [];
+  p.pinnedIdeas = Array.isArray(p.pinnedIdeas) ? p.pinnedIdeas.filter((i) => i && i.id && typeof i.pitch === 'string') : [];
   p.stage = Number(p.stage) || 1;
   if (p.stage > STAGE_COUNT) p.stage = STAGE_COUNT; // 2.5 merged the old stages 5 and 6
   p.archived = !!p.archived;

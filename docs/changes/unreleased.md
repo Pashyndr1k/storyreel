@@ -179,6 +179,45 @@ without the names.
 
 ---
 
+## 5. Stage 1: pinned versions
+
+**Request.** Let the user pin a specific story direction to a saved list and
+return to it after any number of regenerations and plot variations.
+
+**Behaviour.**
+- Every idea card has a star button in its header: click to pin, click again
+  to unpin. A pin stores a copy of the idea.
+- A "Pinned versions" section below the idea grid lists the pins (dashed
+  cards, with a count). It stays when "Create/Recreate ideas" replaces the
+  idea cards. Each pinned card has "Develop this version" (same action as on
+  an idea card: sets the approved plot and the selection) and a remove button.
+- "Pin this plot" next to "Use my original" saves the approved plot exactly as
+  it reads now (including manual edits) as a pin titled "Pinned plot N"; the
+  button reads "Plot pinned" and is disabled while that exact text is pinned.
+- Pins are per project and are copied with it (duplicate, export/import).
+
+**Data model.** `project.pinnedIdeas`: array of
+`{ id, title, pitch, why_it_works, modifiers, pinnedAt }`; default `[]` in
+`projectDefaults`, normalised in `migrateProject` (entries without `id` or
+a string `pitch` are dropped). A pinned idea keeps the id of the idea it was
+copied from, so `project.selectedIdeaId` highlights it in both lists.
+
+**Files.**
+- `src/lib/storage.js`: the field.
+- `src/stages/Stage1.jsx`: `pinned`, `isPinned`, `togglePin`, `pinApproved`,
+  the shared `ideaCard(idea, inPinned)` renderer (replaces the inline card
+  markup), the pinned section, the "Pin this plot" button.
+- `src/styles.css`: `.idea-head`, `.idea-pin`, `.idea-card.pinned`,
+  `.pinned-title`.
+- i18n: `s1.pinnedTitle`, `s1.pinnedHint`, `s1.pinPlot`, `s1.plotPinned`,
+  `s1.pinnedPlotTitle`, `tip.s1Pin`, `tip.s1Unpin`, `tip.s1PinPlot`,
+  `tip.s1PlotPinned`.
+
+**Verified.** In the dev app with a stubbed text model: pin, regenerate ideas
+(pin stays), develop the pinned version, pin the edited plot, unpin.
+
+---
+
 ## Open
 
 - The reworded image styles (section 4) have not been compared visually with the old ones.

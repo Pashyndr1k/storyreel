@@ -18,6 +18,10 @@
   film title; those are replaced with descriptive wording (for example
   "Pixar 3D Magic" is now "Polished 3D Family Animation"). Styles you edited
   and your own styles are not touched.
+- **Pinned versions (Stage 1).** A star on every idea card pins that story
+  direction to a saved list that stays when new ideas are created; "Pin this
+  plot" saves the approved plot as it reads now. Any pinned version can be
+  developed again later or removed from the list.
 - **Change companions.** Technical descriptions of every change are kept per
   version in docs/changes/.
 
