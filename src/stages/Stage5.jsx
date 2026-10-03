@@ -532,22 +532,25 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       else next[shotId] = value;
       return { [key]: next };
     });
-  // A segmented selector styled like the resolution selector; Camera and
-  // Action sit side by side on one line, so they carry no text label (the
-  // group's hover hint names them). The derived default is outlined until the
-  // user picks a segment; clicking the picked segment again returns to it.
+  // A labelled block: the caption above a segmented selector with the same
+  // height as the resolution selector. All buttons of a block are as wide as
+  // its longest label (CSS grid), so no label ever wraps in any language.
+  // The derived default is outlined until the user picks a segment; clicking
+  // the picked segment again returns to it.
   const dynSlider = (shot, kind) => {
     const levels = kind === 'camera' ? CAMERA_LEVELS : ACTION_LEVELS;
     const key = kind === 'camera' ? 'shotCamera' : 'shotAction';
     const value = kind === 'camera' ? cameraOf(project, shot, sceneBlock) : actionOf(project, shot, sceneBlock);
     const manual = (project[key] || {})[shot.id] != null;
     return (
-      <span
-        className={`seg seg-tall seg-compact dyn-seg dyn-${kind} ${manual ? '' : 'auto'}`}
-        role="radiogroup"
-        aria-label={t(`dyn.${kind}`)}
-        title={t(`tip.dyn_${kind}`)}
-      >
+      <div className={`dyn-block dyn-${kind}`}>
+        <span className="s5e-eyebrow" title={t(`tip.dyn_${kind}`)}>{t(`dyn.${kind}`)}</span>
+        <span
+          className={`seg seg-tall seg-compact dyn-seg ${manual ? '' : 'auto'}`}
+          role="radiogroup"
+          aria-label={t(`dyn.${kind}`)}
+          style={{ '--n': levels.length }}
+        >
         {levels.map((lv, k) => {
           const on = k === value;
           return (
@@ -564,7 +567,8 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
             </button>
           );
         })}
-      </span>
+        </span>
+      </div>
     );
   };
 

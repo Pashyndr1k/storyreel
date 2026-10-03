@@ -2630,13 +2630,17 @@ textarea.s5e-prompt-sm { min-height: 110px; }
 
 /* aligned control rows: primary + equal-height icon-only squares */
 .s5e-btnrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-/* shot dynamics: Camera (6 segments) and Action (3) side by side on one
-   line, styled like the resolution selector */
-.dyn-sliders { display: flex; flex-direction: column; gap: 6px; margin: 2px 0 10px; }
-.dyn-line { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.dyn-seg { flex: 0 1 auto; min-width: 0; }
-.dyn-line .seg.seg-compact { height: 28px; }
-.dyn-line .seg.seg-compact .seg-btn { padding: 0 5px; font-size: 9.5px; letter-spacing: 0.02em; white-space: nowrap; }
+/* shot dynamics: two labelled blocks, Camera (6 buttons) and Dynamics (3).
+   Buttons are as tall as the resolution selector's and, inside a block, all
+   as wide as the block's longest label — the grid's equal 1fr columns take
+   the max-content width, and labels never wrap. The blocks sit side by side
+   and move to a second line as whole blocks when the card is too narrow. */
+.dyn-sliders { display: flex; flex-direction: column; gap: 8px; margin: 2px 0 12px; }
+.dyn-line { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 14px; min-width: 0; }
+.dyn-block { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.dyn-block .s5e-eyebrow { margin: 0; }
+.dyn-block .seg.dyn-seg { display: inline-grid; grid-template-columns: repeat(var(--n), 1fr); width: max-content; max-width: none; height: 38px; }
+.dyn-block .seg.dyn-seg .seg-btn { justify-content: center; padding: 0 7px; font-size: 9.5px; letter-spacing: 0.03em; white-space: nowrap; }
 /* the derived default: outlined instead of filled until the user picks */
 .dyn-seg.auto .seg-btn.on { background: transparent; color: var(--text); box-shadow: inset 0 0 0 1px var(--ink); }
 .dyn-stale { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }

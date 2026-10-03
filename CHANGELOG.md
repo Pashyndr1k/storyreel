@@ -50,8 +50,8 @@
   script is in another language. "H3 native" is the default voice source for
   dialogue shots; shots that already have a voice clip, or that you set to
   TTS, keep H3 silent as before. Recreate a video prompt to apply it.
-- **Camera and Action selectors (Stage 5, Video tab).** "Camera" has six
-  positions — Static, Handheld, Dolly, Crane, Drone, Shaky — and "Action" has
+- **Camera and Dynamics selectors (Stage 5, Video tab).** "Camera" has six
+  positions — Static, Handheld, Dolly, Crane, Drone, Shaky — and "Dynamics" has
   three — Calm, Active, Intense — for how much everyone in the frame moves.
   Both start from the scene description (shown outlined); pick a value and
   recreate the video prompt, or click the picked value again to go back. They apply to H3, LTX and Kling prompts.

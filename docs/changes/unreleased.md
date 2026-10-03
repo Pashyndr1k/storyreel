@@ -591,15 +591,19 @@ detailed, action-rich, lead with the main character's movement, and carry any
 spoken line directly in H3's dialogue format.
 
 **Behaviour — sliders.**
-- Video tab of a shot, above the Create video row: two segmented selectors
-  side by side on one line, with the same look as the resolution selector
-  (`seg seg-tall seg-compact`, 28px high): Camera (Static, Handheld, Dolly,
-  Crane, Drone, Shaky) and Action (Calm, Active, Intense). They have no text
-  label; the hover hint of each group and segment names the setting. The
-  derived default is shown outlined (`.dyn-seg.auto`); a manual pick is filled,
-  and clicking the picked segment again returns to the default. (Earlier
-  iterations — a range input with tick labels, then one labelled row per
-  setting with an "Auto" chip — were replaced at the user's request.)
+- Video tab of a shot, above the Create video row: two labelled blocks —
+  "Camera" (Static, Handheld, Dolly, Crane, Drone, Shaky) and "Dynamics"
+  (Calm, Active, Intense; the setting is called "action" in the code and the
+  data). Each block is a caption above a segmented selector that looks like
+  the resolution selector and has its height (38px). Inside a block every
+  button is as wide as the block's longest label (`inline-grid` with
+  `repeat(var(--n), 1fr)` and `width: max-content`); labels never wrap
+  (`white-space: nowrap`) in EN, RU or UA. The blocks sit side by side and
+  move to a second line as whole blocks when the card is too narrow. The
+  derived default is shown outlined (`.dyn-seg.auto`); a manual pick is
+  filled, and clicking the picked segment again returns to the default.
+  (Earlier iterations — a range input, a labelled row with an "Auto" chip, an
+  unlabelled single line — were replaced at the user's request.)
 - Default (`defaultCamera` / `defaultAction`): first the shot's own text
   (shot type, action, notes — EN/RU/UA keywords such as drone, crane, chase,
   handheld, dolly, static; "sits/reads/waits" forces Calm; fight/chase/explosion
@@ -658,7 +662,7 @@ All default `{}` in `projectDefaults` and are normalised in `migrateProject`.
   `.dyn-sliders` block, `shotPromptDyn` recorded in `applyPrompts` and
   `regenPrompt`.
 - `src/lib/storage.js`: the three fields.
-- `src/styles.css`: `.dyn-sliders`, `.dyn-line`, `.dyn-seg`, `.dyn-stale`.
+- `src/styles.css`: `.dyn-sliders`, `.dyn-line`, `.dyn-block`, `.dyn-seg`, `.dyn-stale`.
 - i18n: `dyn.camera`, `dyn.action`, `dyn.camera_<level>` and
   `dyn.camera_<level>_tip` (6 levels), `dyn.action_<level>` and
   `dyn.action_<level>_tip` (3 levels), `dyn.stale`, `dyn.recreate`,
