@@ -801,6 +801,29 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
 
   // Upload a finished shot video; its real duration is probed so the assembly
   // trim rules know how much raw material exists.
+  // Delete the shot's video (generated or uploaded) with what was derived
+  // from it: its recorded length and engine, its trim, and the H3 sound clip
+  // on the timeline. The prompt and the frames stay, so it can be made again.
+  const deleteShotVideo = (shot) => {
+    if (!window.confirm(t('vid.deleteConfirm'))) return;
+    update((p) => {
+      const drop = (map) => {
+        const next = { ...(map || {}) };
+        delete next[shot.id];
+        return next;
+      };
+      return {
+        shotVideos: drop(p.shotVideos),
+        videoGenDurations: drop(p.videoGenDurations),
+        shotVideoEngines: drop(p.shotVideoEngines),
+        shotTrims: drop(p.shotTrims),
+        audioLayers: (p.audioLayers || []).map((L) =>
+          L.id === 'h3mix' ? { ...L, clips: (L.clips || []).filter((c) => c.id !== `h3_${shot.id}`) } : L
+        ),
+      };
+    });
+  };
+
   const uploadShotVideo = async (shot, file) => {
     try {
       const dataURL = await readFileDataURL(file);
@@ -1071,18 +1094,19 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   // before it. Failures are skipped; the queue continues.
   // `silent` skips the confirm (the assembly stage's auto queue confirms once
   // for the whole project); `onStep` reports each finished item to it.
-  const processSceneMedia = async ({ silent = false, onStep = null } = {}) => {
+  const processSceneMedia = async ({ silent = false, onStep = null, videosOnly = false } = {}) => {
     mediaCancel.current = false;
     const list = shots;
     const planned =
-      list.filter((s) => !(projectRef.current.shotImages || {})[s.id] && projectRef.current.shotPrompts[s.id]?.imagePrompt?.trim()).length +
+      (videosOnly ? 0 : list.filter((s) => !(projectRef.current.shotImages || {})[s.id] && projectRef.current.shotPrompts[s.id]?.imagePrompt?.trim()).length) +
       list.filter((s) => !(projectRef.current.shotVideos || {})[s.id] && projectRef.current.shotPrompts[s.id]?.videoPrompt?.trim()).length;
     if (!planned) return;
     // Each job occupies the GPU for minutes — never start the queue silently.
     if (!silent && !window.confirm(t('s5.genMediaConfirm', { n: planned }))) return;
     let done = 0;
     setMediaProg({ a: 0, b: planned });
-    for (const shot of list) {
+    // the assembly stage's auto queue asks for videos only
+    for (const shot of videosOnly ? [] : list) {
       if (mediaCancel.current) break;
       const cur = projectRef.current;
       if (!(cur.shotImages || {})[shot.id] && cur.shotPrompts[shot.id]?.imagePrompt?.trim()) {
@@ -2362,6 +2386,18 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         }}
                       />
                     </label>
+                    {shotVid && (
+                      <button
+                        type="button"
+                        className="s5e-ico"
+                        title={t('vid.delete')}
+                        aria-label={t('vid.delete')}
+                        disabled={anyBusy}
+                        onClick={() => deleteShotVideo(shot)}
+                      >
+                        <Trash size={16} />
+                      </button>
+                    )}
                     {/* Generation parameters share the Generate row: resolution +
                         workflow. Auto picks the richest workflow the shot's
                         material allows; a pinned choice overrides it. Options

@@ -29,6 +29,12 @@
   project, Stage 3 gains a "Series plan / Scene outline" switch, the outline
   for the whole series is written a few episodes at a time, and you continue
   to Stage 4 in the same project. Best for short series.
+- **Auto queue per scene (Stage 5).** The auto queue no longer waits for the
+  whole project: it is available as soon as one scene has a video prompt and
+  a first frame for every shot, and creates the videos of all such scenes.
+  It makes videos only, and only for shots that have none.
+- **Delete a video (Stage 5).** A trash button on the Video tab removes the
+  shot's video (after a confirmation); the prompt and frames stay.
 - **Change companions.** Technical descriptions of every change are kept per
   version in docs/changes/.
 

@@ -291,6 +291,58 @@ project) has not been load-tested.
 
 ---
 
+## 7. Stage 5: auto queue per ready scene; delete a video
+
+**Request.** Enable the auto queue as soon as one scene has prompts and first
+frames for all its shots, so that scene's videos can be generated before the
+other scenes are finished; generate videos only for shots without one; add
+deleting a generated video, like deleting a generated image.
+
+**Behaviour — auto queue.**
+- A scene is **ready** when it has shots and every shot has a non-empty video
+  prompt and a first frame (`project.shotImages[shotId]`). Other scenes are
+  ignored — they no longer block the button.
+- The "Auto queue" button is enabled when at least one ready scene has a shot
+  without a video. Its hint and the confirmation state the number of videos
+  and of ready scenes. With no ready scene the hint explains what "ready"
+  means; with nothing missing it says so.
+- The queue walks the ready scenes in order and generates **videos only**, and
+  only for shots that have none (members of an H3 take are skipped, as
+  before — their video is the take lead's). It no longer creates first frames;
+  the workbench's own "Create scene media" still does images + videos for one
+  scene.
+- Stop, progress (`Stop a/b`), the finish toasts and the stop on a content
+  policy refusal are unchanged.
+
+**Behaviour — delete video.** The Video tab's button row shows a trash button
+after the upload button when the shot has a video. After a confirmation it
+removes the video and what was derived from it; the prompt and frames stay.
+The shot then counts as "without a video" for the auto queue.
+
+**Data model.** No new fields. Deleting removes the shot's key from
+`shotVideos`, `videoGenDurations`, `shotVideoEngines` and `shotTrims`, and
+the clip `h3_<shotId>` from the `h3mix` audio lane.
+
+**Files.**
+- `src/stages/Stage6.jsx`: `sceneReady`, `missingVideos`, `readyScenes`,
+  `queueScenes`, `queueTotal`, `queueReason` replace `noPromptCount` /
+  `queuePlan`; `runAutoQueue` iterates `queueScenes` and calls the
+  workbench queue with `videosOnly: true`.
+- `src/stages/Stage5.jsx`: `processSceneMedia({ silent, onStep, videosOnly })`
+  skips the image pass and its count when `videosOnly`; `deleteShotVideo(shot)`;
+  the trash button in the video button row.
+- i18n: changed `s6.autoQueueTip` (params `{v}`, `{s}`),
+  `s6.autoQueueNothing`, `s6.autoQueueConfirm` (params `{v}`, `{s}`); removed
+  `s6.autoQueueNoPrompts`; new `s6.autoQueueNoScene`, `vid.delete`,
+  `vid.deleteConfirm`.
+
+**Verified.** In the dev app on a seeded two-scene project (one ready, one
+not): button state and hint text in each case, the queue's scene list, and
+deleting a video (button returns to enabled, timeline clip gone). The queue
+itself was not started — the dev build is wired to the live ComfyUI.
+
+---
+
 ## Open
 
 - The reworded image styles (section 4) have not been compared visually with the old ones.

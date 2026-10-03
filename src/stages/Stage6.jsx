@@ -698,45 +698,40 @@ export default function Stage6({ project, update, settings, ...workbench }) {
   // measured track width divided by the total duration.
   const pxPerSec = () => (zoomed ? scale : trackRef.current ? trackRef.current.clientWidth / total : 0);
 
-  // ---- Auto queue: every missing first frame and video, one after another ----
-  // Available only when every shot already has both prompts; existing media
-  // is never regenerated. The workbench (Stage5, embedded) owns the per-scene
-  // generators, so the queue walks the scenes by selecting each one in turn
-  // and running the workbench's own scene queue there.
-  const allShots = project.outline.flatMap((sc) => (project.sceneDetails[sc.id]?.shots || []).map((sh) => ({ sh, sceneId: sc.id })));
-  const noPromptCount = allShots.filter(
-    ({ sh }) => !(project.shotPrompts[sh.id]?.imagePrompt || '').trim() || !(project.shotPrompts[sh.id]?.videoPrompt || '').trim()
-  ).length;
-  const queuePlan = allShots.reduce(
-    (acc, { sh }) => {
-      const hasImg = !!(project.shotImages || {})[sh.id];
-      if (!hasImg) acc.images++;
-      if (!(project.shotVideos || {})[sh.id] && !isTakeMember(project, sh.id)) acc.videos++;
-      return acc;
-    },
-    { images: 0, videos: 0 }
-  );
-  const queueTotal = queuePlan.images + queuePlan.videos;
-  const queueReason = noPromptCount
-    ? t('s6.autoQueueNoPrompts', { n: noPromptCount })
+  // ---- Auto queue: the missing videos of every READY scene, one after another ----
+  // A scene is ready when each of its shots has a video prompt and a first
+  // frame — the rest of the project may still be unfinished. Only shots
+  // without a video are generated; existing videos are never redone. The
+  // workbench (Stage5, embedded) owns the per-scene generators, so the queue
+  // walks the ready scenes by selecting each in turn and running the
+  // workbench's own scene queue there, videos only.
+  const sceneReady = (sc) => {
+    const shots = project.sceneDetails[sc.id]?.shots || [];
+    return (
+      shots.length > 0 &&
+      shots.every((sh) => (project.shotPrompts[sh.id]?.videoPrompt || '').trim() && (project.shotImages || {})[sh.id])
+    );
+  };
+  const missingVideos = (sc) =>
+    (project.sceneDetails[sc.id]?.shots || []).filter((sh) => !(project.shotVideos || {})[sh.id] && !isTakeMember(project, sh.id)).length;
+  const readyScenes = project.outline.filter(sceneReady);
+  const queueScenes = readyScenes.filter((sc) => missingVideos(sc) > 0);
+  const queueTotal = queueScenes.reduce((a, sc) => a + missingVideos(sc), 0);
+  const queueReason = !readyScenes.length
+    ? t('s6.autoQueueNoScene')
     : !queueTotal
       ? t('s6.autoQueueNothing')
-      : t('s6.autoQueueTip', { i: queuePlan.images, v: queuePlan.videos });
+      : t('s6.autoQueueTip', { v: queueTotal, s: queueScenes.length });
   const tick = () => new Promise((r) => { const ch = new MessageChannel(); ch.port1.onmessage = () => r(); ch.port2.postMessage(0); });
   const runAutoQueue = async () => {
-    if (queue || noPromptCount || !queueTotal) return;
-    if (!window.confirm(t('s6.autoQueueConfirm', { i: queuePlan.images, v: queuePlan.videos }))) return;
+    if (queue || !queueTotal) return;
+    if (!window.confirm(t('s6.autoQueueConfirm', { v: queueTotal, s: queueScenes.length }))) return;
     queueCancel.current = false;
     let done = 0;
     setQueue({ a: 0, b: queueTotal });
     setPlaying(false);
-    for (const sc of project.outline) {
+    for (const sc of queueScenes) {
       if (queueCancel.current) break;
-      const shots = project.sceneDetails[sc.id]?.shots || [];
-      const needs = shots.some(
-        (sh) => !(project.shotImages || {})[sh.id] || (!(project.shotVideos || {})[sh.id] && !isTakeMember(project, sh.id))
-      );
-      if (!needs) continue;
       // bring the workbench onto this scene and wait for it to report in
       setSelectedId(null);
       setSelectedSceneId(sc.id);
@@ -746,6 +741,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
       try {
         await queueApi.current.run({
           silent: true,
+          videosOnly: true,
           onStep: () => {
             done++;
             setQueue({ a: done, b: queueTotal });
@@ -2373,7 +2369,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
             job currently on the GPU finishes) */}
         <button
           className={`btn small fixedw ${queue ? 'danger' : ''}`}
-          disabled={rendering || (!queue && (!!noPromptCount || !queueTotal))}
+          disabled={rendering || (!queue && !queueTotal)}
           title={queue ? t('s6.autoQueueStopTip') : queueReason}
           onClick={queue ? cancelAutoQueue : runAutoQueue}
         >
