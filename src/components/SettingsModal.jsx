@@ -47,6 +47,28 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
   const [projectsDir, setProjectsDir] = useState(settings.projectsDir || DEFAULT_PROJECTS_DIR);
   const [hideStaleToast, setHideStaleToast] = useState(!!settings.hideStaleToast);
   const [uiFont, setUiFont] = useState(settings.uiFont || 'default');
+  const [agentEnabled, setAgentEnabled] = useState(!!settings.agentEnabled);
+  const [agentPort, setAgentPort] = useState(String(settings.agentPort || 47821));
+  const [agentInfo, setAgentInfo] = useState(null); // { running, port, url, mcpScript, error } from the desktop app
+  const [agentCopied, setAgentCopied] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    window.agentBridge?.info?.().then((i) => alive && setAgentInfo(i));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const agentCommand = agentInfo?.mcpScript ? `claude mcp add storyreel -- node "${agentInfo.mcpScript}"` : '';
+  const copyAgentCommand = async () => {
+    try {
+      if (window.localFiles?.clipboardWrite) await window.localFiles.clipboardWrite(agentCommand);
+      else await navigator.clipboard.writeText(agentCommand);
+      setAgentCopied(true);
+      setTimeout(() => setAgentCopied(false), 1500);
+    } catch {
+      /* the command is selectable in the field */
+    }
+  };
   const [policies, setPolicies] = useState(loadPolicies);
   const [policyId, setPolicyId] = useState(() => (loadPolicies().some((p) => p.id === settings.policyId) ? settings.policyId : ''));
 
@@ -157,6 +179,8 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
       hideStaleToast,
       uiFont,
       policyId,
+      agentEnabled,
+      agentPort: Math.max(1024, Math.min(65535, Math.round(Number(agentPort) || 47821))),
     });
     onClose();
   };
@@ -231,7 +255,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
     const pad = cs ? parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) : 18;
     setPanelH(max + pad);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modelList, fetchErr, fetching, tab, videoEngine, policies.length]);
+  }, [modelList, fetchErr, fetching, tab, videoEngine, policies.length, agentEnabled, agentInfo]);
 
   const backupsBody = (
     <>
@@ -473,6 +497,38 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
         </label>
         <button title={t('tip.policyDelete')} className="btn small" disabled={!policyId} onClick={deletePolicy}>{t('set.policyDelete')}</button>
       </div>
+      <label>{t('set.agent')}</label>
+      <p className="hint">{t('set.agentHint')}</p>
+      {window.agentBridge ? (
+        <>
+          <label className="check-row" title={t('tip.agentToggle')}>
+            <input type="checkbox" checked={agentEnabled} onChange={(e) => setAgentEnabled(e.target.checked)} />
+            <span>{t('set.agentOn')}</span>
+          </label>
+          {agentEnabled && (
+            <div className="agent-setup">
+              <div className="row">
+                <label htmlFor="agent-port" className="agent-port">
+                  <span>{t('set.agentPort')}</span>
+                  <input id="agent-port" type="number" min={1024} max={65535} title={t('tip.agentPort')} value={agentPort} onChange={(e) => setAgentPort(e.target.value)} />
+                </label>
+                <span className="total-badge" title={t('ind.agentState')}>
+                  {agentInfo?.running ? t('set.agentRunning', { p: agentInfo.port }) : agentInfo?.error ? agentInfo.error : t('set.agentAfterSave')}
+                </span>
+              </div>
+              <p className="hint">{t('set.agentCommandHint')}</p>
+              <div className="row">
+                <input className="grow agent-command" readOnly value={agentCommand} title={t('tip.agentCommand')} onFocus={(e) => e.target.select()} />
+                <button title={t('tip.agentCopy')} className="btn small fixedw" disabled={!agentCommand} onClick={copyAgentCommand}>
+                  {agentCopied ? t('set.agentCopied') : t('set.agentCopy')}
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <p className="hint">{t('set.agentDesktopOnly')}</p>
+      )}
     </>
   );
 

@@ -1,3 +1,4 @@
+import { useAgentScope } from '../lib/agent/registry.js';
 import { scenePhotos } from '../lib/sceneLocations.js';
 import { SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC } from '../lib/config.js';
 import { useRef, useState } from 'react';
@@ -75,6 +76,24 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
         [targetSceneId]: { shots: mapShots(rawShots, block ? densityRange(block) : undefined) },
       },
     }));
+
+  // for the agent: one scene by id, or every scene, each returning its promise
+  useAgentScope('stage4', {
+    projectId: project.id,
+    error,
+    generateScene: (sid) => {
+      const sc = project.outline.find((x) => x.id === sid);
+      const block = blockOf(sc);
+      return run(stage4Prompt(project, { ...sc, number: project.outline.indexOf(sc) + 1 }, genLang, scriptStyle, block), (data) => applyShots(sc.id, data.shots, block));
+    },
+    generateAll: () =>
+      runBatch(
+        project.outline,
+        (s) => stage4Prompt(project, { ...s, number: project.outline.indexOf(s) + 1 }, genLang, scriptStyle, blockOf(s)),
+        (s, data) => applyShots(s.id, data.shots, blockOf(s)),
+        (a, b) => setProg(b ? { a, b } : null)
+      ),
+  });
 
   const generate = () => {
     if (shots.length && !window.confirm(t('s4.replaceConfirm'))) return;

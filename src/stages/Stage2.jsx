@@ -1,3 +1,4 @@
+import { useAgentScope } from '../lib/agent/registry.js';
 import { useEffect, useRef, useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
@@ -26,13 +27,14 @@ export default function Stage2({ project, update, rawUpdate, settings, goNext, o
   const { busy, error, run } = useGenerate(settings);
   const storyline = project.storyline;
 
+  useAgentScope('stage2', { projectId: project.id, generate: () => generate(), error });
   const [coverBusy, setCoverBusy] = useState(false);
   const [coverErr, setCoverErr] = useState('');
   const coverTried = useRef(false);
 
   const generate = () => {
-    if (storyline && !window.confirm(t('s2.replaceConfirm'))) return;
-    run(stage2Prompt(project, genLang, scriptStyle), (data) =>
+    if (storyline && !window.confirm(t('s2.replaceConfirm'))) return undefined;
+    return run(stage2Prompt(project, genLang, scriptStyle), (data) =>
       update((p) => ({
         storyline: {
           synopsis: data.synopsis || '',

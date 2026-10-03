@@ -8,6 +8,8 @@ import { loadLibrary, persistLibraryEntry, deleteLibraryEntry } from './lib/libr
 import SettingsModal from './components/SettingsModal.jsx';
 import PolicyNotice from './components/PolicyNotice.jsx';
 import { POLICY_EVENT } from './lib/policy.js';
+import { useAgentScope } from './lib/agent/registry.js';
+import { callAgent, toolList } from './lib/agent/api.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { loadProjects, saveProjects, loadSettings, saveSettings } from './lib/storage.js';
 import { loadStyles, saveStyles, absorbLegacyStyles } from './lib/styles.js';
@@ -239,6 +241,28 @@ export default function App() {
           : p
       )
     );
+
+  // ---- AI agent access: the app-level scope the agent API works through,
+  // and the bridge to the local server in the desktop app's main process.
+  useAgentScope('app', {
+    version: __APP_VERSION__,
+    projects,
+    settings,
+    styles,
+    library,
+    lang: settings.lang || 'en',
+    updateProject: (id, patch) => updateProject(id, patch),
+    addProjects: (list) => setProjects((ps) => [...list, ...ps]),
+    openProject: (id) => setRoute((r) => (r.name === 'project' && r.id === id ? r : { name: 'project', id })),
+  });
+  useEffect(() => {
+    // dev and tests reach the same entry point without the server
+    window.__storyreelAgent = { call: callAgent, tools: toolList };
+    return window.agentBridge?.onCall?.((method, params) => (method === '__tools' ? { ok: true, result: toolList() } : callAgent(method, params)));
+  }, []);
+  useEffect(() => {
+    window.agentBridge?.configure?.({ enabled: !!settings.agentEnabled, port: Number(settings.agentPort) || 47821 });
+  }, [settings.agentEnabled, settings.agentPort]);
 
   const removeProject = (id) => {
     setProjects((ps) => ps.filter((p) => p.id !== id));

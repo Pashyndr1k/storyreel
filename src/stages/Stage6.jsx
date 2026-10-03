@@ -1,3 +1,4 @@
+import { useAgentScope } from '../lib/agent/registry.js';
 import { POLICY_EVENT } from '../lib/policy.js';
 import { DEFAULT_OUTPUT_DIR, SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC } from '../lib/config.js';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -222,6 +223,19 @@ export default function Stage6({ project, update, settings, ...workbench }) {
   // (nothing renders as a permanent note/frame). Errors linger longer.
   const [toast, setToast] = useState(null); // { msg, kind: 'info'|'error' }
   const toastTimer = useRef(null);
+  useAgentScope('assembly', {
+    projectId: project.id,
+    error: null,
+    lastToast: toast?.msg || '',
+    canRender: !!window.ffmpegBridge?.render,
+    select: (sceneId, shotId) => {
+      setSelectedId(shotId || null);
+      setSelectedSceneId(sceneId);
+    },
+    render: () => doRender(),
+  });
+  // shots with an open agent flag get a marker on their clip
+  const flaggedShots = new Set((project.agentFlags || []).filter((x) => !x.resolved && x.target?.shotId).map((x) => x.target.shotId));
   const showToast = (msg, kind = 'info') => {
     clearTimeout(toastTimer.current);
     setToast({ msg, kind });
@@ -1886,7 +1900,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                           e.currentTarget.click();
                         }
                       }}
-                      className={`nle-clip ${selectedId === it.shot.id ? 'selected' : ''} ${overIns?.sceneId === g.scene.id && overIns.idx === si ? 'ins-before' : ''} ${overIns?.sceneId === g.scene.id && overIns.idx === g.shots.length && si === g.shots.length - 1 ? 'ins-after' : ''} ${trimId === it.shot.id ? 'trimming' : ''}`}
+                      className={`nle-clip ${flaggedShots.has(it.shot.id) ? 'flagged' : ''} ${selectedId === it.shot.id ? 'selected' : ''} ${overIns?.sceneId === g.scene.id && overIns.idx === si ? 'ins-before' : ''} ${overIns?.sceneId === g.scene.id && overIns.idx === g.shots.length && si === g.shots.length - 1 ? 'ins-after' : ''} ${trimId === it.shot.id ? 'trimming' : ''}`}
                       style={zoomed ? { flex: 'none', width: (it.shot.duration || 1) * scale } : { flexGrow: Math.max(0.5, it.shot.duration || 1) }}
                       title={`${globalIdx + 1} · ${it.shot.duration}s · ${it.shot.shotType || ''} — ${t('s6.dragShot')} · ${t('s6.dblTrim')}`}
                       draggable={trimId === null}

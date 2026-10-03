@@ -1,3 +1,4 @@
+import { useAgentScope } from '../lib/agent/registry.js';
 import { useGenerate } from '../lib/useGenerate.js';
 import { stage1Prompt } from '../lib/prompts.js';
 import { uid } from '../lib/storage.js';
@@ -15,7 +16,7 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
 
   const generate = () => {
     const spec = stage1Prompt(project, genLang, scriptStyle, project.randomization);
-    run(spec, (data) =>
+    return run(spec, (data) =>
       update({
         // Stamp each idea with the concrete random modifiers that shaped this
         // generation (e.g. which constraint / persona / micro-tone was rolled).
@@ -24,6 +25,8 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
       })
     );
   };
+
+  useAgentScope('stage1', { projectId: project.id, generate: () => generate(), error });
 
   const pickIdea = (idea) =>
     update((p) => ({

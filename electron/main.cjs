@@ -5,6 +5,7 @@ const { comfyRequest } = require('./comfyRequest.cjs');
 const { netRequest } = require('./netRequest.cjs');
 const { ffmpegVersion, renderJob, cancelActive } = require('./ffmpegRender.cjs');
 const { resolveProjectDir, listStrayDirs, deleteDirs } = require('./projectDirs.cjs');
+const { createAgentServer } = require('./agentServer.cjs');
 
 // All ComfyUI traffic goes through the main process — renderer fetches carry
 // an Origin header that ComfyUI rejects with HTTP 403.
@@ -244,6 +245,8 @@ app.whenReady().then(() => {
     }
     cb({ responseHeaders: headers });
   });
+  // Local API for AI agents (off until enabled in Settings); see agentServer.cjs.
+  createAgentServer({ app, ipcMain, getWindow: () => BrowserWindow.getAllWindows()[0] || null });
   createWindow();
 });
 

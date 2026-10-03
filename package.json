@@ -40,6 +40,12 @@
       "dist/**",
       "electron/**"
     ],
+    "extraResources": [
+      {
+        "from": "agent",
+        "to": "agent"
+      }
+    ],
     "asarUnpack": [
       "**/node_modules/ffmpeg-static/**"
     ],

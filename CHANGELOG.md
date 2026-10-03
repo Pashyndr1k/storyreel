@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+- **Agent access.** An AI agent on your computer (for example Claude Code) can
+  now operate StoryReel: run the stages, create frames, videos and voices,
+  check each result and fix or flag problems. Turn it on in Settings →
+  Interface → Agent access (desktop app, off by default) and run the shown
+  command once to connect Claude Code. See docs/agent-api.md.
+- **Checks the agent gets.** For every shot the app hands the agent the
+  character, location and asset references, the previous shot's last frame,
+  the shot's frames and a contact sheet of its video, plus measurements:
+  video shorter than its slot, sound cut off at the end, voice longer than
+  the shot.
+- **Four attempts, then a flag.** Every generation the agent starts is
+  counted per shot or stage; the fifth is refused and the item is flagged.
+  Flags appear as a red flag button in the project header and a red dot on
+  the shot's clip; resolving a flag lets the agent try again.
+
 ## 2.12.0 — 2026-10-03
 
 - **Script export (Stage 4 and Project settings).** Once every scene has its

@@ -132,6 +132,13 @@ export const AudioPlus = (p) => (
   </S>
 );
 
+export const Flag = (p) => (
+  <S {...p}>
+    <path d="M5 21V4" />
+    <path d="M5 4h12l-2.5 4.5L17 13H5" />
+  </S>
+);
+
 export const Plus = (p) => (
   <S {...p} sw={2}>
     <path d="M12 5v14M5 12h14" />

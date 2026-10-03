@@ -1,3 +1,4 @@
+import { useAgentScope } from '../lib/agent/registry.js';
 import { useRef, useState } from 'react';
 import { generateJSON, textKeyError } from '../lib/claude.js';
 import { seriesArcsPrompt, seriesEpisodesPrompt } from '../lib/prompts.js';
@@ -113,6 +114,8 @@ export default function Stage3Series({ project, update, settings, onSettings, on
       setProg(null);
     }
   };
+
+  useAgentScope('stage3', { projectId: project.id, generate: () => run(arcs.length && !missing ? 'all' : arcs.length ? 'missing' : 'all'), error });
 
   // ---- split into production projects
   const segSize = clampSegment(plan?.segmentSize);

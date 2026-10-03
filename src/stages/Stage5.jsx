@@ -1,3 +1,4 @@
+import { useAgentScope } from '../lib/agent/registry.js';
 import { generateKlingVideo, klingModelOf, klingSeconds, KLING_VIDEO_MODES, resolveKlingMode } from '../lib/kling.js';
 import { SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC, MAX_IMAGE_VERSIONS, MAX_CHARACTER_REFS, MAX_LOCATION_PHOTOS } from '../lib/config.js';
 import { shotCastRefs } from '../lib/castRefs.js';
@@ -195,6 +196,20 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
 
   const scene = project.outline.find((s) => s.id === sceneId) || project.outline[0];
   const shots = (scene && project.sceneDetails[scene.id]?.shots) || [];
+  // the workbench's actions, for the agent (same functions the buttons call)
+  useAgentScope('bench', {
+    projectId: project.id,
+    sceneId: scene?.id || null,
+    focusShotId: focusShotId || null,
+    error,
+    imgErr,
+    createPrompts: () => runMany(specFor(scene), (data) => applyPrompts(scene, data)),
+    regenPrompt: (shot, kind) => regenPrompt(shot, kind),
+    genImage: (shot) => genImage(shot),
+    genFinalFrame: (shot) => genFinalFrame(shot),
+    genVideo: (shot, i) => genVideo(shot, i),
+    genVoice: (shot, i) => genVoice(shot, i),
+  });
   const hasPrompts = shots.some((s) => project.shotPrompts[s.id]);
 
   // Reference photos available for this scene.

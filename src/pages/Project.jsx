@@ -1,3 +1,4 @@
+import { useAgentScope } from '../lib/agent/registry.js';
 import { STAGE_COUNT } from '../lib/config.js';
 import { useState } from 'react';
 import Stage1 from '../stages/Stage1.jsx';
@@ -11,9 +12,11 @@ import { useLibrarySync } from '../lib/useLibrarySync.js';
 import { resolveStyleText } from '../lib/styles.js';
 import ProjectSettingsModal from '../components/ProjectSettingsModal.jsx';
 import SmartEditModal from '../components/SmartEditModal.jsx';
+import AgentFlagsModal from '../components/AgentFlagsModal.jsx';
+import { waitScope } from '../lib/agent/registry.js';
 import Dropdown from '../components/Dropdown.jsx';
 import ThemeToggle from '../components/ThemeToggle.jsx';
-import { ArrowLeft, Download, Sliders, Cog, Stars, Check, Globe } from '../components/icons.jsx';
+import { ArrowLeft, Download, Sliders, Cog, Stars, Check, Globe, Flag } from '../components/icons.jsx';
 import { LANGS } from '../lib/i18n.js';
 
 export default function Project({ project, updateProject, settings, setSettings, styles, setStyles, library, libUpsert, libDelete, onBack, onSettings, addProjects, openProject, projectExists }) {
@@ -21,8 +24,21 @@ export default function Project({ project, updateProject, settings, setSettings,
   // character and location cards edited in the project update their library cards
   useLibrarySync(project, library, libUpsert);
   const [view, setView] = useState(Math.min(project.stage, STAGE_COUNT));
+  useAgentScope('project', { id: project.id, view, setView });
   const [showProjectSettings, setShowProjectSettings] = useState(false);
   const [showSmartEdit, setShowSmartEdit] = useState(false);
+  const [showFlags, setShowFlags] = useState(false);
+  const openFlags = (project.agentFlags || []).filter((f) => !f.resolved).length;
+  // jump to what a flag points at: a shot or scene of Stage 5, or a text stage
+  const gotoFlag = async (f) => {
+    setShowFlags(false);
+    const tg = f.target || {};
+    if (tg.shotId || tg.sceneId) {
+      setView(STAGE_COUNT);
+      const assembly = await waitScope('assembly', (s) => s.projectId === project.id, 4000);
+      assembly?.select(tg.sceneId, tg.shotId || null);
+    } else if (Number(tg.stage) >= 1) setView(Math.min(Number(tg.stage), STAGE_COUNT));
+  };
   const [staleFrom, setStaleFrom] = useState(null);
 
   const STAGES = Array.from({ length: STAGE_COUNT }, (_, i) => i + 1).map((n) => ({ n, label: t(`stages.${n}`) }));
@@ -134,6 +150,12 @@ export default function Project({ project, updateProject, settings, setSettings,
             title={t('set.language')}
           />
           <ThemeToggle theme={settings.theme || 'dark'} setTheme={(th) => setSettings({ ...settings, theme: th })} />
+          {openFlags > 0 && (
+            <button className="icon-btn h44 flags-btn" title={t('flag.button', { n: openFlags })} aria-label={t('flag.button', { n: openFlags })} onClick={() => setShowFlags(true)}>
+              <Flag size={16} />
+              <span className="flags-count">{openFlags}</span>
+            </button>
+          )}
           <button className="icon-btn h44" title={t('edit.button')} aria-label={t('edit.button')} onClick={() => setShowSmartEdit(true)}>
             <Stars size={16} />
           </button>
@@ -160,6 +182,7 @@ export default function Project({ project, updateProject, settings, setSettings,
           onClose={() => setShowProjectSettings(false)}
         />
       )}
+      {showFlags && <AgentFlagsModal project={project} update={update} onGoto={gotoFlag} onClose={() => setShowFlags(false)} />}
       {showSmartEdit && (
         <SmartEditModal
           project={project}

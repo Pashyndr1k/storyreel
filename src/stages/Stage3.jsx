@@ -1,3 +1,4 @@
+import { useAgentScope } from '../lib/agent/registry.js';
 import { useGenerate } from '../lib/useGenerate.js';
 import { stage3Prompt, durationOf } from '../lib/prompts.js';
 import { uid } from '../lib/storage.js';
@@ -114,8 +115,8 @@ function Stage3Outline({ project, update, settings, goNext, onSettings, onProjec
 
   const generate = () => {
     if (isSeriesInline(project)) return generateInline();
-    if (outline.length && !window.confirm(t('s3.replaceConfirm'))) return;
-    run(stage3Prompt(project, genLang, scriptStyle), (data) =>
+    if (outline.length && !window.confirm(t('s3.replaceConfirm'))) return undefined;
+    return run(stage3Prompt(project, genLang, scriptStyle), (data) =>
       update({
         outline: (data.scenes || []).map(sceneFrom),
         // The Action Dynamics Plan travels with the outline it was written for.
@@ -125,6 +126,8 @@ function Stage3Outline({ project, update, settings, goNext, onSettings, onProjec
       })
     );
   };
+
+  useAgentScope('stage3', { projectId: project.id, generate: () => generate(), error });
 
   const updateScene = (id, patch) =>
     update((p) => ({ outline: p.outline.map((s) => (s.id === id ? { ...s, ...patch } : s)) }));

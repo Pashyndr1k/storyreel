@@ -52,3 +52,23 @@ contextBridge.exposeInMainWorld('ffmpegBridge', {
     return () => ipcRenderer.removeListener('ffmpeg-progress', handler);
   },
 });
+
+// AI agent access: the main process runs a local server (agentServer.cjs) and
+// relays each call here; the page answers with the tool's result.
+contextBridge.exposeInMainWorld('agentBridge', {
+  onCall: (cb) => {
+    const handler = async (_e, { id, method, params }) => {
+      let payload;
+      try {
+        payload = await cb(method, params);
+      } catch (e) {
+        payload = { ok: false, error: { code: 'ERROR', message: String(e && e.message ? e.message : e) } };
+      }
+      ipcRenderer.send('agent-result', { id, payload });
+    };
+    ipcRenderer.on('agent-call', handler);
+    return () => ipcRenderer.removeListener('agent-call', handler);
+  },
+  configure: (cfg) => ipcRenderer.invoke('agent-configure', cfg),
+  info: () => ipcRenderer.invoke('agent-info'),
+});
