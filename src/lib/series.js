@@ -40,7 +40,11 @@ export const clampEpisodes = (n) =>
 export const clampSegment = (n) => Math.max(SEGMENT_MIN, Math.min(SEGMENT_MAX, Math.round(Number(n) || SEGMENT_DEFAULT)));
 
 export const isSeries = (p) => p?.scriptType === 'series';
-export const isSeriesMaster = (p) => isSeries(p) && !p.seriesPart;
+// "inline": the series is produced inside its own master project instead of
+// being split — the master carries a seriesPart that spans every episode.
+export const isSeriesInline = (p) => isSeries(p) && !!p.seriesPart?.inline;
+// the project that holds the series plan (an inline master still does)
+export const isSeriesMaster = (p) => isSeries(p) && (!p.seriesPart || !!p.seriesPart.inline);
 export const episodeCountOf = (p) => (p?.seriesPart ? p.seriesPart.to - p.seriesPart.from + 1 : clampEpisodes(p?.episodeCount));
 
 // The model's sections, forced into a gap-free cover of episodes 1..total.
@@ -114,6 +118,33 @@ export function planSegments(arcs, total, size) {
     i = Math.max(-1, Math.min(i, j) - 1);
   }
   return segs;
+}
+
+// The seriesPart of an inline master, rebuilt from the plan as it reads now.
+// No episodeSeconds: the length is read from the project itself.
+export function inlineSeriesPart(project) {
+  const plan = project.seriesPlan || {};
+  const episodes = [...(plan.episodes || [])].sort((a, b) => a.number - b.number);
+  const total = (plan.arcs || []).length ? plan.arcs[plan.arcs.length - 1].to : episodes.length;
+  return { inline: true, parentId: project.id, seriesTitle: project.title, total, from: 1, to: total, arcTitle: '', arcSummary: '', prevCliffhanger: '', episodes };
+}
+
+// A view of the project limited to episodes from..to — what one outline call
+// of an inline master is written for (stage3Prompt reads project.seriesPart).
+export function seriesChunkProject(project, part, from, to) {
+  const arc = (project.seriesPlan?.arcs || []).find((a) => from >= a.from && from <= a.to);
+  return {
+    ...project,
+    seriesPart: {
+      ...part,
+      from,
+      to,
+      arcTitle: arc?.title || '',
+      arcSummary: arc?.summary || '',
+      prevCliffhanger: part.episodes.find((e) => e.number === from - 1)?.cliffhanger || '',
+      episodes: part.episodes.filter((e) => e.number >= from && e.number <= to),
+    },
+  };
 }
 
 export const episodeLine = (e) =>

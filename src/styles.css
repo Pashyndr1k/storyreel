@@ -1321,6 +1321,7 @@ input.episodes-input { width: 110px; }
 .series-setup .hint { flex: 1 1 100%; margin: 0; }
 
 /* ---- short-drama series: the Stage 3 plan --------------------------------- */
+.series-view { margin: 4px 0 10px; }
 .arc-card { margin: 12px 0; border: 1px solid var(--glass-border); border-radius: 3px; background: var(--glass); }
 .arc-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
 .arc-head input.grow { flex: 1 1 auto; min-width: 0; font-weight: 600; }

@@ -225,6 +225,67 @@ copied from, so `project.selectedIdeaId` highlights it in both lists.
 
 ---
 
+## 6. Series: keep all episodes in the current project
+
+**Request.** At Stage 3 of a short-drama series, allow going straight on to
+Stage 4 without splitting, keeping every episode in the current project.
+
+**Behaviour.**
+- The series plan (Stage 3 of a series master) has a second panel under
+  "Split into projects": "Keep in this project" with a "Continue here" button,
+  enabled once every episode is written. It asks for confirmation, stating the
+  episode count and the approximate minutes of video.
+- After that the project is an **inline series**. Stage 3 shows a two-way
+  switch under the heading — "Series plan" / "Scene outline" — and opens on
+  the scene outline. The plan stays editable; splitting into projects still
+  works from the plan view.
+- "Create scene outline" for an inline series writes the outline of the whole
+  series in calls of `EPISODES_PER_CALL` (10) episodes: the button shows
+  "Episodes a–b…", scenes are appended as each call returns (1–3 scenes per
+  episode, titles prefixed "E<n> · "), and the per-call pacing plans are merged
+  into one (scene numbers and timestamps offset, block ids `blk_<call>_<k>`,
+  curve "wave"). A failed call keeps the scenes already written. The outline
+  uses the plan as it reads at that moment.
+- "Continue" in the outline view leads to Stage 4 as in any project.
+- "Use split only" in the plan view turns the inline mode off (confirm); the
+  written outline is kept.
+- Stage 2's episode count/length controls and the Project settings episode
+  field stay visible for an inline series.
+
+**Data model.**
+- `project.seriesPart` with `inline: true` on the master itself:
+  `{ inline, parentId: <own id>, seriesTitle, total, from: 1, to: total,
+  arcTitle: '', arcSummary: '', prevCliffhanger: '', episodes }` — built by
+  `inlineSeriesPart(project)`. It carries no `episodeSeconds`; the length
+  is read from `project.episodeSeconds`. It is refreshed from the plan every
+  time the outline is created.
+- `isSeriesMaster(p)` is now true for a series without `seriesPart` **or**
+  with an inline one; `isSeriesInline(p)` is new. A segment project
+  (`seriesPart` without `inline`) is unchanged.
+
+**Files.**
+- `src/lib/series.js`: `isSeriesInline`, widened `isSeriesMaster`,
+  `inlineSeriesPart`, `seriesChunkProject(project, part, from, to)` (a view
+  of the project limited to an episode range, fed to `stage3Prompt`).
+- `src/stages/Stage3.jsx`: the wrapper picks plan / outline / both with the
+  switch; `Stage3Outline` gains `viewSwitch`, `sceneFrom`,
+  `generateInline` (chunked, own busy/error state).
+- `src/stages/Stage3Series.jsx`: `viewSwitch` and `onKept` props, the
+  "Keep in this project" panel (`keepHere`, `unkeep`), footer text.
+- `src/styles.css`: `.series-view`.
+- i18n: `ser.keepTitle`, `ser.keepHint`, `ser.keepBtn`, `ser.keepConfirm`,
+  `ser.keptNote`, `ser.keptFooter`, `ser.unkeep`, `ser.unkeepConfirm`,
+  `ser.view_plan`, `ser.view_scenes`, `ser.outlineProg`, `tip.serKeep`,
+  `tip.serUnkeep`, `tip.serView_plan`, `tip.serView_scenes`.
+
+**Verified.** In the dev app with a stubbed text model: a 24-episode plan kept
+in the project, the outline written in three calls with merged pacing plan,
+the switch between the two views, Continue to Stage 4, and turning the mode
+off. No real model run; a long inline series (many hundreds of shots in one
+project) has not been load-tested.
+
+---
+
 ## Open
 
 - The reworded image styles (section 4) have not been compared visually with the old ones.

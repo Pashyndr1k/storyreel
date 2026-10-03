@@ -8,6 +8,8 @@ import {
   arcChunks,
   planSegments,
   buildSegmentProject,
+  inlineSeriesPart,
+  isSeriesInline,
   SEGMENT_MIN,
   SEGMENT_MAX,
   SEGMENT_DEFAULT,
@@ -23,7 +25,7 @@ import { Stars, Chevron, RestoreIcon } from '../components/icons.jsx';
 // into main sections (each closing on an intermediate finale), every section
 // into episodes (each closing on a cliffhanger), and the finished plan is
 // split into production projects of 5–10 episodes.
-export default function Stage3Series({ project, update, settings, onSettings, onProjectSettings, genLang, styles, scriptStyle, addProjects, openProject, projectExists }) {
+export default function Stage3Series({ project, update, settings, onSettings, onProjectSettings, genLang, styles, scriptStyle, addProjects, openProject, projectExists, viewSwitch = null, onKept = null }) {
   const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const [prog, setProg] = useState(null); // { a, b } episode-writing calls
@@ -130,6 +132,20 @@ export default function Stage3Series({ project, update, settings, onSettings, on
     }));
   };
 
+  // ---- or keep every episode in this project
+  const inline = isSeriesInline(project);
+  const keepHere = () => {
+    if (!complete) return;
+    const minutes = Math.round((planTotal * (episodeRange(project).min + episodeRange(project).max)) / 2 / 60);
+    if (!window.confirm(t('ser.keepConfirm', { n: planTotal, m: minutes }))) return;
+    update({ seriesPart: inlineSeriesPart(project) });
+    onKept?.();
+  };
+  const unkeep = () => {
+    if (!window.confirm(t('ser.unkeepConfirm'))) return;
+    update({ seriesPart: null });
+  };
+
   const toggle = (i) =>
     setOpen((prev) => {
       const next = new Set(prev);
@@ -153,6 +169,7 @@ export default function Stage3Series({ project, update, settings, onSettings, on
       <div className="stage-head-row">
         <h2 className="stage-h2" data-tip={t('ser.desc')}>{t('ser.title')}</h2>
       </div>
+      {viewSwitch}
 
       <div className="row">
         <button
@@ -310,8 +327,23 @@ export default function Stage3Series({ project, update, settings, onSettings, on
         </div>
       )}
 
+      {arcs.length > 0 && (
+        <div className="seg-panel">
+          <h3 title={t('ser.keepHint')}>{t('ser.keepTitle')}</h3>
+          <p className="hint">{inline ? t('ser.keptNote') : t('ser.keepHint')}</p>
+          <div className="row">
+            {inline ? (
+              <button title={t('tip.serUnkeep')} className="btn" onClick={unkeep}>{t('ser.unkeep')}</button>
+            ) : (
+              <button title={t('tip.serKeep')} className="btn primary" disabled={busy || !complete} onClick={keepHere}>{t('ser.keepBtn')}</button>
+            )}
+          </div>
+          {!inline && !complete && <p className="hint">{t('ser.splitNeedsPlan')}</p>}
+        </div>
+      )}
+
       <footer className="stage-footer">
-        <p className="hint">{t('ser.masterNote')}</p>
+        <p className="hint">{inline ? t('ser.keptFooter') : t('ser.masterNote')}</p>
       </footer>
     </section>
   );
