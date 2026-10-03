@@ -11,7 +11,7 @@ import { generateJSON, textKeyError } from '../lib/claude.js';
 import { stage6SmartCutPrompt } from '../lib/prompts.js';
 import { decodeMediaAudio, audioBufferToWavDataURL } from '../lib/audio.js';
 import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
-import Stage5 from './Stage5.jsx';
+import Stage5, { QUEUE_STOP_EVENT } from './Stage5.jsx';
 import { Play, Pause, SkipBack, StopSq, Grip, Download, Upload, Stars, Trash, TransitionIcon, AudioPlus, Expand, Zap, RestoreIcon } from '../components/icons.jsx';
 import Lightbox from '../components/Lightbox.jsx';
 import ShotTrimModal from '../components/ShotTrimModal.jsx';
@@ -767,7 +767,11 @@ export default function Stage6({ project, update, settings, ...workbench }) {
       queueApi.current?.cancel?.();
     };
     window.addEventListener(POLICY_EVENT, stop);
-    return () => window.removeEventListener(POLICY_EVENT, stop);
+    window.addEventListener(QUEUE_STOP_EVENT, stop); // the user stopped the running video job
+    return () => {
+      window.removeEventListener(POLICY_EVENT, stop);
+      window.removeEventListener(QUEUE_STOP_EVENT, stop);
+    };
   }, []);
 
   // Trim a shot from BOTH sides: `head` is the in-point inside the shot's

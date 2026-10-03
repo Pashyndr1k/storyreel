@@ -88,8 +88,16 @@ async function call(settings, path, { method = 'GET', json = null } = {}) {
 export async function generateKlingVideo(
   settings,
   { prompt, firstFrame, lastFrame = null, durationSec, resolution = 'HD', name },
-  { onStatus } = {}
+  { onStatus, signal } = {}
 ) {
+  // Stopping only ends the wait: Kling has no cancel call, so a task that was
+  // accepted keeps running (and is billed) on Kling's side.
+  const stopIfAborted = () => {
+    if (!signal?.aborted) return;
+    const e = new Error('Aborted');
+    e.name = 'AbortError';
+    throw e;
+  };
   if (!(settings.klingKey || '').trim()) throw new Error('NO_KLING_KEY');
   await enforcePolicy(settings, { kind: 'video', text: prompt });
   const model = klingModelOf(settings);
@@ -124,6 +132,7 @@ export async function generateKlingVideo(
       if (e.klingCode === 1303 && attempt < 5) {
         onStatus?.('queued');
         await sleep(2000 * 2 ** attempt);
+        stopIfAborted();
         continue;
       }
       throw e;
@@ -135,6 +144,7 @@ export async function generateKlingVideo(
   const t0 = Date.now();
   for (;;) {
     await sleep(5000);
+    stopIfAborted();
     const data = await call(settings, `/tasks?task_ids=${encodeURIComponent(task.id)}`);
     const tk = Array.isArray(data) ? data[0] : data;
     onStatus?.(tk?.status || 'processing');
@@ -152,6 +162,6 @@ export async function generateKlingVideo(
       };
     }
     if (tk?.status === 'failed') throw new Error(`Kling: generation failed — ${tk.message || 'no reason given'}`);
-    if (Date.now() - t0 > 25 * 60 * 1000) throw new Error('Kling: timed out waiting for the video.');
+    if (Date.now() - t0 > 60 * 60 * 1000) throw new Error('Kling: timed out after 60 minutes waiting for the video.');
   }
 }

@@ -189,7 +189,31 @@ async function uploadInput(settings, dataURL, name) {
 }
 
 // Queue an API-format graph; resolves with the outputs map once execution ends.
-async function runGraph(settings, graph, { timeoutMs = 15 * 60 * 1000, onStatus } = {}) {
+// Video jobs can run for a long time on a busy or modest GPU (45 minutes has
+// been seen), so they wait up to an hour; other jobs keep the 15-minute limit.
+export const VIDEO_TIMEOUT_MS = 60 * 60 * 1000;
+
+const abortError = () => {
+  const e = new Error('Aborted');
+  e.name = 'AbortError';
+  return e;
+};
+
+// Take a job off ComfyUI: interrupt it if it is the one running, or remove it
+// from the pending queue. Never interrupts somebody else's running job.
+async function cancelPrompt(settings, id) {
+  try {
+    const q = (await request(settings, '/queue')).json();
+    const has = (list) => (list || []).some((item) => item?.[1] === id);
+    if (has(q.queue_running)) await request(settings, '/interrupt', { method: 'POST', json: {} });
+    else if (has(q.queue_pending)) await request(settings, '/queue', { method: 'POST', json: { delete: [id] } });
+  } catch {
+    /* best-effort: the wait stops either way */
+  }
+}
+
+async function runGraph(settings, graph, { timeoutMs = 15 * 60 * 1000, onStatus, signal } = {}) {
+  if (signal?.aborted) throw abortError();
   const res = await request(settings, '/prompt', {
     method: 'POST',
     json: { prompt: graph, client_id: 'storyreel' },
@@ -200,7 +224,11 @@ async function runGraph(settings, graph, { timeoutMs = 15 * 60 * 1000, onStatus 
   const started = Date.now();
   for (;;) {
     await new Promise((r) => setTimeout(r, 2000));
-    if (Date.now() - started > timeoutMs) throw new Error('ComfyUI generation timed out.');
+    if (signal?.aborted) {
+      await cancelPrompt(settings, id);
+      throw abortError();
+    }
+    if (Date.now() - started > timeoutMs) throw new Error(`ComfyUI generation timed out after ${Math.round(timeoutMs / 60000)} minutes.`);
     let hist;
     try {
       hist = (await request(settings, `/history/${id}`)).json();
@@ -464,7 +492,7 @@ export function buildH3MultiGraph(settings, { prompt, pictures, guides, refVideo
   return graph;
 }
 
-export async function generateComfyMultiVideo(settings, args, { onStatus } = {}) {
+export async function generateComfyMultiVideo(settings, args, { onStatus, signal } = {}) {
   await enforcePolicy(settings, { kind: 'video', text: args.prompt });
   await h3Preflight(settings, h3MultiTemplate, { tag: 'mfr', lora: settings.h3Lightning ? H3_LIGHTNING_LORA : null });
   const stamp = Date.now();
@@ -480,7 +508,7 @@ export async function generateComfyMultiVideo(settings, args, { onStatus } = {})
   for (const r of args.refAudios || []) await up(r.src, /^data:audio\/wav/i.test(r.src) ? 'wav' : 'mp3');
   for (const r of args.refVideos || []) await up(r.src, 'mp4');
   const graph = buildH3MultiGraph(settings, args, files);
-  const outs = await runGraph(settings, graph, { onStatus });
+  const outs = await runGraph(settings, graph, { onStatus, signal, timeoutMs: VIDEO_TIMEOUT_MS });
   return firstVideo(outs, settings);
 }
 
@@ -492,7 +520,7 @@ export const H3_REF_CAPS = { images: 9, videos: 3, audios: 3, total: 12 };
 export async function generateComfyRefVideo(
   settings,
   { prompt, refImages = [], refVideos = [], refAudios = [], durationSec, aspectRatio, resolution, name },
-  { onStatus } = {}
+  { onStatus, signal } = {}
 ) {
   await enforcePolicy(settings, { kind: 'video', text: prompt });
   await h3Preflight(settings, h3RefTemplate);
@@ -539,14 +567,14 @@ export async function generateComfyRefVideo(
   }
   graph['129'].inputs.noise_seed = rndSeed();
   graph['92'].inputs.filename_prefix = `StoryReel/${sanitize(name)}`;
-  const outs = await runGraph(settings, graph, { onStatus });
+  const outs = await runGraph(settings, graph, { onStatus, signal, timeoutMs: VIDEO_TIMEOUT_MS });
   return firstVideo(outs, settings);
 }
 
 export async function generateComfyVideo(
   settings,
   { prompt, firstFrame, lastFrame, audio, durationSec, aspectRatio, resolution, name, mode = 'auto' },
-  { onStatus } = {}
+  { onStatus, signal } = {}
 ) {
   await enforcePolicy(settings, { kind: 'video', text: prompt });
   const engine = settings.videoEngine === 'minimax' ? 'minimax' : 'ltx';
@@ -579,7 +607,7 @@ export async function generateComfyVideo(
     graph['104'].inputs.length = h3Frames(durationSec || 4);
     graph['15'].inputs.noise_seed = rndSeed();
     graph['92'].inputs.filename_prefix = `StoryReel/${sanitize(name)}`;
-    const outs = await runGraph(settings, graph, { onStatus });
+    const outs = await runGraph(settings, graph, { onStatus, signal, timeoutMs: VIDEO_TIMEOUT_MS });
     return firstVideo(outs, settings);
   }
 
@@ -624,7 +652,7 @@ export async function generateComfyVideo(
     graph['75'].inputs.filename_prefix = `StoryReel/${sanitize(name)}`;
   }
 
-  const outputs = await runGraph(settings, graph, { onStatus });
+  const outputs = await runGraph(settings, graph, { onStatus, signal, timeoutMs: VIDEO_TIMEOUT_MS });
   return firstVideo(outputs, settings);
 }
 

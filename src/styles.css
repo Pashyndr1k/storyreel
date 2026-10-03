@@ -368,6 +368,13 @@ label {
 /* dual-state buttons (Play/Stop, Generate/Generating…) hold ONE width */
 .btn.fixedw { min-width: 118px; }
 .btn.fixedw-lg { min-width: 168px; }
+/* a generate button showing its job's progress: fill bar behind the label */
+.s5e-gen.progress { position: relative; overflow: hidden; }
+.s5e-gen.progress:disabled { opacity: 1; cursor: progress; }
+.gen-fill { position: absolute; top: 0; bottom: 0; left: 0; background: rgba(var(--accent-rgb), 0.38); transition: width 1s linear; }
+.gen-label { position: relative; font-variant-numeric: tabular-nums; }
+.s5e-ico.vid-stop { color: var(--accent); border-color: rgba(var(--accent-rgb), 0.5); }
+@media (prefers-reduced-motion: reduce) { .gen-fill { transition: none; } }
 .btn.back {
   height: auto;
   background: transparent;

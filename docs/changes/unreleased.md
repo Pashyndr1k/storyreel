@@ -343,6 +343,103 @@ itself was not started — the dev build is wired to the live ComfyUI.
 
 ---
 
+## 8. Stage 5: Create video button as a progress bar
+
+**Request.** The "Create video" button should double as the progress
+indicator: when generation starts it switches to a progress-bar state and
+shows the progress.
+
+**Behaviour.**
+- While a shot's video is being generated its button (same width, disabled)
+  shows a fill bar behind the label and the text "NN% · m:ss". The clock is
+  the real elapsed time; the tooltip gives elapsed and expected time.
+- **The percentage is an estimate.** Neither backend reports step progress
+  over the calls the app uses: ComfyUI's `/history` poll only says "not done"
+  or "done", and Kling returns a status word. The bar is therefore driven by
+  the expected duration of this kind of job, learned from finished runs on
+  the same machine: linear to 90% at the expected time, then creeping toward
+  99%, never 100% before the result arrives.
+- The expectation is kept per `engine:resolution:mode` as seconds of work per
+  second of requested video (running average, updated after every successful
+  run; failures are not recorded). First-run defaults: H3 45, LTX 25, Kling 35.
+- Applies to manual runs and to runs started by the scene queue / auto queue
+  (visible when that shot's card is open).
+
+**Data model.** Nothing in the project. `localStorage['storyreel.videoEta.v1']`:
+`{ "<engine>:<resolution>:<mode>": <seconds per video-second> }`.
+
+**Files.**
+- `src/lib/videoEta.js` (new): `etaKey`, `expectedSeconds`, `recordRun`,
+  `etaPercent`.
+- `src/components/GenProgress.jsx` (new): the fill + label, ticking once a
+  second on its own state.
+- `src/stages/Stage5.jsx`: `vidProg` state (`{ shotId, startedAt,
+  expectedSec }`) set in `genVideo` before the generator call and cleared in
+  its `finally`; `recordRun` after a successful generation; the button gets
+  the `progress` class and renders `<GenProgress>` while busy.
+- `src/styles.css`: `.s5e-gen.progress`, `.gen-fill`, `.gen-label`.
+- i18n: `vid.progressTip`.
+
+**Verified.** `etaPercent` / `expectedSeconds` / `recordRun` values and the
+rendered button state (fill width, label, tooltip, width unchanged at 168px)
+in the dev app, by starting a job with every ComfyUI request stubbed. No real
+generation was run, so the learned timings are untested against a real GPU run.
+
+**Open.** True step progress is available from ComfyUI only over its
+WebSocket, which the packaged app would have to reach through the Electron
+main process (renderer requests to ComfyUI are rejected for their Origin).
+Not built.
+
+---
+
+## 9. Stage 5: stop a video generation; one-hour video timeout
+
+**Request.** Add a button to interrupt video generation, and raise the
+timeout if it is under 30 minutes — some videos take up to 45 minutes.
+
+**Behaviour — stop.**
+- While a shot's video is being generated a stop button (square icon, accent
+  outline) appears right after the Create video button. It asks for
+  confirmation.
+- ComfyUI engines (H3, LTX): the wait ends within one poll (2 s) and the job is
+  taken off ComfyUI — `POST /interrupt` if it is the job currently running,
+  or `POST /queue { delete: [id] }` if it is still pending. A job that belongs
+  to someone else and happens to be running is never interrupted.
+- Kling: only the wait ends. Kling has no cancel call, so an accepted task
+  keeps running and is billed on Kling's side; its result is not collected.
+- A stopped job shows no error. The scene queue and the assembly stage's auto
+  queue stop with it (the latter through the `storyreel:queue-stop` window
+  event). Nothing is recorded for the progress estimate.
+
+**Behaviour — timeout.** Video jobs wait up to 60 minutes: ComfyUI video
+(was 15) and Kling (was 25). Image, music and sound-effect jobs keep their
+limits. The timeout message states the minutes.
+
+**Files.**
+- `src/lib/comfy.js`: `VIDEO_TIMEOUT_MS` (exported), `abortError`,
+  `cancelPrompt(settings, id)`; `runGraph` takes `signal`; the three video
+  generators (`generateComfyVideo`, `generateComfyRefVideo`,
+  `generateComfyMultiVideo`) accept `{ onStatus, signal }` and pass
+  `signal` + `VIDEO_TIMEOUT_MS`.
+- `src/lib/kling.js`: `generateKlingVideo(..., { onStatus, signal })`,
+  abort checks in the create back-off and the poll loop, 60-minute limit.
+- `src/stages/Stage5.jsx`: `vidAbort` ref, `stopVideo`, the
+  `AbortController` per job passed as the generators' third argument,
+  `AbortError` swallowed in `genVideo`'s catch, the stop button, exported
+  `QUEUE_STOP_EVENT`.
+- `src/stages/Stage6.jsx`: listens for `QUEUE_STOP_EVENT` next to the policy
+  event and cancels the auto queue.
+- `src/styles.css`: `.s5e-ico.vid-stop`.
+- i18n: `vid.stop`, `vid.stopConfirm`.
+
+**Verified.** With every ComfyUI request stubbed in the dev app (no real job):
+starting a job from the button, the stop button appearing, and an aborted wait
+that issues `/interrupt` for a running job and a queue delete for a
+pending one, raises `AbortError`, and the timeout constant is 60 minutes.
+Not tested against a real ComfyUI job or a real Kling task.
+
+---
+
 ## Open
 
 - The reworded image styles (section 4) have not been compared visually with the old ones.

@@ -1,7 +1,12 @@
 import { generateKlingVideo, klingModelOf, klingSeconds, KLING_VIDEO_MODES, resolveKlingMode } from '../lib/kling.js';
 import { SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC, MAX_IMAGE_VERSIONS, MAX_CHARACTER_REFS, MAX_LOCATION_PHOTOS } from '../lib/config.js';
 import { shotCastRefs } from '../lib/castRefs.js';
+import GenProgress from '../components/GenProgress.jsx';
+import { etaKey, expectedSeconds, recordRun } from '../lib/videoEta.js';
 import { POLICY_EVENT } from '../lib/policy.js';
+
+// fired when the user stops a video job; the assembly stage's auto queue stops with it
+export const QUEUE_STOP_EVENT = 'storyreel:queue-stop';
 import { locationsOf, shotLocations, shotLocationRefs, locationLibId } from '../lib/sceneLocations.js';
 import { useEffect, useRef, useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
@@ -155,6 +160,8 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const [imgBusy, setImgBusy] = useState(null); // shotId being generated
   const [imgErr, setImgErr] = useState(null); // { id, msg }
   const [refineText, setRefineText] = useState({}); // shotId -> instruction draft
+  const vidAbort = useRef(null); // AbortController of the running video job
+  const [vidProg, setVidProg] = useState(null); // running video job: { shotId, startedAt, expectedSec } — drives the button's progress bar
   const [locSaved, setLocSaved] = useState(null); // shotId whose location ref was just saved
   const [showAssets, setShowAssets] = useState(false); // asset library manager
   const [assetPickFor, setAssetPickFor] = useState(null); // shotId choosing an asset
@@ -1184,6 +1191,15 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   // through image-to-video, or first + final frame through the first/last-
   // frame workflow. The result plays inline and a copy lands in the local
   // outputs folder.
+  // Stop the running video job: interrupts it on ComfyUI (or ends the wait
+  // for Kling) and halts the scene queue and the auto queue with it.
+  const stopVideo = () => {
+    if (!vidAbort.current || !window.confirm(t('vid.stopConfirm'))) return;
+    mediaCancel.current = true;
+    window.dispatchEvent(new CustomEvent(QUEUE_STOP_EVENT));
+    vidAbort.current?.abort();
+  };
+
   const genVideo = async (shot, i) => {
     // Read through projectRef: the prompt/frames must be the LATEST state at
     // call time (fixes regeneration using a stale video prompt after edits).
@@ -1233,6 +1249,13 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       : useMode === 'si2v' || isH3
         ? slotDur
         : Math.round(shot.duration || 4) + DYNAMICS_CONFIG.generation_padding_sec;
+    // progress estimate for the button, from how long this kind of job took before
+    const runKey = etaKey(isKling ? 'kling' : isH3 ? 'minimax' : 'ltx', cur.videoResolution || 'HD', useMode);
+    const runStart = Date.now();
+    setVidProg({ shotId: shot.id, startedAt: runStart, expectedSec: expectedSeconds(runKey, genDuration) });
+    const abort = new AbortController();
+    vidAbort.current = abort;
+    const runOpts = { signal: abort.signal };
     try {
       const sendPrompt =
         isH3 && useMode !== 'r2v' && useMode !== 'mfr'
@@ -1258,26 +1281,27 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
               durationSec: slotDur,
               resolution: cur.videoResolution || 'HD',
               name: genArgs.name,
-            })
+            }, runOpts)
           : useMode === 'mfr'
           ? await generateComfyMultiVideo(settings, {
               ...genArgs,
               ...h3MultiPlan(cur, shot.id, { durationSec: genDuration }),
-            })
+            }, runOpts)
           : useMode === 'r2v'
           ? await generateComfyRefVideo(settings, {
               ...genArgs,
               refImages: (refs.images || []).map((r) => r.src),
               refVideos: (refs.videos || []).map((r) => r.src),
               refAudios: (refs.audios || []).map((r) => r.src),
-            })
+            }, runOpts)
           : await generateComfyVideo(settings, {
               ...genArgs,
               firstFrame: first,
               lastFrame: useMode === 'flf2v' ? last : null,
               audio: useMode === 'si2v' ? voiceAud : null,
               mode: useMode,
-            });
+            }, runOpts);
+      recordRun(runKey, (Date.now() - runStart) / 1000, genDuration);
       saveToLocalOutputs(settings, filename, dataURL); // best-effort local copy
       // H3 clips carry a full native mix (dialogue, effects, score). Detach it
       // onto the "H3 mix" lane NLE-style — video muted, audio on its own lane
@@ -1333,8 +1357,11 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         return { ...base, audioLayers: Ls, shotMutes: { ...(p.shotMutes || {}), [shot.id]: true } };
       });
     } catch (e) {
-      setImgErr({ id: shot.id, msg: e.message === 'COMFY_UNREACHABLE' ? 'COMFY_UNREACHABLE' : e.message || String(e) });
+      // stopped by the user: not an error
+      if (e?.name !== 'AbortError') setImgErr({ id: shot.id, msg: e.message === 'COMFY_UNREACHABLE' ? 'COMFY_UNREACHABLE' : e.message || String(e) });
     } finally {
+      vidAbort.current = null;
+      setVidProg(null);
       setImgBusy(null);
     }
   };
@@ -2353,7 +2380,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                   <div className="s5e-btnrow">
                     {p.videoPrompt?.trim() ? (
                       <button title={t('tip.genVideo')}
-                        className="btn small primary s5e-gen fixedw-lg"
+                        className={`btn small primary s5e-gen fixedw-lg ${vidBusy ? 'progress' : ''}`}
                         disabled={
                           anyBusy ||
                           !!regenBusy ||
@@ -2362,9 +2389,25 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         }
                         onClick={() => genVideo(shot, i)}
                       >
-                        {vidBusy ? t('vid.generating') : shotVid ? t('vid.regenerate') : t('vid.generate')}
+                        {vidBusy ? (
+                          vidProg?.shotId === shot.id ? (
+                            <GenProgress startedAt={vidProg.startedAt} expectedSec={vidProg.expectedSec} />
+                          ) : (
+                            t('vid.generating')
+                          )
+                        ) : shotVid ? (
+                          t('vid.regenerate')
+                        ) : (
+                          t('vid.generate')
+                        )}
                       </button>
-                    ) : (
+                    ) : null}
+                    {vidBusy && (
+                      <button type="button" className="s5e-ico vid-stop" title={t('vid.stop')} aria-label={t('vid.stop')} onClick={stopVideo}>
+                        <StopSq size={16} />
+                      </button>
+                    )}
+                    {p.videoPrompt?.trim() ? null : (
                       <button title={t('tip.createPrompt')}
                         className="btn small primary s5e-gen fixedw-lg"
                         disabled={anyBusy || !!regenBusy}

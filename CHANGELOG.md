@@ -35,6 +35,15 @@
   It makes videos only, and only for shots that have none.
 - **Delete a video (Stage 5).** A trash button on the Video tab removes the
   shot's video (after a confirmation); the prompt and frames stay.
+- **Progress on the Create video button (Stage 5).** While a video is being
+  created the button turns into a progress bar with a percentage and the
+  elapsed time. The percentage is an estimate learned from earlier runs on
+  your machine; the elapsed time is exact.
+- **Stop a video generation (Stage 5).** A stop button next to the Create
+  video button interrupts the running job on ComfyUI and halts any queue.
+  With Kling it only stops waiting — a task Kling accepted still runs and is
+  billed there.
+- **Video timeout raised to 60 minutes** (was 15 for ComfyUI, 25 for Kling).
 - **Change companions.** Technical descriptions of every change are kept per
   version in docs/changes/.
 
