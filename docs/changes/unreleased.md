@@ -591,11 +591,15 @@ detailed, action-rich, lead with the main character's movement, and carry any
 spoken line directly in H3's dialogue format.
 
 **Behaviour — sliders.**
-- Video tab of a shot, above the Create video row: "Camera" (Static, Handheld,
-  Dolly, Crane, Drone, Shaky) and "Action" (Calm, Active, Intense). Each has a
-  range input, clickable one-word tick labels, the current value, and an
-  "Auto" chip (lit while the value is the derived default; click it to return
-  to the default after a manual change).
+- Video tab of a shot, above the Create video row: two segmented selectors
+  side by side on one line, with the same look as the resolution selector
+  (`seg seg-tall seg-compact`, 28px high): Camera (Static, Handheld, Dolly,
+  Crane, Drone, Shaky) and Action (Calm, Active, Intense). They have no text
+  label; the hover hint of each group and segment names the setting. The
+  derived default is shown outlined (`.dyn-seg.auto`); a manual pick is filled,
+  and clicking the picked segment again returns to the default. (Earlier
+  iterations — a range input with tick labels, then one labelled row per
+  setting with an "Auto" chip — were replaced at the user's request.)
 - Default (`defaultCamera` / `defaultAction`): first the shot's own text
   (shot type, action, notes — EN/RU/UA keywords such as drone, crane, chase,
   handheld, dolly, static; "sits/reads/waits" forces Calm; fight/chase/explosion
@@ -654,12 +658,12 @@ All default `{}` in `projectDefaults` and are normalised in `migrateProject`.
   `.dyn-sliders` block, `shotPromptDyn` recorded in `applyPrompts` and
   `regenPrompt`.
 - `src/lib/storage.js`: the three fields.
-- `src/styles.css`: `.dyn-sliders`, `.dyn-slider`, `.dyn-head`, `.dyn-value`,
-  `.dyn-auto`, `.dyn-ticks`, `.dyn-stale`.
-- i18n: `dyn.camera`, `dyn.action`, `dyn.auto`, `dyn.camera_<level>` and
+- `src/styles.css`: `.dyn-sliders`, `.dyn-line`, `.dyn-seg`, `.dyn-stale`.
+- i18n: `dyn.camera`, `dyn.action`, `dyn.camera_<level>` and
   `dyn.camera_<level>_tip` (6 levels), `dyn.action_<level>` and
   `dyn.action_<level>_tip` (3 levels), `dyn.stale`, `dyn.recreate`,
-  `tip.dyn_camera`, `tip.dyn_action`, `tip.dynAuto`, `tip.dynIsAuto`,
+  `tip.dyn_camera`, `tip.dyn_action`, `tip.dynAuto`, `tip.dynIsAuto` (appended to the
+  default segment's hint),
   `tip.dynRecreate`.
 
 **Verified.** In the dev app: defaults for sample shots, manual change, Auto

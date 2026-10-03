@@ -532,52 +532,39 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       else next[shotId] = value;
       return { [key]: next };
     });
+  // A segmented selector styled like the resolution selector; Camera and
+  // Action sit side by side on one line, so they carry no text label (the
+  // group's hover hint names them). The derived default is outlined until the
+  // user picks a segment; clicking the picked segment again returns to it.
   const dynSlider = (shot, kind) => {
     const levels = kind === 'camera' ? CAMERA_LEVELS : ACTION_LEVELS;
     const key = kind === 'camera' ? 'shotCamera' : 'shotAction';
     const value = kind === 'camera' ? cameraOf(project, shot, sceneBlock) : actionOf(project, shot, sceneBlock);
     const manual = (project[key] || {})[shot.id] != null;
     return (
-      <div className={`dyn-slider dyn-${kind}`}>
-        <div className="dyn-head">
-          <span className="s5e-eyebrow" title={t(`tip.dyn_${kind}`)}>{t(`dyn.${kind}`)}</span>
-          <span className="dyn-value" title={t(`dyn.${kind}_${levels[value]}_tip`)}>{t(`dyn.${kind}_${levels[value]}`)}</span>
-          <button
-            type="button"
-            className={`dyn-auto ${manual ? '' : 'on'}`}
-            aria-pressed={!manual}
-            disabled={!manual}
-            title={manual ? t('tip.dynAuto') : t('tip.dynIsAuto')}
-            onClick={() => setDynamics(shot.id, key, null)}
-          >
-            {t('dyn.auto')}
-          </button>
-        </div>
-        <input
-          type="range"
-          min={0}
-          max={levels.length - 1}
-          step={1}
-          value={value}
-          aria-label={t(`dyn.${kind}`)}
-          aria-valuetext={t(`dyn.${kind}_${levels[value]}`)}
-          title={t(`dyn.${kind}_${levels[value]}_tip`)}
-          onChange={(e) => setDynamics(shot.id, key, Number(e.target.value))}
-        />
-        <div className="dyn-ticks" style={{ '--n': levels.length }}>
-          {levels.map((lv, k) => (
+      <span
+        className={`seg seg-tall seg-compact dyn-seg dyn-${kind} ${manual ? '' : 'auto'}`}
+        role="radiogroup"
+        aria-label={t(`dyn.${kind}`)}
+        title={t(`tip.dyn_${kind}`)}
+      >
+        {levels.map((lv, k) => {
+          const on = k === value;
+          return (
             <button
               key={lv}
               type="button"
-              className={k === value ? 'on' : ''}
-              title={t(`dyn.${kind}_${lv}_tip`)}
-              onClick={() => setDynamics(shot.id, key, k)}
+              role="radio"
+              aria-checked={on}
+              className={`seg-btn ${on ? 'on' : ''}`}
+              title={`${t(`dyn.${kind}`)}: ${t(`dyn.${kind}_${lv}_tip`)}${on ? ` — ${t(manual ? 'tip.dynAuto' : 'tip.dynIsAuto')}` : ''}`}
+              onClick={() => setDynamics(shot.id, key, on && manual ? null : k)}
             >
               {t(`dyn.${kind}_${lv}`)}
             </button>
-          ))}
-        </div>
-      </div>
+          );
+        })}
+      </span>
     );
   };
 
@@ -2455,8 +2442,10 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     </p>
                   )}
                   <div className="dyn-sliders">
-                    {dynSlider(shot, 'camera')}
-                    {dynSlider(shot, 'action')}
+                    <div className="dyn-line">
+                      {dynSlider(shot, 'camera')}
+                      {dynSlider(shot, 'action')}
+                    </div>
                     {dynamicsStale(project, shot, sceneBlock) && (
                       <div className="dyn-stale">
                         <span className="hint">{t('dyn.stale')}</span>
