@@ -1237,7 +1237,8 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         : resolveVideoMode(mode, { lastFrame: last, audio: voiceAud });
     if (!first && useMode !== 'r2v' && useMode !== 'mfr') return; // every non-reference workflow is frame-anchored
     if (isKling && !(settings.klingKey || '').trim()) return setImgErr({ id: shot.id, msg: 'NO_KLING_KEY' });
-    setImgBusy(`${shot.id}:vid`);
+    // one video job at a time (the GPU and the progress state are single)
+    if (vidAbort.current) return;
     setImgErr(null);
     // +3s padding rule (silent workflows only): generate longer than the
     // timeline needs; the assembly timeline trims 15 frames from head and tail to mask AI
@@ -1365,7 +1366,6 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     } finally {
       vidAbort.current = null;
       setVidProg(null);
-      setImgBusy(null);
     }
   };
 
@@ -1835,7 +1835,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
             className="icon-btn sq42 push-right"
             title={t('s5.genMedia')}
             aria-label={t('s5.genMedia')}
-            disabled={busy || !!mediaProg || !!imgBusy}
+            disabled={busy || !!mediaProg || !!imgBusy || !!vidProg}
             onClick={processSceneMedia}
           >
             <Zap size={16} />
@@ -1867,7 +1867,11 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           const finalImg = (project.shotFinalImages || {})[shot.id];
           const finalBusy = imgBusy === `${shot.id}:final`;
           const locBusy = imgBusy === `${shot.id}:loc`;
-          const vidBusy = imgBusy === `${shot.id}:vid`;
+          // The video job has its own state (vidProg): the shared imgBusy is
+          // overwritten by any image/voice action on another shot, which used
+          // to hide a running video's progress.
+          const vidBusy = vidProg?.shotId === shot.id;
+          const vidElsewhere = !!vidProg && !vidBusy; // a video is running on another shot
           const audBusy = imgBusy === `${shot.id}:aud` || imgBusy === `${shot.id}:audp`;
           const anyBusy = imgBusy === shot.id || finalBusy || locBusy || vidBusy || audBusy;
           const shotVid = (project.shotVideos || {})[shot.id];
@@ -2386,6 +2390,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         className={`btn small primary s5e-gen fixedw-lg ${vidBusy ? 'progress' : ''}`}
                         disabled={
                           anyBusy ||
+                          vidElsewhere ||
                           !!regenBusy ||
                           (!genImg && effMode !== 'r2v') ||
                           (curEngine === 'minimax' && isTakeMember(project, shot.id))
@@ -2393,11 +2398,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         onClick={() => genVideo(shot, i)}
                       >
                         {vidBusy ? (
-                          vidProg?.shotId === shot.id ? (
-                            <GenProgress startedAt={vidProg.startedAt} expectedSec={vidProg.expectedSec} />
-                          ) : (
-                            t('vid.generating')
-                          )
+                          <GenProgress startedAt={vidProg.startedAt} expectedSec={vidProg.expectedSec} />
                         ) : shotVid ? (
                           t('vid.regenerate')
                         ) : (

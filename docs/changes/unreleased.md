@@ -475,6 +475,40 @@ counts 0 finished. No real job was run.
 
 ---
 
+## 11. Fix: video progress disappeared when another shot was worked on
+
+**Report.** After starting a video, switching to another shot and creating a
+prompt or an image there made the progress bar stop showing.
+
+**Cause.** The workbench tracks "what is busy" in one shared state,
+`imgBusy` (a single shot id / `id:kind` string). The video job marked itself
+there as `<shotId>:vid`; an image, final-frame, location or voice action on
+any other shot overwrote the value and, on finishing, reset it to `null` — so
+the video's button fell back to its idle look while the job kept running.
+
+**Fix.** The video job no longer uses `imgBusy`. Its busy state is `vidProg`
+(`{ shotId, startedAt, expectedSec }`) alone:
+- `vidBusy = vidProg?.shotId === shot.id` in the shot card;
+- `genVideo` no longer sets or clears `imgBusy`; it returns at once when a
+  video job is already running (`vidAbort.current` set);
+- while a video runs on one shot, "Create video" on every other shot is
+  disabled (`vidElsewhere`) — one video job at a time — and "Create scene
+  media" is disabled too. Prompts, images and voice on other shots stay
+  available and no longer affect the video's progress or stop button.
+
+**Files.** `src/stages/Stage5.jsx` only.
+
+**Verified.** In the dev app with every ComfyUI and Gemini request stubbed:
+a video started on shot 1, then an image created on shot 2 and its prompt
+recreated; back on shot 1 the progress bar and stop button are still shown
+and the clock kept counting. No real job was run.
+
+**Known, not changed.** The other kinds of jobs (image, final frame, location
+plate, voice) still share `imgBusy`: starting one on a second shot hides the
+"Creating…" label of the first, though both jobs complete.
+
+---
+
 ## Open
 
 - The reworded image styles (section 4) have not been compared visually with the old ones.

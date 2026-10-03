@@ -39,6 +39,10 @@
   created the button turns into a progress bar with a percentage and the
   elapsed time. The percentage is an estimate learned from earlier runs on
   your machine; the elapsed time is exact.
+- **Fix: the video progress bar stays visible while you work on other shots.**
+  Creating a prompt or an image on another shot used to hide the progress of
+  a running video (the job itself kept running). Only one video is created at
+  a time, so Create video on other shots is disabled meanwhile.
 - **Stop a video generation (Stage 5).** A stop button next to the Create
   video button interrupts the running job on ComfyUI and halts any queue.
   With Kling it only stops waiting — a task Kling accepted still runs and is
