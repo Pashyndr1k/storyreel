@@ -6,7 +6,8 @@ import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import VoiceButton from '../components/VoiceButton.jsx';
 import RandomizationSelector from '../components/RandomizationSelector.jsx';
-import { Stars, Star, Trash } from '../components/icons.jsx';
+import { Stars, Star, Trash, Chevron } from '../components/icons.jsx';
+import { useState } from 'react';
 
 export default function Stage1({ project, update, settings, goNext, onSettings, genLang, scriptStyle }) {
   const { t } = useI18n();
@@ -35,6 +36,14 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
   // copy of the idea (or of the approved plot as it reads now), so it can be
   // returned to after any number of new variations.
   const pinned = project.pinnedIdeas || [];
+  const [openPins, setOpenPins] = useState(() => new Set()); // unfolded pinned rows (ids)
+  const togglePinOpen = (id) =>
+    setOpenPins((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const isPinned = (idea) => pinned.some((p) => p.id === idea.id);
   const togglePin = (idea) =>
     update((p) => {
@@ -55,31 +64,34 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
       ],
     }));
 
-  const ideaCard = (idea, inPinned) => (
-    <div key={idea.id} className={`idea-card ${project.selectedIdeaId === idea.id ? 'selected' : ''} ${inPinned ? 'pinned' : ''}`}>
+  const ideaMods = (idea) =>
+    (idea.modifiers || []).length > 0 && (
+      <p className="idea-mods">
+        🎲{' '}
+        {idea.modifiers
+          .map((m) => (m.name ? `${t(`rand.name_${m.method}`)}: ${m.name}` : t(`rand.name_${m.method}`)))
+          .join(' · ')}
+      </p>
+    );
+
+  const ideaCard = (idea) => (
+    <div key={idea.id} className={`idea-card ${project.selectedIdeaId === idea.id ? 'selected' : ''}`}>
       <div className="idea-head">
         <h3 title={idea.title}>{idea.title}</h3>
         <button
           type="button"
-          className={`idea-pin ${inPinned || isPinned(idea) ? 'on' : ''}`}
-          aria-pressed={inPinned || isPinned(idea)}
-          title={inPinned || isPinned(idea) ? t('tip.s1Unpin') : t('tip.s1Pin')}
-          aria-label={inPinned || isPinned(idea) ? t('tip.s1Unpin') : t('tip.s1Pin')}
+          className={`idea-pin ${isPinned(idea) ? 'on' : ''}`}
+          aria-pressed={isPinned(idea)}
+          title={isPinned(idea) ? t('tip.s1Unpin') : t('tip.s1Pin')}
+          aria-label={isPinned(idea) ? t('tip.s1Unpin') : t('tip.s1Pin')}
           onClick={() => togglePin(idea)}
         >
-          {inPinned ? <Trash size={15} /> : <Star size={16} filled={isPinned(idea)} />}
+          <Star size={16} filled={isPinned(idea)} />
         </button>
       </div>
       <p>{idea.pitch}</p>
       {idea.why_it_works && <p className="why"><em>{idea.why_it_works}</em></p>}
-      {(idea.modifiers || []).length > 0 && (
-        <p className="idea-mods">
-          🎲{' '}
-          {idea.modifiers
-            .map((m) => (m.name ? `${t(`rand.name_${m.method}`)}: ${m.name}` : t(`rand.name_${m.method}`)))
-            .join(' · ')}
-        </p>
-      )}
+      {ideaMods(idea)}
       <button title={t('tip.s1Pick')} className="btn small primary" onClick={() => pickIdea(idea)}>
         {project.selectedIdeaId === idea.id ? t('s1.selected') : t('s1.develop')}
       </button>
@@ -118,7 +130,7 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
       </div>
       <ErrorNote error={error} onSettings={onSettings} />
 
-      {project.ideas.length > 0 && <div className="ideas-grid">{project.ideas.map((idea) => ideaCard(idea, false))}</div>}
+      {project.ideas.length > 0 && <div className="ideas-grid">{project.ideas.map((idea) => ideaCard(idea))}</div>}
 
       {pinned.length > 0 && (
         <>
@@ -126,7 +138,43 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
             <Star size={14} filled /> {t('s1.pinnedTitle')} <span className="chip-count" title={t('ind.count')}>{pinned.length}</span>
           </h3>
           <p className="hint">{t('s1.pinnedHint')}</p>
-          <div className="ideas-grid">{pinned.map((idea) => ideaCard(idea, true))}</div>
+          {/* compact: one row per pinned version — the title; the row unfolds
+              into the full description */}
+          <div className="pinned-list">
+            {pinned.map((idea) => {
+              const isOpen = openPins.has(idea.id);
+              const sel = project.selectedIdeaId === idea.id;
+              return (
+                <div key={idea.id} className={`pinned-row ${sel ? 'selected' : ''} ${isOpen ? 'open' : ''}`}>
+                  <div className="pinned-head">
+                    <button
+                      type="button"
+                      className="pinned-toggle"
+                      aria-expanded={isOpen}
+                      title={isOpen ? t('tip.s1PinFold') : t('tip.s1PinUnfold')}
+                      onClick={() => togglePinOpen(idea.id)}
+                    >
+                      <span className={`prompt-fold ${isOpen ? 'open' : ''}`} aria-hidden="true"><Chevron size={14} /></span>
+                      <span className="pinned-name">{idea.title || t('s1.pinnedUntitled')}</span>
+                    </button>
+                    <button title={t('tip.s1Pick')} className="btn small primary fixedw" onClick={() => pickIdea(idea)}>
+                      {sel ? t('s1.selected') : t('s1.developShort')}
+                    </button>
+                    <button type="button" className="idea-pin" title={t('tip.s1Unpin')} aria-label={t('tip.s1Unpin')} onClick={() => togglePin(idea)}>
+                      <Trash size={15} />
+                    </button>
+                  </div>
+                  {isOpen && (
+                    <div className="pinned-body">
+                      <p>{idea.pitch}</p>
+                      {idea.why_it_works && <p className="why"><em>{idea.why_it_works}</em></p>}
+                      {ideaMods(idea)}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </>
       )}
 

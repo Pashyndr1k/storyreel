@@ -865,7 +865,17 @@ label {
 .idea-pin { flex: none; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 3px; background: transparent; color: var(--muted-2); cursor: pointer; transition: 0.15s; }
 .idea-pin:hover { color: var(--text); border-color: var(--glass-border); }
 .idea-pin.on { color: var(--accent); }
-.idea-card.pinned { border-style: dashed; }
+.pinned-list { display: grid; gap: 6px; margin: 10px 0 16px; }
+.pinned-row { border: 1px solid var(--glass-border-soft); border-radius: 3px; background: var(--glass); }
+.pinned-row.selected { border-color: rgba(var(--accent-rgb), 0.5); background: rgba(var(--accent-rgb), 0.08); }
+.pinned-head { display: flex; align-items: center; gap: 8px; padding: 4px 8px 4px 4px; }
+.pinned-toggle { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 6px; border: none; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.pinned-toggle .prompt-fold { flex: none; pointer-events: none; }
+.pinned-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 13.5px; }
+.pinned-row.open .pinned-name { white-space: normal; }
+.pinned-body { padding: 2px 14px 12px 38px; }
+.pinned-body p { margin: 0 0 8px; font-size: 13.5px; }
+.pinned-body .why { color: var(--muted-2); font-size: 13px; }
 .pinned-title { display: flex; align-items: center; gap: 8px; margin: 22px 0 2px; }
 .pinned-title svg { color: var(--accent); }
 .idea-card.selected { border-color: rgba(var(--accent-rgb), 0.5); background: rgba(var(--accent-rgb), 0.12); }

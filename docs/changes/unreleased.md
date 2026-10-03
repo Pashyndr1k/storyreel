@@ -187,10 +187,14 @@ return to it after any number of regenerations and plot variations.
 **Behaviour.**
 - Every idea card has a star button in its header: click to pin, click again
   to unpin. A pin stores a copy of the idea.
-- A "Pinned versions" section below the idea grid lists the pins (dashed
-  cards, with a count). It stays when "Create/Recreate ideas" replaces the
-  idea cards. Each pinned card has "Develop this version" (same action as on
-  an idea card: sets the approved plot and the selection) and a remove button.
+- A "Pinned versions" section below the idea grid holds the pins as a compact list
+  (with a count): one row per pin showing only its title. Clicking the title
+  (or its chevron) unfolds the row into the full description — pitch, "why it
+  works" and the randomization modifiers; the unfolded state is view state
+  (`openPins`, a Set of ids in the component), not stored. Each row has
+  "Develop" (same action as on an idea card: sets the approved plot and the
+  selection; reads "✓ Selected" for the selected one) and a remove button.
+  The section stays when "Create/Recreate ideas" replaces the idea cards.
 - "Pin this plot" next to "Use my original" saves the approved plot exactly as
   it reads now (including manual edits) as a pin titled "Pinned plot N"; the
   button reads "Plot pinned" and is disabled while that exact text is pinned.
@@ -205,13 +209,16 @@ copied from, so `project.selectedIdeaId` highlights it in both lists.
 **Files.**
 - `src/lib/storage.js`: the field.
 - `src/stages/Stage1.jsx`: `pinned`, `isPinned`, `togglePin`, `pinApproved`,
-  the shared `ideaCard(idea, inPinned)` renderer (replaces the inline card
-  markup), the pinned section, the "Pin this plot" button.
-- `src/styles.css`: `.idea-head`, `.idea-pin`, `.idea-card.pinned`,
-  `.pinned-title`.
+  `ideaCard(idea)` and `ideaMods(idea)` renderers (replace the inline card
+  markup), the pinned list (`openPins`, `togglePinOpen`), the "Pin this plot"
+  button.
+- `src/styles.css`: `.idea-head`, `.idea-pin`, `.pinned-title`,
+  `.pinned-list`, `.pinned-row`, `.pinned-head`, `.pinned-toggle`,
+  `.pinned-name`, `.pinned-body`.
 - i18n: `s1.pinnedTitle`, `s1.pinnedHint`, `s1.pinPlot`, `s1.plotPinned`,
   `s1.pinnedPlotTitle`, `tip.s1Pin`, `tip.s1Unpin`, `tip.s1PinPlot`,
-  `tip.s1PlotPinned`.
+  `tip.s1PlotPinned`, `s1.developShort`, `s1.pinnedUntitled`,
+  `tip.s1PinUnfold`, `tip.s1PinFold`.
 
 **Verified.** In the dev app with a stubbed text model: pin, regenerate ideas
 (pin stays), develop the pinned version, pin the edited plot, unpin.
