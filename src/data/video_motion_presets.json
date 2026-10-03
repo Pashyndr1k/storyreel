@@ -13,7 +13,7 @@
   },
   {
     "id": "motion_03",
-    "name": "3D Pixar Animation",
+    "name": "3D Family Animation",
     "vibe": "Expressive, bouncy, theatrical gestures.",
     "prompt_injection": "Smooth, gracefully curving camera moves. Exaggerated squash-and-stretch physics with bouncy, springy character motion; highly expressive faces and broad theatrical gestures. Quiet beats filled with micro-actions — blinks, glances, small fidgets."
   },
@@ -37,7 +37,7 @@
   },
   {
     "id": "motion_07",
-    "name": "MTV Retro",
+    "name": "Retro Music Video",
     "vibe": "Frenetic, chaotic, overlapping speech, high energy.",
     "prompt_injection": "Chaotic handheld camera with rapid whip pans between subjects. High-energy frenetic movement — constant pacing, fidgeting, restless gestures — in a breathless rhythm with no still moments."
   },
@@ -49,7 +49,7 @@
   },
   {
     "id": "motion_09",
-    "name": "Action Camera (GoPro)",
+    "name": "Action Camera",
     "vibe": "Breathless, athletic, high-impact physics.",
     "prompt_injection": "First-person body-mounted action camera with high-frequency vibration and aggressive momentum. Athletic, urgent motion — sprinting, climbing, ducking — in continuous physical exertion. Heavy breathing and wind roar over the ambience."
   },

@@ -15,7 +15,7 @@ import { SHORT_DRAMA_STYLE, SHORT_DRAMA_STYLE_NAME, SHORT_DRAMA_V6_REWRITES } fr
 
 const STYLES_KEY = 'storyreel.styles.v1';
 const STYLES_BACKUP_KEY = 'storyreel.styles.corrupt'; // last unreadable value, for recovery
-export const STYLES_VERSION = 6;
+export const STYLES_VERSION = 7;
 export const STYLE_CATEGORIES = ['script', 'image', 'video'];
 
 // v2 built-ins, imported from text_styles.pdf (script) and visual styles.pdf
@@ -33,26 +33,26 @@ const BUILTINS_V2 = {
     { id: 'bi2.script.visual_poem', builtin: true, name: 'Visual Poem / Arthouse', instructions: 'Write as an experimental visual poem. Disconnect literal action from the voiceover. Focus on associative imagery, elemental motifs (water, fire, shadow), and rhythmic pacing. Shot dynamics: non-linear editing, dreamlike slow-motion takes, experimental juxtaposition of unrelated imagery.' },
   ],
   image: [
-    { id: 'bi2.image.panavision_70s', builtin: true, name: '1970s Panavision', instructions: 'shot on 35mm film, Panavision anamorphic lens, warm golden halation, slight organic film grain, desaturated vintage colors. Avoid: digital noise reduction, pristine, 8k, modern, hyper-detailed, clean digital artifacts.' },
+    { id: 'bi2.image.panavision_70s', builtin: true, name: '1970s Anamorphic Film', instructions: 'shot on 35mm film, vintage anamorphic lens, warm golden halation, slight organic film grain, desaturated vintage colors. Avoid: digital noise reduction, pristine, 8k, modern, hyper-detailed, clean digital artifacts.' },
     { id: 'bi2.image.cyberpunk_neon', builtin: true, name: 'Cyberpunk Neon', instructions: 'cinematic neo-noir, high contrast chiaroscuro lighting, heavy neon reflections on wet surfaces, 50mm f/1.8, cool blue and magenta grading. Avoid: daylight, flat lighting, natural sunlight, pastel, soft focus, sunny, cheerful.' },
     { id: 'bi2.image.doc_handheld', builtin: true, name: 'Documentary Handheld', instructions: 'documentary style, handheld camera movement, natural ambient lighting, 16mm film stock, unpolished realism, deep depth of field. Avoid: studio lighting, perfect composition, posed, high fashion, cinematic 3-point lighting.' },
     { id: 'bi2.image.clean_corporate', builtin: true, name: 'Clean Corporate Modern', instructions: 'high-key lighting, soft diffused shadows, minimalist composition, pristine depth of field, 85mm lens f/2.8, hyper-crisp 8k resolution, neutral color balance. Avoid: film grain, dirt, grit, chromatic aberration, vignette, vintage, messy, dark.' },
     { id: 'bi2.image.gothic_fantasy', builtin: true, name: 'Gothic / Dark Fantasy', instructions: 'low-key dramatic lighting, deep shadows, desaturated cool tones, ethereal atmosphere, heavy volumetric fog, 24mm wide angle. Avoid: bright, cheerful, high-key lighting, saturated, neon, daytime, sunny, warm tones.' },
-    { id: 'bi2.image.french_new_wave', builtin: true, name: 'French New Wave', instructions: 'black and white 35mm film, high contrast Kodak Tri-X, handheld 35mm lens, naturalistic window light, intimate composition, vintage indie film. Avoid: color, modern lighting, high budget, artificial lighting, saturated, hyper-polished.' },
-    { id: 'bi2.image.imax_epic', builtin: true, name: 'IMAX Epic Sci-Fi', instructions: 'IMAX 70mm film, sweeping anamorphic framing, atmospheric haze, razor-sharp details, teal and orange cinematic color grading, directed by Denis Villeneuve. Avoid: low resolution, grainy, claustrophobic framing, flat lighting, amateur video, vintage.' },
-    { id: 'bi2.image.sun_nostalgia', builtin: true, name: 'Sun-Drenched Nostalgia', instructions: 'golden hour lighting, warm pastel color palette, soft focus vintage lens, dreamy bokeh, Kodak Portra 400 film stock, romantic nostalgic atmosphere. Avoid: dark, moody, high contrast, harsh shadows, cold blue tones, cyberpunk, grim.' },
+    { id: 'bi2.image.french_new_wave', builtin: true, name: 'French New Wave', instructions: 'black and white 35mm film, high contrast fast black-and-white film stock, handheld 35mm lens, naturalistic window light, intimate composition, vintage indie film. Avoid: color, modern lighting, high budget, artificial lighting, saturated, hyper-polished.' },
+    { id: 'bi2.image.imax_epic', builtin: true, name: 'Large-Format Epic Sci-Fi', instructions: 'large-format 70mm film, sweeping anamorphic framing, atmospheric haze, razor-sharp details, teal and orange cinematic color grading, monumental scale, austere minimalist production design. Avoid: low resolution, grainy, claustrophobic framing, flat lighting, amateur video, vintage.' },
+    { id: 'bi2.image.sun_nostalgia', builtin: true, name: 'Sun-Drenched Nostalgia', instructions: 'golden hour lighting, warm pastel color palette, soft focus vintage lens, dreamy bokeh, warm fine-grain colour negative film stock, romantic nostalgic atmosphere. Avoid: dark, moody, high contrast, harsh shadows, cold blue tones, cyberpunk, grim.' },
     { id: 'bi2.image.fashion_editorial', builtin: true, name: 'High-Fashion Editorial', instructions: 'studio fashion lighting, harsh directional strobe, deep contrast, vibrant stylized color grading, 100mm macro lens, ultra-detailed skin textures. Avoid: candid, unposed, natural ambient lighting, messy, amateur, low resolution, soft focus.' },
-    { id: 'bi2.image.surreal_pop', builtin: true, name: 'Surreal Pop', instructions: 'extreme symmetrical framing, flat space composition, meticulously curated pastel color palette, soft natural lighting, wide-angle lens, Wes Anderson style. Avoid: handheld movement, gritty, dark noir, messy composition, realistic stark lighting, asymmetrical.' },
-    { id: 'bi2.image.pixar_3d', builtin: true, name: 'Pixar 3D Magic', instructions: '3D animation, Disney Pixar style, soft subsurface scattering skin, expressive stylized features, rich saturated colors, cinematic clay-shader lighting. Avoid: photorealistic, real human, live action, gritty, high-contrast, edge-lighting, rough textures, messy sketching.' },
-    { id: 'bi2.image.retro_90s_anime', builtin: true, name: 'Retro 90s Anime', instructions: '90s anime style, vintage hand-drawn cel animation, retro aesthetic, distinct line art, flat colors, soft film grain, nostalgic colors, Studio Ghibli aesthetic. Avoid: 3D render, CGI, digital painting, modern glossy shading, vector art, photorealism, depth of field.' },
-    { id: 'bi2.image.modern_anime', builtin: true, name: 'Modern Cinematic Anime', instructions: 'modern anime style, stunning cinematic lighting, hyper-detailed sky and environment, lens flares, vibrant color grading, intricate linework, breathtaking composition (Makoto Shinkai / CoMix Wave style). Avoid: retro anime, old cel animation, 3D, pixelated, rough sketch, monotone, minimal detail.' },
+    { id: 'bi2.image.surreal_pop', builtin: true, name: 'Surreal Pop', instructions: 'extreme symmetrical framing, flat space composition, meticulously curated pastel color palette, soft natural lighting, wide-angle lens, deadpan storybook whimsy. Avoid: handheld movement, gritty, dark noir, messy composition, realistic stark lighting, asymmetrical.' },
+    { id: 'bi2.image.pixar_3d', builtin: true, name: 'Polished 3D Family Animation', instructions: 'polished feature-film 3D animation, warm family-film look, soft subsurface scattering skin, expressive stylized features, rich saturated colors, cinematic clay-shader lighting. Avoid: photorealistic, real human, live action, gritty, high-contrast, edge-lighting, rough textures, messy sketching.' },
+    { id: 'bi2.image.retro_90s_anime', builtin: true, name: 'Retro 90s Anime', instructions: '90s anime style, vintage hand-drawn cel animation, retro aesthetic, distinct line art, flat colors, soft film grain, nostalgic colors, gentle hand-painted pastoral backgrounds. Avoid: 3D render, CGI, digital painting, modern glossy shading, vector art, photorealism, depth of field.' },
+    { id: 'bi2.image.modern_anime', builtin: true, name: 'Modern Cinematic Anime', instructions: 'modern anime style, stunning cinematic lighting, hyper-detailed sky and environment, lens flares, vibrant color grading, intricate linework, breathtaking composition, luminous photoreal backgrounds. Avoid: retro anime, old cel animation, 3D, pixelated, rough sketch, monotone, minimal detail.' },
     { id: 'bi2.image.claymation', builtin: true, name: 'Claymation / Stop-Motion', instructions: 'claymation style, stop-motion animation, visible thumbprint textures, tactile modeling clay surfaces, slightly uneven sculpting, mini studio lighting. Avoid: smooth 3D render, pristine CGI, photorealistic human, fluid digital movement, vector, flat illustration.' },
     { id: 'bi2.image.vintage_comic', builtin: true, name: 'Vintage Comic Book', instructions: 'vintage comic book illustration, hand-inked linework, classic ben-day dots, halftone shading, retro color printing, distressed paper texture, dynamic framing. Avoid: 3D, smooth gradient shading, photo, CGI, high-end digital painting, clean vector line art.' },
-    { id: 'bi2.image.spiderverse', builtin: true, name: 'Stylized "Spider-Verse" 3D', instructions: 'stylized 3D animation, comic book overlay, chromatic aberration, halftone textures, hand-painted textures, dynamic screen-tones, stylized motion blur. Avoid: standard 3D render, generic CGI, photorealism, flat 2D, smooth shading, boring composition.' },
+    { id: 'bi2.image.spiderverse', builtin: true, name: 'Stylized Comic-Book 3D', instructions: 'stylized 3D animation, comic book overlay, chromatic aberration, halftone textures, hand-painted textures, dynamic screen-tones, stylized motion blur. Avoid: standard 3D render, generic CGI, photorealism, flat 2D, smooth shading, boring composition.' },
     { id: 'bi2.image.whimsical_watercolor', builtin: true, name: 'Whimsical Watercolor', instructions: 'whimsical watercolor animation, soft bleeding ink edges, visible textured paper grain, pastel color palette, hand-drawn sketch overlay, charming indie style. Avoid: sharp lines, clean vectors, 3D render, neon, high contrast, dark noir, photorealistic.' },
     { id: 'bi2.image.pixel_art', builtin: true, name: 'Chunky Retro Pixel Art', instructions: 'high-quality pixel art style, isometric view, vibrant 32-bit color palette, crisp grid placement, retro video game aesthetic, clean pixel clusters. Avoid: smooth curves, anti-aliasing, 3D render, gradient shading, photographic blur, blurry lines.' },
     { id: 'bi2.image.mecha_anime', builtin: true, name: 'Cyberpunk Mecha Anime', instructions: 'cyberpunk mecha anime, hand-drawn machinery, intricate mechanical details, harsh neon sparks, smoke and debris, dark moody industrial tones, grit (80s/90s OVA style). Avoid: cute anime, chibi, clean 3D render, friendly cartoon, bright pastel, corporate minimalism.' },
-    { id: 'bi2.image.gothic_stopmotion', builtin: true, name: 'Gothic Stop-Motion', instructions: 'dark gothic stop-motion style, elongated surreal character proportions, burlap and stitch textures, moody dramatic shadows, desaturated Victorian color palette (Tim Burton / Henry Selick style). Avoid: bright, cheerful, corporate, smooth Pixar 3D, colorful, shiny plastic, real human.' },
+    { id: 'bi2.image.gothic_stopmotion', builtin: true, name: 'Gothic Stop-Motion', instructions: 'dark gothic stop-motion style, elongated surreal character proportions, burlap and stitch textures, moody dramatic shadows, desaturated Victorian color palette, macabre handmade puppet look. Avoid: bright, cheerful, corporate, smooth glossy 3D, colorful, shiny plastic, real human.' },
   ],
   video: [],
 };
@@ -125,6 +125,28 @@ const BUILTINS_V5 = {
   script: [{ id: 'bi5.script.short_drama', builtin: true, name: SHORT_DRAMA_STYLE_NAME, instructions: SHORT_DRAMA_STYLE }],
   image: [],
   video: [],
+};
+
+// v7: brand names, personal names and film titles were taken out of the
+// factory styles and replaced with descriptive wording. The v6 factory titles
+// and texts are frozen here so the migration rewrites a style ONLY where the
+// user never edited that field.
+const V6_FACTORY_NAMED = {
+  'bi2.image.panavision_70s': { name: '1970s Panavision', instructions: 'shot on 35mm film, Panavision anamorphic lens, warm golden halation, slight organic film grain, desaturated vintage colors. Avoid: digital noise reduction, pristine, 8k, modern, hyper-detailed, clean digital artifacts.' },
+  'bi2.image.imax_epic': { name: 'IMAX Epic Sci-Fi', instructions: 'IMAX 70mm film, sweeping anamorphic framing, atmospheric haze, razor-sharp details, teal and orange cinematic color grading, directed by Denis Villeneuve. Avoid: low resolution, grainy, claustrophobic framing, flat lighting, amateur video, vintage.' },
+  'bi2.image.french_new_wave': { name: 'French New Wave', instructions: 'black and white 35mm film, high contrast Kodak Tri-X, handheld 35mm lens, naturalistic window light, intimate composition, vintage indie film. Avoid: color, modern lighting, high budget, artificial lighting, saturated, hyper-polished.' },
+  'bi2.image.sun_nostalgia': { name: 'Sun-Drenched Nostalgia', instructions: 'golden hour lighting, warm pastel color palette, soft focus vintage lens, dreamy bokeh, Kodak Portra 400 film stock, romantic nostalgic atmosphere. Avoid: dark, moody, high contrast, harsh shadows, cold blue tones, cyberpunk, grim.' },
+  'bi2.image.surreal_pop': { name: 'Surreal Pop', instructions: 'extreme symmetrical framing, flat space composition, meticulously curated pastel color palette, soft natural lighting, wide-angle lens, Wes Anderson style. Avoid: handheld movement, gritty, dark noir, messy composition, realistic stark lighting, asymmetrical.' },
+  'bi2.image.pixar_3d': { name: 'Pixar 3D Magic', instructions: '3D animation, Disney Pixar style, soft subsurface scattering skin, expressive stylized features, rich saturated colors, cinematic clay-shader lighting. Avoid: photorealistic, real human, live action, gritty, high-contrast, edge-lighting, rough textures, messy sketching.' },
+  'bi2.image.retro_90s_anime': { name: 'Retro 90s Anime', instructions: '90s anime style, vintage hand-drawn cel animation, retro aesthetic, distinct line art, flat colors, soft film grain, nostalgic colors, Studio Ghibli aesthetic. Avoid: 3D render, CGI, digital painting, modern glossy shading, vector art, photorealism, depth of field.' },
+  'bi2.image.modern_anime': { name: 'Modern Cinematic Anime', instructions: 'modern anime style, stunning cinematic lighting, hyper-detailed sky and environment, lens flares, vibrant color grading, intricate linework, breathtaking composition (Makoto Shinkai / CoMix Wave style). Avoid: retro anime, old cel animation, 3D, pixelated, rough sketch, monotone, minimal detail.' },
+  'bi2.image.spiderverse': { name: 'Stylized "Spider-Verse" 3D', instructions: 'stylized 3D animation, comic book overlay, chromatic aberration, halftone textures, hand-painted textures, dynamic screen-tones, stylized motion blur. Avoid: standard 3D render, generic CGI, photorealism, flat 2D, smooth shading, boring composition.' },
+  'bi2.image.gothic_stopmotion': { name: 'Gothic Stop-Motion', instructions: 'dark gothic stop-motion style, elongated surreal character proportions, burlap and stitch textures, moody dramatic shadows, desaturated Victorian color palette (Tim Burton / Henry Selick style). Avoid: bright, cheerful, corporate, smooth Pixar 3D, colorful, shiny plastic, real human.' },
+};
+const V6_VIDEO_NAMES = {
+  'bi3.video.motion_03': '3D Pixar Animation',
+  'bi3.video.motion_07': 'MTV Retro',
+  'bi3.video.motion_09': 'Action Camera (GoPro)',
 };
 
 function addMissingBuiltins(styles, additions) {
@@ -220,6 +242,27 @@ function migrate(fromVersion, styles) {
         st.id === 'bi5.script.short_drama'
           ? { ...st, instructions: SHORT_DRAMA_V6_REWRITES.reduce((txt, [a, b]) => txt.split(a).join(b), st.instructions || '') }
           : st
+      ),
+    };
+  }
+  if (fromVersion < 7) {
+    // v7: descriptive wording instead of brand / personal names (see V6_FACTORY_NAMED).
+    const freshImage = new Map(BUILTINS_V2.image.map((st) => [st.id, st]));
+    const freshVideo = new Map(BUILTINS_V3.video.map((st) => [st.id, st]));
+    s = {
+      ...s,
+      image: (s.image || []).map((st) => {
+        const old = V6_FACTORY_NAMED[st.id];
+        const fresh = freshImage.get(st.id);
+        if (!old || !fresh) return st;
+        return {
+          ...st,
+          name: st.name === old.name ? fresh.name : st.name,
+          instructions: (st.instructions || '') === old.instructions ? fresh.instructions : st.instructions,
+        };
+      }),
+      video: (s.video || []).map((st) =>
+        st.id in V6_VIDEO_NAMES && st.name === V6_VIDEO_NAMES[st.id] && freshVideo.has(st.id) ? { ...st, name: freshVideo.get(st.id).name } : st
       ),
     };
   }

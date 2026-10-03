@@ -126,39 +126,61 @@ LF in the same change.
 
 ---
 
-## 4. Style library review for protected names (no code change)
+## 4. Style library: protected names replaced with descriptive wording
 
 **Request.** Check all library styles (script, image, video) for brand names,
-personal names, trademarks and film or game characters.
+personal names, trademarks and film or game characters; then replace the ones
+found with descriptive wording.
 
-**Result.** Script styles: none. Stage 1 personas (`auteur_personas.json`):
-none. Image styles and video presets that contain such names:
+**Review result.** Script styles and the Stage 1 personas
+() contained none. Ten image styles and three video
+preset titles did.
 
-| Style id | Where | Name found |
-|---|---|---|
-| `bi2.image.panavision_70s` | title and text | Panavision |
-| `bi2.image.imax_epic` | title and text | IMAX; "directed by Denis Villeneuve" |
-| `bi2.image.french_new_wave` | text | Kodak Tri-X |
-| `bi2.image.sun_nostalgia` | text | Kodak Portra 400 |
-| `bi2.image.surreal_pop` | text | Wes Anderson |
-| `bi2.image.pixar_3d` | title and text | Pixar; Disney Pixar |
-| `bi2.image.retro_90s_anime` | text | Studio Ghibli |
-| `bi2.image.modern_anime` | text | Makoto Shinkai; CoMix Wave |
-| `bi2.image.spiderverse` | title | Spider-Verse |
-| `bi2.image.gothic_stopmotion` | text | Tim Burton; Henry Selick; "Pixar" in the avoid list |
-| `bi3.video.motion_03` | title | Pixar |
-| `bi3.video.motion_07` | title | MTV |
-| `bi3.video.motion_09` | title | GoPro |
+**Behaviour.** Factory titles and texts changed as follows (style ids are
+unchanged, so projects that selected these styles stay linked):
 
-Nothing was changed. Replacing them needs a styles migration (v7) that swaps
-the factory text only where the user has not edited it, as v4 did for the
-video presets. Styles the user added in their own installation live in that
-machine's local storage and were not reviewed.
+| Style id | Change |
+|---|---|
+|  | title "1970s Panavision" → "1970s Anamorphic Film"; "Panavision anamorphic lens" → "vintage anamorphic lens" |
+|  | title "IMAX Epic Sci-Fi" → "Large-Format Epic Sci-Fi"; "IMAX 70mm film" → "large-format 70mm film"; "directed by Denis Villeneuve" → "monumental scale, austere minimalist production design" |
+|  | "high contrast Kodak Tri-X" → "high contrast fast black-and-white film stock" |
+|  | "Kodak Portra 400 film stock" → "warm fine-grain colour negative film stock" |
+|  | "Wes Anderson style" → "deadpan storybook whimsy" |
+|  | title "Pixar 3D Magic" → "Polished 3D Family Animation"; "3D animation, Disney Pixar style," → "polished feature-film 3D animation, warm family-film look," |
+|  | "Studio Ghibli aesthetic" → "gentle hand-painted pastoral backgrounds" |
+|  | "(Makoto Shinkai / CoMix Wave style)" → "luminous photoreal backgrounds" |
+|  | title 'Stylized "Spider-Verse" 3D' → "Stylized Comic-Book 3D" |
+|  | "(Tim Burton / Henry Selick style)" → "macabre handmade puppet look"; "smooth Pixar 3D" → "smooth glossy 3D" in the avoid list |
+|  | title "3D Pixar Animation" → "3D Family Animation" |
+|  | title "MTV Retro" → "Retro Music Video" |
+|  | title "Action Camera (GoPro)" → "Action Camera" |
+
+Existing installations are migrated on start: a style's title is replaced only
+if it still equals the old factory title, and its text only if it still equals
+the old factory text. Anything the user edited is left as it is, as are the
+user's own styles.
+
+**Data model.** . Migration v7 in .
+
+**Files.**
+- : new texts in ; frozen old values in
+   (image: title + text) and  (video
+  titles) — the old names stay in the source only as these comparison strings;
+  migration v7.
+- : the three preset titles.
+
+**Verified.** In the dev app: a stored v6 library upgrades to v7 with no
+remaining names; an edited title or text is kept; a user style is untouched.
+Note for dev work: editing  while the dev page is open hot-reloads
+the module and can persist the page's old in-memory library under the new
+version number — reload with the stored version set back to test a migration.
+The reworded styles were not test-rendered; the looks may shift slightly
+without the names.
 
 ---
 
 ## Open
 
-- Decide whether the names in section 4 are replaced with descriptive wording.
+- The reworded image styles (section 4) have not been compared visually with the old ones.
 - The story text is assembled, not rewritten; if a literary rewrite by the
   text model is wanted, it is a separate feature.

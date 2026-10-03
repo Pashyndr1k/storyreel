@@ -13,6 +13,11 @@
   outlines are written for those numbers. The Short Drama Series rules no
   longer state a fixed episode length.
 - **Stage 4: the "Storyboard preview & timeline" section is hidden.**
+- **Style library without brand or personal names.** Ten image styles and
+  three video presets named camera and film brands, studios, directors or a
+  film title; those are replaced with descriptive wording (for example
+  "Pixar 3D Magic" is now "Polished 3D Family Animation"). Styles you edited
+  and your own styles are not touched.
 - **Change companions.** Technical descriptions of every change are kept per
   version in docs/changes/.
 
