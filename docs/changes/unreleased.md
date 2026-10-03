@@ -311,8 +311,8 @@ deleting a generated video, like deleting a generated image.
   before — their video is the take lead's). It no longer creates first frames;
   the workbench's own "Create scene media" still does images + videos for one
   scene.
-- Stop, progress (`Stop a/b`), the finish toasts and the stop on a content
-  policy refusal are unchanged.
+- The finish toasts and the stop on a content policy refusal are unchanged
+  (the Stop state itself is replaced in section 10).
 
 **Behaviour — delete video.** The Video tab's button row shows a trash button
 after the upload button when the shot has a video. After a confirmation it
@@ -437,6 +437,41 @@ starting a job from the button, the stop button appearing, and an aborted wait
 that issues `/interrupt` for a running job and a queue delete for a
 pending one, raises `AbortError`, and the timeout constant is 60 minutes.
 Not tested against a real ComfyUI job or a real Kling task.
+
+---
+
+## 10. Stage 5: auto queue button — "Abort creation"
+
+**Request.** When the auto queue starts, switch its button to an "Abort
+creation" state so the user can interrupt the automatic generation.
+
+**Behaviour.**
+- While the auto queue runs, the "Auto queue" button reads "Abort creation"
+  (stop icon, danger style, same fixed width — the button is now
+  `fixedw-lg`); the progress count `a/b` moved out of the label into a badge
+  beside it.
+- Clicking it asks for confirmation, then aborts: no further jobs are started
+  **and the video being created is interrupted** (ComfyUI: interrupt / remove
+  from the queue; Kling: only the wait ends — see section 9). Before, "Stop"
+  let the running job finish first.
+- An interrupted job is not counted as finished: the scene queue breaks before
+  incrementing its counter, so the closing toast ("Auto queue aborted after
+  N item(s)") counts completed videos only.
+
+**Files.**
+- `src/stages/Stage6.jsx`: `cancelAutoQueue` confirms first; the button
+  markup (label, class, the count badge).
+- `src/stages/Stage5.jsx`: the queue API's `cancel` also calls
+  `vidAbort.current?.abort()`; `processSceneMedia` breaks after an
+  interrupted `genVideo`.
+- i18n: new `s6.autoQueueAbort`, `s6.autoQueueAbortTip`,
+  `s6.autoQueueAbortConfirm`, `ind.autoQueueCount`; removed
+  `s6.autoQueueStop`, `s6.autoQueueStopTip`; reworded `s6.autoQueueStopped`.
+
+**Verified.** In the dev app with every ComfyUI request stubbed: starting the
+queue switches the button to "Abort creation" with the count badge; aborting
+issues the interrupt, the button returns to "Auto queue", and the toast
+counts 0 finished. No real job was run.
 
 ---
 

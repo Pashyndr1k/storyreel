@@ -43,6 +43,9 @@
   video button interrupts the running job on ComfyUI and halts any queue.
   With Kling it only stops waiting — a task Kling accepted still runs and is
   billed there.
+- **Auto queue: "Abort creation".** While the auto queue runs, its button
+  reads "Abort creation" with the progress count beside it. Aborting now
+  interrupts the video being created instead of waiting for it to finish.
 - **Video timeout raised to 60 minutes** (was 15 for ComfyUI, 25 for Kling).
 - **Change companions.** Technical descriptions of every change are kept per
   version in docs/changes/.

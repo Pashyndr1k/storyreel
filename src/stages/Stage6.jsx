@@ -756,7 +756,9 @@ export default function Stage6({ project, update, settings, ...workbench }) {
     setQueue(null);
     showToast(queueCancel.current ? t('s6.autoQueueStopped', { n: done }) : t('s6.autoQueueDone', { n: done }));
   };
+  // Abort: no further jobs are started and the one on the GPU is interrupted.
   const cancelAutoQueue = () => {
+    if (!window.confirm(t('s6.autoQueueAbortConfirm'))) return;
     queueCancel.current = true;
     queueApi.current?.cancel?.();
   };
@@ -2368,17 +2370,20 @@ export default function Stage6({ project, update, settings, ...workbench }) {
         <button title={t('tip.render')} className="btn small fixedw" disabled={rendering} onClick={doRender}>
           <Download size={14} />{rendering ? t('s6.rendering') : t('s6.render')}
         </button>
-        {/* Auto queue: every missing first frame and video, one after another */}
-        {/* One dual-state button: Auto queue → Stop a/b (halts after the
-            job currently on the GPU finishes) */}
+        {/* Auto queue: the missing videos of every ready scene, one after another */}
+        {/* One dual-state button: Auto queue → Abort creation (interrupts the
+            job on the GPU and starts no more); the count sits beside it */}
         <button
-          className={`btn small fixedw ${queue ? 'danger' : ''}`}
+          className={`btn small fixedw-lg ${queue ? 'danger' : ''}`}
           disabled={rendering || (!queue && !queueTotal)}
-          title={queue ? t('s6.autoQueueStopTip') : queueReason}
+          title={queue ? t('s6.autoQueueAbortTip') : queueReason}
           onClick={queue ? cancelAutoQueue : runAutoQueue}
         >
-          {queue ? <><StopSq size={14} />{t('s6.autoQueueStop', { a: queue.a, b: queue.b })}</> : <><Zap size={14} />{t('s6.autoQueue')}</>}
+          {queue ? <><StopSq size={14} />{t('s6.autoQueueAbort')}</> : <><Zap size={14} />{t('s6.autoQueue')}</>}
         </button>
+        {queue && (
+          <span className="total-badge" title={t('ind.autoQueueCount')}>{queue.a}/{queue.b}</span>
+        )}
         <button title={t('tip.music')}
           className="btn small"
           disabled={total <= 0}

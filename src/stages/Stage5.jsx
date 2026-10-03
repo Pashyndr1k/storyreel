@@ -1133,6 +1133,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         (cur.shotImages || {})[shot.id]
       ) {
         await genVideo(shot, i);
+        if (mediaCancel.current) break; // interrupted, not finished
         done++;
         setMediaProg({ a: done, b: planned });
         onStep?.();
@@ -1154,8 +1155,10 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     onQueueApi?.({
       sceneId: scene?.id || null,
       run: processSceneMedia,
+      // abort from the assembly stage: no more jobs, and interrupts the job on the GPU
       cancel: () => {
         mediaCancel.current = true;
+        vidAbort.current?.abort();
       },
     });
   });
