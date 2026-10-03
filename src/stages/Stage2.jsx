@@ -16,6 +16,7 @@ import VoiceButton from '../components/VoiceButton.jsx';
 import LibraryPicker from '../components/LibraryPicker.jsx';
 import { StylePicker } from '../components/StyleControls.jsx';
 import { RestoreIcon, Upload, Layers } from '../components/icons.jsx';
+import { isSeriesMaster, clampEpisodes, clampEpisodeSec, episodeRange, SERIES_MIN_EPISODES, SERIES_MAX_EPISODES, EPISODE_SEC_MIN, EPISODE_SEC_MAX } from '../lib/series.js';
 
 export default function Stage2({ project, update, rawUpdate, settings, goNext, onSettings, genLang, styles, scriptStyle, imageStyle, imageStylePlus = false, library, libUpsert }) {
   const [pickFor, setPickFor] = useState(null); // character id awaiting a library pick
@@ -239,6 +240,45 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
         <summary>{t('s2.approvedPlot')}</summary>
         <p>{project.approvedPlot}</p>
       </details>
+
+      {isSeriesMaster(project) && (
+        <div className="series-setup">
+          <label htmlFor="s2-episodes">
+            <span>{t('new.episodes')}</span>
+            <input
+              id="s2-episodes"
+              key={`n${project.episodeCount}`}
+              type="number"
+              className="episodes-input"
+              title={t('tip.episodes')}
+              min={SERIES_MIN_EPISODES}
+              max={SERIES_MAX_EPISODES}
+              defaultValue={project.episodeCount}
+              onBlur={(e) => rawUpdate({ episodeCount: clampEpisodes(e.target.value) })}
+            />
+          </label>
+          <label htmlFor="s2-episode-sec">
+            <span>{t('ser.episodeLen')}</span>
+            <input
+              id="s2-episode-sec"
+              key={`d${project.episodeSeconds}`}
+              type="number"
+              className="episodes-input"
+              title={t('tip.episodeLen')}
+              min={EPISODE_SEC_MIN}
+              max={EPISODE_SEC_MAX}
+              step={5}
+              defaultValue={clampEpisodeSec(project.episodeSeconds)}
+              onBlur={(e) => rawUpdate({ episodeSeconds: clampEpisodeSec(e.target.value) })}
+            />
+            <span className="unit">{t('s3.sec')}</span>
+          </label>
+          <span className="total-badge" title={t('ind.serTotal')}>
+            {t('ser.totalRun', { m: Math.round((clampEpisodes(project.episodeCount) * (episodeRange(project).min + episodeRange(project).max)) / 2 / 60) })}
+          </span>
+          <p className="hint">{t('ser.setupHint', { a: episodeRange(project).min, b: episodeRange(project).max })}</p>
+        </div>
+      )}
 
       <div className="row">
         <button title={t('tip.s2Generate')} className="btn primary" disabled={busy} onClick={generate}>

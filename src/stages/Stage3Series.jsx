@@ -11,8 +11,7 @@ import {
   SEGMENT_MIN,
   SEGMENT_MAX,
   SEGMENT_DEFAULT,
-  EPISODE_MIN_SEC,
-  EPISODE_MAX_SEC,
+  episodeRange,
 } from '../lib/series.js';
 import { useI18n } from '../lib/i18n.js';
 import ErrorNote from '../components/ErrorNote.jsx';
@@ -171,7 +170,7 @@ export default function Stage3Series({ project, update, settings, onSettings, on
         )}
         <StyleChip project={project} styles={styles} cat="script" onClick={onProjectSettings} />
         <span className="total-badge" title={t('ind.serEpisodes')}>
-          {t('ser.badge', { n: total, a: EPISODE_MIN_SEC, b: EPISODE_MAX_SEC })}
+          {t('ser.badge', { n: total, a: episodeRange(project).min, b: episodeRange(project).max })}
         </span>
         {arcs.length > 0 && (
           <span className={`total-badge ${missing ? 'over' : ''}`} title={t('ind.serWritten')}>

@@ -1298,6 +1298,9 @@ label {
 .type-cards { display: flex; gap: 8px; flex-wrap: wrap; }
 .type-cards .type-card { flex: 1 1 110px; }
 input.episodes-input { width: 110px; }
+.series-setup { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin: 12px 0 4px; }
+.series-setup label { display: inline-flex; align-items: center; gap: 8px; margin: 0; }
+.series-setup .hint { flex: 1 1 100%; margin: 0; }
 
 /* ---- short-drama series: the Stage 3 plan --------------------------------- */
 .arc-card { margin: 12px 0; border: 1px solid var(--glass-border); border-radius: 3px; background: var(--glass); }

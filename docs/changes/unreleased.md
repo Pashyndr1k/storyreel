@@ -1,0 +1,164 @@
+# Unreleased (after v2.11.0)
+
+Base: tag `v2.11.0` (commit `226abd8`). All work below is on `main`, local.
+
+Conventions that apply to every change: UI strings exist in EN/RU/UA in
+`src/lib/i18n.js` (`const en`, `const ru`, `const uk`); every button, header
+and indicator carries a hover hint (`title`); buttons are three words at most.
+
+---
+
+## 1. Script export (Stage 4 and Project settings)
+
+**Request.** Once every scene has its shot breakdown, offer a "Script Export"
+button at Stage 4 and in Project settings. Two formats, chosen by checkboxes
+(either or both): a book-style text (synopsis first, then the story with no
+technical, camera or sound notes) and a JSON file with everything from Stage 4.
+
+**Behaviour.**
+- Button "Export script" in the Stage 4 action row (after the batch progress
+  badge) and a "Script export" section in the Project settings modal. Both are
+  disabled until `scriptReady(project)` — every outline scene has at least one
+  shot.
+- The button opens `ScriptExportModal`: two checkboxes, both ticked by
+  default; "Save" is disabled when neither is ticked. Each ticked format is
+  saved as a browser download (`<title>-script.md`, `<title>-script.json`).
+- Story text (`buildBookText`): `# title`, `## Synopsis` + the Stage 2
+  synopsis, a `* * *` rule, then per scene `## scene title` followed by each
+  shot's action as a paragraph and each line of its dialogue as its own
+  paragraph. Shot type, location, durations and notes are omitted. Production
+  cues inside an action line are stripped: bracketed or parenthesised groups
+  starting with a cue word (`[camera …]`, `(SFX: …)`) and label sentences
+  (`Camera: …`, `Sound: …`). The cue-word list is `CUE_WORDS` in the module.
+  The text is assembled from the written shots; no model call is made, so
+  wording is exactly what Stage 4 holds.
+- JSON (`buildScriptJSON`): `{ format: 'storyreel-script', version: 1,
+  exported_at, title, genres, language, aspect_ratio, script_type, series?,
+  synopsis, characters[], groups[], total_duration_sec, scenes[], dynamics_plan }`.
+  Each scene: `number, episode?, title, summary, start_sec, duration_sec,
+  planned_duration_sec, shots[]`; each shot: `number, start_sec, duration_sec,
+  shot_type, location, action, dialogue, notes`. Text fields are unmodified.
+
+**Files.**
+- `src/lib/scriptExport.js` (new): `scriptReady`, `buildBookText`,
+  `buildScriptJSON`, `scriptFileBase`.
+- `src/components/ScriptExportModal.jsx` (new).
+- `src/lib/exportScript.js`: `downloadText(filename, text, type)` — third
+  argument added (MIME type, default markdown).
+- `src/stages/Stage4.jsx`: `showExport` state, the button, the modal.
+- `src/components/ProjectSettingsModal.jsx`: the section, the modal.
+- i18n: `sx.button`, `sx.title`, `sx.hint`, `sx.notReady`, `sx.book`,
+  `sx.bookHint`, `sx.json`, `sx.jsonHint`, `sx.save`, `tip.sxOpen`,
+  `tip.sxBook`, `tip.sxJson`, `tip.sxSave`.
+
+**Verified.** Module output checked on a seeded project (cue stripping,
+timings, JSON shape); button, modal and the disabled states checked in the dev
+app. The actual file download was not clicked through.
+
+---
+
+## 2. Series: free episode count and episode length (Stage 2)
+
+**Request.** At Stage 2 of a short-drama project let the user set the number
+of episodes and the duration of each, instead of the fixed template.
+
+**Behaviour.**
+- Stage 2 of a series master shows, above "Create storyline": "Number of
+  episodes" and "Episode length" (seconds), an approximate total running time,
+  and a hint. Values are saved on blur through `rawUpdate` (no stale-stage
+  toast).
+- Episode count range is now 1–200 (was 3–100). Episode length is a target of
+  30–600 s, default 105; prompts ask for target ± 15 s (so the default is the
+  former 90–120 s).
+- Every series prompt (Stage 1 directions, Stage 2 storyline, series sections,
+  episodes, the segment scene outline) and the Stage 3 badge use the project's
+  range. Segment projects copy the length from the master.
+- Changing the numbers after the storyline or plan exists does not rewrite
+  them; the hint says to recreate. Stage 3 already warns when the plan's
+  episode count differs from the project's.
+
+**Data model.**
+- `project.episodeSeconds` (number; 0 for non-series; clamped 30–600, default
+  105) — `projectDefaults`, `newProject({ episodeSeconds })`, `migrateProject`.
+- `project.seriesPart.episodeSeconds` on segment projects.
+- `project.episodeCount` clamp widened to 1–200.
+
+**Files.**
+- `src/lib/series.js`: `SERIES_MIN_EPISODES = 1`, `SERIES_MAX_EPISODES = 200`;
+  `EPISODE_MIN_SEC` / `EPISODE_MAX_SEC` removed in favour of
+  `EPISODE_DEFAULT_SEC`, `EPISODE_SEC_MIN`, `EPISODE_SEC_MAX`,
+  `EPISODE_TOLERANCE_SEC`, `clampEpisodeSec`, `episodeRange(project)`;
+  `buildSegmentProject` passes `episodeSeconds`.
+- `src/lib/storage.js`: the field and clamps above.
+- `src/lib/prompts.js`: `episodeRange(project)` everywhere a length is stated;
+  `seriesTotal(project)` (the whole series' count, also inside a segment
+  project) replaces `episodeCountOf` in the prompts.
+- `src/stages/Stage2.jsx`: the `.series-setup` block.
+- `src/stages/Stage3Series.jsx`: badge uses `episodeRange`.
+- `src/data/shortDramaStyle.js`: the factory rules no longer state a fixed
+  episode length; `SHORT_DRAMA_V6_REWRITES` lists the replaced phrases.
+- `src/lib/styles.js`: `STYLES_VERSION = 6`; migration v6 applies those phrase
+  rewrites to the stored "Short Drama Series" style (other user edits kept).
+- `src/styles.css`: `.series-setup`.
+- i18n: `ser.episodeLen`, `tip.episodeLen`, `ser.totalRun`, `ind.serTotal`,
+  `ser.setupHint`; reworded `new.episodesHint`, `tip.episodes`.
+
+**Verified.** `episodeRange` values, the style migration and the Stage 2
+controls (edit → saved → hint and total update) in the dev app. No real model
+run with a non-default length.
+
+---
+
+## 3. Stage 4: "Storyboard preview & timeline" hidden
+
+**Request.** Hide the section on Stage 4.
+
+**Behaviour.** The section is not rendered. `StoryboardTimeline.jsx`, its
+strings and the stored `project.storyboards` / `project.referenceFrames` are
+kept; Stage 5 still offers existing storyboard frames as H3 references.
+Side effects: new storyboard frames can no longer be created, and Stage 4
+loses the timeline's drag-to-reorder and duration handles (shot cards keep
+their own duration field and drag handle).
+
+**Files.** `src/stages/Stage4.jsx`: `const SHOW_STORYBOARD = false` guards
+the `<StoryboardTimeline>` render. The file's line endings were normalised to
+LF in the same change.
+
+---
+
+## 4. Style library review for protected names (no code change)
+
+**Request.** Check all library styles (script, image, video) for brand names,
+personal names, trademarks and film or game characters.
+
+**Result.** Script styles: none. Stage 1 personas (`auteur_personas.json`):
+none. Image styles and video presets that contain such names:
+
+| Style id | Where | Name found |
+|---|---|---|
+| `bi2.image.panavision_70s` | title and text | Panavision |
+| `bi2.image.imax_epic` | title and text | IMAX; "directed by Denis Villeneuve" |
+| `bi2.image.french_new_wave` | text | Kodak Tri-X |
+| `bi2.image.sun_nostalgia` | text | Kodak Portra 400 |
+| `bi2.image.surreal_pop` | text | Wes Anderson |
+| `bi2.image.pixar_3d` | title and text | Pixar; Disney Pixar |
+| `bi2.image.retro_90s_anime` | text | Studio Ghibli |
+| `bi2.image.modern_anime` | text | Makoto Shinkai; CoMix Wave |
+| `bi2.image.spiderverse` | title | Spider-Verse |
+| `bi2.image.gothic_stopmotion` | text | Tim Burton; Henry Selick; "Pixar" in the avoid list |
+| `bi3.video.motion_03` | title | Pixar |
+| `bi3.video.motion_07` | title | MTV |
+| `bi3.video.motion_09` | title | GoPro |
+
+Nothing was changed. Replacing them needs a styles migration (v7) that swaps
+the factory text only where the user has not edited it, as v4 did for the
+video presets. Styles the user added in their own installation live in that
+machine's local storage and were not reviewed.
+
+---
+
+## Open
+
+- Decide whether the names in section 4 are replaced with descriptive wording.
+- The story text is assembled, not rewritten; if a literary rewrite by the
+  text model is wanted, it is a separate feature.

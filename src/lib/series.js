@@ -1,5 +1,5 @@
 // Short-drama series (the "series" project template): a vertical serial of
-// 3–100 episodes, 1.5–2 minutes each.
+// any number of episodes (1–200), each of a user-set length (default 1.5–2 min).
 //
 // A series lives in two kinds of project:
 //   master  — scriptType 'series', no seriesPart. Stages 1–3 plan the whole
@@ -12,11 +12,21 @@
 //             production project (stages 3–5) covering 5–10 consecutive episodes.
 import { newProject, uid } from './storage.js';
 
-export const SERIES_MIN_EPISODES = 3;
-export const SERIES_MAX_EPISODES = 100;
+export const SERIES_MIN_EPISODES = 1;
+export const SERIES_MAX_EPISODES = 200;
 export const SERIES_DEFAULT_EPISODES = 30;
-export const EPISODE_MIN_SEC = 90;
-export const EPISODE_MAX_SEC = 120;
+// Episode length: the user sets a target in seconds; prompts ask for the
+// target ± EPISODE_TOLERANCE_SEC (the default 105 gives the classic 90–120).
+export const EPISODE_DEFAULT_SEC = 105;
+export const EPISODE_SEC_MIN = 30;
+export const EPISODE_SEC_MAX = 600;
+export const EPISODE_TOLERANCE_SEC = 15;
+export const clampEpisodeSec = (n) => Math.max(EPISODE_SEC_MIN, Math.min(EPISODE_SEC_MAX, Math.round(Number(n) || EPISODE_DEFAULT_SEC)));
+// { min, max } seconds of one episode of this project's series
+export const episodeRange = (p) => {
+  const d = clampEpisodeSec(p?.seriesPart?.episodeSeconds || p?.episodeSeconds);
+  return { min: Math.max(15, d - EPISODE_TOLERANCE_SEC), max: d + EPISODE_TOLERANCE_SEC };
+};
 export const SEGMENT_MIN = 5;
 export const SEGMENT_MAX = 10;
 export const SEGMENT_DEFAULT = 8;
@@ -124,6 +134,7 @@ export function buildSegmentProject(master, seg, label) {
     scriptType: 'series',
     aspectRatio: master.aspectRatio,
     episodeCount: total,
+    episodeSeconds: clampEpisodeSec(master.episodeSeconds),
     scriptStyleId: master.scriptStyleId,
   });
   return {
@@ -145,6 +156,7 @@ export function buildSegmentProject(master, seg, label) {
       arcTitle: arc?.title || '',
       arcSummary: arc?.summary || '',
       prevCliffhanger: prev?.cliffhanger || '',
+      episodeSeconds: clampEpisodeSec(master.episodeSeconds),
       episodes,
     },
   };

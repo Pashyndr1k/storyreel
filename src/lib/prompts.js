@@ -3,7 +3,7 @@ import { aspectDescription } from './aspect.js';
 import { buildRandomization } from './randomization.js';
 import { densityRange, buildShotPayload } from './dynamics.js';
 import { scenePhotos } from './sceneLocations.js';
-import { EPISODE_MIN_SEC, EPISODE_MAX_SEC, episodeCountOf, episodeLine } from './series.js';
+import { episodeRange, clampEpisodes, episodeLine } from './series.js';
 
 const LANG_NAMES = { en: 'English', ru: 'Russian', uk: 'Ukrainian' };
 
@@ -17,15 +17,16 @@ const DURATIONS = {
 export const durationOf = (project) => {
   if (project?.scriptType === 'series' && project.seriesPart) {
     const n = project.seriesPart.to - project.seriesPart.from + 1;
-    return { min: n * EPISODE_MIN_SEC, max: n * EPISODE_MAX_SEC };
+    return { min: n * episodeRange(project).min, max: n * episodeRange(project).max };
   }
   return DURATIONS[project?.scriptType] || DURATIONS.medium;
 };
 
 // The format every series task is written for; the story rules themselves come
 // from the project's script style (the editable "Short Drama Series" style).
+const seriesTotal = (project) => project.seriesPart?.total || clampEpisodes(project.episodeCount);
 const seriesFormat = (project) =>
-  `FORMAT: a vertical (9:16) short-drama series of exactly ${episodeCountOf(project)} episodes, each ${EPISODE_MIN_SEC}–${EPISODE_MAX_SEC} seconds long. Every episode is a mini-story with its own hook, escalation and turn, and ends on an event that carries over into the next episode.`;
+  `FORMAT: a vertical (9:16) short-drama series of exactly ${seriesTotal(project)} episodes, each ${episodeRange(project).min}–${episodeRange(project).max} seconds long. Every episode is a mini-story with its own hook, escalation and turn, and ends on an event that carries over into the next episode.`;
 
 const SERIES_PERSONA =
   'You are the showrunner of hit vertical short-drama series. Take the user\'s brief idea and pitch four distinct ways to build a whole series on it. Lean into strong, familiar tropes and execute them sharply; every direction must sustain the full episode count through escalating reversals.';
@@ -101,7 +102,7 @@ ${project.logline}
 
 ${seriesFormat(project)}
 
-Generate exactly 4 distinct directions for developing this concept into the series. Make them genuinely different from each other (a different central trope, antagonist, secret or relationship) — not four variations of one idea. Each must stay faithful to the core of the original and be big enough to fill all ${episodeCountOf(project)} episodes: name the protagonist and the wrong done to them, the secret or reversal that drives the story, the chain of escalating antagonists or obstacles, and the final payoff.
+Generate exactly 4 distinct directions for developing this concept into the series. Make them genuinely different from each other (a different central trope, antagonist, secret or relationship) — not four variations of one idea. Each must stay faithful to the core of the original and be big enough to fill all ${seriesTotal(project)} episodes: name the protagonist and the wrong done to them, the secret or reversal that drives the story, the chain of escalating antagonists or obstacles, and the final payoff.
 
 JSON schema:
 {"ideas":[{"title":"catchy series title","pitch":"the series in 5-8 sentences: premise, protagonist and the wrong, the engine of reversals, the central secret, how it escalates, the ending","why_it_works":"1-2 sentences on why viewers keep watching episode after episode"}]}`,
@@ -142,7 +143,7 @@ ${project.approvedPlot}
 
 ${seriesFormat(project)}
 
-Create the final storyline of the whole series. The synopsis must tell the complete story from the first episode to the last, sized for ${episodeCountOf(project)} episodes: the wrong and the inciting incident, the early big reveal, each escalating cycle of the middle with its antagonist and its reversal, the main turning points, the full truth coming out, the villain's comeuppance and the final payoff. Keep the cast small.
+Create the final storyline of the whole series. The synopsis must tell the complete story from the first episode to the last, sized for ${seriesTotal(project)} episodes: the wrong and the inciting incident, the early big reveal, each escalating cycle of the middle with its antagonist and its reversal, the main turning points, the full truth coming out, the villain's comeuppance and the final payoff. Keep the cast small.
 
 JSON schema:
 {"title":"a strong final series title","genres":["2-3 short genre tags, e.g. revenge, romance, drama"],"synopsis":"the complete series story, 350-600 words, in chronological order","characters":[{"name":"character name","role":"protagonist / love interest / antagonist / supporting","description":"2-4 sentences: age, physical appearance (specific enough to keep the character visually consistent across AI image generation), personality, motivation, and their secret if they have one"}]}`,
@@ -170,7 +171,7 @@ JSON schema:
 
 // Series master, step 1: the main sections of the series.
 export function seriesArcsPrompt(project, lang, scriptStyle) {
-  const n = episodeCountOf(project);
+  const n = seriesTotal(project);
   const sections = n <= 8 ? '1 or 2 sections' : `one section per roughly 8–12 episodes (a section may run 5–15 episodes; about ${Math.max(2, Math.round(n / 10))} sections in total)`;
   return {
     system: system(lang, scriptStyle),
@@ -201,7 +202,7 @@ JSON schema:
 
 // Series master, step 2: the episodes of one section (a chunk of it at a time).
 export function seriesEpisodesPrompt(project, lang, scriptStyle, { arcs, arc, from, to, previous }) {
-  const n = episodeCountOf(project);
+  const n = seriesTotal(project);
   const arcList = arcs.map((a, i) => `${i + 1}. "${a.title}" — episodes ${a.from}–${a.to}. ${a.summary} Finale: ${a.finale}`).join('\n');
   const prev = (previous || []).length
     ? `The episodes written just before these (continue directly from the last cliffhanger):\n${previous.map(episodeLine).join('\n')}`
@@ -244,7 +245,7 @@ export function stage3Prompt(project, lang, scriptStyle) {
     return {
       system: system(lang, scriptStyle),
       maxTokens: 9000,
-      user: `Series: ${sp.seriesTitle} — a vertical short-drama series of ${sp.total} episodes, each ${EPISODE_MIN_SEC}–${EPISODE_MAX_SEC} seconds. This project produces episodes ${sp.from}–${sp.to}${sp.arcTitle ? ` (section "${sp.arcTitle}")` : ''}.
+      user: `Series: ${sp.seriesTitle} — a vertical short-drama series of ${sp.total} episodes, each ${episodeRange(project).min}–${episodeRange(project).max} seconds. This project produces episodes ${sp.from}–${sp.to}${sp.arcTitle ? ` (section "${sp.arcTitle}")` : ''}.
 Genres: ${project.genres.join(', ')}
 
 Series synopsis:
@@ -259,11 +260,11 @@ ${sp.prevCliffhanger ? `The previous episode (${sp.from - 1}) ended on this clif
 ${(sp.episodes || []).map(episodeLine).join('\n')}
 
 Create the scene-by-scene outline for these ${n} episodes. Rules:
-- Go episode by episode, in order. Each episode gets 1–3 scenes whose durations total ${EPISODE_MIN_SEC}–${EPISODE_MAX_SEC} seconds; put the episode's number in "episode".
+- Go episode by episode, in order. Each episode gets 1–3 scenes whose durations total ${episodeRange(project).min}–${episodeRange(project).max} seconds; put the episode's number in "episode".
 - Each scene is a single continuous location and moment. Keep to 1–2 locations per episode and reuse locations across episodes.
 - The first scene of an episode opens mid-conflict, answering the previous episode's cliffhanger within the first seconds — no setup, no establishing scene.
 - The last scene of an episode ends exactly on that episode's cliffhanger; say so in its summary.
-- The whole outline runs between ${n * EPISODE_MIN_SEC} and ${n * EPISODE_MAX_SEC} seconds.
+- The whole outline runs between ${n * episodeRange(project).min} and ${n * episodeRange(project).max} seconds.
 
 Alongside the outline, create the ACTION DYNAMICS PLAN — the pacing schedule. Rules for the plan:
 - Divide the full runtime into 2–6 sequential "rhythm_blocks". Each block covers one or more consecutive scenes (list their numbers in "scene_numbers"; every scene belongs to exactly one block).

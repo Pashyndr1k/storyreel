@@ -186,7 +186,8 @@ function projectDefaults() {
     archived: false,
     lang: '', // '' = follow the app language; 'en'/'ru'/'uk' = per-project override
     scriptType: 'medium', // 'short' 10-30s | 'medium' 1-4min | 'long' 5-10min | 'series' short-drama serial (lib/series.js)
-    episodeCount: 0, // series only: number of episodes (3-100)
+    episodeCount: 0, // series only: number of episodes (1-200)
+    episodeSeconds: 0, // series only: target length of one episode, seconds (30-600; default 105)
     seriesPlan: null, // series master: { arcs, episodes, segmentSize, segments } — see lib/series.js
     seriesPart: null, // series segment project: { parentId, seriesTitle, total, from, to, episodes, … }
     aspectRatio: '16:9', // image/video aspect ratio: 16:9|4:3|1:1|3:4|9:16
@@ -237,14 +238,15 @@ function projectDefaults() {
 
 const SCRIPT_TYPES = ['short', 'medium', 'long', 'series'];
 
-export function newProject({ title, logline, scriptType, aspectRatio, episodeCount = 0, scriptStyleId = '' }) {
+export function newProject({ title, logline, scriptType, aspectRatio, episodeCount = 0, episodeSeconds = 0, scriptStyleId = '' }) {
   return {
     ...projectDefaults(),
     title: (title || '').trim() || 'Untitled project',
     logline: logline || '',
     scriptType: SCRIPT_TYPES.includes(scriptType) ? scriptType : 'medium',
     aspectRatio: isValidAspect(aspectRatio) ? aspectRatio : '16:9',
-    episodeCount: scriptType === 'series' ? Math.max(3, Math.min(100, Math.round(Number(episodeCount) || 30))) : 0,
+    episodeCount: scriptType === 'series' ? Math.max(1, Math.min(200, Math.round(Number(episodeCount) || 30))) : 0,
+    episodeSeconds: scriptType === 'series' ? Math.max(30, Math.min(600, Math.round(Number(episodeSeconds) || 105))) : 0,
     scriptStyleId: scriptStyleId || '',
   };
 }
@@ -268,7 +270,8 @@ export function migrateProject(raw) {
   p.cover = typeof p.cover === 'string' ? p.cover : '';
   p.lang = typeof p.lang === 'string' ? p.lang : '';
   p.scriptType = SCRIPT_TYPES.includes(p.scriptType) ? p.scriptType : 'medium';
-  p.episodeCount = p.scriptType === 'series' ? Math.max(3, Math.min(100, Math.round(Number(p.episodeCount) || 30))) : 0;
+  p.episodeCount = p.scriptType === 'series' ? Math.max(1, Math.min(200, Math.round(Number(p.episodeCount) || 30))) : 0;
+  p.episodeSeconds = p.scriptType === 'series' ? Math.max(30, Math.min(600, Math.round(Number(p.episodeSeconds) || 105))) : 0;
   p.seriesPlan = p.seriesPlan && typeof p.seriesPlan === 'object' ? p.seriesPlan : null;
   p.seriesPart = p.seriesPart && typeof p.seriesPart === 'object' ? p.seriesPart : null;
   p.aspectRatio = isValidAspect(p.aspectRatio) ? p.aspectRatio : '16:9';

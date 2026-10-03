@@ -11,11 +11,11 @@
 // Custom styles are only ever seeded on first run and are never overwritten by
 // defaults on later launches. They are also included in Settings → Backup.
 import videoMotionPresets from '../data/video_motion_presets.json';
-import { SHORT_DRAMA_STYLE, SHORT_DRAMA_STYLE_NAME } from '../data/shortDramaStyle.js';
+import { SHORT_DRAMA_STYLE, SHORT_DRAMA_STYLE_NAME, SHORT_DRAMA_V6_REWRITES } from '../data/shortDramaStyle.js';
 
 const STYLES_KEY = 'storyreel.styles.v1';
 const STYLES_BACKUP_KEY = 'storyreel.styles.corrupt'; // last unreadable value, for recovery
-export const STYLES_VERSION = 5;
+export const STYLES_VERSION = 6;
 export const STYLE_CATEGORIES = ['script', 'image', 'video'];
 
 // v2 built-ins, imported from text_styles.pdf (script) and visual styles.pdf
@@ -210,6 +210,18 @@ function migrate(fromVersion, styles) {
   if (fromVersion < 5) {
     // v5: add the Short Drama Series script style (idempotent by id).
     s = addMissingBuiltins(s, BUILTINS_V5);
+  }
+  if (fromVersion < 6) {
+    // v6: episode length is a project setting now — drop the fixed length from
+    // the Short Drama Series rules (only those phrases; other edits are kept).
+    s = {
+      ...s,
+      script: (s.script || []).map((st) =>
+        st.id === 'bi5.script.short_drama'
+          ? { ...st, instructions: SHORT_DRAMA_V6_REWRITES.reduce((txt, [a, b]) => txt.split(a).join(b), st.instructions || '') }
+          : st
+      ),
+    };
   }
   return s;
 }

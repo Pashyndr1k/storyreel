@@ -4,11 +4,14 @@ import { STYLE_CATEGORIES } from '../lib/styles.js';
 import StylesModal from './StylesModal.jsx';
 import AspectSelector from './AspectSelector.jsx';
 import { styleLabel } from './StyleControls.jsx';
+import ScriptExportModal from './ScriptExportModal.jsx';
+import { scriptReady } from '../lib/scriptExport.js';
 import { isSeriesMaster, clampEpisodes, SERIES_MIN_EPISODES, SERIES_MAX_EPISODES } from '../lib/series.js';
 
 export default function ProjectSettingsModal({ project, update, styles, setStyles, settings, onSettings, onClose }) {
   const { t } = useI18n();
   const [manageCat, setManageCat] = useState(null); // opens the library manager at a category
+  const [showExport, setShowExport] = useState(false);
 
   const idField = { script: 'scriptStyleId', image: 'imageStyleId', video: 'videoStyleId' };
 
@@ -72,11 +75,20 @@ export default function ProjectSettingsModal({ project, update, styles, setStyle
         <label className="section-label">{t('pset.styles')}</label>
         {STYLE_CATEGORIES.map((c) => selector(c))}
 
+        <label className="section-label">{t('sx.title')}</label>
+        <p className="hint">{scriptReady(project) ? t('sx.hint') : t('sx.notReady')}</p>
+        <div className="row">
+          <button title={t('tip.sxOpen')} className="btn small" disabled={!scriptReady(project)} onClick={() => setShowExport(true)}>
+            {t('sx.button')}
+          </button>
+        </div>
+
         <div className="modal-actions">
           <button title={t('tip.done')} className="btn primary" onClick={onClose}>{t('pset.done')}</button>
         </div>
       </div>
 
+      {showExport && <ScriptExportModal project={project} onClose={() => setShowExport(false)} />}
       {manageCat && (
         <StylesModal
           styles={styles}

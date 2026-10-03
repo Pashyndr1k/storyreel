@@ -111,8 +111,8 @@ export function parseProjectFile(text) {
   return null;
 }
 
-export function downloadText(filename, text) {
-  const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
+export function downloadText(filename, text, type = 'text/markdown;charset=utf-8') {
+  const blob = new Blob([text], { type });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = filename;

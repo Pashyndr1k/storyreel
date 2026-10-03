@@ -13,6 +13,12 @@ import { StyleChip } from '../components/StyleControls.jsx';
 import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
 import Lightbox from '../components/Lightbox.jsx';
 import SceneNav from '../components/SceneNav.jsx';
+import ScriptExportModal from '../components/ScriptExportModal.jsx';
+import { Download } from '../components/icons.jsx';
+
+// The "Storyboard preview & timeline" section is hidden (2.12); the component
+// and the frames already stored in projects are kept.
+const SHOW_STORYBOARD = false;
 import { blockForScene, densityRange } from '../lib/dynamics.js';
 
 export function fmt(sec) {
@@ -56,6 +62,7 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
 
   const scene = project.outline.find((s) => s.id === sceneId) || project.outline[0];
   const shots = (scene && project.sceneDetails[scene.id]?.shots) || [];
+  const [showExport, setShowExport] = useState(false);
   const doneCount = project.outline.filter((s) => project.sceneDetails[s.id]?.shots?.length).length;
   const allDone = doneCount === project.outline.length && project.outline.length > 0;
 
@@ -176,12 +183,15 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
         {prog && (
           <span className="total-badge" title={t('ind.batchProgress')}>{t('batch.progress', { a: prog.a, b: prog.b })}</span>
         )}
+        <button title={allDone ? t('tip.sxOpen') : t('sx.notReady')} className="btn" disabled={!allDone} onClick={() => setShowExport(true)}>
+          <Download size={14} /> {t('sx.button')}
+        </button>
         <span className="push-right" />
         <DynamicsVisualizer plan={project.dynamicsPlan} />
       </div>
       <ErrorNote error={error} onSettings={onSettings} />
 
-      {shots.length > 0 && (
+      {SHOW_STORYBOARD && shots.length > 0 && (
         <StoryboardTimeline
           project={project}
           scene={scene}
@@ -303,6 +313,7 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
         </button>
       </footer>
       <Lightbox item={lightbox} onClose={() => setLightbox(null)} />
+      {showExport && <ScriptExportModal project={project} onClose={() => setShowExport(false)} />}
     </section>
   );
 }

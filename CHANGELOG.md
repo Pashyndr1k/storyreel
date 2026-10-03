@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+- **Script export (Stage 4 and Project settings).** Once every scene has its
+  shot breakdown, "Export script" saves the script to disk in one or both of
+  two formats: the story text (the synopsis, then the whole story as plain
+  narrative with no shot types, timings, camera or sound notes) and the
+  marked-up script as JSON with everything from Stage 4.
+- **Series: your own episode count and length.** Stage 2 of a short drama
+  now has "Number of episodes" (1–200) and "Episode length" (30–600 seconds)
+  with the total running time; the storyline, the series plan and the scene
+  outlines are written for those numbers. The Short Drama Series rules no
+  longer state a fixed episode length.
+- **Stage 4: the "Storyboard preview & timeline" section is hidden.**
+- **Change companions.** Technical descriptions of every change are kept per
+  version in docs/changes/.
+
 ## 2.11.0 — 2026-10-01
 
 - **Fix: "The model returned an unexpected format" on text generation.** The
