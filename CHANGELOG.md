@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.12.0 — 2026-10-03
 
 - **Script export (Stage 4 and Project settings).** Once every scene has its
   shot breakdown, "Export script" saves the script to disk in one or both of
