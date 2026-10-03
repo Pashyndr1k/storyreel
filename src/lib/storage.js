@@ -211,6 +211,9 @@ function projectDefaults() {
     shotVideoModes: {}, // shotId -> pinned video workflow: 'auto' | 'i2v' | 'flf2v' | 'si2v'
     shotVideoEngines: {}, // shotId -> engine that rendered it: 'ltx' | 'minimax' (drives assembly trim)
     shotPromptEngines: {}, // shotId -> engine the video prompt was WRITTEN for: 'ltx' | 'minimax'
+    shotCamera: {}, // shotId -> camera dynamics 0..5 chosen by the user (unset = derived default, see lib/shotDynamics.js)
+    shotAction: {}, // shotId -> action level 0..2 chosen by the user (unset = derived default)
+    shotPromptDyn: {}, // shotId -> { camera, action } the stored video prompt was written with
     shotVoiceSources: {}, // shotId -> explicit 'native' (H3 speaks the line) | 'tts' (separate voice); unset = see voiceSourceFor in prompts.js
     shotSpeakerNotes: {}, // shotId -> voice identity/timbre/delivery notes fed into the H3 prompt
     shotRefs: {}, // shotId -> { images: [{src,label}], videos: [{src,label}], audios: [{src,label}] } for H3 reference mode
@@ -297,6 +300,7 @@ export function migrateProject(raw) {
   p.shotVideoModes = p.shotVideoModes && typeof p.shotVideoModes === 'object' ? p.shotVideoModes : {};
   p.shotVideoEngines = p.shotVideoEngines && typeof p.shotVideoEngines === 'object' ? p.shotVideoEngines : {};
   p.shotPromptEngines = p.shotPromptEngines && typeof p.shotPromptEngines === 'object' ? p.shotPromptEngines : {};
+  for (const k of ['shotCamera', 'shotAction', 'shotPromptDyn']) p[k] = p[k] && typeof p[k] === 'object' ? p[k] : {};
   p.shotVoiceSources = p.shotVoiceSources && typeof p.shotVoiceSources === 'object' ? p.shotVoiceSources : {};
   p.shotSpeakerNotes = p.shotSpeakerNotes && typeof p.shotSpeakerNotes === 'object' ? p.shotSpeakerNotes : {};
   p.shotRefs = p.shotRefs && typeof p.shotRefs === 'object' ? p.shotRefs : {};

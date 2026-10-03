@@ -50,6 +50,14 @@
   script is in another language. "H3 native" is the default voice source for
   dialogue shots; shots that already have a voice clip, or that you set to
   TTS, keep H3 silent as before. Recreate a video prompt to apply it.
+- **Camera and Action sliders (Stage 5, Video tab).** "Camera" has six
+  positions — Static, Handheld, Dolly, Crane, Drone, Shaky — and "Action" has
+  three — Calm, Active, Intense — for how much everyone in the frame moves.
+  Both start from the scene description ("Auto"); change them and recreate
+  the video prompt. They apply to H3, LTX and Kling prompts.
+- **Richer MiniMax H3 prompts.** H3 prompts now describe the main character's
+  movement beat by beat, give secondary characters and extras their own
+  activity, and must contain any spoken line in H3's dialogue format.
 - **Stop a video generation (Stage 5).** A stop button next to the Create
   video button interrupts the running job on ComfyUI and halts any queue.
   With Kling it only stops waiting — a task Kling accepted still runs and is

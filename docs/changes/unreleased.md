@@ -579,6 +579,97 @@ positions of the controls after the button are identical idle and running.
 
 ---
 
+## 14. Stage 5: camera and action sliders; richer H3 prompts
+
+**Request.** Make videos more dynamic and easy to steer: a 6-position camera
+slider (static, handheld with a stationary operator, smooth dolly/track,
+dynamic crane, dynamic FPV drone, shaky handheld running) and a 3-position
+slider for the action level of everyone in the scene, both defaulting from
+the scene description and changeable, with the prompt recreated from the new
+settings. Research MiniMax H3's prompting guide further; H3 prompts must be
+detailed, action-rich, lead with the main character's movement, and carry any
+spoken line directly in H3's dialogue format.
+
+**Behaviour — sliders.**
+- Video tab of a shot, above the Create video row: "Camera" (Static, Handheld,
+  Dolly, Crane, Drone, Shaky) and "Action" (Calm, Active, Intense). Each has a
+  range input, clickable one-word tick labels, the current value, and an
+  "Auto" chip (lit while the value is the derived default; click it to return
+  to the default after a manual change).
+- Default (`defaultCamera` / `defaultAction`): first the shot's own text
+  (shot type, action, notes — EN/RU/UA keywords such as drone, crane, chase,
+  handheld, dolly, static; "sits/reads/waits" forces Calm; fight/chase/explosion
+  forces Intense), then the scene's rhythm block from the Action Dynamics Plan
+  (camera momentum words, then kinetic energy: camera ≤2 Static, ≤4 Handheld,
+  ≤6 Dolly, ≤8 Crane, else Shaky; action ≤3 Calm, ≤7 Active, else Intense).
+  With no plan: Dolly and Active.
+- When a shot's stored video prompt was written with different settings, a
+  line "The video prompt was written with other camera or action settings."
+  appears with a "Recreate prompt" button (`regenPrompt(shot, 'video')`).
+  Scene-level prompt creation uses the current settings too.
+
+**Behaviour — prompts (all three engines).**
+- Each shot passed to the prompt writer carries a CAMERA and an ACTION
+  directive (`dynamicsFor`); a shared instruction (`DYNAMICS_RULE`) makes both
+  binding: the camera setting overrides the camera-variety rule, the style and
+  the scene momentum; the action setting requires the main character's
+  movement first and in most detail, then specific activity for secondary
+  characters and background extras.
+- H3: CAMERA / ACTION lines per shot (and per take member), with the camera
+  restated in H3 vocabulary (e.g. crane = Pedestal + Tilt + Arc with large
+  amplitude; drone = fast Tracking/POV with Roll; shaky = fast Tracking with
+  Shake Strongly). LTX: `camera_setting` / `action_setting` fields in the
+  shot JSON. Kling: the same fields, camera restated in Kling's camera
+  language; it also lifts Kling's "aerial only if the frame already is" limit.
+
+**Behaviour — H3 system instruction.** After re-reading MiniMax's official
+guide (base prompt-writing guide in the MiniMax-H3 model repository):
+- new rule "ACTION IS THE BODY OF THE PROMPT": the main character's movement
+  beat by beat (body, hands, head, gaze, path in frame, speed, cause → effect,
+  intermediate states), expanding the script's action line without changing it;
+- new rule "EVERYONE VISIBLE IS ALIVE": specific actions for secondary
+  characters and concrete business for extras, scaled to the ACTION setting;
+  non-speaking people get no speaker ID (per the guide);
+- length guidance: five to nine sentences for a 4–10 s shot;
+- hard rule: a spoken line must appear inside `<d>[English] …</d>` (unless the
+  shot is marked voice-in-post) — "she speaks" alone is wrong.
+The guide has no dedicated crane / drone / handheld syntax (they are composed
+from its motion vocabulary), and it says user dialogue must not be translated;
+the English-speech rule from section 12 deliberately departs from that.
+
+**Data model.**
+- `project.shotCamera`: `{ [shotId]: 0..5 }` — manual camera choice only.
+- `project.shotAction`: `{ [shotId]: 0..2 }` — manual action choice only.
+- `project.shotPromptDyn`: `{ [shotId]: { camera, action } }` — what the stored
+  video prompt was written with (set by `applyPrompts` and `regenPrompt`).
+All default `{}` in `projectDefaults` and are normalised in `migrateProject`.
+
+**Files.**
+- `src/lib/shotDynamics.js` (new): `CAMERA_LEVELS`, `ACTION_LEVELS`,
+  `defaultCamera`, `defaultAction`, `cameraOf`, `actionOf`, `dynamicsFor`,
+  `DYNAMICS_RULE`, `dynamicsStale`.
+- `src/lib/prompts.js`: the three builders (`stage5VideoPrompt`,
+  `stage5KlingVideoPrompt`, `stage5H3VideoPrompt`) and `H3_SYSTEM`.
+- `src/stages/Stage5.jsx`: `sceneBlock`, `setDynamics`, `dynSlider`, the
+  `.dyn-sliders` block, `shotPromptDyn` recorded in `applyPrompts` and
+  `regenPrompt`.
+- `src/lib/storage.js`: the three fields.
+- `src/styles.css`: `.dyn-sliders`, `.dyn-slider`, `.dyn-head`, `.dyn-value`,
+  `.dyn-auto`, `.dyn-ticks`, `.dyn-stale`.
+- i18n: `dyn.camera`, `dyn.action`, `dyn.auto`, `dyn.camera_<level>` and
+  `dyn.camera_<level>_tip` (6 levels), `dyn.action_<level>` and
+  `dyn.action_<level>_tip` (3 levels), `dyn.stale`, `dyn.recreate`,
+  `tip.dyn_camera`, `tip.dyn_action`, `tip.dynAuto`, `tip.dynIsAuto`,
+  `tip.dynRecreate`.
+
+**Verified.** In the dev app: defaults for sample shots, manual change, Auto
+reset, the stale line, and the directives present in the built H3, LTX and
+Kling prompt specs. No text-model call and no video generation — whether the
+models honour the directives, and how much more dynamic the results are, is
+untested.
+
+---
+
 ## Open
 
 - The reworded image styles (section 4) have not been compared visually with the old ones.

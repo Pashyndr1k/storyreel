@@ -1,6 +1,7 @@
 import { generateKlingVideo, klingModelOf, klingSeconds, KLING_VIDEO_MODES, resolveKlingMode } from '../lib/kling.js';
 import { SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC, MAX_IMAGE_VERSIONS, MAX_CHARACTER_REFS, MAX_LOCATION_PHOTOS } from '../lib/config.js';
 import { shotCastRefs } from '../lib/castRefs.js';
+import { CAMERA_LEVELS, ACTION_LEVELS, cameraOf, actionOf, dynamicsStale } from '../lib/shotDynamics.js';
 import GenProgress from '../components/GenProgress.jsx';
 import { etaKey, expectedSeconds, recordRun } from '../lib/videoEta.js';
 import { POLICY_EVENT } from '../lib/policy.js';
@@ -406,6 +407,8 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       const sceneShots = p.sceneDetails[targetScene.id]?.shots || [];
       const next = { ...p.shotPrompts };
       const engines = { ...(p.shotPromptEngines || {}) };
+      const dyn = { ...(p.shotPromptDyn || {}) };
+      const blk = blockForScene(p.dynamicsPlan, p.outline.findIndex((s) => s.id === targetScene.id) + 1);
       (data.prompts || []).forEach((pr) => {
         const shot = sceneShots[(Number(pr.shot) || 1) - 1];
         if (!shot) return;
@@ -415,9 +418,12 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           imagePrompt: pr.image_prompt != null ? pr.image_prompt : cur.imagePrompt || '',
           videoPrompt: pr.video_prompt != null ? pr.video_prompt : cur.videoPrompt || '',
         };
-        if (pr.video_prompt != null) engines[shot.id] = curEngine;
+        if (pr.video_prompt != null) {
+          engines[shot.id] = curEngine;
+          dyn[shot.id] = { camera: cameraOf(p, shot, blk), action: actionOf(p, shot, blk) };
+        }
       });
-      return { shotPrompts: next, shotPromptEngines: engines };
+      return { shotPrompts: next, shotPromptEngines: engines, shotPromptDyn: dyn };
     });
 
   const specFor = (s) => {
@@ -502,13 +508,77 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       if (typeof text !== 'string' || !text.trim()) throw new Error('The response held no prompt for this shot.');
       setPrompt(shot.id, { [kind === 'image' ? 'imagePrompt' : 'videoPrompt']: text });
       if (kind === 'video') {
-        update((p) => ({ shotPromptEngines: { ...(p.shotPromptEngines || {}), [shot.id]: engine } }));
+        update((p) => {
+          const blk = blockForScene(p.dynamicsPlan, p.outline.findIndex((s) => s.id === scene.id) + 1);
+          return {
+            shotPromptEngines: { ...(p.shotPromptEngines || {}), [shot.id]: engine },
+            shotPromptDyn: { ...(p.shotPromptDyn || {}), [shot.id]: { camera: cameraOf(p, shot, blk), action: actionOf(p, shot, blk) } },
+          };
+        });
       }
     } catch (e) {
       setImgErr({ id: shot.id, msg: e.message || String(e) });
     } finally {
       setRegenBusy(null);
     }
+  };
+
+  // ---- shot dynamics: the camera and action sliders of the Video tab
+  const sceneBlock = scene ? blockForScene(project.dynamicsPlan, project.outline.indexOf(scene) + 1) : null;
+  const setDynamics = (shotId, key, value) =>
+    update((p) => {
+      const next = { ...(p[key] || {}) };
+      if (value == null) delete next[shotId];
+      else next[shotId] = value;
+      return { [key]: next };
+    });
+  const dynSlider = (shot, kind) => {
+    const levels = kind === 'camera' ? CAMERA_LEVELS : ACTION_LEVELS;
+    const key = kind === 'camera' ? 'shotCamera' : 'shotAction';
+    const value = kind === 'camera' ? cameraOf(project, shot, sceneBlock) : actionOf(project, shot, sceneBlock);
+    const manual = (project[key] || {})[shot.id] != null;
+    return (
+      <div className={`dyn-slider dyn-${kind}`}>
+        <div className="dyn-head">
+          <span className="s5e-eyebrow" title={t(`tip.dyn_${kind}`)}>{t(`dyn.${kind}`)}</span>
+          <span className="dyn-value" title={t(`dyn.${kind}_${levels[value]}_tip`)}>{t(`dyn.${kind}_${levels[value]}`)}</span>
+          <button
+            type="button"
+            className={`dyn-auto ${manual ? '' : 'on'}`}
+            aria-pressed={!manual}
+            disabled={!manual}
+            title={manual ? t('tip.dynAuto') : t('tip.dynIsAuto')}
+            onClick={() => setDynamics(shot.id, key, null)}
+          >
+            {t('dyn.auto')}
+          </button>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={levels.length - 1}
+          step={1}
+          value={value}
+          aria-label={t(`dyn.${kind}`)}
+          aria-valuetext={t(`dyn.${kind}_${levels[value]}`)}
+          title={t(`dyn.${kind}_${levels[value]}_tip`)}
+          onChange={(e) => setDynamics(shot.id, key, Number(e.target.value))}
+        />
+        <div className="dyn-ticks" style={{ '--n': levels.length }}>
+          {levels.map((lv, k) => (
+            <button
+              key={lv}
+              type="button"
+              className={k === value ? 'on' : ''}
+              title={t(`dyn.${kind}_${lv}_tip`)}
+              onClick={() => setDynamics(shot.id, key, k)}
+            >
+              {t(`dyn.${kind}_${lv}`)}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   // Compact card only: fold / unfold the prompt editor under its head.
@@ -2384,6 +2454,18 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       })}
                     </p>
                   )}
+                  <div className="dyn-sliders">
+                    {dynSlider(shot, 'camera')}
+                    {dynSlider(shot, 'action')}
+                    {dynamicsStale(project, shot, sceneBlock) && (
+                      <div className="dyn-stale">
+                        <span className="hint">{t('dyn.stale')}</span>
+                        <button title={t('tip.dynRecreate')} className="btn small" disabled={!!regenBusy || anyBusy} onClick={() => regenPrompt(shot, 'video')}>
+                          {regenBusy === `${shot.id}:video` ? t('s5.creatingPrompt') : t('dyn.recreate')}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <div className="s5e-btnrow">
                     {p.videoPrompt?.trim() ? (
                       <button title={t('tip.genVideo')}
