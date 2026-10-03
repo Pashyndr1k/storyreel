@@ -43,6 +43,12 @@
   Creating a prompt or an image on another shot used to hide the progress of
   a running video (the job itself kept running). Only one video is created at
   a time, so Create video on other shots is disabled meanwhile.
+- **MiniMax H3: H3 speaks the lines, in English.** H3 video prompts now
+  describe each dialogue or monologue (who speaks to whom, delivery, pauses,
+  reactions) and include the spoken lines, translated into English when the
+  script is in another language. "H3 native" is the default voice source for
+  dialogue shots; shots that already have a voice clip, or that you set to
+  TTS, keep H3 silent as before. Recreate a video prompt to apply it.
 - **Stop a video generation (Stage 5).** A stop button next to the Create
   video button interrupts the running job on ComfyUI and halts any queue.
   With Kling it only stops waiting — a task Kling accepted still runs and is

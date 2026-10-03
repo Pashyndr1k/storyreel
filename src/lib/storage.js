@@ -211,7 +211,7 @@ function projectDefaults() {
     shotVideoModes: {}, // shotId -> pinned video workflow: 'auto' | 'i2v' | 'flf2v' | 'si2v'
     shotVideoEngines: {}, // shotId -> engine that rendered it: 'ltx' | 'minimax' (drives assembly trim)
     shotPromptEngines: {}, // shotId -> engine the video prompt was WRITTEN for: 'ltx' | 'minimax'
-    shotVoiceSources: {}, // shotId -> 'tts' (default, both engines) | 'native' (H3 speaks the line itself)
+    shotVoiceSources: {}, // shotId -> explicit 'native' (H3 speaks the line) | 'tts' (separate voice); unset = see voiceSourceFor in prompts.js
     shotSpeakerNotes: {}, // shotId -> voice identity/timbre/delivery notes fed into the H3 prompt
     shotRefs: {}, // shotId -> { images: [{src,label}], videos: [{src,label}], audios: [{src,label}] } for H3 reference mode
     shotGroups: {}, // leadShotId -> { shotIds: [lead, ...members] } — H3 multi-shot takes (2-3 consecutive shots, one generation)

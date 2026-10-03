@@ -13,7 +13,7 @@ import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage, generateGeminiVoice, GEMINI_VOICES } from '../lib/gemini.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
 import { generateComfyVideo, generateComfyRefVideo, generateComfyMultiVideo, generateComfyImage, saveToLocalOutputs, VIDEO_RESOLUTIONS, VIDEO_MODES, H3_VIDEO_MODES, resolveVideoMode, resolveH3VideoMode, h3Seconds } from '../lib/comfy.js';
-import { stage5Prompt, stage5VideoPrompt, stage5H3VideoPrompt, stage5KlingVideoPrompt, h3ComposePrompt, stage5GeminiVoicePrompt, finalFramePrompt, tweakPromptSpec } from '../lib/prompts.js';
+import { stage5Prompt, stage5VideoPrompt, stage5H3VideoPrompt, stage5KlingVideoPrompt, h3ComposePrompt, voiceSourceFor, stage5GeminiVoicePrompt, finalFramePrompt, tweakPromptSpec } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
 import { aspectDescription } from '../lib/aspect.js';
 import ErrorNote from '../components/ErrorNote.jsx';
@@ -1458,7 +1458,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   // Voice source (H3 dialogue shots only): 'tts' keeps the TTS pipeline —
   // H3 renders the delivery silently and the take is laid on the assembly timeline;
   // 'native' hands the line to H3's own voice, driven by the speaker notes.
-  const voiceSourceOf = (shotId) => ((project.shotVoiceSources || {})[shotId] === 'native' ? 'native' : 'tts');
+  const voiceSourceOf = (shotId) => voiceSourceFor(project, shotId);
   const setVoiceSource = (shotId, v) =>
     update((p) => ({ shotVoiceSources: { ...(p.shotVoiceSources || {}), [shotId]: v } }));
   // Multi-shot takes (H3): combine 2-3 consecutive shots into one generation.

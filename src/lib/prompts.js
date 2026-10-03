@@ -954,7 +954,9 @@ Produce exactly three fields, in MiniMax's training format:
    - Open [Shot 1] with the overall style and initial composition ("Live-action, cinematic, a medium-wide shot frames…"). Styles: Cinematic, live-action, 2D-animated, 3D CG, claymation, watercolor, vintage film.
    - [Shot 1] carries NO timestamp. Later shots (only if the beat genuinely needs a new viewpoint) use "[Shot 2] At 00:03.500, the camera cuts to…" with strictly increasing times inside the duration. A cut must introduce NEW information (subject, space, state, viewpoint, time); if only the distance or angle changes, move the camera instead.
    - ${H3_CAMERA}
-   - Speakers get stable IDs: (S1), (S2); simultaneous speakers (S1,S2). Establish identity on first appearance (type, age, gender, on/off-screen, pitch, timbre, rate, accent). Identity, action and delivery go OUTSIDE the tag; INSIDE goes only the language tag and the verbatim words: The woman (S1) says: <d>[English] Text here.</d>
+   - Speakers get stable IDs: (S1), (S2); simultaneous speakers (S1,S2). Establish identity on first appearance (type, age, gender, on/off-screen, pitch, timbre, rate, accent). Identity, action and delivery go OUTSIDE the tag; INSIDE goes only the language tag and the spoken words: The woman (S1) says: <d>[English] Text here.</d>
+   - ALL direct speech is in ENGLISH: every <d> tag is <d>[English] …</d>. When the script's line is in another language, translate it into natural spoken English that keeps the meaning, tone and register and can be said within the shot's seconds; keep names as they are. Never put non-English words inside <d>.
+   - DESCRIBE every exchange, not only its words: for a DIALOGUE say who speaks to whom, in what order, each speaker's delivery (tone, volume, pace, emotion, pauses) and what the listener does while listening (looks, reactions, interruptions); for a MONOLOGUE say whether the character speaks aloud alone, addresses someone silent, or is heard as inner voice / voiceover, and how the delivery develops. Time each line against the action ("as she turns…", "after a beat…").
    - Voiceover uses the exact phrase "says in an off-screen voiceover", and immediately after the </d> states that the character's lips remain closed.
    - On-screen text goes in double quotes, verbatim, untranslated.
    - Describe diegetic sound (sounds the characters can hear) here, synchronized to the action.
@@ -964,7 +966,7 @@ Produce exactly three fields, in MiniMax's training format:
 3. "non_diegetic_music" — always exactly "N/A". StoryReel scores its films in the edit with a separate music generator, so the video model must produce NO music of its own: no score, no soundtrack, no musical stingers, no humming or singing ambience — only character speech and sound effects, and those belong to the fields above.
 
 Hard rules:
-- Everything in English except the verbatim contents of <d>…</d> and on-screen text, which keep their original language.
+- Everything in English, including the speech inside <d>…</d> (translated when the script is in another language). Only on-screen text keeps its original language.
 - Structured long, not verbose long: spend length on timeline, camera and audio, never on stacked adjectives.
 - Do not invent dialogue that the shot does not have. If the shot is silent, say so through the soundscape instead.
 - Describe only what is seeable or hearable.`;
@@ -1030,6 +1032,17 @@ export function h3ComposePrompt(body, { hasFirst = true, hasLast = false, second
   return head ? `${head}\n\n${clean}` : clean;
 }
 
+// Who voices a shot's line on MiniMax H3: 'native' — H3 speaks it as part of
+// the video (the default) — or 'tts' — a separately generated voice is laid on
+// in the edit and H3 must stay silent. An explicit choice wins; a shot with no
+// choice that already has a voice clip keeps it (projects made before the
+// default changed), otherwise H3 speaks.
+export function voiceSourceFor(project, shotId) {
+  const stored = (project.shotVoiceSources || {})[shotId];
+  if (stored === 'native' || stored === 'tts') return stored;
+  return (project.shotAudios || {})[shotId] ? 'tts' : 'native';
+}
+
 // Rewrite a scene's shots into H3 three-field prompts. Mirrors stage5VideoPrompt
 // (same scene context and continuity chain) but targets the H3 schema and asks
 // for the sound design the model can actually render.
@@ -1089,7 +1102,7 @@ export function stage5H3VideoPrompt(project, scene, shots, videoStyle, block, se
   };
   const shotLine = (s) => {
     const line = (s.dialogue || '').trim();
-    const native = (project.shotVoiceSources || {})[s.id] === 'native';
+    const native = voiceSourceFor(project, s.id) === 'native';
     const spk = ((project.shotSpeakerNotes || {})[s.id] || '').trim();
     const dialogue = !line
       ? '(no speech)'
@@ -1131,7 +1144,7 @@ ${inner}
       // Voice source decides whether H3 generates the speech (native) or the
       // line is laid on later from a TTS/recorded take (post) — the prompt
       // must never let H3 speak a post-voiced line.
-      const native = (project.shotVoiceSources || {})[s.id] === 'native';
+      const native = voiceSourceFor(project, s.id) === 'native';
       const spk = ((project.shotSpeakerNotes || {})[s.id] || '').trim();
       const dialogue = !line
         ? '(none — this shot has no speech)'
@@ -1157,7 +1170,7 @@ Each shot below already has a generated FIRST FRAME that will be attached to the
 
 ${list}
 
-For EACH shot write the three H3 fields describing only that shot's own duration. Shots marked REFERENCE MODE are rendered by H3's reference checkpoint: open their integrated_multimodal_description with subject definitions binding each reference to a role (“<Subject 1> is the woman from <Picture 1>”), state retention explicitly (“Use <Picture 1> exactly as it is” / “retain the voice of <Audio 1>”), then describe the shot; every attached reference must be mentioned by its label. References tagged [STORYBOARD FRAME] use MiniMax's official storyboard declaration — “<Picture N> is a storyboard reference for [Shot K], defining its viewpoint, subject placement, and shot order” — bound to the shot the frame belongs to (its scene/shot number is in the label). Shots marked MULTI-FRAME MODE are rendered by the reference checkpoint with stills pinned to exact timestamps: for those shots IGNORE the three-field layout and write "video_prompt" in the ${'SIX-SECTION KEYFRAME FORMAT'} defined at the end of this brief — the anchor table lists every picture with its role and its exact time, and [Shot N] markers inside the take must land on those times. GROUP TAKE entries are ONE multi-shot generation: write ONE video_prompt for the whole take — open with [Shot 1] (no timestamp), start every later segment with [Shot N] At MM:SS.mmm exactly matching the listed times, put <scenetrans> at each internal cut, keep continuity across the cuts — and return it under the take's shot number only; folded shots get NO entry of their own. Dialogue handling: where a line is marked [NATIVE VOICE], put it verbatim inside <d>[Language] …</d> with a speaker ID and an established voice identity (honor the speaker notes) — H3 speaks it natively. Where a line is marked [VOICE ADDED IN POST], the character visibly delivers it — mouth and body act the words — but NO speech may appear in any audio field: no <d> tags for that shot, the soundscape stays ambience and effects, the voice track is laid on in editing.
+For EACH shot write the three H3 fields describing only that shot's own duration. Shots marked REFERENCE MODE are rendered by H3's reference checkpoint: open their integrated_multimodal_description with subject definitions binding each reference to a role (“<Subject 1> is the woman from <Picture 1>”), state retention explicitly (“Use <Picture 1> exactly as it is” / “retain the voice of <Audio 1>”), then describe the shot; every attached reference must be mentioned by its label. References tagged [STORYBOARD FRAME] use MiniMax's official storyboard declaration — “<Picture N> is a storyboard reference for [Shot K], defining its viewpoint, subject placement, and shot order” — bound to the shot the frame belongs to (its scene/shot number is in the label). Shots marked MULTI-FRAME MODE are rendered by the reference checkpoint with stills pinned to exact timestamps: for those shots IGNORE the three-field layout and write "video_prompt" in the ${'SIX-SECTION KEYFRAME FORMAT'} defined at the end of this brief — the anchor table lists every picture with its role and its exact time, and [Shot N] markers inside the take must land on those times. GROUP TAKE entries are ONE multi-shot generation: write ONE video_prompt for the whole take — open with [Shot 1] (no timestamp), start every later segment with [Shot N] At MM:SS.mmm exactly matching the listed times, put <scenetrans> at each internal cut, keep continuity across the cuts — and return it under the take's shot number only; folded shots get NO entry of their own. Dialogue handling: where a line is marked [NATIVE VOICE], H3 speaks it. Describe the dialogue or monologue it belongs to (who speaks to whom, delivery, pauses, the listener's reactions) and give each spoken line inside <d>[English] …</d> with a speaker ID and an established voice identity (honor the speaker notes). The spoken words must be in English — translate the script's line faithfully if it is in another language; split a long line across the speakers and beats exactly as the script has it; never drop or add lines. Where a line is marked [VOICE ADDED IN POST], the character visibly delivers it — mouth and body act the words, and you still describe who speaks and how — but NO speech may appear in any audio field: no <d> tags for that shot, the soundscape stays ambience and effects, the voice track is laid on in editing.
 
 Return one entry per shot, in order, numbered from 1. "video_prompt" holds the three fields as ONE text block written exactly like this, blank line between fields:
 

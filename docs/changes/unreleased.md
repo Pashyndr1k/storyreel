@@ -509,6 +509,55 @@ plate, voice) still share `imgBusy`: starting one on a second shot hides the
 
 ---
 
+## 12. MiniMax H3 video prompts: dialogue described and spoken, speech in English
+
+**Request.** H3 video prompts must include descriptions of dialogues and
+monologues and the characters' spoken lines; all direct speech in English.
+
+**Behaviour.**
+- **H3 speaks by default.** A dialogue shot's voice source used to default to
+  "TTS", for which the H3 prompt deliberately contained no speech. The default
+  is now "H3 native": the prompt carries the spoken lines and H3 voices them.
+  An explicit per-shot choice still wins; a shot with no choice that already
+  has a voice clip (`project.shotAudios[id]`) stays "TTS", so older projects
+  with laid-in voices do not get a second voice.
+- **Speech in English.** Every `<d>` tag is `<d>[English] …</d>`. A script line
+  in another language is translated into natural spoken English (meaning,
+  tone, register kept; sized to the shot's seconds; names unchanged). Before,
+  native lines were passed verbatim in the script language. On-screen text
+  still keeps its original language.
+- **Dialogue and monologue are described.** The prompt writer must state who
+  speaks to whom and in what order, each delivery (tone, volume, pace,
+  emotion, pauses), the listener's reactions, and for a monologue whether it
+  is spoken aloud alone, addressed to someone silent, or an inner voice /
+  voiceover; lines are timed against the action.
+- Shots explicitly set to "TTS" behave as before: the character visibly
+  delivers the line and the delivery is described, but no speech reaches any
+  audio field.
+- Applies to every H3 prompt path that uses `stage5H3VideoPrompt` (plain,
+  takes, reference and multi-frame modes). LTX and Kling prompts are
+  unchanged. Existing stored prompts change only when recreated.
+
+**Data model.** No new field. `project.shotVoiceSources[shotId]` now holds
+only explicit choices (`'native'` | `'tts'`); the effective value comes from
+`voiceSourceFor(project, shotId)`.
+
+**Files.**
+- `src/lib/prompts.js`: new exported `voiceSourceFor`; `H3_SYSTEM` — the
+  speaker rule, two new rules (English speech; describe every exchange) and
+  the language hard rule; the "Dialogue handling" paragraph of
+  `stage5H3VideoPrompt`; both `native` checks use `voiceSourceFor`.
+- `src/stages/Stage5.jsx`: `voiceSourceOf` delegates to `voiceSourceFor`.
+- `src/lib/storage.js`: field comment.
+- i18n: reworded `vsrc.nativeHint`, `tip.vsrc_tts`, `tip.vsrc_native`.
+
+**Verified.** The built prompt for a seeded scene (a Russian dialogue shot
+with no choice, one with an existing voice clip, one explicitly TTS) inspected
+in the dev app: tags and instructions as described. No model call — the
+quality of the English lines and of H3's delivery is untested.
+
+---
+
 ## Open
 
 - The reworded image styles (section 4) have not been compared visually with the old ones.
