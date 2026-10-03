@@ -371,6 +371,10 @@ label {
 /* a generate button showing its job's progress: fill bar behind the label */
 .s5e-gen.progress { position: relative; overflow: hidden; }
 .s5e-gen.progress:disabled { opacity: 1; cursor: progress; }
+/* While it runs, the button gives up exactly the room the stop button needs
+   (38px square + the row's 10px gap), so the pair is as wide as the idle
+   button and nothing in the row moves or wraps. */
+.s5e-btnrow .s5e-gen.progress { min-width: calc(168px - 48px); width: calc(168px - 48px); padding-left: 6px; padding-right: 6px; }
 .gen-fill { position: absolute; top: 0; bottom: 0; left: 0; background: rgba(var(--accent-rgb), 0.38); transition: width 1s linear; }
 .gen-label { position: relative; font-variant-numeric: tabular-nums; }
 .s5e-ico.vid-stop { color: var(--accent); border-color: rgba(var(--accent-rgb), 0.5); }

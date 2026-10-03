@@ -558,6 +558,27 @@ quality of the English lines and of H3's delivery is untested.
 
 ---
 
+## 13. Fix: video button row wrapped when the stop button appeared
+
+**Report.** When the stop button appears during video generation, the buttons
+of the row shift onto the next line.
+
+**Cause.** The stop button (38px + the row's 10px gap) was added to a row that
+was already full in the compact card, next to the 168px Create video button.
+
+**Fix.** While the job runs, the Create video button is 48px narrower
+(`.s5e-btnrow .s5e-gen.progress`: 120px, side padding 6px), so button + stop
+button occupy exactly the idle button's 168px. The upload, delete, resolution
+and workflow controls keep their positions. The progress label ("NN% · m:ss")
+fits the narrower button.
+
+**Files.** `src/styles.css` only.
+
+**Verified.** In the dev app with ComfyUI stubbed: the row height and the
+positions of the controls after the button are identical idle and running.
+
+---
+
 ## Open
 
 - The reworded image styles (section 4) have not been compared visually with the old ones.

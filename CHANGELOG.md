@@ -38,7 +38,8 @@
 - **Progress on the Create video button (Stage 5).** While a video is being
   created the button turns into a progress bar with a percentage and the
   elapsed time. The percentage is an estimate learned from earlier runs on
-  your machine; the elapsed time is exact.
+  your machine; the elapsed time is exact. The progress button and its
+  stop button share the width of the idle button, so the row does not move.
 - **Fix: the video progress bar stays visible while you work on other shots.**
   Creating a prompt or an image on another shot used to hide the progress of
   a running video (the job itself kept running). Only one video is created at
