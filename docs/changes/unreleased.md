@@ -133,47 +133,47 @@ personal names, trademarks and film or game characters; then replace the ones
 found with descriptive wording.
 
 **Review result.** Script styles and the Stage 1 personas
-() contained none. Ten image styles and three video
-preset titles did.
+(`src/data/auteur_personas.json`) contained none. Ten image styles and
+three video preset titles did.
 
 **Behaviour.** Factory titles and texts changed as follows (style ids are
 unchanged, so projects that selected these styles stay linked):
 
 | Style id | Change |
 |---|---|
-|  | title "1970s Panavision" → "1970s Anamorphic Film"; "Panavision anamorphic lens" → "vintage anamorphic lens" |
-|  | title "IMAX Epic Sci-Fi" → "Large-Format Epic Sci-Fi"; "IMAX 70mm film" → "large-format 70mm film"; "directed by Denis Villeneuve" → "monumental scale, austere minimalist production design" |
-|  | "high contrast Kodak Tri-X" → "high contrast fast black-and-white film stock" |
-|  | "Kodak Portra 400 film stock" → "warm fine-grain colour negative film stock" |
-|  | "Wes Anderson style" → "deadpan storybook whimsy" |
-|  | title "Pixar 3D Magic" → "Polished 3D Family Animation"; "3D animation, Disney Pixar style," → "polished feature-film 3D animation, warm family-film look," |
-|  | "Studio Ghibli aesthetic" → "gentle hand-painted pastoral backgrounds" |
-|  | "(Makoto Shinkai / CoMix Wave style)" → "luminous photoreal backgrounds" |
-|  | title 'Stylized "Spider-Verse" 3D' → "Stylized Comic-Book 3D" |
-|  | "(Tim Burton / Henry Selick style)" → "macabre handmade puppet look"; "smooth Pixar 3D" → "smooth glossy 3D" in the avoid list |
-|  | title "3D Pixar Animation" → "3D Family Animation" |
-|  | title "MTV Retro" → "Retro Music Video" |
-|  | title "Action Camera (GoPro)" → "Action Camera" |
+| `bi2.image.panavision_70s` | title "1970s Panavision" → "1970s Anamorphic Film"; "Panavision anamorphic lens" → "vintage anamorphic lens" |
+| `bi2.image.imax_epic` | title "IMAX Epic Sci-Fi" → "Large-Format Epic Sci-Fi"; "IMAX 70mm film" → "large-format 70mm film"; ", directed by Denis Villeneuve" → ", monumental scale, austere minimalist production design" |
+| `bi2.image.french_new_wave` | "high contrast Kodak Tri-X" → "high contrast fast black-and-white film stock" |
+| `bi2.image.sun_nostalgia` | "Kodak Portra 400 film stock" → "warm fine-grain colour negative film stock" |
+| `bi2.image.surreal_pop` | ", Wes Anderson style" → ", deadpan storybook whimsy" |
+| `bi2.image.pixar_3d` | title "Pixar 3D Magic" → "Polished 3D Family Animation"; "3D animation, Disney Pixar style," → "polished feature-film 3D animation, warm family-film look," |
+| `bi2.image.retro_90s_anime` | ", Studio Ghibli aesthetic" → ", gentle hand-painted pastoral backgrounds" |
+| `bi2.image.modern_anime` | " (Makoto Shinkai / CoMix Wave style)" → ", luminous photoreal backgrounds" |
+| `bi2.image.spiderverse` | title 'Stylized "Spider-Verse" 3D' → "Stylized Comic-Book 3D" |
+| `bi2.image.gothic_stopmotion` | " (Tim Burton / Henry Selick style)" → ", macabre handmade puppet look"; "smooth Pixar 3D" → "smooth glossy 3D" in the avoid list |
+| `bi3.video.motion_03` | title "3D Pixar Animation" → "3D Family Animation" |
+| `bi3.video.motion_07` | title "MTV Retro" → "Retro Music Video" |
+| `bi3.video.motion_09` | title "Action Camera (GoPro)" → "Action Camera" |
 
 Existing installations are migrated on start: a style's title is replaced only
 if it still equals the old factory title, and its text only if it still equals
 the old factory text. Anything the user edited is left as it is, as are the
 user's own styles.
 
-**Data model.** . Migration v7 in .
+**Data model.** `STYLES_VERSION = 7`; migration v7 in `migrate()`.
 
 **Files.**
-- : new texts in ; frozen old values in
-   (image: title + text) and  (video
-  titles) — the old names stay in the source only as these comparison strings;
-  migration v7.
-- : the three preset titles.
+- `src/lib/styles.js`: new titles and texts in `BUILTINS_V2.image`; the old
+  values frozen in `V6_FACTORY_NAMED` (image: title + text) and
+  `V6_VIDEO_NAMES` (video titles) — the old names remain in the source only
+  as these comparison strings; migration v7.
+- `src/data/video_motion_presets.json`: the three preset titles.
 
 **Verified.** In the dev app: a stored v6 library upgrades to v7 with no
 remaining names; an edited title or text is kept; a user style is untouched.
-Note for dev work: editing  while the dev page is open hot-reloads
+Note for dev work: editing `styles.js` while the dev page is open hot-reloads
 the module and can persist the page's old in-memory library under the new
-version number — reload with the stored version set back to test a migration.
+version number — set the stored version back and reload to test a migration.
 The reworded styles were not test-rendered; the looks may shift slightly
 without the names.
 
