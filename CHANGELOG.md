@@ -23,8 +23,9 @@
   plot" saves the approved plot as it reads now. The list is compact — titles only; click a
   title to unfold the full description. Any pinned version can be developed
   again later or removed from the list.
-- **Keep a series in one project.** The series plan has a new "Keep in this
-  project" option next to the split: all episodes stay in the current
+- **Keep a series in one project.** The series plan now ends with one
+  "Production" section offering two ways: split into projects, or the new
+  "Keep in this project": all episodes stay in the current
   project, Stage 3 gains a "Series plan / Scene outline" switch, the outline
   for the whole series is written a few episodes at a time, and you continue
   to Stage 4 in the same project. Best for short series.

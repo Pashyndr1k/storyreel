@@ -280,7 +280,26 @@ export default function Stage3Series({ project, update, settings, onSettings, on
 
       {arcs.length > 0 && (
         <div className="seg-panel">
-          <h3 title={t('ser.splitHint')}>{t('ser.splitTitle')}</h3>
+          <h3 title={t('ser.prodHint')}>{t('ser.prodTitle')}</h3>
+          <p className="hint">{t('ser.prodHint')}</p>
+          {!complete && <p className="hint">{t('ser.splitNeedsPlan')}</p>}
+
+          {/* option 1: everything in this project */}
+          <div className="prod-option">
+            <h4 title={t('ser.keepHint')}>{t('ser.keepTitle')}</h4>
+            <p className="hint">{inline ? t('ser.keptNote') : t('ser.keepHint')}</p>
+            <div className="row">
+              {inline ? (
+                <button title={t('tip.serUnkeep')} className="btn" onClick={unkeep}>{t('ser.unkeep')}</button>
+              ) : (
+                <button title={t('tip.serKeep')} className="btn primary" disabled={busy || !complete} onClick={keepHere}>{t('ser.keepBtn')}</button>
+              )}
+            </div>
+          </div>
+
+          {/* option 2: separate projects of 5–10 episodes */}
+          <div className="prod-option">
+          <h4 title={t('ser.splitHint')}>{t('ser.splitTitle')}</h4>
           <p className="hint">{t('ser.splitHint')}</p>
           <div className="row">
             <label className="seg-size">
@@ -304,7 +323,6 @@ export default function Stage3Series({ project, update, settings, onSettings, on
               {t('ser.createProjects', { n: pendingSegs.length })}
             </button>
           </div>
-          {!complete && <p className="hint">{t('ser.splitNeedsPlan')}</p>}
           <div className="seg-list">
             {segs.map((s) => {
               const made = createdFor(s);
@@ -324,21 +342,7 @@ export default function Stage3Series({ project, update, settings, onSettings, on
               );
             })}
           </div>
-        </div>
-      )}
-
-      {arcs.length > 0 && (
-        <div className="seg-panel">
-          <h3 title={t('ser.keepHint')}>{t('ser.keepTitle')}</h3>
-          <p className="hint">{inline ? t('ser.keptNote') : t('ser.keepHint')}</p>
-          <div className="row">
-            {inline ? (
-              <button title={t('tip.serUnkeep')} className="btn" onClick={unkeep}>{t('ser.unkeep')}</button>
-            ) : (
-              <button title={t('tip.serKeep')} className="btn primary" disabled={busy || !complete} onClick={keepHere}>{t('ser.keepBtn')}</button>
-            )}
           </div>
-          {!inline && !complete && <p className="hint">{t('ser.splitNeedsPlan')}</p>}
         </div>
       )}
 

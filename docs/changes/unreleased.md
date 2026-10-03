@@ -231,10 +231,14 @@ copied from, so `project.selectedIdeaId` highlights it in both lists.
 Stage 4 without splitting, keeping every episode in the current project.
 
 **Behaviour.**
-- The series plan (Stage 3 of a series master) has a second panel under
-  "Split into projects": "Keep in this project" with a "Continue here" button,
-  enabled once every episode is written. It asks for confirmation, stating the
-  episode count and the approximate minutes of video.
+- The series plan (Stage 3 of a series master) ends with a single "Production" section
+  (`.seg-panel`) holding both ways to produce the series as two
+  `.prod-option` blocks: first "Keep in this project" with a "Continue here"
+  button, then "Split into projects" (size selector, "Create projects", the
+  list of parts). The "write every episode first" hint appears once, at the
+  top of the section. "Continue here" is enabled once every episode is
+  written and asks for confirmation, stating the episode count and the
+  approximate minutes of video.
 - After that the project is an **inline series**. Stage 3 shows a two-way
   switch under the heading — "Series plan" / "Scene outline" — and opens on
   the scene outline. The plan stays editable; splitting into projects still
@@ -272,10 +276,11 @@ Stage 4 without splitting, keeping every episode in the current project.
   `generateInline` (chunked, own busy/error state).
 - `src/stages/Stage3Series.jsx`: `viewSwitch` and `onKept` props, the
   "Keep in this project" panel (`keepHere`, `unkeep`), footer text.
-- `src/styles.css`: `.series-view`.
+- `src/styles.css`: `.series-view`, `.prod-option`.
 - i18n: `ser.keepTitle`, `ser.keepHint`, `ser.keepBtn`, `ser.keepConfirm`,
   `ser.keptNote`, `ser.keptFooter`, `ser.unkeep`, `ser.unkeepConfirm`,
-  `ser.view_plan`, `ser.view_scenes`, `ser.outlineProg`, `tip.serKeep`,
+  `ser.view_plan`, `ser.view_scenes`, `ser.outlineProg`, `ser.prodTitle`,
+  `ser.prodHint`, `tip.serKeep`,
   `tip.serUnkeep`, `tip.serView_plan`, `tip.serView_scenes`.
 
 **Verified.** In the dev app with a stubbed text model: a 24-episode plan kept
