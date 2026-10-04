@@ -3012,6 +3012,45 @@ textarea.s5e-prompt-sm { min-height: 110px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--hairline-soft); }
 .settings-io { margin-top: 6px; }
 .policy-row { align-items: center; gap: 8px; flex-wrap: wrap; }
+/* ---- spatial layout window ------------------------------------------------ */
+.modal.sp-modal { width: min(1280px, 96vw); max-width: min(1280px, 96vw); max-height: 96vh; padding: 16px 18px; }
+.sp-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.sp-top h2 { margin: 0; flex: 0 1 auto; min-width: 0; }
+.sp-shots { display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 auto; }
+.sp-shot { min-width: 28px; height: 28px; padding: 0 6px; border: 1px solid var(--glass-border); border-radius: 3px; background: transparent; color: var(--muted-2); font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; cursor: pointer; }
+.sp-shot.own { color: var(--text); border-color: var(--ink); }
+.sp-shot.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.sp-action { margin: 8px 0; font-size: 13px; color: var(--text-2); }
+.sp-action em { color: var(--muted-2); font-style: normal; }
+.sp-views { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.sp-pane { min-width: 0; display: flex; flex-direction: column; }
+.sp-pane-title { margin-bottom: 4px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.sp-canvas { display: block; width: 100%; background: #2a2c30; border: 1px solid var(--glass-border); border-radius: 3px; }
+.sp-editor { height: 40vh; min-height: 240px; cursor: grab; touch-action: none; }
+.sp-editor:active { cursor: grabbing; }
+.sp-camera-box { height: 40vh; min-height: 240px; display: flex; align-items: center; justify-content: center; background: #000; border-radius: 3px; overflow: hidden; }
+.sp-camera { flex: none; border: none; border-radius: 0; } /* sized in px by scene3d.resize to the project aspect */
+.sp-panels { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1.3fr); gap: 14px; margin-top: 12px; }
+.sp-panel { min-width: 0; }
+.sp-cast { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+.sp-chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px; border: 1px solid var(--glass-border); border-radius: 13px; background: transparent; color: var(--text-2); font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer; }
+.sp-chip i { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+.sp-chip .sp-box-dot { background: #9aa0aa; }
+.sp-chip.on { border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 1px var(--accent); }
+.sp-chip.add { border-style: dashed; color: var(--muted-2); }
+.sp-props { display: grid; gap: 6px; }
+.sp-slider { display: grid; grid-template-columns: 92px minmax(0, 1fr) 54px; align-items: center; gap: 8px; margin: 0; font-size: 12px; }
+.sp-slider input[type='range'] { width: 100%; accent-color: var(--accent); }
+.sp-slider i { font-style: normal; text-align: right; color: var(--muted-2); font-variant-numeric: tabular-nums; }
+.sp-row { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.sp-row select { flex: 1 1 0; min-width: 0; }
+.sp-panel > .seg { margin: 6px 0 8px; }
+.sp-report pre { margin: 6px 0 0; padding: 8px 10px; max-height: 190px; overflow: auto; background: var(--glass); border: 1px solid var(--glass-border-soft); border-radius: 3px; font: 11.5px/1.45 ui-monospace, 'Cascadia Code', Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.sp-warnings { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.sp-warnings button { width: 100%; padding: 5px 8px; border: 1px solid rgba(var(--accent-rgb), 0.45); border-left-width: 3px; border-radius: 3px; background: transparent; color: var(--text-2); font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.sp-help { margin-right: auto; }
+.btn.has-layout, .icon-btn.has-layout { color: var(--accent); }
+@media (max-width: 900px) { .sp-views, .sp-panels { grid-template-columns: minmax(0, 1fr); } }
 /* AI agent: settings block, flags button and list, flagged clips */
 .agent-setup { margin-top: 8px; }
 .agent-port { display: inline-flex; align-items: center; gap: 8px; margin: 0; }

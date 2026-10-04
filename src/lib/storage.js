@@ -215,6 +215,7 @@ function projectDefaults() {
     shotPromptEngines: {}, // shotId -> engine the video prompt was WRITTEN for: 'ltx' | 'minimax'
     agentFlags: [], // problems recorded by the AI agent (or auto-flagged after 4 attempts): [{ id, target, kind, issue, note, attempts, resolved, createdAt }]
     agentAttempts: {}, // attempt counters per target, e.g. 'shot:<id>:video' -> 3 (see lib/agent/api.js)
+    sceneLayouts: {}, // sceneId -> { props, shots: { shotId: { chars, camera, view? } } } — the 3D spatial layout (lib/spatial/layout.js)
     shotCamera: {}, // shotId -> camera dynamics 0..5 chosen by the user (unset = derived default, see lib/shotDynamics.js)
     shotAction: {}, // shotId -> action level 0..2 chosen by the user (unset = derived default)
     shotPromptDyn: {}, // shotId -> { camera, action } the stored video prompt was written with
@@ -304,7 +305,7 @@ export function migrateProject(raw) {
   p.shotVideoModes = p.shotVideoModes && typeof p.shotVideoModes === 'object' ? p.shotVideoModes : {};
   p.shotVideoEngines = p.shotVideoEngines && typeof p.shotVideoEngines === 'object' ? p.shotVideoEngines : {};
   p.shotPromptEngines = p.shotPromptEngines && typeof p.shotPromptEngines === 'object' ? p.shotPromptEngines : {};
-  for (const k of ['shotCamera', 'shotAction', 'shotPromptDyn', 'agentAttempts']) p[k] = p[k] && typeof p[k] === 'object' ? p[k] : {};
+  for (const k of ['shotCamera', 'shotAction', 'shotPromptDyn', 'agentAttempts', 'sceneLayouts']) p[k] = p[k] && typeof p[k] === 'object' ? p[k] : {};
   p.agentFlags = Array.isArray(p.agentFlags) ? p.agentFlags.filter((f) => f && f.id) : [];
   p.shotVoiceSources = p.shotVoiceSources && typeof p.shotVoiceSources === 'object' ? p.shotVoiceSources : {};
   p.shotSpeakerNotes = p.shotSpeakerNotes && typeof p.shotSpeakerNotes === 'object' ? p.shotSpeakerNotes : {};

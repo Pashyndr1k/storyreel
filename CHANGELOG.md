@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **Spatial layout (Stage 4 and Stage 5).** A 3D window per scene: a
+  checkerboard floor in one-metre squares, a coloured block figure for each
+  character, simple labelled set boxes, and a camera with five real lenses.
+  The 3D scene is on the left and the camera view on the right. "Build
+  layout" lets the text model place everyone and the camera for every shot;
+  you then drag figures, change pose and direction, and move the camera. A
+  shot continues the previous shot's layout until you change it.
+- **Prompts follow the layout.** For a scene that has a layout, image and
+  video prompts are written from a measured description of each shot: who is
+  where in the frame, how far from the camera, which way they face and look,
+  the shot size and camera height. The window also warns when two characters
+  swap sides of the frame between shots or a named character is out of frame.
 - **Duplicate a shot (Stage 4).** A copy icon next to the delete icon adds a
   copy of the shot right after it.
 - **Stage 5 prompt header.** "Recreate prompt" is now a text button and Copy

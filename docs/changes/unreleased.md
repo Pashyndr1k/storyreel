@@ -236,3 +236,133 @@ original with a new id), the Stage 5 header buttons, the absence of the mute
 badge and of the Stage 4 thumbnails, the label, and the new rules present in
 the built H3 prompt spec. No model call — the length and quality of real H3
 prompts, and how H3 renders internal cuts, are untested.
+
+---
+
+## 3. Spatial layout: a 3D blocking tool that the prompt writers follow
+
+**Request.** A "spatial awareness" tool for placing and tracking characters in
+a frame: a 3D scene with a checkerboard floor and ultra-simple block figures
+(box head, torso, arms, legs; an arrow in front of the face; one distinct
+colour per character — red, blue, green, orange, purple, grey — with
+different shades on front, side and back; a head with eyes, mouth, ears, nose
+and a mark on the back; four pose templates: standing, sitting, lying,
+jumping, which set vertical position); a freely movable camera with real
+optics (orbit, vertical move, target point, five lenses); a pop-up with the 3D
+editor on the left and the camera view on the right. The scene is first built
+by AI from the story, positions change shot by shot when characters move, and
+the model that writes shot descriptions and prompts cross-references the
+camera view. Improvements were proposed first; the user chose: built by the
+app's text model; measured description only (no image) for the prompt
+writers; characters plus simple set boxes; one layout per shot.
+
+**Behaviour.**
+- A "Layout" button on the Stage 4 action row and a cube icon button in the
+  Stage 5 scene tools open the window for the current scene (accent-coloured
+  once the scene has a layout). Disabled until the scene has shots.
+- The window (`SpatialModal`): title, a strip of the scene's shots (outlined
+  = has its own layout, filled = open), "Build layout" / "Rebuild layout";
+  the open shot's type and action; left, the 3D editor; right, the camera
+  view at the project's aspect ratio with the lens in its title; below, three
+  panels — "In the scene" (a chip per character in its colour and per set
+  box, "+ Box", and the selected item's controls), "Camera" (lens 18 / 24 /
+  35 / 50 / 85 mm, orbit, elevation, distance, target height, "Aim at…",
+  "Use previous"), and "What the prompt writer gets" (the measured
+  description and the scene's continuity warnings, each a button that opens
+  its shot).
+- Editor interactions: drag a figure, a box or the red camera target across
+  the floor (0.1 m snap); drag empty space to orbit the editor view,
+  Shift-drag to pan, wheel to zoom. The shot camera is drawn as a body with
+  its frustum to the target distance. Figure controls: pose (Stand, Sit, Lie,
+  Jump), direction (-180…180°), head turn (-80…80°), "Turn toward…" (body)
+  and "Look at…" (head only). Box controls: label, width, depth, height,
+  direction, delete. Up to 6 characters (colours in cast order) and 8 boxes.
+- **One layout per shot, carried forward.** A shot without its own entry uses
+  the nearest earlier shot's; the first edit gives it its own. "Use previous"
+  drops a shot's own layout. Set boxes are per scene.
+- **Build layout** sends the scene, its cast and its shots to the text model
+  (`layoutPrompt`) and stores positions, poses, facing, boxes and a camera
+  for every shot (`layoutFromModel`); a character the model leaves out stays
+  where they were; `aim_at` points the camera at a character.
+- **Measured description** (`describeShot`), computed from the same camera
+  maths the view renders with: shot size (from the frame height at the
+  subject: extreme close-up < 0.3 m, close-up < 0.7, medium close-up < 1.1,
+  medium < 1.7, medium-full < 2.6, full < 3.6, wide < 9, else extreme wide),
+  lens, camera height word and tilt; who is in frame from screen-left to
+  screen-right; per character the frame position (centre, left/right of
+  centre, left/right, far left/right), foreground / middle / background,
+  distance from camera, pose, body facing relative to the camera, head turn,
+  and who they look at (head within 22°); per pair who is screen-left, the
+  distance and their relation (facing each other, back to back, one faces the
+  other, at an angle); who is not in frame; set boxes in frame.
+- **Prompt integration.** When the scene has a layout, each shot in the image
+  prompt request, the LTX and Kling video prompt requests (`spatial_layout`
+  field) and the H3 request (`spatial_layout:` block) carries that text, with
+  the binding `SPATIAL_RULE`: stage the frame exactly so, never move or turn a
+  character otherwise, keep positions consistent across shots, never mention
+  the figure colours or the floor plan. Scenes without a layout are unchanged.
+- **Continuity warnings** (`continuityWarnings`): a character named in a
+  shot's text but not in frame; two characters swapping screen sides between
+  consecutive shots (the line was crossed); a character more than 3 m from
+  where the previous shot left them.
+- Closing the window saves the open shot's camera view (JPEG, ≤ 480 px wide)
+  as `view` in its layout. The agent's `storyreel_review_shot` returns it as
+  "INTENDED COMPOSITION" and the description as `expected.spatialLayout`.
+
+**Conventions.** Metres on the floor; x to the right, z toward the viewer of
+the default camera. A body at `rot` 0 faces +z; 90 faces +x. Head turn is
+added to `rot` (positive = the character's own left). The camera orbits its
+target: `yaw` 0 is the +z side, `pitch` raises it, `dist` is the distance.
+Vertical field of view: `2·atan(sensorH / 2f)` with a 36 mm long side
+(`sensorH = 36 / aspect` for landscape, 36 for portrait). Head-top heights:
+standing 1.8, sitting 1.4, lying 0.35, jumping 2.4.
+
+**Data model.** `project.sceneLayouts[sceneId] = { props: [{ id, label, x, z,
+w, d, h, rot }], shots: { [shotId]: { chars: { [characterId]: { x, z, rot,
+head, pose } }, camera: { tx, ty, tz, yaw, pitch, dist, lens }, view? } } }` —
+default `{}`, normalised as an object in `migrateProject`. Values are clamped
+on read (`normalizeChar`, `normalizeCamera`, `normalizeProp`).
+
+**Files.**
+- `src/lib/spatial/layout.js` (new): constants (`CHAR_COLORS`, `POSES`,
+  `LENSES`, `POSE_TOP`, `MAX_PROPS`), normalisers, `sceneCast`,
+  `layoutFor` (inheritance), `hasLayout`, `cameraPosition`, `verticalFov`,
+  `aspectValue`, `forwardOf`.
+- `src/lib/spatial/describe.js` (new): `cameraFrame`, `analyse`,
+  `describeShot`, `continuityWarnings`.
+- `src/lib/spatial/scene3d.js` (new, three.js): `createSpatialView` —
+  floor, figures, boxes, labels, camera gizmo (layer 1, editor only), two
+  renderers; `setLayout`, `resize`, `pick`, `floorPoint`, `orbitBy`,
+  `panBy`, `zoomBy`, `snapshot`, `dispose`. Unlit materials with fixed
+  shades per face; face textures drawn on canvases.
+- `src/lib/spatial/build.js` (new): `layoutPrompt`, `layoutFromModel`.
+- `src/components/SpatialModal.jsx` (new).
+- `src/lib/prompts.js`: `SPATIAL_RULE`, `spatialOf`, `anySpatial`, and
+  the four builders.
+- `src/stages/Stage4.jsx`, `src/stages/Stage5.jsx`: the buttons and the modal.
+- `src/lib/agent/api.js`: the intended-composition image and
+  `expected.spatialLayout` in `reviewShot`.
+- `src/lib/storage.js`: `sceneLayouts`.
+- `src/styles.css`: `.sp-*` classes, `.has-layout`.
+- `package.json` / `package-lock.json`: new dependency `three` ^0.170.0
+  (the main bundle grows from about 0.9 MB to 1.5 MB).
+- i18n: `sp.*` (window, poses, camera, report, warnings) and `tip.sp*`.
+
+**Verified.** In the dev app: the description and warnings for a hand-made
+layout; a model answer turned into a layout (name matching, kept positions,
+aim-at); the description present in the image, H3, LTX and Kling prompt
+requests; the window opened from Stage 4 and Stage 5 with both views drawing
+(camera view at 1.78 for a 16:9 project); selecting, pose, direction, aim,
+lens, "Use previous", inheritance, the saved view, and "Rebuild layout"
+through a stubbed model. Dragging a figure with the pointer was exercised
+only for the orbit path. No real model run: how well the text model places a
+scene, and how closely the image and video models follow the description,
+are untested.
+
+**Open.**
+- Portrait (9:16) framing words use the same thresholds as landscape.
+- No start/end pair per shot (the user chose one layout per shot), no
+  elevation for platforms or stairs, no pan of the camera target in height by
+  dragging.
+- Agent tools to read or change the layout were not requested and are not
+  exposed (the description is in `review_shot` only).

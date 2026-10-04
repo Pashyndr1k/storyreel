@@ -1,7 +1,7 @@
 import { useAgentScope } from '../lib/agent/registry.js';
 import { SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC } from '../lib/config.js';
 import { useRef, useState } from 'react';
-import { Grip, Stars, Copy } from '../components/icons.jsx';
+import { Grip, Stars, Copy, Box } from '../components/icons.jsx';
 import { useGenerate } from '../lib/useGenerate.js';
 import { stage4Prompt } from '../lib/prompts.js';
 import { uid } from '../lib/storage.js';
@@ -14,6 +14,8 @@ import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
 import Lightbox from '../components/Lightbox.jsx';
 import SceneNav from '../components/SceneNav.jsx';
 import ScriptExportModal from '../components/ScriptExportModal.jsx';
+import SpatialModal from '../components/SpatialModal.jsx';
+import { hasLayout } from '../lib/spatial/layout.js';
 import { Download } from '../components/icons.jsx';
 
 // The "Storyboard preview & timeline" section is hidden (2.12); the component
@@ -63,6 +65,7 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
   const scene = project.outline.find((s) => s.id === sceneId) || project.outline[0];
   const shots = (scene && project.sceneDetails[scene.id]?.shots) || [];
   const [showExport, setShowExport] = useState(false);
+  const [showLayout, setShowLayout] = useState(false);
   const doneCount = project.outline.filter((s) => project.sceneDetails[s.id]?.shots?.length).length;
   const allDone = doneCount === project.outline.length && project.outline.length > 0;
 
@@ -193,6 +196,9 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
         {prog && (
           <span className="total-badge" title={t('ind.batchProgress')}>{t('batch.progress', { a: prog.a, b: prog.b })}</span>
         )}
+        <button title={shots.length ? t('tip.spOpen') : t('sp.noShots')} className={`btn ${scene && hasLayout(project, scene.id) ? 'has-layout' : ''}`} disabled={!shots.length} onClick={() => setShowLayout(true)}>
+          <Box size={14} /> {t('sp.button')}
+        </button>
         <button title={allDone ? t('tip.sxOpen') : t('sx.notReady')} className="btn" disabled={!allDone} onClick={() => setShowExport(true)}>
           <Download size={14} /> {t('sx.button')}
         </button>
@@ -327,6 +333,7 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
       </footer>
       <Lightbox item={lightbox} onClose={() => setLightbox(null)} />
       {showExport && <ScriptExportModal project={project} onClose={() => setShowExport(false)} />}
+      {showLayout && scene && <SpatialModal project={project} update={update} scene={scene} settings={settings} onClose={() => setShowLayout(false)} />}
     </section>
   );
 }

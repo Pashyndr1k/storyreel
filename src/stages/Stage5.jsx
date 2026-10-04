@@ -25,6 +25,8 @@ import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
 import SceneNav from '../components/SceneNav.jsx';
 import { blockForScene, DYNAMICS_CONFIG } from '../lib/dynamics.js';
 import AssetsModal from '../components/AssetsModal.jsx';
+import SpatialModal from '../components/SpatialModal.jsx';
+import { hasLayout } from '../lib/spatial/layout.js';
 import Lightbox from '../components/Lightbox.jsx';
 import RefPicker from '../components/RefPicker.jsx';
 import KeyframePicker from '../components/KeyframePicker.jsx';
@@ -35,7 +37,7 @@ import LibraryPicker from '../components/LibraryPicker.jsx';
 import { newLibraryEntry } from '../lib/library.js';
 import { fileToResizedDataURL, resizeDataURL } from '../lib/images.js';
 import { extractPalette } from '../lib/palette.js';
-import { Download, RestoreIcon, MapPin, Upload, Layers, Grid, Trash, Stars, Zap, Expand, Mic, StopSq, Chevron, Copy, Check } from '../components/icons.jsx';
+import { Download, RestoreIcon, MapPin, Upload, Layers, Grid, Trash, Stars, Zap, Expand, Mic, StopSq, Chevron, Copy, Check, Box } from '../components/icons.jsx';
 
 const readFileDataURL = (file) =>
   new Promise((resolve, reject) => {
@@ -166,6 +168,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const [vidProg, setVidProg] = useState(null); // running video job: { shotId, startedAt, expectedSec } — drives the button's progress bar
   const [locSaved, setLocSaved] = useState(null); // shotId whose location ref was just saved
   const [showAssets, setShowAssets] = useState(false); // asset library manager
+  const [showLayout, setShowLayout] = useState(false); // 3D spatial layout of the scene
   const [assetPickFor, setAssetPickFor] = useState(null); // shotId choosing an asset
   const [pickLoc, setPickLoc] = useState(null); // library picker for a new location: { shotId } (shotId null = scene panel)
   const [mediaProg, setMediaProg] = useState(null); // { a, b } scene-media queue
@@ -1916,6 +1919,17 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
             <Zap size={16} />
           </button>
         )}
+        {shots.length > 0 && (
+          <button
+            type="button"
+            className={`icon-btn sq42 ${hasLayout(project, scene.id) ? 'has-layout' : ''}`}
+            title={t('tip.spOpen')}
+            aria-label={t('tip.spOpen')}
+            onClick={() => setShowLayout(true)}
+          >
+            <Box size={16} />
+          </button>
+        )}
         <button
           type="button"
           className={`icon-btn sq42 ${shots.length ? '' : 'push-right'}`}
@@ -2910,6 +2924,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           onChange={(next) => setKeyframes(keyPickFor.id, next)}
           onClose={() => setKeyPickFor(null)}
         />
+      )}
+      {showLayout && scene && (
+        <SpatialModal project={project} update={update} scene={scene} settings={settings} initialShotId={focusShotId} onClose={() => setShowLayout(false)} />
       )}
       {showAssets && (
         <AssetsModal

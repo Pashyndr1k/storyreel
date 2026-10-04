@@ -21,6 +21,8 @@ import { smartEditPrompt, voiceSourceFor } from '../prompts.js';
 import { computeSmartPatch } from '../../components/SmartEditModal.jsx';
 import { shotCastRefs } from '../castRefs.js';
 import { locationsOf, shotLocationRefs } from '../sceneLocations.js';
+import { describeShot } from '../spatial/describe.js';
+import { sceneLayout } from '../spatial/layout.js';
 import { CAMERA_LEVELS, ACTION_LEVELS, cameraOf, actionOf } from '../shotDynamics.js';
 import { blockForScene } from '../dynamics.js';
 import { transcribeAudio } from '../gemini.js';
@@ -321,6 +323,8 @@ async function reviewShot({ projectId, shotId, frames = 6, transcript = false })
   const fin = (project.shotFinalImages || {})[shot.id];
   const video = (project.shotVideos || {})[shot.id];
   const voice = (project.shotAudios || {})[shot.id];
+  // the layout's camera view: the composition the shot was planned with
+  await push('INTENDED COMPOSITION — camera view of the 3D layout (block figures stand in for the characters; compare positions and facing, not looks)', sceneLayout(project, scene.id)?.shots?.[shot.id]?.view);
   await push('THIS SHOT — first frame', first);
   await push('THIS SHOT — final frame', fin);
 
@@ -363,6 +367,7 @@ async function reviewShot({ projectId, shotId, frames = 6, transcript = false })
       voiceSource: (shot.dialogue || '').trim() ? voiceSourceFor(project, shot.id) : null,
       imagePrompt: pr.imagePrompt || '',
       videoPrompt: pr.videoPrompt || '',
+      spatialLayout: describeShot(project, scene, shot.id) || null,
     },
     checks,
     attempts: Object.fromEntries(Object.entries(project.agentAttempts || {}).filter(([k]) => k.startsWith(`shot:${shot.id}:`))),
