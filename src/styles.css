@@ -435,6 +435,9 @@ label {
 }
 .copy-link:hover:not(:disabled) { color: var(--accent); }
 .copy-link:disabled { opacity: 0.45; cursor: not-allowed; }
+.copy-link.prompt-recreate { white-space: nowrap; }
+.prompt-regen.prompt-copy.done { color: var(--accent); }
+.btn.tiny.shot-dup { display: inline-flex; align-items: center; justify-content: center; }
 
 .file-btn { cursor: pointer; margin: 0; }
 

@@ -1,8 +1,7 @@
 import { useAgentScope } from '../lib/agent/registry.js';
-import { scenePhotos } from '../lib/sceneLocations.js';
 import { SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC } from '../lib/config.js';
 import { useRef, useState } from 'react';
-import { Grip, Stars } from '../components/icons.jsx';
+import { Grip, Stars, Copy } from '../components/icons.jsx';
 import { useGenerate } from '../lib/useGenerate.js';
 import { stage4Prompt } from '../lib/prompts.js';
 import { uid } from '../lib/storage.js';
@@ -125,6 +124,12 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
 
   const updateShot = (id, patch) => setShots(shots.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   const removeShot = (id) => setShots(shots.filter((s) => s.id !== id));
+  // a copy of the shot's text and duration, placed right after it
+  const duplicateShot = (id) => {
+    const i = shots.findIndex((s) => s.id === id);
+    if (i < 0) return;
+    setShots([...shots.slice(0, i + 1), { ...shots[i], id: uid() }, ...shots.slice(i + 1)]);
+  };
 
   const dragIdx = useRef(null);
   const [overIdx, setOverIdx] = useState(null);
@@ -176,20 +181,6 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
         {t('s4.startsAt', { t: fmt(sceneStart) })} · {t('s4.target', { d: scene.duration })}
         {shots.length > 0 && <> · {t('s4.current', { d: sceneTotal })}</>}
         <p>{scene.summary}</p>
-        {/* Environment references are managed at Stage 5; Stage 4 only shows
-            the ones the scene already carries. */}
-        {scenePhotos(scene, Number.POSITIVE_INFINITY).length > 0 && (
-          <>
-            <label className="photos-label">{t('scene.photos')}</label>
-            <div className="photo-row">
-              {scenePhotos(scene, Number.POSITIVE_INFINITY).map((ph, i) => (
-                <div key={i} className="photo-thumb">
-                  <img decoding="async" loading="lazy" src={ph} alt="" onClick={() => setLightbox({ kind: 'img', src: ph })} />
-                </div>
-              ))}
-            </div>
-          </>
-        )}
       </div>
 
       <div className="row">
@@ -266,6 +257,9 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
                 >
                   <Grip size={16} />
                 </span>
+                <button title={t('tip.dupShot')} aria-label={t('tip.dupShot')} className="btn tiny shot-dup" onClick={() => duplicateShot(shot.id)}>
+                  <Copy size={13} />
+                </button>
                 <button title={t('tip.removeShot')} className="btn danger tiny" onClick={() => removeShot(shot.id)}>✕</button>
               </div>
             </div>

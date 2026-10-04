@@ -1936,9 +1936,6 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                         <span className="nle-clip-num">{globalIdx + 1}</span>
                       )}
                       <span className="nle-dur" title={t('ind.clipDur')}>{Number(it.shot.duration || 0).toFixed(1)}s</span>
-                      {it.muted && it.video && (
-                        <span className="clip-mute" title={t('s6.mutedBadge')}>🔇</span>
-                      )}
                       {/* both edges trim: left = the beginning (in-point),
                           right = the end. A take is one generation — its
                           beginning is not trimmable here. */}

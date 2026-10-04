@@ -177,3 +177,62 @@ full packaged app has not been driven by Claude Code end to end.
 - An app-side vision check (the app calling a vision model itself and
   returning a verdict) would let agents without image input use the same
   workflow.
+
+---
+
+## 2. UI changes at Stage 4 / Stage 5; highly detailed H3 prompts
+
+**Request.** (1) Stage 4: a "duplicate shot" icon on each shot card next to
+the delete icon; the copy goes right after the original. (2) Stage 5: the
+"regenerate prompt" icon becomes a text button, and the "copy" text button
+becomes an icon. (3) Timeline: remove the mute icon in the top-left corner of
+a shot's clip. (4) Stage 4: remove the environment thumbnails from the scene
+description. (5) Stage 4: "Duration (2–10 s)" → "Duration". (6) MiniMax H3
+prompts must be highly detailed, with camera dynamics and character movement,
+and use shot changes inside one shot when the description allows and the shot
+is longer than 4 seconds; an example prompt was supplied as the standard.
+
+**Behaviour.**
+- Stage 4 shot card tools: a copy icon before the ✕. `duplicateShot(id)`
+  inserts `{ ...shot, id: uid() }` at index + 1 (text and duration only —
+  media, prompts and settings are keyed by shot id and are not copied).
+- Stage 5 prompt header: the recreate control is a text button "Recreate
+  prompt" (reads "Creating prompt…" while it runs); Copy is an icon button
+  that shows a check mark for 1.5 s after copying. The wording follows the
+  app-wide Create / Recreate rule, not "Regenerate". Applies to the image,
+  video and voice prompt headers (the voice header has only the copy icon).
+- Timeline clips no longer show the 🔇 badge. Muting itself is unchanged
+  (`project.shotMutes`); the string `s6.mutedBadge` is now unused.
+- Stage 4 scene header shows title, timing and summary only; the environment
+  photos remain at Stage 5.
+- Stage 4 duration label reads "Duration" (the 2–10 s limits still apply).
+- H3 system instruction (`H3_SYSTEM`):
+  - new rule "SHOT CHANGES INSIDE ONE VIDEO": a shot longer than 4 s whose
+    action has more than one beat is written as two or three internal shots
+    (`[Shot 2] At 00:03.500, …`), at most one cut per two seconds, first
+    internal shot ≥ 2 s; each internal shot has its own framing and follows
+    the shot's CAMERA setting; shots of ≤ 4 s, single unbroken actions and
+    explicit one-take shots stay one shot; with a final frame attached the
+    last internal shot must arrive at it. This replaces "only if the beat
+    genuinely needs a new viewpoint".
+  - new "DETAIL STANDARD" (replaces "five to nine sentences"): 150–350 words;
+    the camera for the whole shot including what it does not do; for every
+    moving element what moves, direction, speed, how many times, start and
+    end state; what must stay unchanged; everything in playback order.
+  - the scene request adds a sentence invoking both, and its `maxTokens`
+    rises from 6000 to 14000.
+  The user's example (a locked-off animated painting) informed the standard;
+  its text is not embedded in the prompt.
+
+**Files.** `src/stages/Stage4.jsx` (`duplicateShot`, the icon, the removed
+thumbnail block), `src/stages/Stage5.jsx` (`CopyButton`, `regenBtn`, icon
+imports), `src/stages/Stage6.jsx` (badge removed), `src/lib/prompts.js`
+(`H3_SYSTEM`, `stage5H3VideoPrompt`), `src/styles.css`
+(`.prompt-recreate`, `.prompt-copy.done`, `.shot-dup`), i18n: new
+`tip.dupShot`; changed `s4.duration`.
+
+**Verified.** In the dev app: duplicating a shot (copy placed after the
+original with a new id), the Stage 5 header buttons, the absence of the mute
+badge and of the Stage 4 thumbnails, the label, and the new rules present in
+the built H3 prompt spec. No model call — the length and quality of real H3
+prompts, and how H3 renders internal cuts, are untested.

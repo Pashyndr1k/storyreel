@@ -35,7 +35,7 @@ import LibraryPicker from '../components/LibraryPicker.jsx';
 import { newLibraryEntry } from '../lib/library.js';
 import { fileToResizedDataURL, resizeDataURL } from '../lib/images.js';
 import { extractPalette } from '../lib/palette.js';
-import { Download, RestoreIcon, MapPin, Upload, Layers, Grid, Trash, Stars, Zap, Expand, Mic, StopSq, Chevron } from '../components/icons.jsx';
+import { Download, RestoreIcon, MapPin, Upload, Layers, Grid, Trash, Stars, Zap, Expand, Mic, StopSq, Chevron, Copy, Check } from '../components/icons.jsx';
 
 const readFileDataURL = (file) =>
   new Promise((resolve, reject) => {
@@ -140,8 +140,8 @@ function CopyButton({ text }) {
     }
   };
   return (
-    <button title={t('tip.copy')} type="button" className="copy-link" disabled={!text} onClick={copy}>
-      {copied ? t('s5.copied') : t('s5.copy')}
+    <button title={copied ? t('s5.copied') : t('tip.copy')} aria-label={t('tip.copy')} type="button" className={`prompt-regen prompt-copy ${copied ? 'done' : ''}`} disabled={!text} onClick={copy}>
+      {copied ? <Check size={14} /> : <Copy size={14} />}
     </button>
   );
 }
@@ -602,17 +602,16 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       </button>
     ) : null;
 
-  // Regenerate icon shown in a prompt frame's header, next to Copy.
+  // "Recreate prompt" text button in a prompt frame's header, next to the copy icon.
   const regenBtn = (shot, kind) => (
     <button
       type="button"
-      className={`prompt-regen ${regenBusy === `${shot.id}:${kind}` ? 'busy' : ''}`}
+      className="copy-link prompt-recreate"
       title={t('s5.regenOne')}
-      aria-label={t('s5.regenOne')}
       disabled={!!regenBusy}
       onClick={() => regenPrompt(shot, kind)}
     >
-      <RestoreIcon size={14} />
+      {regenBusy === `${shot.id}:${kind}` ? t('s5.creatingPrompt') : t('dyn.recreate')}
     </button>
   );
 

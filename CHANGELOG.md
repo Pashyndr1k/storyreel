@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **Duplicate a shot (Stage 4).** A copy icon next to the delete icon adds a
+  copy of the shot right after it.
+- **Stage 5 prompt header.** "Recreate prompt" is now a text button and Copy
+  is an icon.
+- **Cleaner Stage 4 and timeline.** The environment thumbnails are gone from
+  the Stage 4 scene header, the duration label reads "Duration", and timeline
+  clips no longer show a mute badge.
+- **Much more detailed MiniMax H3 prompts.** Prompts now spell out the camera
+  for the whole shot and, for every moving element, what moves, how fast, how
+  many times and where it ends. Shots longer than 4 seconds with more than
+  one beat are written with shot changes inside the one video.
 - **Agent access.** An AI agent on your computer (for example Claude Code) can
   now operate StoryReel: run the stages, create frames, videos and voices,
   check each result and fix or flag problems. Turn it on in Settings →
