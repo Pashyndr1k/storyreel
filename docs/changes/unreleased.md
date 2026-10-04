@@ -477,3 +477,37 @@ scene's shots to apply it.
 
 **Open.** Only Stage 4 was asked for; the Stage 3 outline and the "edit with
 AI" requests rely on the general system rule (names in Latin letters) only.
+
+---
+
+## 6. Spatial layout: rebuild one shot
+
+**Request.** An option in the 3D layout window to recreate the scene for an
+individual shot.
+
+**Behaviour.** A "Rebuild shot" button in the window's top row, left of
+"Build layout / Rebuild layout". It asks the text model to place the
+characters and the camera again for the open shot only. The request
+(`shotLayoutPrompt`) reuses the planner's system rules and the scene / cast /
+shot list, and adds as fixed facts the set boxes and the current layout of
+the previous and the next shot (positions, facing, pose, presence, camera),
+with the instruction to stay continuous with them. The answer
+(`shotLayoutFromModel`) replaces that shot's entry (`chars`, `camera`; its
+saved `view` is dropped and re-saved on close); a character the model leaves
+out keeps the state they had in the shot. Other shots, the set boxes and the
+cast list are untouched. If the shot already has its own layout a
+confirmation is asked first. Both build buttons are disabled while either
+runs; `busy` is now `false | 'all' | 'shot'`.
+
+**Files.** `src/lib/spatial/build.js` (`shotLayoutPrompt`,
+`shotLayoutFromModel`), `src/components/SpatialModal.jsx` (`buildShot`).
+i18n: `sp.rebuildShot`, `tip.spBuildShot`, `sp.buildShotConfirm`.
+
+**Verified.** In the dev app with the model call stubbed: the request text,
+and the button replacing shot 2 only (new pose, camera and presence shown in
+the chips and the description; shots 1 and 3 unchanged). No real model run.
+The top row's fit with two buttons was not checked visually (it wraps if the
+window is narrow).
+
+**Open.** Shots after the rebuilt one that have their own entries are not
+adjusted; a continuity warning appears if the new staging breaks with them.

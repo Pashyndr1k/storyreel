@@ -4,7 +4,7 @@ import { generateJSON, textKeyError } from '../lib/claude.js';
 import { createSpatialView } from '../lib/spatial/scene3d.js';
 import { layoutFor, sceneLayout, sceneCast, aspectValue, normalizeProp, wrapDeg, POSES, LENSES, POSE_TOP, MAX_PROPS, MAX_LAYOUT_CHARS } from '../lib/spatial/layout.js';
 import { describeShot, continuityWarnings } from '../lib/spatial/describe.js';
-import { layoutPrompt, layoutFromModel } from '../lib/spatial/build.js';
+import { layoutPrompt, layoutFromModel, shotLayoutPrompt, shotLayoutFromModel } from '../lib/spatial/build.js';
 import { Trash, Plus, Stars } from './icons.jsx';
 
 // Spatial layout of a scene: a 3D floor with block figures (left, the editor)
@@ -16,7 +16,7 @@ export default function SpatialModal({ project, update, scene, settings, initial
   const shots = project.sceneDetails[scene.id]?.shots || [];
   const [shotId, setShotId] = useState(initialShotId && shots.some((s) => s.id === initialShotId) ? initialShotId : shots[0]?.id || null);
   const [sel, setSel] = useState(null); // { type: 'char' | 'prop' | 'camera', id }
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(false); // false | 'all' | 'shot'
   const [error, setError] = useState('');
   const editorRef = useRef(null);
   const cameraRef = useRef(null);
@@ -133,12 +133,38 @@ export default function SpatialModal({ project, update, scene, settings, initial
     drag.current = null;
   };
 
+  // ---- rebuild the open shot only; the other shots and the set stay
+  const buildShot = async () => {
+    const keyErr = textKeyError(settings);
+    if (keyErr) return setError(keyErr === 'NO_GEMINI_KEY' ? t('err.noGeminiKey') : t('err.noKey'));
+    const sid = shotId;
+    const index = shots.findIndex((x) => x.id === sid);
+    if (index < 0) return undefined;
+    if (stored?.shots?.[sid] && !window.confirm(t('sp.buildShotConfirm', { n: index + 1 }))) return undefined;
+    setBusy('shot');
+    setError('');
+    try {
+      const data = await generateJSON(settings, shotLayoutPrompt(project, scene, shots, index));
+      const built = shotLayoutFromModel(project, scene, shots, index, data);
+      if (!built) throw new Error(t('sp.buildEmpty'));
+      update((p) => {
+        const sl = (p.sceneLayouts || {})[scene.id] || { props: [], shots: {} };
+        return { sceneLayouts: { ...(p.sceneLayouts || {}), [scene.id]: { ...sl, shots: { ...sl.shots, [sid]: built } } } };
+      });
+    } catch (e) {
+      setError(e.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+    return undefined;
+  };
+
   // ---- build with the text model
   const build = async () => {
     const keyErr = textKeyError(settings);
     if (keyErr) return setError(keyErr === 'NO_GEMINI_KEY' ? t('err.noGeminiKey') : t('err.noKey'));
     if (stored && Object.keys(stored.shots || {}).length && !window.confirm(t('sp.buildConfirm'))) return undefined;
-    setBusy(true);
+    setBusy('all');
     setError('');
     try {
       const data = await generateJSON(settings, layoutPrompt(project, scene, shots));
@@ -246,8 +272,11 @@ export default function SpatialModal({ project, update, scene, settings, initial
               );
             })}
           </div>
-          <button title={t('tip.spBuild')} className="btn small primary fixedw-lg" disabled={busy} onClick={build}>
-            <Stars size={13} /> {busy ? t('sp.building') : stored && Object.keys(stored.shots || {}).length ? t('sp.rebuild') : t('sp.build')}
+          <button title={t('tip.spBuildShot', { n: shotIndex + 1 })} className="btn small fixedw-lg" disabled={!!busy || shotIndex < 0} onClick={buildShot}>
+            <Stars size={13} /> {busy === 'shot' ? t('sp.building') : t('sp.rebuildShot')}
+          </button>
+          <button title={t('tip.spBuild')} className="btn small primary fixedw-lg" disabled={!!busy} onClick={build}>
+            <Stars size={13} /> {busy === 'all' ? t('sp.building') : stored && Object.keys(stored.shots || {}).length ? t('sp.rebuild') : t('sp.build')}
           </button>
         </div>
         <p className="sp-action" title={t('sp.actionTip')}>

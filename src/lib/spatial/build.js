@@ -1,7 +1,7 @@
 // "Build layout": the text model reads the scene and its shots and places the
 // characters, a few set boxes and the camera for every shot. The result is a
 // starting point the user adjusts in the 3D window.
-import { namedInShot, sceneCast, normalizeChar, normalizeCamera, normalizeProp, LENSES, POSES, MAX_PROPS, POSE_TOP } from './layout.js';
+import { layoutFor, namedInShot, sceneCast, normalizeChar, normalizeCamera, normalizeProp, LENSES, POSES, MAX_PROPS, POSE_TOP } from './layout.js';
 
 export function layoutPrompt(project, scene, shots) {
   const cast = sceneCast(project, scene);
@@ -81,4 +81,57 @@ export function layoutFromModel(project, scene, shots, data) {
     }
   });
   return out;
+}
+
+// "Rebuild shot": the same planner re-places ONE shot. It is given the layout
+// of the neighbouring shots and the set pieces as fixed facts, so the new
+// staging cuts together with what is already there.
+export function shotLayoutPrompt(project, scene, shots, index) {
+  const base = layoutPrompt(project, scene, shots);
+  const r1 = (v) => Math.round(v * 10) / 10;
+  const stateOf = (i) => {
+    const l = layoutFor(project, scene, shots[i].id);
+    const people = l.cast.map((c) => {
+      const st = l.chars[c.id];
+      return st.off ? `${c.name}: not present` : `${c.name}: x ${r1(st.x)}, z ${r1(st.z)}, facing_deg ${Math.round((st.rot + 360) % 360)}, head_turn_deg ${Math.round(st.head)}, ${st.pose}`;
+    });
+    const cam = l.camera;
+    return `Shot ${i + 1}:\n${people.map((p) => `  - ${p}`).join('\n')}\n  - camera: target x ${r1(cam.tx)}, z ${r1(cam.tz)}, height ${r1(cam.ty)}; yaw_deg ${Math.round((cam.yaw + 360) % 360)}, elevation_deg ${Math.round(cam.pitch)}, distance_m ${r1(cam.dist)}, lens_mm ${cam.lens}`;
+  };
+  const current = layoutFor(project, scene, shots[index].id);
+  const around = [index - 1, index + 1].filter((i) => i >= 0 && i < shots.length);
+  const props = current.props.length
+    ? current.props.map((p) => `- ${p.label || 'box'}: x ${r1(p.x)}, z ${r1(p.z)}, ${r1(p.w)} × ${r1(p.d)} m, ${r1(p.h)} m high`).join('\n')
+    : '(none)';
+  const head = base.user.slice(0, base.user.indexOf('Return the layout for all'));
+  const one = `{"shots":[{"shot":${index + 1},${base.user.slice(base.user.indexOf('"characters":['))}`;
+  return {
+    system: base.system,
+    maxTokens: 4000,
+    user: `${head}SET PIECES ALREADY ON THE FLOOR (fixed — do not move, add or return them):
+${props}
+
+LAYOUT OF THE NEIGHBOURING SHOTS (fixed — they stay as they are):
+${around.length ? around.map(stateOf).join('\n') : '(this is the only shot)'}
+
+Re-plan ONLY shot ${index + 1}. Stage it afresh from its own action and shot type: choose the positions, facing, poses and the camera that tell this shot best. Keep it continuous with the neighbouring shots above — a character stands where the previous shot left them unless this shot's action moves them, and screen sides do not flip against the previous shot unless the action demands it. List every character with "present".
+
+Return exactly one entry in "shots", with "shot": ${index + 1}.
+
+JSON schema:
+${one}`,
+  };
+}
+
+// One rebuilt shot from the model's answer: { chars, camera } or null.
+export function shotLayoutFromModel(project, scene, shots, index, data) {
+  const rows = Array.isArray(data?.shots) ? data.shots : data?.characters ? [data] : [];
+  const row = rows.find((r) => Number(r?.shot) === index + 1) || rows[0];
+  if (!row) return null;
+  const built = layoutFromModel(project, scene, shots, { shots: [{ ...row, shot: index + 1 }] }).shots[shots[index].id];
+  if (!built) return null;
+  // anyone the model left out keeps the state they had in this shot
+  const cur = layoutFor(project, scene, shots[index].id);
+  for (const c of cur.cast) if (!built.chars[c.id]) built.chars[c.id] = cur.chars[c.id];
+  return built;
 }

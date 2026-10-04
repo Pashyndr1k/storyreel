@@ -25,6 +25,9 @@
 - **Names exactly as on the cards (Stage 4).** Shot descriptions, dialogue
   and notes now use each character's English name exactly as written on the
   Stage 2 card — never translated or inflected, in any script language.
+- **Rebuild one shot (3D layout).** "Rebuild shot" in the layout window lets
+  the text model place the characters and camera again for the open shot
+  only, keeping it continuous with the shots before and after it.
 - **Duplicate a shot (Stage 4).** A copy icon next to the delete icon adds a
   copy of the shot right after it.
 - **Stage 5 prompt header.** "Recreate prompt" is now a text button and Copy
