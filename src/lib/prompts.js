@@ -1,4 +1,5 @@
 import { dataURLToImageBlock } from './images.js';
+import { latinNames } from './names.js';
 import { aspectDescription } from './aspect.js';
 import { buildRandomization } from './randomization.js';
 import { densityRange, buildShotPayload } from './dynamics.js';
@@ -47,13 +48,18 @@ Rules:
 - Respond with VALID JSON ONLY. No markdown, no code fences, no commentary outside the JSON.
 - Follow the exact JSON schema given in the task.
 - Write ALL creative content (titles, pitches, synopsis, character descriptions, dialogue, action descriptions, notes) in ${langName}, regardless of the language of the user's input.
-- Character names must ALWAYS be written in English using Latin letters (transliterate if needed) — never in Cyrillic or any non-Latin script — so they stay consistent inside the English image and video prompts.
+- Character names must ALWAYS be written in English using Latin letters — never in Cyrillic or any non-Latin script. When the task lists the characters, every mention of a character anywhere in your answer uses the name EXACTLY as listed, character for character: never translated, transliterated, shortened, declined or inflected, even inside a sentence in another language (write "рядом с Anna", never "рядом с Анной"). New names you invent are written in Latin letters too.
 - The "image_prompt" and "video_prompt" fields must ALWAYS be written entirely in English — never in any other language.`;
   const extra = (custom || '').trim();
   return extra
     ? `${base}\n\nAdditional project-specific instructions (follow these, but never break the rules above):\n${extra}`
     : base;
 }
+
+// Names as written on the Stage 2 cards (characters, then groups). A request
+// that carries them as `names` has its answer checked by lib/names.js.
+export const cardNames = (project) =>
+  [...(project.storyline?.characters || []), ...(project.storyline?.groups || [])].map((c) => (c.name || '').trim()).filter(Boolean);
 
 function characterBlock(project) {
   const chars = project.storyline?.characters || [];
@@ -177,6 +183,7 @@ export function seriesArcsPrompt(project, lang, scriptStyle) {
   const sections = n <= 8 ? '1 or 2 sections' : `one section per roughly 8–12 episodes (a section may run 5–15 episodes; about ${Math.max(2, Math.round(n / 10))} sections in total)`;
   return {
     system: system(lang, scriptStyle),
+    names: cardNames(project),
     maxTokens: 5000,
     user: `Series title: ${project.title}
 Genres: ${project.genres.join(', ')}
@@ -211,6 +218,7 @@ export function seriesEpisodesPrompt(project, lang, scriptStyle, { arcs, arc, fr
     : 'These are the first episodes of the series.';
   return {
     system: system(lang, scriptStyle),
+    names: cardNames(project),
     maxTokens: 6000,
     user: `Series title: ${project.title}
 
@@ -246,6 +254,7 @@ export function stage3Prompt(project, lang, scriptStyle) {
     const n = sp.to - sp.from + 1;
     return {
       system: system(lang, scriptStyle),
+      names: cardNames(project),
       maxTokens: 9000,
       user: `Series: ${sp.seriesTitle} — a vertical short-drama series of ${sp.total} episodes, each ${episodeRange(project).min}–${episodeRange(project).max} seconds. This project produces episodes ${sp.from}–${sp.to}${sp.arcTitle ? ` (section "${sp.arcTitle}")` : ''}.
 Genres: ${project.genres.join(', ')}
@@ -282,6 +291,7 @@ JSON schema:
   }
   return {
     system: system(lang, scriptStyle),
+    names: cardNames(project),
     maxTokens: 4500,
     user: `Title: ${project.title}
 Genres: ${project.genres.join(', ')}
@@ -353,7 +363,7 @@ export function compositionRules(block, prevTypes = [], mode = 'breakdown') {
 
 export function stage4Prompt(project, scene, lang, scriptStyle, block) {
   const outlineList = project.outline
-    .map((s, i) => `${i + 1}. ${s.title} — ${s.summary} (~${s.duration}s)`)
+    .map((s, i) => `${i + 1}. ${latinNames(s.title, cardNames(project))} — ${latinNames(s.summary, cardNames(project))} (~${s.duration}s)`)
     .join('\n');
   const envNote = scenePhotos(scene).length
     ? `\n\nAttached are reference photos of this scene's environment. Match the locations, lighting and mood in your shot descriptions to these photos.`
@@ -362,7 +372,8 @@ export function stage4Prompt(project, scene, lang, scriptStyle, block) {
   // shot lengths and dictates motion/dialogue density and camera behavior.
   const range = block ? densityRange(block) : { min: 2, max: 10 };
   // names as written on the Stage 2 cards — the shot text must repeat them verbatim
-  const names = [...(project.storyline?.characters || []), ...(project.storyline?.groups || [])].map((c) => (c.name || '').trim()).filter(Boolean);
+  const names = cardNames(project);
+  const fix = (text) => latinNames(text, names);
   // composition count carries across the scene boundary
   const sceneIdx = project.outline.findIndex((x) => x.id === scene.id);
   const prevShots = sceneIdx > 0 ? project.sceneDetails?.[project.outline[sceneIdx - 1].id]?.shots || [] : [];
@@ -376,12 +387,13 @@ export function stage4Prompt(project, scene, lang, scriptStyle, block) {
     : '';
   return {
     system: system(lang, scriptStyle),
+    names: cardNames(project),
     maxTokens: 5000,
     user: withPhotos(scenePhotos(scene), `Title: ${project.title}
 
 Synopsis:
 """
-${project.storyline?.synopsis || ''}
+${fix(project.storyline?.synopsis || '')}
 """
 
 Characters:
@@ -390,7 +402,7 @@ ${characterBlock(project)}
 Full scene outline:
 ${outlineList}
 
-Now break down SCENE ${scene.number}: "${scene.title}" (${scene.summary}) into individual camera shots.
+Now break down SCENE ${scene.number}: "${fix(scene.title)}" (${fix(scene.summary)}) into individual camera shots.
 
 Requirements:
 - Each shot lasts between ${range.min} and ${range.max} seconds.

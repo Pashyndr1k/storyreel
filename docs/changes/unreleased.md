@@ -511,3 +511,67 @@ window is narrow).
 
 **Open.** Shots after the rebuilt one that have their own entries are not
 adjusted; a continuity warning appears if the new staging breaks with them.
+
+---
+
+## 7. Character names enforced on the model's answer
+
+**Request.** The Stage 4 shot generator still wrote character names in
+Cyrillic after section 5. A strict rule: only the original English names,
+everywhere, exactly as on the Stage 2 cards.
+
+**Behaviour.** The instruction alone was not obeyed, so the names are now
+enforced on the answer itself (`src/lib/names.js`), in two passes:
+1. **Deterministic.** Every capitalised Cyrillic word (or word in capitals,
+   e.g. a speaker prefix) that reads as a form of a card-name word is replaced
+   by that word as written on the card. Matching: transliteration to Latin, a
+   phonetic key for both sides (dzh/zh → j, sh, ph → f, th → t, ch/ck/c/q →
+   k, soft c → s, w → v, y → i, z → s, h dropped, doubles collapsed; a second
+   key with soft g; a third for J + vowel names read as Ю/Я), then either
+   "starts with the name's stem and the rest is a case ending" or, for names
+   with three or more consonants, an equal consonant skeleton. Examples that
+   pass: Анну / Анной / Аня → Anna, Бориса / Борисом → Boris, Джона /
+   Джонові → John, Майкл → Michael, Сарой → Sarah, Юля / Юлии → Julia,
+   Алису → Alice, БОРИС: → Boris:.
+2. **Model check for what is left.** Capitalised Cyrillic words still in the
+   answer (three letters or more; words in capitals only as speakers) are
+   sent in one small request (`namesRepairSpec`) with the card names; the
+   model answers, per word, the matching card name or null (place, brand,
+   ordinary word). Accepted values must be a card name or one of its words.
+   Named words are then replaced everywhere. This catches translated or
+   national forms the first pass cannot read (Ганна → Anna, Олена → Elena).
+   Verdicts are remembered per cast for the session (module-level map), so a
+   word is asked once. If the check request fails, pass 1's result is kept.
+- **Where.** `generateJSON` runs it for any request whose spec has
+  `names`. `cardNames(project)` (characters, then groups) is attached to
+  `stage4Prompt`, `stage3Prompt` (both forms), `seriesArcsPrompt` and
+  `seriesEpisodesPrompt`. Stage 2 creates the cards and is not covered; the
+  Stage 5 prompts are English already.
+- **Input.** `stage4Prompt` also runs pass 1 over the synopsis, the scene
+  outline and the scene's title / summary it sends, so an older Cyrillic
+  spelling there no longer leads the model.
+- **System rule** (all script requests) reworded: names exactly as listed,
+  never translated, transliterated, shortened, declined or inflected, with an
+  example.
+
+**Cost.** Up to one extra small text request per answer, only while new
+capitalised Cyrillic words keep appearing (sentence openers are included, so
+expect it on most Russian / Ukrainian Stage 3–4 runs; none for English).
+
+**Files.** `src/lib/names.js` (new: `latinNames`, `enforceNames`,
+`namesRepairSpec`), `src/lib/claude.js` (`generateJSON`),
+`src/lib/prompts.js` (`cardNames`, `names` on four builders, input
+cleaning, system rule). No data or i18n change.
+
+**Verified.** In the dev app: the pass-1 examples above, non-names left alone
+(Москву, Олегом, «Волга», Сыр, Вера в победу, Марка автомобиля), and the full
+path through `generateJSON` with stubbed model answers (replacement, the
+check request, no second request on a repeat). Not run against a real model.
+
+**Open.**
+- Pass 1 can replace an ordinary sentence-opening word that happens to read
+  as a form of a name (a character called Vera and "Верю…"; Mark and
+  "Марка…" when the stem and ending fit). Not seen in the tests, possible.
+- Names with non-Latin card spelling are not handled (cards are expected in
+  English). Existing shots are not rewritten — recreate them.
+- The "edit with AI" requests do not carry `names`.

@@ -1,4 +1,5 @@
 import { CLAUDE_MODELS } from './config.js';
+import { enforceNames } from './names.js';
 import { withRetry } from './retry.js';
 import { generateGeminiText } from './gemini.js';
 import { activePolicy, policySystemBlock, refuse } from './policy.js';
@@ -99,7 +100,7 @@ export async function generateJSON(settings, spec, { signal, noPolicy } = {}) {
   // with a policy_refusal object when the request itself conflicts with it.
   const policy = noPolicy ? null : activePolicy(settings);
   if (policy) spec = { ...spec, system: `${spec.system || ''}${policySystemBlock(policy, settings)}` };
-  return withRetry(async () => {
+  const answer = await withRetry(async () => {
     if (signal?.aborted) {
       const e = new Error('Aborted');
       e.name = 'AbortError';
@@ -113,4 +114,8 @@ export async function generateJSON(settings, spec, { signal, noPolicy } = {}) {
     if (policy && out && !Array.isArray(out) && out.policy_refusal) refuse(policy, out.policy_refusal);
     return out;
   });
+  // A request that lists the character cards' names gets them enforced on the
+  // answer: Cyrillic forms of a name are put back exactly as on the card.
+  if (!spec.names?.length) return answer;
+  return enforceNames(answer, spec.names, (repair) => generateJSON(settings, repair, { signal, noPolicy: true }));
 }

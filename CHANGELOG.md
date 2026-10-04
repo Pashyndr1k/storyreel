@@ -22,6 +22,10 @@
 - **The 3D layout is optional.** It is off by default; turn it on per project
   in Project settings ("Use the 3D layout in this project"). Each shot card at
   Stage 5 then has its own layout button.
+- **Names enforced (Stages 3 and 4).** Character names in scene outlines,
+  series plans and shot breakdowns are now corrected after the model answers:
+  any Russian or Ukrainian form of a name is put back exactly as on the
+  Stage 2 card.
 - **Names exactly as on the cards (Stage 4).** Shot descriptions, dialogue
   and notes now use each character's English name exactly as written on the
   Stage 2 card — never translated or inflected, in any script language.
