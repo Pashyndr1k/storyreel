@@ -22,6 +22,9 @@
 - **The 3D layout is optional.** It is off by default; turn it on per project
   in Project settings ("Use the 3D layout in this project"). Each shot card at
   Stage 5 then has its own layout button.
+- **Names exactly as on the cards (Stage 4).** Shot descriptions, dialogue
+  and notes now use each character's English name exactly as written on the
+  Stage 2 card — never translated or inflected, in any script language.
 - **Duplicate a shot (Stage 4).** A copy icon next to the delete icon adds a
   copy of the shot right after it.
 - **Stage 5 prompt header.** "Recreate prompt" is now a text button and Copy

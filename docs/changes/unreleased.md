@@ -451,3 +451,29 @@ flag.
 **Open.** A shot card (and so its icon) appears at Stage 5 as before, only
 for the focused shot. Removing a character does not delete their stored
 positions, so adding them back restores them.
+
+---
+
+## 5. Stage 4: character names verbatim from the Stage 2 cards
+
+**Request.** In the shot descriptions of Stage 4, use the English versions of
+the names, exactly as they appear on the character cards from Stage 2.
+
+**Behaviour.** `stage4Prompt` has a new requirement, CHARACTER NAMES: in
+"action", "dialogue" (speaker prefixes and names spoken inside lines) and
+"notes" every character and group name is written exactly as on the card —
+same English spelling in Latin letters — and is never translated,
+transliterated into another script, shortened, declined or inflected,
+whatever the script language. The names (characters, then groups) are listed
+in the rule. Before, a Russian or Ukrainian breakdown could write a name in
+Cyrillic or in an inflected form, which also broke name matching elsewhere
+(the spatial layout's cast, the continuity checks).
+
+**Files.** `src/lib/prompts.js` (`stage4Prompt`). No data or i18n change.
+
+**Verified.** The rule and the name list appear in the built request. Not run
+against a real model. Existing shot breakdowns are not rewritten — recreate a
+scene's shots to apply it.
+
+**Open.** Only Stage 4 was asked for; the Stage 3 outline and the "edit with
+AI" requests rely on the general system rule (names in Latin letters) only.

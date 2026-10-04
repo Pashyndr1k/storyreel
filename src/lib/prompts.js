@@ -361,6 +361,8 @@ export function stage4Prompt(project, scene, lang, scriptStyle, block) {
   // Action Dynamics Plan: the scene's rhythm block mathematically constrains
   // shot lengths and dictates motion/dialogue density and camera behavior.
   const range = block ? densityRange(block) : { min: 2, max: 10 };
+  // names as written on the Stage 2 cards — the shot text must repeat them verbatim
+  const names = [...(project.storyline?.characters || []), ...(project.storyline?.groups || [])].map((c) => (c.name || '').trim()).filter(Boolean);
   // composition count carries across the scene boundary
   const sceneIdx = project.outline.findIndex((x) => x.id === scene.id);
   const prevShots = sceneIdx > 0 ? project.sceneDetails?.[project.outline[sceneIdx - 1].id]?.shots || [] : [];
@@ -396,6 +398,7 @@ Requirements:
 - "action" must describe precisely what the characters do and what the camera sees — concrete and filmable, no abstractions.
 - "dialogue" contains the spoken lines prefixed by the speaker's name, or an empty string if the shot has no dialogue.
 - "location" is the specific place plus time of day / lighting condition.
+- CHARACTER NAMES: in "action", "dialogue" (speaker prefixes and names spoken inside the lines) and "notes", write every character's name EXACTLY as it is written in the Characters list above — the same English spelling in Latin letters, character for character${names.length ? ` (${names.join(', ')})` : ''}. Never translate, transliterate into another script, shorten, decline or otherwise inflect a name, whatever language the rest of the text is in: the name stays unchanged inside the sentence. The same applies to group names.
 
 JSON schema:
 {"shots":[{"duration_sec":4,"shot_type":"framing + camera angle, e.g. low-angle medium close-up / top-down wide / eye-level medium / POV tracking","location":"specific location, time of day","action":"what happens and what the camera sees","dialogue":"NAME: line — or empty string","notes":"mood, lighting, sound or continuity note — may be empty"}]}` + dynNote + compNote + envNote),
