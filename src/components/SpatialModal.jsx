@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../lib/i18n.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
 import { createSpatialView } from '../lib/spatial/scene3d.js';
-import { layoutFor, sceneLayout, sceneCast, aspectValue, normalizeProp, wrapDeg, POSES, LENSES, POSE_TOP, MAX_PROPS } from '../lib/spatial/layout.js';
+import { layoutFor, sceneLayout, sceneCast, aspectValue, normalizeProp, wrapDeg, POSES, LENSES, POSE_TOP, MAX_PROPS, MAX_LAYOUT_CHARS } from '../lib/spatial/layout.js';
 import { describeShot, continuityWarnings } from '../lib/spatial/describe.js';
 import { layoutPrompt, layoutFromModel } from '../lib/spatial/build.js';
 import { Trash, Plus, Stars } from './icons.jsx';
@@ -46,6 +46,16 @@ export default function SpatialModal({ project, update, scene, settings, initial
       return { sceneLayouts: { ...(p.sceneLayouts || {}), [scene.id]: { ...sl, props: fn((sl.props || []).map(normalizeProp)) } } };
     });
   const setChar = (id, patch) => writeShot((cur) => Object.assign(cur.chars[id], patch));
+  // The scene's cast: starts as everyone its shots name; the user may add or
+  // remove characters, which fixes the list for this scene.
+  const writeCast = (fn) =>
+    update((p) => {
+      const sc = p.outline.find((s) => s.id === scene.id);
+      const sl = (p.sceneLayouts || {})[scene.id] || { props: [], shots: {} };
+      const ids = fn(sceneCast(p, sc).map((c) => c.id)).slice(0, MAX_LAYOUT_CHARS);
+      return { sceneLayouts: { ...(p.sceneLayouts || {}), [scene.id]: { ...sl, cast: ids } } };
+    });
+  const outsiders = (project.storyline?.characters || []).filter((c) => !sceneCast(project, scene).some((x) => x.id === c.id));
   const setCam = (patch) => writeShot((cur) => Object.assign(cur.camera, patch));
   const clearShot = () =>
     update((p) => {
@@ -273,7 +283,7 @@ export default function SpatialModal({ project, update, scene, settings, initial
             <div className="s5e-eyebrow" title={t('sp.castTip')}>{t('sp.cast')}</div>
             <div className="sp-cast">
               {layout.cast.map((c) => (
-                <button key={c.id} type="button" className={`sp-chip ${selChar?.id === c.id ? 'on' : ''}`} title={t('sp.selectTip', { name: c.name })} onClick={() => setSel({ type: 'char', id: c.id })}>
+                <button key={c.id} type="button" className={`sp-chip ${selChar?.id === c.id ? 'on' : ''} ${layout.chars[c.id].off ? 'absent' : ''}`} title={`${t('sp.selectTip', { name: c.name })}${layout.chars[c.id].off ? ` — ${t('sp.absentTip')}` : ''}`} onClick={() => setSel({ type: 'char', id: c.id })}>
                   <i style={{ background: c.color.hex }} /> {c.name}
                 </button>
               ))}
@@ -282,6 +292,12 @@ export default function SpatialModal({ project, update, scene, settings, initial
                   <i className="sp-box-dot" /> {p.label || t('sp.propDefault')}
                 </button>
               ))}
+              {outsiders.length > 0 && layout.cast.length < MAX_LAYOUT_CHARS && (
+                <select className="sp-add-char" title={t('tip.spAddChar')} value="" onChange={(e) => e.target.value && writeCast((ids) => [...ids, e.target.value])}>
+                  <option value="">{t('sp.addChar')}</option>
+                  {outsiders.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              )}
               {layout.props.length < MAX_PROPS && (
                 <button type="button" className="sp-chip add" title={t('tip.spAddProp')} onClick={addProp}>
                   <Plus size={12} /> {t('sp.addProp')}
@@ -291,6 +307,13 @@ export default function SpatialModal({ project, update, scene, settings, initial
 
             {selChar && (
               <div className="sp-props">
+                <div className="sp-row">
+                  <label className="check-row sp-present" title={t('tip.spPresent')}>
+                    <input type="checkbox" checked={!layout.chars[selChar.id].off} onChange={(e) => setChar(selChar.id, { off: !e.target.checked })} />
+                    <span>{t('sp.present')}</span>
+                  </label>
+                  <button type="button" className="btn small" title={t('tip.spRemoveChar')} onClick={() => { writeCast((ids) => ids.filter((x) => x !== selChar.id)); setSel(null); }}>{t('sp.removeChar')}</button>
+                </div>
                 <span className="seg seg-tall seg-compact" role="radiogroup" aria-label={t('sp.pose')}>
                   {POSES.map((po) => (
                     <button key={po} type="button" title={t(`sp.pose_${po}_tip`)} className={`seg-btn ${layout.chars[selChar.id].pose === po ? 'on' : ''}`} onClick={() => setChar(selChar.id, { pose: po })}>

@@ -268,6 +268,7 @@ export function createSpatialView({ editorCanvas, cameraCanvas }) {
     clear(gizmos);
     pickables = [];
     for (const c of layout.cast) {
+      if (layout.chars[c.id].off) continue; // not in this shot
       const fig = figure(c, layout.chars[c.id]);
       content.add(fig);
       fig.traverse((o) => o.userData?.type && pickables.push(o));

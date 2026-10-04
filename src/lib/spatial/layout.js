@@ -58,6 +58,7 @@ export function normalizeChar(c) {
     rot: wrapDeg(c?.rot),
     head: clamp(num(c?.head, 0), -80, 80),
     pose: POSES.includes(c?.pose) ? c.pose : 'standing',
+    off: !!c?.off, // not present in this shot (still tracked across the scene)
   };
 }
 export function normalizeProp(p) {
@@ -73,21 +74,49 @@ export function normalizeProp(p) {
   };
 }
 
-// The characters a scene's layout holds: those its shots name (by full name
-// or first word), in cast order; when nobody is named, the first of the cast.
-export function sceneCast(project, scene) {
+// The layout tool is optional per project (Project settings), off by default.
+export const layoutEnabled = (project) => !!project?.useLayout;
+
+// Does a text mention a character? Whole name or any word of it; Cyrillic
+// words are matched by their stem so inflected forms count ("Анну" → Анна).
+export function mentions(text, name) {
+  const low = String(text || '').toLowerCase();
+  const n = String(name || '').trim().toLowerCase();
+  if (!n) return false;
+  if (low.includes(n)) return true;
+  return n.split(/\s+/).filter((w) => w.length >= 3).some((w) => {
+    const stem = /[а-яёіїєґ]/.test(w) ? w.slice(0, Math.max(3, w.length - 2)) : w;
+    return new RegExp(`(^|[^\\p{L}])${stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'u').test(low);
+  });
+}
+const shotText = (s) => `${s.action || ''}\n${s.dialogue || ''}\n${s.notes || ''}`;
+
+// Characters named anywhere in the scene — in ANY of its shots — in cast order.
+export function autoCastIds(project, scene) {
   const all = project.storyline?.characters || [];
   const shots = project.sceneDetails?.[scene.id]?.shots || [];
-  const text = shots.map((s) => `${s.action || ''}\n${s.dialogue || ''}\n${s.notes || ''}`).join('\n').toLowerCase();
+  const text = [scene.title, scene.summary, ...shots.map(shotText)].join('\n');
   const groups = project.storyline?.groups || [];
-  const viaGroup = new Set(groups.filter((g) => (g.name || '').trim() && text.includes(g.name.trim().toLowerCase())).flatMap((g) => g.memberIds || []));
-  const named = all.filter((c) => {
-    const name = (c.name || '').trim().toLowerCase();
-    if (!name) return false;
-    return text.includes(name) || (name.includes(' ') && text.includes(name.split(/\s+/)[0])) || viaGroup.has(c.id);
-  });
-  return (named.length ? named : all).slice(0, MAX_LAYOUT_CHARS).map((c, i) => ({ id: c.id, name: c.name || `Character ${i + 1}`, color: CHAR_COLORS[i] }));
+  const viaGroup = new Set(groups.filter((g) => mentions(text, g.name)).flatMap((g) => g.memberIds || []));
+  const named = all.filter((c) => mentions(text, c.name) || viaGroup.has(c.id));
+  return (named.length ? named : all).map((c) => c.id);
 }
+
+// The characters a scene's layout holds for ALL its shots: the list the user
+// set in the window, or everyone the scene's shots name. Each character is
+// placed once per scene and marked present or absent shot by shot.
+export function sceneCast(project, scene) {
+  const all = project.storyline?.characters || [];
+  const stored = (project.sceneLayouts || {})[scene.id]?.cast;
+  const ids = Array.isArray(stored) ? stored : autoCastIds(project, scene);
+  return ids
+    .map((id) => all.find((c) => c.id === id))
+    .filter(Boolean)
+    .slice(0, MAX_LAYOUT_CHARS)
+    .map((c, i) => ({ id: c.id, name: c.name || `Character ${i + 1}`, color: CHAR_COLORS[i] }));
+}
+// Is the character named in this particular shot?
+export const namedInShot = (project, shot, name) => mentions(shotText(shot), name);
 
 // Everyone in a row facing the camera — the layout before anything is placed.
 export function defaultChars(cast) {
@@ -115,7 +144,25 @@ export function layoutFor(project, scene, shotId) {
     }
   }
   const fallback = defaultChars(cast);
-  const chars = Object.fromEntries(cast.map((c) => [c.id, normalizeChar(base?.chars?.[c.id] || fallback[c.id])]));
+  // Each character continues from the nearest earlier shot that placed them.
+  // One who is placed only later has not arrived yet: shown at that future
+  // spot, marked absent. One never placed anywhere stands in the default row.
+  const stateOf = (cid) => {
+    for (let i = idx; i >= 0; i--) {
+      const st = stored?.shots?.[shots[i]?.id]?.chars?.[cid];
+      if (st) return normalizeChar(st);
+    }
+    for (let i = idx + 1; i < shots.length; i++) {
+      const st = stored?.shots?.[shots[i]?.id]?.chars?.[cid];
+      if (st) return normalizeChar({ ...st, off: true });
+    }
+    // never placed (e.g. added to the cast after the layout was made): absent
+    // until a shot's text first names them
+    const name = cast.find((c) => c.id === cid)?.name;
+    const arrived = !base || shots.slice(0, idx + 1).some((s) => namedInShot(project, s, name));
+    return normalizeChar({ ...fallback[cid], off: !arrived });
+  };
+  const chars = Object.fromEntries(cast.map((c) => [c.id, stateOf(c.id)]));
   return {
     cast,
     chars,

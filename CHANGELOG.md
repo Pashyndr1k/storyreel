@@ -14,6 +14,14 @@
   where in the frame, how far from the camera, which way they face and look,
   the shot size and camera height. The window also warns when two characters
   swap sides of the frame between shots or a named character is out of frame.
+- **Layout covers the whole scene's cast.** The 3D layout now holds every
+  character who appears in any shot of the scene, and each one is marked as
+  in or out of each shot ("In this shot"). Characters who arrive later are
+  absent until then; you can also add or remove characters by hand. Fixes
+  scenes where characters who enter after the first shot were missing.
+- **The 3D layout is optional.** It is off by default; turn it on per project
+  in Project settings ("Use the 3D layout in this project"). Each shot card at
+  Stage 5 then has its own layout button.
 - **Duplicate a shot (Stage 4).** A copy icon next to the delete icon adds a
   copy of the shot right after it.
 - **Stage 5 prompt header.** "Recreate prompt" is now a text button and Copy

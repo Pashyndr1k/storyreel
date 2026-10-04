@@ -15,7 +15,7 @@ import Lightbox from '../components/Lightbox.jsx';
 import SceneNav from '../components/SceneNav.jsx';
 import ScriptExportModal from '../components/ScriptExportModal.jsx';
 import SpatialModal from '../components/SpatialModal.jsx';
-import { hasLayout } from '../lib/spatial/layout.js';
+import { hasLayout, layoutEnabled } from '../lib/spatial/layout.js';
 import { Download } from '../components/icons.jsx';
 
 // The "Storyboard preview & timeline" section is hidden (2.12); the component
@@ -196,9 +196,11 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
         {prog && (
           <span className="total-badge" title={t('ind.batchProgress')}>{t('batch.progress', { a: prog.a, b: prog.b })}</span>
         )}
-        <button title={shots.length ? t('tip.spOpen') : t('sp.noShots')} className={`btn ${scene && hasLayout(project, scene.id) ? 'has-layout' : ''}`} disabled={!shots.length} onClick={() => setShowLayout(true)}>
-          <Box size={14} /> {t('sp.button')}
-        </button>
+        {layoutEnabled(project) && (
+          <button title={shots.length ? t('tip.spOpen') : t('sp.noShots')} className={`btn ${scene && hasLayout(project, scene.id) ? 'has-layout' : ''}`} disabled={!shots.length} onClick={() => setShowLayout(true)}>
+            <Box size={14} /> {t('sp.button')}
+          </button>
+        )}
         <button title={allDone ? t('tip.sxOpen') : t('sx.notReady')} className="btn" disabled={!allDone} onClick={() => setShowExport(true)}>
           <Download size={14} /> {t('sx.button')}
         </button>

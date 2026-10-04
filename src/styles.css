@@ -3038,6 +3038,11 @@ textarea.s5e-prompt-sm { min-height: 110px; }
 .sp-chip .sp-box-dot { background: #9aa0aa; }
 .sp-chip.on { border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 1px var(--accent); }
 .sp-chip.add { border-style: dashed; color: var(--muted-2); }
+.sp-chip.absent { opacity: 0.45; border-style: dashed; }
+.sp-add-char { width: auto; height: 26px; padding: 0 6px; font-size: 12px; }
+.sp-present { margin: 0; flex: 1 1 auto; }
+.take-btn.shot-layout { display: inline-flex; align-items: center; justify-content: center; }
+.take-btn.shot-layout.has-layout { color: var(--accent); }
 .sp-props { display: grid; gap: 6px; }
 .sp-slider { display: grid; grid-template-columns: 92px minmax(0, 1fr) 54px; align-items: center; gap: 8px; margin: 0; font-size: 12px; }
 .sp-slider input[type='range'] { width: 100%; accent-color: var(--accent); }

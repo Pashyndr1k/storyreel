@@ -72,6 +72,13 @@ export default function ProjectSettingsModal({ project, update, styles, setStyle
           onChange={(v) => update({ aspectRatio: v })}
         />
 
+        <label className="section-label">{t('pset.layout')}</label>
+        <p className="hint">{t('pset.layoutHint')}</p>
+        <label className="check-row" title={t('tip.psetLayout')}>
+          <input type="checkbox" checked={!!project.useLayout} onChange={(e) => update({ useLayout: e.target.checked })} />
+          <span>{t('pset.layoutOn')}</span>
+        </label>
+
         <label className="section-label">{t('pset.styles')}</label>
         {STYLE_CATEGORIES.map((c) => selector(c))}
 

@@ -215,6 +215,7 @@ function projectDefaults() {
     shotPromptEngines: {}, // shotId -> engine the video prompt was WRITTEN for: 'ltx' | 'minimax'
     agentFlags: [], // problems recorded by the AI agent (or auto-flagged after 4 attempts): [{ id, target, kind, issue, note, attempts, resolved, createdAt }]
     agentAttempts: {}, // attempt counters per target, e.g. 'shot:<id>:video' -> 3 (see lib/agent/api.js)
+    useLayout: false, // the 3D spatial layout tool is optional per project (Project settings)
     sceneLayouts: {}, // sceneId -> { props, shots: { shotId: { chars, camera, view? } } } — the 3D spatial layout (lib/spatial/layout.js)
     shotCamera: {}, // shotId -> camera dynamics 0..5 chosen by the user (unset = derived default, see lib/shotDynamics.js)
     shotAction: {}, // shotId -> action level 0..2 chosen by the user (unset = derived default)

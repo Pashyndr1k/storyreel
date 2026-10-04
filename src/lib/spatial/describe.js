@@ -3,7 +3,7 @@
 // the camera, who looks at whom, distances, the shot size the lens gives and
 // the camera's height and angle. Also the continuity warnings between shots.
 // Everything is computed from the same camera maths the 3D view renders with.
-import { layoutFor, cameraPosition, verticalFov, aspectValue, forwardOf, POSE_TOP, hasLayout } from './layout.js';
+import { layoutFor, cameraPosition, verticalFov, aspectValue, forwardOf, POSE_TOP, hasLayout, layoutEnabled, namedInShot } from './layout.js';
 
 const rad = (d) => (d * Math.PI) / 180;
 const deg = (r) => (r * 180) / Math.PI;
@@ -78,7 +78,7 @@ function cameraWords(cam, pos) {
 export function analyse(layout, aspect) {
   const frame = cameraFrame(layout.camera, aspect);
   const flatRight = norm({ x: frame.right.x, y: 0, z: frame.right.z });
-  const people = layout.cast.map((c) => {
+  const people = layout.cast.filter((c) => !layout.chars[c.id].off).map((c) => {
     const st = layout.chars[c.id];
     const top = POSE_TOP[st.pose] || 1.8;
     const head = { x: st.x, y: top - 0.16, z: st.z };
@@ -108,7 +108,7 @@ export function analyse(layout, aspect) {
 
 // The measured description of one shot's layout, as plain sentences.
 export function describeShot(project, scene, shotId) {
-  if (!hasLayout(project, scene.id)) return '';
+  if (!layoutEnabled(project) || !hasLayout(project, scene.id)) return '';
   const layout = layoutFor(project, scene, shotId);
   if (!layout.exists || !layout.cast.length) return '';
   const aspect = aspectValue(project.aspectRatio);
@@ -157,7 +157,9 @@ export function describeShot(project, scene, shotId) {
     }
   }
   const out = people.filter((p) => !p.inFrame);
-  if (out.length) lines.push(`Not in frame: ${out.map((p) => `${p.name}${p.partly ? ' (partly at the edge)' : ''}`).join(', ')}.`);
+  if (out.length) lines.push(`Present but outside the frame: ${out.map((p) => `${p.name}${p.partly ? ' (partly at the edge)' : ''}`).join(', ')}.`);
+  const absent = layout.cast.filter((c) => layout.chars[c.id].off);
+  if (absent.length) lines.push(`Not in this shot at all (do not show them): ${absent.map((c) => c.name).join(', ')}.`);
 
   // set pieces the camera sees
   const props = layout.props
@@ -169,7 +171,7 @@ export function describeShot(project, scene, shotId) {
 
 // Continuity warnings across a scene's shots: [{ shotIndex, kind, text }].
 export function continuityWarnings(project, scene) {
-  if (!hasLayout(project, scene.id)) return [];
+  if (!layoutEnabled(project) || !hasLayout(project, scene.id)) return [];
   const shots = project.sceneDetails?.[scene.id]?.shots || [];
   const aspect = aspectValue(project.aspectRatio);
   const out = [];
@@ -177,11 +179,12 @@ export function continuityWarnings(project, scene) {
   shots.forEach((shot, i) => {
     const layout = layoutFor(project, scene, shot.id);
     const { people } = analyse(layout, aspect);
-    const text = `${shot.action || ''}\n${shot.dialogue || ''}`.toLowerCase();
     for (const p of people) {
-      const name = (p.name || '').toLowerCase();
-      const mentioned = name && (text.includes(name) || text.includes(name.split(/\s+/)[0]));
-      if (mentioned && !p.inFrame) out.push({ shotIndex: i, kind: 'outOfFrame', a: p.name });
+      if (namedInShot(project, shot, p.name) && !p.inFrame) out.push({ shotIndex: i, kind: 'outOfFrame', a: p.name });
+    }
+    // named in the shot's text but marked absent from it
+    for (const c of layout.cast) {
+      if (layout.chars[c.id].off && namedInShot(project, shot, c.name)) out.push({ shotIndex: i, kind: 'absentNamed', a: c.name });
     }
     if (prev) {
       // the line between two characters was crossed: their screen order flipped

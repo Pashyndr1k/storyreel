@@ -1,7 +1,7 @@
 // "Build layout": the text model reads the scene and its shots and places the
 // characters, a few set boxes and the camera for every shot. The result is a
 // starting point the user adjusts in the 3D window.
-import { sceneCast, normalizeChar, normalizeCamera, normalizeProp, LENSES, POSES, MAX_PROPS, POSE_TOP } from './layout.js';
+import { namedInShot, sceneCast, normalizeChar, normalizeCamera, normalizeProp, LENSES, POSES, MAX_PROPS, POSE_TOP } from './layout.js';
 
 export function layoutPrompt(project, scene, shots) {
   const cast = sceneCast(project, scene);
@@ -20,18 +20,18 @@ FLOOR PLAN CONVENTIONS
 - "lens_mm" is one of: ${LENSES.join(', ')} (full-frame).
 
 RULES
-- Place every listed character in EVERY shot, also when the shot does not show them — put them where they are in the story at that moment.
+- THE CAST COVERS THE WHOLE SCENE. List EVERY character in EVERY shot, with "present": true when the character is at the location during that shot (on or off camera) and "present": false when they are not there — they have not arrived yet, or have left. Read all the shots first: a character who first appears in shot 3 is "present": false in shots 1 and 2. For an absent character still give the position where they will enter or where they left.
 - CONTINUITY: a character stays exactly where they were in the previous shot unless this shot's action moves them; then move them only as far as the action says. Never swap two characters' places.
 - People who talk to each other face each other, 1 to 1.5 metres apart. Nobody stands closer than 0.6 metres to anyone else. People walking together face the same way.
 - THE LINE: for two characters in conversation, keep the camera on the same side of the line between them for the whole scene, so the one on screen-left stays on screen-left. Cross the line only when a shot's description demands it.
 - FRAMING: choose distance and lens from the shot type — extreme close-up: 85 mm at about 1 m; close-up: 85 mm at 1.5–2.5 m; medium close-up: 50 mm at 2–2.5 m; medium: 50 mm at 3–4 m; full: 35 mm at 5–6 m; wide: 24 mm at 6–9 m; extreme wide: 18 mm at 10 m or more. Low angle: negative elevation with the camera low; high angle: elevation 25–45; top-down: elevation 80; ground-level: target_height 0.3 and elevation 0 to -10.
-- The camera must see every character the shot's action or dialogue names. Aim it ("aim_at") at the character who is the subject of the shot, or give target_x / target_z for a group.
+- The camera must see every PRESENT character the shot's action or dialogue names. Aim it ("aim_at") at the character who is the subject of the shot, or give target_x / target_z for a group.
 - Add up to ${MAX_PROPS} set pieces as plain boxes only where the action uses them or they define the place (door, table, bench, bed, car, counter, window, wall). They do not move between shots.`,
     maxTokens: 9000,
     user: `SCENE ${sceneNo}: ${scene.title} — ${scene.summary}
 
 CHARACTERS (use these exact names):
-${cast.map((c) => `- ${c.name}`).join('\n')}
+${cast.map((c) => { const first = shots.findIndex((s) => namedInShot(project, s, c.name)); return `- ${c.name}${first >= 0 ? ` (first named in shot ${first + 1})` : ''}`; }).join('\n')}
 
 SHOTS:
 ${shots.map((s, i) => `${i + 1}. [${s.shotType || 'shot'}] location: ${s.location || scene.title}. Action: ${s.action || '—'}${s.dialogue ? ` Dialogue: ${s.dialogue}` : ''}`).join('\n')}
@@ -39,7 +39,7 @@ ${shots.map((s, i) => `${i + 1}. [${s.shotType || 'shot'}] location: ${s.locatio
 Return the layout for all ${shots.length} shots, in order.
 
 JSON schema:
-{"props":[{"label":"door","x":0,"z":-3,"w":1,"d":0.2,"h":2.1,"rot":0}],"shots":[{"shot":1,"characters":[{"name":"${cast[0]?.name || 'Name'}","x":-0.6,"z":0,"facing_deg":90,"head_turn_deg":0,"pose":"standing"}],"camera":{"aim_at":"${cast[0]?.name || 'Name'}","target_x":0,"target_z":0,"target_height":1.5,"yaw_deg":20,"elevation_deg":5,"distance_m":3,"lens_mm":50}}]}`,
+{"props":[{"label":"door","x":0,"z":-3,"w":1,"d":0.2,"h":2.1,"rot":0}],"shots":[{"shot":1,"characters":[{"name":"${cast[0]?.name || 'Name'}","present":true,"x":-0.6,"z":0,"facing_deg":90,"head_turn_deg":0,"pose":"standing"}],"camera":{"aim_at":"${cast[0]?.name || 'Name'}","target_x":0,"target_z":0,"target_height":1.5,"yaw_deg":20,"elevation_deg":5,"distance_m":3,"lens_mm":50}}]}`,
   };
 }
 
@@ -50,7 +50,8 @@ export function layoutFromModel(project, scene, shots, data) {
     const n = String(name || '').trim().toLowerCase();
     return cast.find((c) => c.name.toLowerCase() === n) || cast.find((c) => n && (c.name.toLowerCase().startsWith(n) || n.startsWith(c.name.toLowerCase().split(/\s+/)[0])));
   };
-  const out = { props: (Array.isArray(data?.props) ? data.props : []).slice(0, MAX_PROPS).map(normalizeProp), shots: {} };
+  const keptCast = (project.sceneLayouts || {})[scene.id]?.cast;
+  const out = { ...(Array.isArray(keptCast) ? { cast: keptCast } : {}), props: (Array.isArray(data?.props) ? data.props : []).slice(0, MAX_PROPS).map(normalizeProp), shots: {} };
   let prevChars = null;
   (Array.isArray(data?.shots) ? data.shots : []).forEach((row, k) => {
     const shot = shots[(Number(row?.shot) || k + 1) - 1];
@@ -58,13 +59,13 @@ export function layoutFromModel(project, scene, shots, data) {
     const chars = {};
     for (const c of Array.isArray(row.characters) ? row.characters : []) {
       const who = byName(c?.name);
-      if (who) chars[who.id] = normalizeChar({ x: c.x, z: c.z, rot: c.facing_deg, head: c.head_turn_deg, pose: c.pose });
+      if (who) chars[who.id] = normalizeChar({ x: c.x, z: c.z, rot: c.facing_deg, head: c.head_turn_deg, pose: c.pose, off: c.present === false });
     }
     // anyone the model left out stays where they were
     for (const c of cast) if (!chars[c.id] && prevChars?.[c.id]) chars[c.id] = prevChars[c.id];
     const cam = row.camera || {};
     const aim = byName(cam.aim_at);
-    const aimed = aim && chars[aim.id];
+    const aimed = aim && chars[aim.id] && !chars[aim.id].off ? chars[aim.id] : null;
     const camera = normalizeCamera({
       tx: aimed ? aimed.x : cam.target_x,
       tz: aimed ? aimed.z : cam.target_z,

@@ -366,3 +366,88 @@ are untested.
   dragging.
 - Agent tools to read or change the layout were not requested and are not
   exposed (the description is in `review_shot` only).
+
+---
+
+## 4. Spatial layout: whole-scene cast, presence per shot, optional tool
+
+**Request.** A bug: a scene opens with a shot describing one character, two
+more appear in the third shot and another later; the layout must account for
+all characters across all shots, present in some and absent in others. Make
+the tool optional with a switch that is off by default. Put the icon that
+opens the layout into the individual shot's interface at Stage 5.
+
+**Behaviour.**
+- **Cast of the scene.** `sceneCast` now holds everyone named in ANY shot of
+  the scene (action, dialogue, notes), the scene title and summary, plus the
+  members of a named group. Name matching (`mentions`) accepts the whole name
+  or any word of it at a word start; Cyrillic words are matched by stem (the
+  word minus its last two letters, at least three), so inflected forms count.
+  If nobody is matched, the whole cast is used. Still at most 6.
+- **Editing the cast.** In the window, "+ Character" (a select next to the
+  chips) adds anyone from the story's cast; "Remove from scene" on a selected
+  character removes them from the layout in every shot. Either action stores
+  an explicit list (`cast`) for the scene, which then replaces the automatic
+  one. "Rebuild layout" keeps that list.
+- **Presence per shot.** Each character's per-shot state has `off` (absent).
+  The selected character has an "In this shot" checkbox. An absent character
+  is not drawn in either view, has a dimmed dashed chip, takes no part in the
+  measurements or the flip / jump warnings, and is listed in the description
+  as "Not in this shot at all (do not show them): …". A present character
+  outside the frame is now worded "Present but outside the frame: …".
+- **Inheritance is per character** (`layoutFor`): each character continues
+  from the nearest earlier shot whose entry places them; one placed only in a
+  later shot is absent until then, shown at that later position; one never
+  placed (for example added to the cast after the layout was made) stands in
+  the default row and is absent until a shot's text first names them. Before
+  this, a character missing from a shot's entry fell back to the default row
+  and was shown. The camera still comes from the nearest earlier shot entry.
+- **Build layout.** The request lists every cast member with the shot that
+  first names them and requires every character in every shot with
+  `"present": true | false` (false = not arrived yet or gone; position = where
+  they enter or left). `layoutFromModel` stores `off`; `aim_at` ignores an
+  absent character.
+- **New warning** `absentNamed`: a character named in a shot's text but
+  marked absent from it.
+- **Optional tool.** `project.useLayout` (default false). Project settings has
+  a "3D spatial layout" section with the checkbox "Use the 3D layout in this
+  project". When off: no Layout button at Stage 4, no cube buttons at Stage
+  5, `describeShot` returns '' (so no prompt request carries a layout),
+  `continuityWarnings` returns [], and the agent's `review_shot` omits the
+  intended-composition image. Stored layouts are kept and return when the
+  switch is turned on. **Projects that already have layouts start with the
+  tool off** until it is switched on.
+- **Shot card (Stage 5).** A cube icon button in the shot card header, before
+  the style chips, opens the window on that shot (accent-coloured when the
+  scene has a layout). The scene-tools cube button remains and opens on the
+  focused shot.
+
+**Data model.** `project.useLayout: boolean`.
+`project.sceneLayouts[sceneId].cast?: characterId[]` (explicit cast; absent
+= automatic). Character state gains `off: boolean`.
+
+**Files.** `src/lib/spatial/layout.js` (`layoutEnabled`, `mentions`,
+`autoCastIds`, `sceneCast`, `namedInShot`, `normalizeChar`, `layoutFor`),
+`describe.js`, `scene3d.js`, `build.js`, `src/components/SpatialModal.jsx`
+(`writeCast`, presence checkbox, add / remove), `ProjectSettingsModal.jsx`,
+`src/stages/Stage4.jsx`, `src/stages/Stage5.jsx` (`showLayout` is now
+`null | { shotId }`), `src/lib/agent/api.js`, `src/lib/storage.js`,
+`src/styles.css` (`.sp-chip.absent`, `.sp-add-char`, `.sp-present`,
+`.shot-layout`). i18n: `pset.layout`, `pset.layoutHint`, `pset.layoutOn`,
+`tip.psetLayout`, `tip.spOpenShot`, `sp.present`, `tip.spPresent`,
+`sp.absentTip`, `sp.removeChar`, `tip.spRemoveChar`, `sp.addChar`,
+`tip.spAddChar`, `sp.warn_absentNamed`.
+
+**Verified.** In the dev app: a four-shot scene with one character in shot 1
+(inflected Cyrillic name), two entering in shot 3 and one in shot 4 gives a
+cast of four, present 1 / 1 / 3 / 4 from a model-shaped answer and from a
+hand layout with partial entries; the description lists the absent ones; the
+switch is off by default and hides the buttons and the description; with it
+on, the shot-card icon opens the window on that shot; adding a character,
+ticking / unticking "In this shot", the earlier shots showing them absent,
+and the new warning. No real model run of "Build layout" with the presence
+flag.
+
+**Open.** A shot card (and so its icon) appears at Stage 5 as before, only
+for the focused shot. Removing a character does not delete their stored
+positions, so adding them back restores them.
