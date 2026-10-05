@@ -32,6 +32,9 @@
 - **Rebuild one shot (3D layout).** "Rebuild shot" in the layout window lets
   the text model place the characters and camera again for the open shot
   only, keeping it continuous with the shots before and after it.
+- **Agent: layout and shot tools.** An AI agent can now turn the 3D layout
+  on, read it, have it built for a scene or one shot, move characters and the
+  camera, set who is present, and duplicate a shot.
 - **Duplicate a shot (Stage 4).** A copy icon next to the delete icon adds a
   copy of the shot right after it.
 - **Stage 5 prompt header.** "Recreate prompt" is now a text button and Copy

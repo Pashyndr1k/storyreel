@@ -22,7 +22,8 @@ import { computeSmartPatch } from '../../components/SmartEditModal.jsx';
 import { shotCastRefs } from '../castRefs.js';
 import { locationsOf, shotLocationRefs } from '../sceneLocations.js';
 import { describeShot } from '../spatial/describe.js';
-import { sceneLayout, layoutEnabled } from '../spatial/layout.js';
+import { sceneLayout, layoutEnabled, hasLayout } from '../spatial/layout.js';
+import { layoutTools } from './layoutTools.js';
 import { CAMERA_LEVELS, ACTION_LEVELS, cameraOf, actionOf } from '../shotDynamics.js';
 import { blockForScene } from '../dynamics.js';
 import { transcribeAudio } from '../gemini.js';
@@ -156,6 +157,7 @@ function projectView(project, { prompts = false } = {}) {
     scriptType: project.scriptType,
     ...(project.scriptType === 'series' ? { episodeCount: project.episodeCount, episodeSeconds: project.episodeSeconds, seriesMaster: isSeriesMaster(project) } : {}),
     aspectRatio: project.aspectRatio,
+    useLayout: layoutEnabled(project),
     styles: {
       script: { id: project.scriptStyleId, name: styleName('script', project.scriptStyleId) },
       image: { id: project.imageStyleId, name: styleName('image', project.imageStyleId) },
@@ -178,6 +180,7 @@ function projectView(project, { prompts = false } = {}) {
       summary: scene.summary,
       plannedSec: Number(scene.duration) || 0,
       locations: locationsOf(scene).map((l) => ({ name: l.name, referencePhotos: (l.photos || []).length })),
+      ...(layoutEnabled(project) ? { hasLayout: hasLayout(project, scene.id) } : {}),
       shots: (project.sceneDetails[scene.id]?.shots || []).map((s, i) => shotView(project, scene, s, i, prompts)),
     })),
     flags: (project.agentFlags || []).filter((f) => !f.resolved),
@@ -447,7 +450,7 @@ export const TOOLS = [
   },
   {
     name: 'storyreel_update_project',
-    description: 'Change project settings: title, genres, logline, approvedPlot, aspectRatio, and the three styles (scriptStyleId, imageStyleId, videoStyleId — ids from storyreel_list_styles, "" for none). Use it to choose the visual and video style that fit the story.',
+    description: 'Change project settings: title, genres, logline, approvedPlot, aspectRatio, the three styles (scriptStyleId, imageStyleId, videoStyleId — ids from storyreel_list_styles, "" for none), and useLayout — the optional 3D spatial layout (off by default; when on, prompts follow each shot\'s layout, see storyreel_build_layout). Use it to choose the visual and video style that fit the story.',
     inputSchema: schema(
       {
         ...PROJECT,
@@ -459,6 +462,7 @@ export const TOOLS = [
         scriptStyleId: { type: 'string' },
         imageStyleId: { type: 'string' },
         videoStyleId: { type: 'string' },
+        useLayout: { type: 'boolean' },
       },
       ['projectId']
     ),
@@ -469,6 +473,7 @@ export const TOOLS = [
         if (patch[key] && !(styles[cat] || []).some((s) => s.id === patch[key])) fail('BAD_INPUT', `${key}: no ${cat} style with id "${patch[key]}".`);
       }
       if (patch.genres) patch.genres = patch.genres.slice(0, 3);
+      if ('useLayout' in patch) patch.useLayout = !!patch.useLayout;
       patchProject(projectId, patch);
       await settle();
       return { updated: Object.keys(patch) };
@@ -545,6 +550,22 @@ export const TOOLS = [
     },
   },
   {
+    name: 'storyreel_duplicate_shot',
+    description: 'Stage 4: insert a copy of a shot right after it (same duration, type, location, action, dialogue and notes; no prompts or media). Then change the copy with storyreel_edit_script — e.g. to split a long action into two angles.',
+    inputSchema: schema({ ...PROJECT, shotId: { type: 'string' } }, ['projectId', 'shotId']),
+    run: async ({ projectId, shotId }) => {
+      const { scene, shot, index } = findShot(projectOf(projectId), shotId);
+      const copy = { ...shot, id: uid() };
+      patchProject(projectId, (q) => {
+        const list = q.sceneDetails[scene.id].shots;
+        const i = list.findIndex((s) => s.id === shotId);
+        return { sceneDetails: { ...q.sceneDetails, [scene.id]: { ...q.sceneDetails[scene.id], shots: [...list.slice(0, i + 1), copy, ...list.slice(i + 1)] } } };
+      });
+      await settle();
+      return { newShotId: copy.id, number: index + 2, sceneId: scene.id };
+    },
+  },
+  {
     name: 'storyreel_smart_edit',
     description: 'The app\'s smart edit: one plain-language instruction applied consistently across the whole project text — plot, synopsis, characters, scenes, shots and prompts (e.g. "rename Anna to Maria", "move the story to winter", "make the ending hopeful"). Does not touch images or videos. Counts as an attempt.',
     inputSchema: schema({ ...PROJECT, instruction: str('What to change, in plain language.') }, ['projectId', 'instruction']),
@@ -598,6 +619,7 @@ export const TOOLS = [
       return { camera: camera || 'unchanged', dynamics: dynamics || 'unchanged', next: 'storyreel_create_prompts with shotId and kind "video".' };
     },
   },
+  ...layoutTools({ app, projectOf, patchProject, sceneOf, findShot, fail, settle, countAttempt, schema, PROJECT }),
   {
     name: 'storyreel_create_media',
     description: 'Stage 5: generate one piece of media for a shot — "image" (first frame), "final_frame", "video" (needs the first frame; can take many minutes) or "voice" (TTS for the shot\'s dialogue). Counts as an attempt; after four the target is flagged and further calls are refused. Verify the result with storyreel_review_shot.',
@@ -662,7 +684,7 @@ let running = null;
 export async function callAgent(method, params = {}) {
   const tool = TOOLS.find((t) => t.name === method);
   if (!tool) return { ok: false, error: { code: 'UNKNOWN_TOOL', message: `No tool named "${method}".` } };
-  const readOnly = ['storyreel_guide', 'storyreel_status', 'storyreel_list_projects', 'storyreel_get_project', 'storyreel_list_styles', 'storyreel_list_flags'].includes(method);
+  const readOnly = ['storyreel_guide', 'storyreel_status', 'storyreel_list_projects', 'storyreel_get_project', 'storyreel_list_styles', 'storyreel_list_flags', 'storyreel_get_layout'].includes(method);
   if (running && !readOnly) return { ok: false, error: { code: 'BUSY', message: `StoryReel is still running "${running}". Wait for it to finish.` } };
   if (!readOnly) running = method;
   try {

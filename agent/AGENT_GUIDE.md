@@ -92,6 +92,52 @@ them and judge:
   going when the file ends — speech cut off), `shortBy` (video shorter than
   its slot). Ask for `transcript: true` when you need to confirm the words.
 
+## The 3D spatial layout (optional)
+
+A project can carry a 3D floor plan per scene: where each character stands in
+every shot, which way body and head face, the pose, whether they are present,
+a few set boxes, and the camera with a real lens. When it is on, the image
+and video prompts are written from a measured description of that staging,
+so characters keep their sides of the frame and their eyelines from shot to
+shot. It is off by default (`useLayout` in `storyreel_get_project`).
+
+Use it when staging matters: two or more characters sharing a scene over
+several shots, dialogue with shot / reverse shot, anyone entering or leaving.
+Skip it for single-character scenes, montage and inserts.
+
+1. `storyreel_update_project { useLayout: true }` — once per project.
+2. After Stage 4, per scene: `storyreel_build_layout { sceneId }`. The cast
+   covers the whole scene; a character who enters in shot 3 is "not present"
+   in shots 1–2.
+3. Read `warnings` in the result and each shot's `description` against its
+   action: is everyone the shot names present and in frame, on the same
+   screen side as in the previous shot, facing who they talk to, and does the
+   shot size match the shot type? `storyreel_get_layout { image: true }`
+   shows the camera view.
+4. Fix: one wrong shot → `storyreel_build_layout { shotId }` (counts as an
+   attempt) or, better when you know what is wrong, `storyreel_set_layout`
+   with only the fields to change (free). Typical fixes: `present: false`
+   for someone not there yet; `camera.aimAt`; swap the camera side
+   (`yawDeg` + 180) when two characters flipped; a longer lens or shorter
+   distance for a close-up.
+5. Only then `storyreel_create_prompts`. Prompts written before a layout
+   change do not follow it — recreate them.
+6. `storyreel_review_shot` returns the layout's camera view as "INTENDED
+   COMPOSITION" and the description as `expected.spatialLayout`: check the
+   generated frame against them (who is on which side, facing, shot size).
+   Block-figure colours only identify characters; they are not costumes.
+
+Conventions: metres; x to the right, z toward the default camera;
+`facingDeg` 0 = toward +z, 90 = +x, 180 = -z, 270 = -x; `yawDeg` is where
+the camera stands around its target (0 = the +z side).
+
+## Names
+
+Character names are written exactly as on the character cards (English,
+Latin letters) in every stage's text, whatever the script language. The app
+corrects other spellings in generated text itself; keep to the card names in
+anything you write with `storyreel_edit_script` or `storyreel_set_prompt`.
+
 ## Fixing a failed check
 
 Change one thing per attempt, and say what you changed:

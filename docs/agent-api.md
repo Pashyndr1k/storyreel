@@ -122,3 +122,21 @@ Every request needs `Authorization: Bearer <token>`. The server listens on
 Error codes: `ATTEMPT_LIMIT`, `BUSY`, `NOT_READY`, `NOT_FOUND`, `BAD_INPUT`,
 `NO_KEY`, `GENERATION_FAILED`, `UI`, `APP_NOT_READY`, `TIMEOUT`,
 `UNKNOWN_TOOL`.
+
+## Added after 2.12.0: layout and shot tools
+
+| Tool | What it does | Attempt |
+| --- | --- | --- |
+| `storyreel_duplicate_shot` | Stage 4: inserts a copy of a shot after it; returns `newShotId`. | no |
+| `storyreel_get_layout` | The 3D layout of a scene or one shot: cast, set boxes, per shot the characters (position, facing, pose, present), camera, measured description, warnings. `image: true` adds the camera view of each shot. Read-only (allowed while another call runs). | no |
+| `storyreel_build_layout` | The text model builds the layout for a scene (`sceneId`) or re-plans one shot (`shotId`). Error `LAYOUT_OFF` when the project's layout switch is off. | yes (`scene:<id>:layout` / `shot:<id>:layout`) |
+| `storyreel_set_layout` | Hand edit: scene `cast` and `setBoxes`; per shot `characters` (partial), `camera` (partial, `aimAt`), `usePrevious`. | no |
+
+`storyreel_update_project` accepts `useLayout` (boolean). `storyreel_get_project`
+returns `useLayout` and, when it is on, `hasLayout` per scene. Build and set
+save each changed shot's camera view (rendered off-screen), which
+`storyreel_review_shot` returns as the intended composition.
+
+Units for the layout tools: metres; `facingDeg` 0 = toward +z, 90 = +x;
+`yawDeg` = the camera's place around its target (0 = +z side);
+`elevationDeg` positive = looking down; `lensMm` one of 18, 24, 35, 50, 85.

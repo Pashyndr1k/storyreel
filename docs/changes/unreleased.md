@@ -575,3 +575,61 @@ check request, no second request on a repeat). Not run against a real model.
 - Names with non-Latin card spelling are not handled (cards are expected in
   English). Existing shots are not rewritten — recreate them.
 - The "edit with AI" requests do not carry `names`.
+
+---
+
+## 8. Agent access: tools for the new features
+
+**Request.** Extend the MCP functionality so the AI agent can use the new
+features (those added after the agent interface: the 3D layout with its
+cast / presence / per-shot rebuild / on-off switch, duplicate shot, enforced
+names).
+
+**Behaviour.** Four new tools (23 in total) and two extended ones. The MCP
+bridge (`agent/storyreel-mcp.mjs`) reads the tool list from the app, so it
+needs no change — restart the app and reconnect the MCP server.
+- `storyreel_duplicate_shot { projectId, shotId }` — copy inserted after the
+  shot; returns `newShotId`, `number`, `sceneId`. No attempt.
+- `storyreel_get_layout { projectId, sceneId | shotId, image? }` — `enabled`,
+  `hasLayout`, `cast`, `castSource`, `setBoxes`, per shot `layout`
+  ("own" / "continues shot n" / default), `characters[{ name, present, x, z,
+  facingDeg, headTurnDeg, pose }]`, `camera{ targetX, targetZ, targetHeight,
+  yawDeg, elevationDeg, distanceM, lensMm }`, `description` (what the
+  prompt writers get), and `warnings` as sentences. `image: true` adds
+  the camera view of up to 12 shots. Read-only (not blocked by BUSY).
+- `storyreel_build_layout { projectId, sceneId | shotId }` — whole scene
+  (replaces layout and boxes, keeps a hand-set cast) or one shot (same request
+  as the window's "Rebuild shot"). Errors: `LAYOUT_OFF`, `NO_KEY`,
+  `NOT_READY` (no shots), `GENERATION_FAILED`. Counts an attempt under
+  `scene:<id>:layout` or `shot:<id>:layout` (limit 4, then flagged).
+- `storyreel_set_layout` — scene level: `cast` (names, max 6),
+  `setBoxes` (full list, max 8); shot level: `characters` (partial, by
+  name), `camera` (partial; `aimAt` sets the target to a character and, if
+  no `targetHeight`, a height from their pose), `usePrevious`. Errors:
+  `LAYOUT_OFF`, `NOT_FOUND` (unknown name / not in the cast),
+  `BAD_INPUT`. No attempt.
+- `storyreel_update_project` accepts `useLayout`; `storyreel_get_project`
+  returns `useLayout` and per scene `hasLayout` (when on).
+- Build and set render the changed shots' camera view off-screen
+  (`layoutSnapshot`) and store it as `view`, so `storyreel_review_shot`
+  has the intended composition without the window ever being opened.
+- `agent/AGENT_GUIDE.md`: new sections "The 3D spatial layout (optional)"
+  (when to use it, the build → check → fix → prompts order, typical fixes,
+  conventions) and "Names" (card names verbatim; the app corrects generated
+  text itself).
+- Enforced names need no tool: they apply to `storyreel_run_stage` 3 and 4
+  through `generateJSON`.
+
+**Files.** `src/lib/agent/layoutTools.js` (new: `layoutTools(ctx)`,
+`layoutView`), `src/lib/spatial/offscreen.js` (new: `layoutSnapshot`),
+`src/lib/agent/api.js`, `agent/AGENT_GUIDE.md`, `docs/agent-api.md`.
+
+**Verified.** In the dev app through `window.__storyreelAgent` with the model
+call stubbed: tool list; `LAYOUT_OFF` when off; get with images (three
+camera views rendered off-screen); build for one shot (attempt counted);
+partial set of characters and camera with `aimAt`; unknown name refused;
+scene cast and boxes; `usePrevious`; duplicate shot. Not run through the MCP
+bridge / packaged app, and no real model run.
+
+**Open.** A whole-scene build through the agent was not exercised (same code
+path as the window's button plus the snapshot loop).
