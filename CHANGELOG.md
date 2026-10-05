@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.13.0 — 2026-10-05
 
 - **Spatial layout (Stage 4 and Stage 5).** A 3D window per scene: a
   checkerboard floor in one-metre squares, a coloured block figure for each
