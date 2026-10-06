@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.14.0 — 2026-10-06
 
 - **Krea (cloud API) for images and videos.** A Krea API token in Settings
   gives access to many models through one service: Nano Banana Pro / 2,
