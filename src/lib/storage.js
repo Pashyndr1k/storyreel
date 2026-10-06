@@ -128,10 +128,13 @@ export function loadSettings() {
     geminiModel: DEFAULT_IMAGE_MODEL,
     klingKey: '', // Kling API key (cloud video)
     klingModel: DEFAULT_KLING_MODEL,
+    kreaKey: '', // Krea API key (cloud images and videos, many models)
+    kreaImageModel: 'nano-banana-pro', // Krea image model (lib/krea.js KREA_IMAGE_MODELS)
+    kreaVideoModel: 'kling-3.0', // Krea video model (lib/krea.js KREA_VIDEO_MODELS)
     textService: 'claude', // 'claude' | 'gemini' — plots, scripts and prompts
     storyboardService: 'gemini', // 'gemini' | 'comfy' — Stage-4 storyboard frames
     videoService: 'comfy', // shot video generation (only ComfyUI for now)
-    videoEngine: 'minimax', // video model: 'minimax' (MiniMax H3, local, default) | 'ltx' (LTX-2.3, local) | 'kling' (cloud API)
+    videoEngine: 'minimax', // video model: 'minimax' (MiniMax H3, local, default) | 'ltx' (LTX-2.3, local) | 'kling' (cloud API) | 'krea' (cloud API, model in kreaVideoModel)
     h3NoticeShown: true, // one-time "H3 is now the default" notice (false only for pre-2.0 installs)
     h3RefImageSize: 'match', // ref2va identity strength: 'match' | 'max' (max = stronger identity lock)
     h3Lightning: false, // MULTI mode only: 4-step Lightning LoRA instead of the 20-step default
@@ -211,7 +214,7 @@ function projectDefaults() {
     dynamicsPlan: null, // Action Dynamics Plan generated at Stage 3 (see lib/dynamics.js)
     videoGenDurations: {}, // shotId -> raw seconds requested from the video model (+2s padding)
     shotVideoModes: {}, // shotId -> pinned video workflow: 'auto' | 'i2v' | 'flf2v' | 'si2v'
-    shotVideoEngines: {}, // shotId -> engine that rendered it: 'ltx' | 'minimax' (drives assembly trim)
+    shotVideoEngines: {}, // shotId -> engine that rendered it: 'ltx' | 'minimax' | 'kling' | 'krea:<model>' | 'upload' (drives assembly trim)
     shotPromptEngines: {}, // shotId -> engine the video prompt was WRITTEN for: 'ltx' | 'minimax'
     agentFlags: [], // problems recorded by the AI agent (or auto-flagged after 4 attempts): [{ id, target, kind, issue, note, attempts, resolved, createdAt }]
     agentAttempts: {}, // attempt counters per target, e.g. 'shot:<id>:video' -> 3 (see lib/agent/api.js)

@@ -1,4 +1,5 @@
 import { KLING_MODELS } from '../lib/kling.js';
+import { KREA_IMAGE_MODELS, KREA_VIDEO_MODELS, DEFAULT_KREA_IMAGE_MODEL, DEFAULT_KREA_VIDEO_MODEL } from '../lib/krea.js';
 import { loadPolicies, addPolicy, removePolicy } from '../lib/policy.js';
 import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIR, DEFAULT_PROJECTS_DIR, DEFAULT_IMAGE_MODEL } from '../lib/config.js';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -34,6 +35,9 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
   const [geminiKey, setGeminiKey] = useState(settings.geminiKey || '');
   const [klingKey, setKlingKey] = useState(settings.klingKey || '');
   const [klingModel, setKlingModel] = useState(settings.klingModel || KLING_MODELS[0].id);
+  const [kreaKey, setKreaKey] = useState(settings.kreaKey || '');
+  const [kreaImageModel, setKreaImageModel] = useState(settings.kreaImageModel || DEFAULT_KREA_IMAGE_MODEL);
+  const [kreaVideoModel, setKreaVideoModel] = useState(settings.kreaVideoModel || DEFAULT_KREA_VIDEO_MODEL);
   const [geminiModel, setGeminiModel] = useState(settings.geminiModel || DEFAULT_IMAGE_MODEL);
   const [textService, setTextService] = useState(settings.textService || 'claude');
   const [storyboardService, setStoryboardService] = useState(settings.storyboardService || 'gemini');
@@ -165,6 +169,9 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
       geminiKey: geminiKey.trim(),
       klingKey: klingKey.trim(),
       klingModel,
+      kreaKey: kreaKey.trim(),
+      kreaImageModel,
+      kreaVideoModel,
       geminiModel: geminiModel.trim() || DEFAULT_IMAGE_MODEL,
       textService,
       storyboardService,
@@ -336,6 +343,12 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
               {t('set.klingKeyHint')}{' '}
               <a href="https://kling.ai/dev/api-key" target="_blank" rel="noreferrer">kling.ai/dev/api-key</a>.
             </p>
+            <label>{t('set.kreaKey')}</label>
+            <input type="password" value={kreaKey} onChange={(e) => setKreaKey(e.target.value)} placeholder="Krea API token" />
+            <p className="hint">
+              {t('set.kreaKeyHint')}{' '}
+              <a href="https://www.krea.ai/settings/api-tokens" target="_blank" rel="noreferrer">krea.ai/settings/api-tokens</a>.
+            </p>
             <label>{t('set.comfyUrl')}</label>
             <input value={comfyUrl} onChange={(e) => setComfyUrl(e.target.value)} placeholder={DEFAULT_COMFY_URL} />
             <label>{t('set.comfyOutputDir')}</label>
@@ -402,7 +415,19 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
         <select title={t('tip.imageService')} value={imageService} onChange={(e) => setImageService(e.target.value)}>
           <option value="gemini">{t('set.svcGemini')}</option>
           <option value="comfy">{t('set.svcComfyImg')}</option>
+          <option value="krea">{t('set.svcKreaImg')}</option>
         </select>
+        {imageService === 'krea' && (
+          <>
+            <label>{t('set.kreaImageModel')}</label>
+            <select title={t('tip.kreaImageModel')} value={kreaImageModel} onChange={(e) => setKreaImageModel(e.target.value)}>
+              {KREA_IMAGE_MODELS.map((mo) => (
+                <option key={mo.id} value={mo.id}>{mo.label}</option>
+              ))}
+            </select>
+            <p className="hint">{t('set.kreaImageHint')}</p>
+          </>
+        )}
       </div>
     </div>
   );
@@ -419,8 +444,20 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
           <option value="ltx">{t('set.engLtx')}</option>
           <option value="minimax">{t('set.engMinimax')}</option>
           <option value="kling">{t('set.engKling')}</option>
+          <option value="krea">{t('set.engKrea')}</option>
         </select>
-        <p className="hint">{t(videoEngine === 'minimax' ? 'set.engMinimaxHint' : videoEngine === 'kling' ? 'set.engKlingHint' : 'set.engLtxHint')}</p>
+        <p className="hint">{t(videoEngine === 'minimax' ? 'set.engMinimaxHint' : videoEngine === 'kling' ? 'set.engKlingHint' : videoEngine === 'krea' ? 'set.engKreaHint' : 'set.engLtxHint')}</p>
+        {videoEngine === 'krea' && (
+          <>
+            <label>{t('set.kreaVideoModel')}</label>
+            <select title={t('tip.kreaVideoModel')} value={kreaVideoModel} onChange={(e) => setKreaVideoModel(e.target.value)}>
+              {KREA_VIDEO_MODELS.map((mo) => (
+                <option key={mo.id} value={mo.id}>{mo.label}{mo.lastFrame ? '' : ' *'}</option>
+              ))}
+            </select>
+            <p className="hint">{t('set.kreaVideoHint')}</p>
+          </>
+        )}
         {videoEngine === 'kling' && (
           <>
             <label>{t('set.klingModel')}</label>

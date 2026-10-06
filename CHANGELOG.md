@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- **Krea (cloud API) for images and videos.** A Krea API token in Settings
+  gives access to many models through one service: Nano Banana Pro / 2,
+  ChatGPT Image 2, Seedream 5 Pro and Runway Gen-4 Image for frames; Kling
+  3.0 / 2.6, Veo 3.1, MiniMax H3 / H3 Max, Seedance 2.0 / 2.5, LTX-2.5 Pro,
+  Wan 3.0, Gemini Omni Flash 1.1 and Runway Gen-4.5 for shot videos. Prompts
+  are written in the chosen model's own format, clip lengths snap to what the
+  model allows, Stop cancels the job on Krea's side, and models with their
+  own sound mix get it on a separate lane like local H3.
+
 ## 2.13.0 — 2026-10-05
 
 - **Spatial layout (Stage 4 and Stage 5).** A 3D window per scene: a

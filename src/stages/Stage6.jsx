@@ -1,4 +1,5 @@
 import { useAgentScope } from '../lib/agent/registry.js';
+import { kreaNativeAudio } from '../lib/krea.js';
 import { POLICY_EVENT } from '../lib/policy.js';
 import { DEFAULT_OUTPUT_DIR, SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC } from '../lib/config.js';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -389,7 +390,8 @@ export default function Stage6({ project, update, settings, ...workbench }) {
           const video = (project.shotVideos || {})[shot.id] || null;
           const raw = (project.videoGenDurations || {})[shot.id] || 0;
           // first-frame-anchored clips (H3, Kling) trim from the tail only
-          const nativeAudio = ['minimax', 'kling'].includes((project.shotVideoEngines || {})[shot.id]);
+          const shotEngine = (project.shotVideoEngines || {})[shot.id];
+          const nativeAudio = ['minimax', 'kling'].includes(shotEngine) || kreaNativeAudio(shotEngine);
           const trim = video
             ? (project.shotTrims || {})[shot.id]
               || defaultTrim(shot.duration || 0, raw, { tailOnly: nativeAudio })

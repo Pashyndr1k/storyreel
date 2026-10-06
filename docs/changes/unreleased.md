@@ -1,0 +1,108 @@
+# Unreleased (after 2.13.0)
+
+Base: tag `v2.13.0` (commit `e1a6bbb`). All work below is on `main`, local.
+
+Conventions that apply to every change: UI strings exist in EN/RU/UA in
+`src/lib/i18n.js` (`const en`, `const ru`, `const uk`); every button, header
+and indicator carries a hover hint (`title`); buttons are three words at most.
+
+---
+
+## 1. Krea as an image and video service
+
+**Request.** Integrate Krea (https://www.krea.ai/docs/developers/mcp,
+https://www.krea.ai/docs/api-reference/introduction,
+https://github.com/krea-ai/skills) into the supported image / video APIs.
+
+**What was integrated.** Krea's REST API (the thing its MCP server and the
+krea-ai/skills repository drive): one token, one job model, many image and
+video models behind `POST /generate/{kind}/{vendor}/{model}`. The MCP server
+itself is for agents talking to Krea directly; the app calls the API from
+its main process exactly as it does for Kling. Endpoints and parameters were
+taken from `https://api.krea.ai/openapi.json` (v1, 122 paths).
+
+**Behaviour.**
+- Settings → API setup: "Krea API token" (created at
+  krea.ai/settings/api-tokens; a prepaid USD balance billed per generation
+  by Krea; failed and cancelled jobs are not charged).
+- Settings → Model selection → "Shot images & editing": new option "Krea
+  (cloud API — model below)" with a model select: Nano Banana Pro (default),
+  Nano Banana 2, ChatGPT Image 2, Seedream 5 Pro, Runway Gen-4 Image. All
+  take the shot's reference photos (characters, locations, assets). Runway
+  needs at least one reference and refuses otherwise.
+- Settings → Video & voice → "Video model": new option "Krea (cloud API —
+  model below)" with a model select: Kling 3.0 (default), Kling 2.6,
+  Veo 3.1, MiniMax H3, MiniMax H3 Max, Seedance 2.0, Seedance 2.5, LTX-2.5
+  Pro, Wan 3.0, Gemini Omni Flash 1.1 *, Runway Gen-4.5 * (* = first frame
+  only). Stage 5's prompt-header pickers show "Krea · <model>" for both.
+- Generation: references and frames are first uploaded with `POST /assets`
+  (media URL fields are limited to 1024 characters, so data URIs cannot be
+  inlined) and cached per session by content, then the model is called and
+  `GET /jobs/{id}` is polled every 3 s until completed / failed / cancelled;
+  the result file is downloaded through the bridge and stored as a data URL
+  like every other clip or frame. A local copy is saved to the outputs
+  folder. Stop → `DELETE /jobs/{id}` (Krea cancels, not billed).
+- Video parameters per model (`KREA_VIDEO_MODELS`): the nearest allowed clip
+  length not shorter than the shot (`kreaSeconds`: ranges or fixed sets such
+  as Kling 2.6 5|10, Veo 4|6|8, LTX 6|8|10); the model's nearest aspect
+  ratio (`kreaAspect`; Runway's pixel pairs); the app's SD/HD/FHD mapped onto
+  the model's resolution (or Kling 3.0's std/pro mode); `generate_audio:
+  false` where the field exists (the app adds voice and sound itself);
+  prompt expansion off for H3 Max and Wan. End frame only when the model
+  supports it (`resolveKreaMode`, modes auto / i2v / flf2v).
+- Prompt format follows the model's family: Kling models get the Kling
+  prompt, MiniMax H3 models the H3 three-field prompt (composed with
+  `h3ComposePrompt` as for local H3), all others the motion prose (LTX
+  format). Image prompts name the Krea model ("for the Nano Banana Pro
+  image generation model").
+- Native-audio models (MiniMax H3, H3 Max, Seedance 2.0 / 2.5) deliver a
+  mix: it is detached onto its own lane as for local H3, and the assembly
+  trims such clips from the tail only. Engine stored per shot as
+  `krea:<model id>`.
+- Progress estimate: first-run rate 30 s of work per second of video,
+  learned per Krea model (`etaKey` "krea:<model>").
+- Errors: `NO_KREA_KEY` / `KREA_NEEDS_APP` shown as notes with the Settings
+  button; HTTP 401 (key), 402 (balance), 403, 404, 400/422, 429 and 5xx
+  mapped to sentences with the raw message kept.
+
+**Data model.** Settings: `kreaKey` (''), `kreaImageModel`
+('nano-banana-pro'), `kreaVideoModel` ('kling-3.0'); `imageService` may be
+'krea'; `videoEngine` may be 'krea'. Project: `shotVideoEngines[shotId]` may
+be `krea:<model>`. No migration needed.
+
+**Files.**
+- `src/lib/krea.js` (new): model tables, `kreaSeconds`, `kreaAspect`,
+  `resolveKreaMode`, `uploadAsset`, `generateKreaImage`, `generateKreaVideo`,
+  `kreaNativeAudio`, error mapping.
+- `electron/netRequest.cjs`: `krea.ai` added to the API host allowlist;
+  multipart uploads (`form: { fields, file: { field, name, mime, base64 } }`).
+- `src/components/SettingsModal.jsx`, `src/stages/Stage5.jsx` (image
+  service branch, engine 'krea', dispatch, modes, errors, pickers),
+  `src/stages/Stage6.jsx` (native audio), `src/lib/prompts.js` (image model
+  name), `src/lib/storage.js`, `src/lib/videoEta.js`.
+- i18n: `set.kreaKey`, `set.kreaKeyHint`, `set.svcKreaImg`,
+  `set.kreaImageModel`, `tip.kreaImageModel`, `set.kreaImageHint`,
+  `set.engKrea`, `set.engKreaHint`, `set.kreaVideoModel`,
+  `tip.kreaVideoModel`, `set.kreaVideoHint`, `err.noKreaKey`,
+  `err.kreaNeedsApp`.
+
+**Verified.** `netRequest.cjs` under Node with fetch mocked (multipart file,
+JSON call, host allowlist, plain download). In the dev app with a fake Krea
+behind `window.netBridge`: asset upload and per-session cache, request bodies
+for Nano Banana Pro (aspect + 2K + image_urls), Seedream (width/height +
+style_images), Runway refusal without references, H3 Max (end frame, 1080p,
+4:3, expansion off), Kling 3.0 (generate_audio false, mode pro, duration 7),
+Omni (no end frame, 1:1 → 16:9), job polling, result download, abort →
+DELETE, 422 and missing-key errors; Settings shows the token field and both
+model selects. **Not run against the real Krea API**: field names come from
+the OpenAPI spec, but response shapes of `/assets` (`image_url`) and
+`result.urls` (strings or `{ type, url }`) are handled from the docs only, and
+no real generation has been made. Not run in the packaged app.
+
+**Open.**
+- Pricing is not shown in the app (Krea bills per model and parameters; see
+  krea.ai/features/api).
+- Switching between Krea models of different prompt families does not flag
+  existing prompts as mismatched (the stored prompt engine is 'krea').
+- Krea's enhance / upscale, audio and 3D endpoints are not used.
+- Stage 4 storyboard frames still use Gemini or ComfyUI only.

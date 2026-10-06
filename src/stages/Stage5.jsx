@@ -1,5 +1,6 @@
 import { useAgentScope } from '../lib/agent/registry.js';
 import { generateKlingVideo, klingModelOf, klingSeconds, KLING_VIDEO_MODES, resolveKlingMode } from '../lib/kling.js';
+import { generateKreaImage, generateKreaVideo, kreaImageModelOf, kreaVideoModelOf, kreaSeconds, KREA_VIDEO_MODES, resolveKreaMode } from '../lib/krea.js';
 import { SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC, MAX_IMAGE_VERSIONS, MAX_CHARACTER_REFS, MAX_LOCATION_PHOTOS } from '../lib/config.js';
 import { shotCastRefs } from '../lib/castRefs.js';
 import { CAMERA_LEVELS, ACTION_LEVELS, cameraOf, actionOf, dynamicsStale } from '../lib/shotDynamics.js';
@@ -258,10 +259,18 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     }
   };
 
-  // Shot images route through the selected service: Gemini (default) or the
-  // local ComfyUI Flux.2 Klein 9B workflow (max 2 reference images).
+  // Shot images route through the selected service: Gemini (default), the
+  // local ComfyUI Flux.2 Klein 9B workflow (max 2 reference images), or a
+  // Krea cloud model (lib/krea.js).
   const useComfyImg = settings.imageService === 'comfy';
+  const useKreaImg = settings.imageService === 'krea';
+  const imageSvc = useComfyImg ? 'comfy' : useKreaImg ? 'krea' : 'gemini';
   const runImageGen = async ({ prompt, images, ratio, name }) => {
+    if (useKreaImg) {
+      const dataURL = await generateKreaImage(settings, { prompt, images, aspectRatio: ratio, name });
+      saveToLocalOutputs(settings, `${name || 'image'}.png`, dataURL); // best-effort local copy
+      return dataURL;
+    }
     if (useComfyImg) {
       const res = await generateComfyImage(settings, { prompt, images, aspectRatio: ratio, name });
       saveToLocalOutputs(settings, res.filename, res.dataURL); // best-effort local copy
@@ -270,7 +279,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     return generateImage(settings, { prompt, images, aspectRatio: ratio, imageSize: '2K' });
   };
   // Missing image-service credentials/setup, or null when ready to generate.
-  const imageKeyError = () => (!useComfyImg && !settings.geminiKey ? 'NO_GEMINI_KEY' : null);
+  const imageKeyError = () => (useKreaImg ? (!(settings.kreaKey || '').trim() ? 'NO_KREA_KEY' : null) : !useComfyImg && !settings.geminiKey ? 'NO_GEMINI_KEY' : null);
 
   const prefFor = (shotId) => refPrefs[shotId] || { char: true, loc: true, asset: true, palette: true };
   const setPref = (shotId, patch) =>
@@ -398,14 +407,15 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   // Video prompts are written in the target model's own format (H3's
   // three-field schema vs LTX's motion-only prose), so the app remembers which
   // engine each prompt was written for and flags mismatches.
-  const engineOf = (v) => (v === 'minimax' ? 'minimax' : v === 'kling' ? 'kling' : 'ltx');
+  const engineOf = (v) => (v === 'minimax' ? 'minimax' : v === 'kling' ? 'kling' : v === 'krea' ? 'krea' : 'ltx');
   const curEngine = engineOf(settings.videoEngine);
-  const engineName = (e) => (e === 'minimax' ? 'H3' : e === 'kling' ? 'Kling' : 'LTX');
-  const engineHintName = curEngine === 'minimax' ? 'MiniMax H3' : curEngine === 'kling' ? klingModelOf(settings).label : 'LTX-2';
+  const engineName = (e) => (e === 'minimax' ? 'H3' : e === 'kling' ? 'Kling' : e === 'krea' ? 'Krea' : 'LTX');
+  const kreaVid = kreaVideoModelOf(settings); // the Krea model in use (its family picks the prompt format)
+  const engineHintName = curEngine === 'minimax' ? 'MiniMax H3' : curEngine === 'kling' ? klingModelOf(settings).label : curEngine === 'krea' ? `Krea · ${kreaVid.label}` : 'LTX-2';
   // The video-prompt spec for an engine — each model has its own prompt
   // format (H3's three fields, LTX's motion prose, Kling's formula).
   const videoSpec = (engine, proj, sceneArg, sceneShots, block) =>
-    engine === 'minimax'
+    engine === 'minimax' || (engine === 'krea' && kreaVid.family === 'minimax')
       ? stage5H3VideoPrompt(proj, sceneArg, sceneShots, videoStyle, block)
       : engine === 'kling'
         ? stage5KlingVideoPrompt(proj, sceneArg, sceneShots, videoStyle, block, {
@@ -413,9 +423,16 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
             modelLabel: klingModelOf(settings).label,
             lastFrame: klingModelOf(settings).lastFrame,
           })
-        : stage5VideoPrompt(proj, sceneArg, sceneShots, videoStyle, block);
-  // image model the first-frame prompts are written for
-  const imageModel = settings.imageService === 'comfy' ? 'comfy' : 'gemini';
+        : engine === 'krea' && kreaVid.family === 'kling'
+          ? stage5KlingVideoPrompt(proj, sceneArg, sceneShots, videoStyle, block, {
+              seconds: (sh) => kreaSeconds(kreaVid, Number(sh.duration) || 4),
+              modelLabel: kreaVid.label,
+              lastFrame: kreaVid.lastFrame,
+            })
+          : stage5VideoPrompt(proj, sceneArg, sceneShots, videoStyle, block);
+  // image model the first-frame prompts are written for ('krea:<label>' names the Krea model)
+  const promptImageModel = (svc) => (svc === 'comfy' ? 'comfy' : svc === 'krea' ? `krea:${kreaImageModelOf(settings).label}` : 'gemini');
+  const imageModel = promptImageModel(imageSvc);
 
   // Each generation is up to three calls (image, video, then audio prompts for
   // scenes with dialogue), each returning only its own field — so merge into
@@ -511,7 +528,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const engine = over.engine || curEngine;
     const spec =
       kind === 'image'
-        ? stage5Prompt(cur, sceneArg, sceneShots, genLang, imageStyle, imageStylePlus, block, over.imageModel || imageModel)
+        ? stage5Prompt(cur, sceneArg, sceneShots, genLang, imageStyle, imageStylePlus, block, over.imageModel ? promptImageModel(over.imageModel) : imageModel)
         : kind === 'video'
           ? videoSpec(engine, cur, sceneArg, sceneShots, block)
           : null;
@@ -640,13 +657,13 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   // Model picker in a prompt's header. The choice is the app-wide generation
   // model (the same setting as in Settings): confirm first, then offer to
   // rewrite THIS shot's prompt in the new model's format.
-  const IMAGE_MODELS = [['gemini', 'Nano Banana'], ['comfy', 'Flux.2 Klein']];
-  const VIDEO_ENGINES = [['minimax', 'MiniMax H3'], ['ltx', 'LTX-2'], ['kling', klingModelOf(settings).label]];
+  const IMAGE_MODELS = [['gemini', 'Nano Banana'], ['comfy', 'Flux.2 Klein'], ['krea', `Krea · ${kreaImageModelOf(settings).label}`]];
+  const VIDEO_ENGINES = [['minimax', 'MiniMax H3'], ['ltx', 'LTX-2'], ['kling', klingModelOf(settings).label], ['krea', `Krea · ${kreaVid.label}`]];
   const pickModel = (shot, kind, value) => {
     if (!setSettings) return;
     const list = kind === 'image' ? IMAGE_MODELS : VIDEO_ENGINES;
     const label = (list.find(([v]) => v === value) || [])[1] || value;
-    if (value === (kind === 'image' ? imageModel : curEngine)) return;
+    if (value === (kind === 'image' ? imageSvc : curEngine)) return;
     if (!window.confirm(t(kind === 'image' ? 'mdl.confirmImage' : 'mdl.confirmVideo', { m: label }))) return;
     setSettings({ ...settings, ...(kind === 'image' ? { imageService: value } : { videoEngine: value }) });
     const has = (project.shotPrompts[shot.id]?.[kind === 'image' ? 'imagePrompt' : 'videoPrompt'] || '').trim();
@@ -658,7 +675,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     setSettings ? (
       <select
         className="prompt-model"
-        value={kind === 'image' ? imageModel : curEngine}
+        value={kind === 'image' ? imageSvc : curEngine}
         title={t(kind === 'image' ? 'mdl.imageTip' : 'mdl.videoTip')}
         aria-label={t(kind === 'image' ? 'mdl.imageTip' : 'mdl.videoTip')}
         disabled={!!regenBusy}
@@ -1297,7 +1314,10 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     // an LTX-era plain prompt is passed through so nothing breaks mid-project.
     const isH3 = settings.videoEngine === 'minimax';
     const isKling = settings.videoEngine === 'kling'; // cloud API, first (+ last) frame
+    const isKrea = settings.videoEngine === 'krea'; // Krea cloud API, many models, first (+ last) frame
     const kModel = klingModelOf(settings);
+    const krModel = kreaVideoModelOf(settings);
+    const kreaH3 = isKrea && krModel.family === 'minimax'; // H3 through Krea: H3 prompt format, native mix
     const last = (cur.shotFinalImages || {})[shot.id] || null;
     const voiceAud = (cur.shotAudios || {})[shot.id] || null;
     // A pinned workflow wins over the automatic choice (and silently falls
@@ -1312,9 +1332,12 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       ? resolveH3VideoMode(mode, { lastFrame: last, hasRefs, hasKeyframes })
       : isKling
         ? resolveKlingMode(mode, { lastFrame: last, model: kModel })
-        : resolveVideoMode(mode, { lastFrame: last, audio: voiceAud });
+        : isKrea
+          ? resolveKreaMode(mode, { lastFrame: last, model: krModel })
+          : resolveVideoMode(mode, { lastFrame: last, audio: voiceAud });
     if (!first && useMode !== 'r2v' && useMode !== 'mfr') return; // every non-reference workflow is frame-anchored
     if (isKling && !(settings.klingKey || '').trim()) return setImgErr({ id: shot.id, msg: 'NO_KLING_KEY' });
+    if (isKrea && !(settings.kreaKey || '').trim()) return setImgErr({ id: shot.id, msg: 'NO_KREA_KEY' });
     // one video job at a time (the GPU and the progress state are single)
     if (vidAbort.current) return;
     setImgErr(null);
@@ -1328,11 +1351,13 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     // model's nearest allowed length, no padding.
     const genDuration = isKling
       ? klingSeconds(kModel, slotDur)
-      : useMode === 'si2v' || isH3
+      : isKrea
+        ? kreaSeconds(krModel, slotDur)
+        : useMode === 'si2v' || isH3
         ? slotDur
         : Math.round(shot.duration || 4) + DYNAMICS_CONFIG.generation_padding_sec;
     // progress estimate for the button, from how long this kind of job took before
-    const runKey = etaKey(isKling ? 'kling' : isH3 ? 'minimax' : 'ltx', cur.videoResolution || 'HD', useMode);
+    const runKey = etaKey(isKling ? 'kling' : isKrea ? `krea:${krModel.id}` : isH3 ? 'minimax' : 'ltx', cur.videoResolution || 'HD', useMode);
     const runStart = Date.now();
     setVidProg({ shotId: shot.id, startedAt: runStart, expectedSec: expectedSeconds(runKey, genDuration) });
     const abort = new AbortController();
@@ -1340,7 +1365,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const runOpts = { signal: abort.signal };
     try {
       const sendPrompt =
-        isH3 && useMode !== 'r2v' && useMode !== 'mfr'
+        (isH3 || kreaH3) && useMode !== 'r2v' && useMode !== 'mfr'
           ? h3ComposePrompt(vPrompt, {
               hasFirst: true,
               hasLast: useMode === 'flf2v' && !!last,
@@ -1355,7 +1380,17 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         name: `${(project.title || 'project').slice(0, 24)}_sc${project.outline.indexOf(scene) + 1}_shot${i + 1}`,
       };
       const { dataURL, filename, seconds: klingSec } =
-        isKling
+        isKrea
+          ? await generateKreaVideo(settings, {
+              prompt: sendPrompt,
+              firstFrame: first,
+              lastFrame: useMode === 'flf2v' ? last : null,
+              durationSec: slotDur,
+              resolution: cur.videoResolution || 'HD',
+              aspectRatio: project.aspectRatio || '16:9',
+              name: genArgs.name,
+            }, runOpts)
+          : isKling
           ? await generateKlingVideo(settings, {
               prompt: vPrompt,
               firstFrame: first,
@@ -1389,7 +1424,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       // onto the "H3 mix" lane NLE-style — video muted, audio on its own lane
       // at the same volume — so the assembly timeline can keep, kill or duck it.
       let mixBuf = null;
-      if (isH3) {
+      if (isH3 || (isKrea && krModel.nativeAudio)) {
         try {
           mixBuf = await decodeMediaAudio(dataURL);
         } catch {
@@ -1402,9 +1437,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           shotVideos: { ...(p.shotVideos || {}), [shot.id]: dataURL },
           videoGenDurations: {
             ...(p.videoGenDurations || {}),
-            [shot.id]: isKling ? klingSec || genDuration : isH3 ? Math.round(h3Seconds(genDuration) * 100) / 100 : genDuration,
+            [shot.id]: isKling || isKrea ? klingSec || genDuration : isH3 ? Math.round(h3Seconds(genDuration) * 100) / 100 : genDuration,
           },
-          shotVideoEngines: { ...(p.shotVideoEngines || {}), [shot.id]: isH3 ? 'minimax' : isKling ? 'kling' : 'ltx' },
+          shotVideoEngines: { ...(p.shotVideoEngines || {}), [shot.id]: isH3 ? 'minimax' : isKling ? 'kling' : isKrea ? `krea:${krModel.id}` : 'ltx' },
         };
         if (!mixWav) return base;
         // timeline start = summed durations of every shot before this one
@@ -1985,7 +2020,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
               ? resolveH3VideoMode(shotMode, { lastFrame: finalImg, hasRefs: !!refsOf(shot.id), hasKeyframes: hasMultiInput(project, shot.id) })
               : curEngine === 'kling'
                 ? resolveKlingMode(shotMode, { lastFrame: finalImg, model: klingModelOf(settings) })
-                : resolveVideoMode(shotMode, { lastFrame: finalImg, audio: shotAud });
+                : curEngine === 'krea'
+                  ? resolveKreaMode(shotMode, { lastFrame: finalImg, model: kreaVid })
+                  : resolveVideoMode(shotMode, { lastFrame: finalImg, audio: shotAud });
           return (
             <div key={shot.id} className={`shot-card s5e-card ${embed ? 's5e-compact' : ''}`}>
               {/* Card header: shot identity, timing, type and action. */}
@@ -2099,7 +2136,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
               {/* Errors surface above the tab content so they're visible from
                   any tab (image/video/audio failures all report here). */}
               {imgErr?.id === shot.id &&
-                (['NO_GEMINI_KEY', 'NO_KEY', 'COMFY_UNREACHABLE', 'NO_KLING_KEY', 'KLING_NEEDS_APP'].includes(imgErr.msg) ? (
+                (['NO_GEMINI_KEY', 'NO_KEY', 'COMFY_UNREACHABLE', 'NO_KLING_KEY', 'KLING_NEEDS_APP', 'NO_KREA_KEY', 'KREA_NEEDS_APP'].includes(imgErr.msg) ? (
                   <div className="note warn">
                     {t(
                       imgErr.msg === 'NO_KEY'
@@ -2110,7 +2147,11 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                             ? 'err.noKlingKey'
                             : imgErr.msg === 'KLING_NEEDS_APP'
                               ? 'err.klingNeedsApp'
-                              : 'err.noGeminiKey'
+                              : imgErr.msg === 'NO_KREA_KEY'
+                                ? 'err.noKreaKey'
+                                : imgErr.msg === 'KREA_NEEDS_APP'
+                                  ? 'err.kreaNeedsApp'
+                                  : 'err.noGeminiKey'
                     )}{' '}
                     <button title={t('tip.openSettings')} className="btn small" onClick={onSettings}>{t('err.openSettings')}</button>
                   </div>
@@ -2576,7 +2617,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       ))}
                     </span>
                     <span className="seg seg-tall seg-compact" title={t('vid.wfTip')}>
-                      {(curEngine === 'minimax' ? H3_VIDEO_MODES : curEngine === 'kling' ? KLING_VIDEO_MODES : VIDEO_MODES).map((m) => {
+                      {(curEngine === 'minimax' ? H3_VIDEO_MODES : curEngine === 'kling' ? KLING_VIDEO_MODES : curEngine === 'krea' ? KREA_VIDEO_MODES : VIDEO_MODES).map((m) => {
                         const avail =
                           m === 'si2v' ? !!shotAud
                             : m === 'flf2v' ? !!finalImg
