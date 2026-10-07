@@ -8,8 +8,6 @@ import {
   normalizeArcs,
   arcChunks,
   planSegments,
-  segmentsFromCuts,
-  normalizeEpisodeCuts,
   buildSegmentProject,
   inlineSeriesPart,
   isSeriesInline,
@@ -22,7 +20,7 @@ import { useI18n } from '../lib/i18n.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import { StyleChip } from '../components/StyleControls.jsx';
-import { Scissors, Stars, Chevron, RestoreIcon } from '../components/icons.jsx';
+import { Stars, Chevron, RestoreIcon } from '../components/icons.jsx';
 
 // Stage 3 of a series master project: the series plan. The story is broken
 // into main sections (each closing on an intermediate finale), every section
@@ -121,10 +119,7 @@ export default function Stage3Series({ project, update, settings, onSettings, on
 
   // ---- split into production projects
   const segSize = clampSegment(plan?.segmentSize, planTotal);
-  // explicit cuts between episodes win over the "every N" size
-  const epCuts = normalizeEpisodeCuts(plan?.cuts, planTotal);
-  const segs = arcs.length ? (epCuts.length ? segmentsFromCuts(epCuts, planTotal, arcs) : planSegments(arcs, planTotal, segSize)) : [];
-  const toggleEpCut = (k) => patchPlan((pl) => ({ ...pl, cuts: epCuts.includes(k) ? epCuts.filter((x) => x !== k) : [...epCuts, k].sort((a, b) => a - b) }));
+  const segs = arcs.length ? planSegments(arcs, planTotal, segSize) : [];
   const createdFor = (s) => (plan?.segments || []).find((x) => x.from === s.from && x.to === s.to && projectExists?.(x.projectId));
   const pendingSegs = segs.filter((s) => !createdFor(s));
   const createSegments = () => {
@@ -309,44 +304,19 @@ export default function Stage3Series({ project, update, settings, onSettings, on
           <div className="prod-option">
           <h4 title={t('ser.splitHint')}>{t('ser.splitTitle')}</h4>
           <p className="hint">{t('ser.splitHint')}</p>
-          {/* every episode as a chip; a cut in any gap starts a new project there */}
-          {complete && planTotal > 1 && (
-            <div className="cut-strip" role="group" aria-label={t('ser.splitTitle')}>
-              {Array.from({ length: planTotal }, (_, i) => i + 1).map((ep) => (
-                <span key={ep} className="cut-item">
-                  <span className="cut-scene" title={`${t('ser.epShort', { n: ep })}${(plan?.episodes || []).find((e) => e.number === ep)?.title ? ` · ${(plan.episodes || []).find((e) => e.number === ep).title}` : ''}`}>{ep}</span>
-                  {ep < planTotal && (
-                    <button
-                      type="button"
-                      className={`cut-gap ${segs.some((s) => s.to === ep) ? (epCuts.includes(ep) ? 'cut' : 'cut auto') : ''}`}
-                      title={t(epCuts.includes(ep) ? 'ser.uncutTip' : 'ser.cutTip', { a: ep, b: ep + 1 })}
-                      aria-pressed={epCuts.includes(ep)}
-                      onClick={() => toggleEpCut(ep)}
-                    >
-                      <Scissors size={12} />
-                    </button>
-                  )}
-                </span>
-              ))}
-            </div>
-          )}
           <div className="row">
             <label className="seg-size">
               <span>{t('ser.segSize')}</span>
               <select
                 title={t('tip.serSegSize')}
-                value={epCuts.length ? '' : segSize}
-                onChange={(e) => e.target.value && patchPlan((pl) => ({ ...pl, segmentSize: clampSegment(e.target.value, planTotal), cuts: [] }))}
+                value={segSize}
+                onChange={(e) => patchPlan((pl) => ({ ...pl, segmentSize: clampSegment(e.target.value, planTotal) }))}
               >
-                {epCuts.length > 0 && <option value="">—</option>}
                 {Array.from({ length: Math.max(1, planTotal) }, (_, k) => k + 1).map((n) => (
                   <option key={n} value={n}>{n}</option>
                 ))}
               </select>
             </label>
-            {epCuts.length > 0 && (
-              <button type="button" title={t('split.clearTip')} className="btn small" onClick={() => patchPlan((pl) => ({ ...pl, cuts: [] }))}>{t('split.clear')}</button>
-            )}
             <button
               title={t('tip.serCreate')}
               className="btn primary"

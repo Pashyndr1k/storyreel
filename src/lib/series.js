@@ -111,22 +111,6 @@ export function planSegments(arcs, total, size) {
   return segs;
 }
 
-// Projects from explicit cuts: `cuts` are episode numbers after which a new
-// project starts. Each project is titled with the section its first episode is in.
-export const normalizeEpisodeCuts = (cuts, total) =>
-  [...new Set((Array.isArray(cuts) ? cuts : []).map(Number).filter((k) => Number.isInteger(k) && k >= 1 && k < total))].sort((a, b) => a - b);
-export function segmentsFromCuts(cuts, total, arcs = []) {
-  const c = normalizeEpisodeCuts(cuts, total);
-  const arcOf = (ep) => (arcs || []).find((x) => ep >= x.from && ep <= x.to)?.title || '';
-  const segs = [];
-  let from = 1;
-  for (const k of c) {
-    segs.push({ from, to: k, arcTitle: arcOf(from) });
-    from = k + 1;
-  }
-  segs.push({ from, to: total, arcTitle: arcOf(from) });
-  return segs;
-}
 
 // The seriesPart of an inline master, rebuilt from the plan as it reads now.
 // No episodeSeconds: the length is read from the project itself.
