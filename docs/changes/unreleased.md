@@ -64,3 +64,38 @@ the context box on a part (its project opened at its stage, 5).
 
 **Open.** Parts are independent copies: later edits in the original do not
 flow into them. Series masters keep their own episode split (Stage3Series).
+
+---
+
+## 2. Agent API brought up to date (engines, parts, split tool)
+
+**Request.** Has the MCP been updated for the amendments of the latest
+versions? Audit and catch-up.
+
+**Audit.** Covered already: 3D layout (get / build / set, `useLayout`),
+duplicate shot, seed replay (`create_media seed`), enforced names (automatic
+in `run_stage` 3 / 4), layout views in `review_shot`. Gaps found and closed:
+- `storyreel_status.services` ignored Krea (reported "gemini" for the Krea
+  image service) and named no models: `image` now reads "gemini (Nano Banana
+  2.1)", "krea (<model>)" or "comfyui (Flux.2 Klein, local)"; `videoEngine`
+  "minimax (H3 local, <steps> steps)", "ltx (local)", "kling (<model>)" or
+  "krea (<model>)"; `kreaKeySet` added.
+- `storyreel_get_project`: `partOf` on a part project, `parts` (scenes,
+  projectId, title) on a split original.
+- New `storyreel_split_project { projectId, cutAfter?: [sceneNo], every?: n }`
+  — the Stage 3 split (section 1) for the agent; existing parts are
+  skipped; stores `splitCuts` / `parts` like the UI. No attempt counted.
+  Errors: `NOT_READY` (< 2 scenes), `BAD_INPUT` (no usable cuts).
+- Guide: new sections "Engines, quality and cost" (engines are the user's
+  choice and not changeable by the agent; 8 / 4-step H3 is preview quality;
+  when to replay a seed; cloud cost) and "Parts". `docs/agent-api.md`
+  appended. 24 tools in total. The MCP bridge needs no change (it reads the
+  tool list from the app) — restart the app and reconnect.
+- Not exposed on purpose: changing engines, models, H3 steps or keys.
+
+**Files.** `src/lib/agent/api.js`, `agent/AGENT_GUIDE.md`, `docs/agent-api.md`.
+
+**Verified.** In the dev app through `window.__storyreelAgent`: status
+strings, `parts` / `partOf`, `BAD_INPUT` without cuts, a split with
+`cutAfter: [1]` creating two projects, a repeat creating none, 24 tools.
+Not run through the MCP bridge.

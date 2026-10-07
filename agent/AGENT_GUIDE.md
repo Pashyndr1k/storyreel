@@ -131,6 +131,34 @@ Conventions: metres; x to the right, z toward the default camera;
 `facingDeg` 0 = toward +z, 90 = +x, 180 = -z, 270 = -x; `yawDeg` is where
 the camera stands around its target (0 = the +z side).
 
+## Engines, quality and cost
+
+`storyreel_status.services` tells you what renders: the image service and
+model (Gemini Nano Banana 2.1 by default, a Krea model, or local Flux.2
+Klein) and the video engine (local MiniMax H3 with its step count, local
+LTX, Kling, or a Krea model). These are the user's choices — there is no
+tool to change engines, keys or H3 steps; if the configured engine cannot
+run (no key, ComfyUI down), the error names it and you flag it.
+
+- Local H3 at 8 or 4 steps is a preview quality the user may have chosen for
+  speed; do not judge fine detail against it as you would a 20-step render.
+- A shot's video carries its noise seed (`shotView.videoSeed`, local engines).
+  `storyreel_create_media { kind: "video", seed: "same" }` replays it, so a
+  prompt fix changes only what the prompt says; the default "new" rolls a
+  new take. Use "same" when the motion was right and one detail was wrong.
+- Cloud engines (Kling, Krea) cost money per second; prefer fixing the
+  prompt or the first frame to blind re-renders, and stop at the attempt
+  limit.
+
+## Parts
+
+A long outline can be split at Stage 3 (`storyreel_split_project`, cut after
+chosen scene numbers or every N scenes): each part becomes its own project
+with its scenes and everything made for them. Work on each part as a normal
+project (`projectView.partOf` says which part of what); the original keeps
+`projectView.parts` with the part projects' ids. Edits do not propagate
+between the original and its parts.
+
 ## Names
 
 Character names are written exactly as on the character cards (English,

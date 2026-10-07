@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Agent: engines and parts.** The agent's status names the image and video
+  models in use (including Krea and the H3 step count); the project view
+  shows parts; a new tool splits a project into parts.
 - **Split into parts (Stage 3).** Cut the scene outline anywhere — between
   any scenes, or every N scenes — and create one project per part. Each part
   gets its scenes with everything already made for them (shots, prompts,

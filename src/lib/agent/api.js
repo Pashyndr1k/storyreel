@@ -23,6 +23,10 @@ import { shotCastRefs } from '../castRefs.js';
 import { locationsOf, shotLocationRefs } from '../sceneLocations.js';
 import { describeShot } from '../spatial/describe.js';
 import { sceneLayout, layoutEnabled, hasLayout } from '../spatial/layout.js';
+import { kreaImageModelOf, kreaVideoModelOf } from '../krea.js';
+import { geminiImageLabel } from '../gemini.js';
+import { h3StepsOf } from '../comfy.js';
+import { planParts, cutsEvery, normalizeCuts, buildPartProject } from '../split.js';
 import { layoutTools } from './layoutTools.js';
 import { CAMERA_LEVELS, ACTION_LEVELS, cameraOf, actionOf } from '../shotDynamics.js';
 import { blockForScene } from '../dynamics.js';
@@ -159,6 +163,8 @@ function projectView(project, { prompts = false } = {}) {
     ...(project.scriptType === 'series' ? { episodeCount: project.episodeCount, episodeSeconds: project.episodeSeconds, seriesMaster: isSeriesMaster(project) } : {}),
     aspectRatio: project.aspectRatio,
     useLayout: layoutEnabled(project),
+    ...(project.partInfo ? { partOf: project.partInfo } : {}),
+    ...((project.parts || []).length ? { parts: project.parts.map((x) => ({ scenes: [x.from + 1, x.to + 1], projectId: x.projectId, title: x.title })) } : {}),
     styles: {
       script: { id: project.scriptStyleId, name: styleName('script', project.scriptStyleId) },
       image: { id: project.imageStyleId, name: styleName('image', project.imageStyleId) },
@@ -406,10 +412,18 @@ export const TOOLS = [
         services: {
           text: (s.textService || 'claude') === 'gemini' ? 'gemini' : `claude (${s.model})`,
           textKeySet: !textKeyError(s),
-          image: s.imageService === 'comfy' ? 'comfyui' : 'gemini',
+          image: s.imageService === 'comfy' ? 'comfyui (Flux.2 Klein, local)' : s.imageService === 'krea' ? `krea (${kreaImageModelOf(s).label})` : `gemini (${geminiImageLabel(s.geminiModel)})`,
           geminiKeySet: !!s.geminiKey,
-          videoEngine: s.videoEngine,
+          videoEngine:
+            s.videoEngine === 'krea'
+              ? `krea (${kreaVideoModelOf(s).label})`
+              : s.videoEngine === 'minimax'
+                ? `minimax (H3 local, ${h3StepsOf(s)} steps)`
+                : s.videoEngine === 'kling'
+                  ? `kling (${s.klingModel || 'kling-3.0'})`
+                  : 'ltx (local)',
           klingKeySet: !!s.klingKey,
+          kreaKeySet: !!(s.kreaKey || '').trim(),
         },
         contentPolicyActive: !!s.policyId,
         maxAttempts: MAX_ATTEMPTS,
@@ -569,6 +583,41 @@ export const TOOLS = [
       });
       await settle();
       return { newShotId: copy.id, number: index + 2, sceneId: scene.id };
+    },
+  },
+  {
+    name: 'storyreel_split_project',
+    description:
+      'Stage 3: split the project into parts, one new project per part, each with its run of scenes and everything already made for them (shots, prompts, frames, videos, layouts) plus the storyline, cast and styles; the original is unchanged. Give either cutAfter — the scene numbers (1-based) after which a new part begins — or every — a part size in scenes (the last part takes the rest). Parts that already have a project are skipped. Returns the new projects.',
+    inputSchema: schema({ ...PROJECT, cutAfter: { type: 'array', items: { type: 'integer', minimum: 1 } }, every: { type: 'integer', minimum: 1 } }, ['projectId']),
+    run: async ({ projectId, cutAfter, every }) => {
+      const p = projectOf(projectId);
+      const n = p.outline.length;
+      if (n < 2) fail('NOT_READY', 'The project needs at least two scenes to split.');
+      const cuts = normalizeCuts(every ? cutsEvery(n, every) : (cutAfter || []).map((k) => Number(k) - 1), n);
+      if (!cuts.length) fail('BAD_INPUT', `Give cutAfter (scene numbers 1–${n - 1}) or every (1–${n - 1}).`);
+      const parts = planParts(n, cuts);
+      const exists = (x) => app().projects.some((q) => q.id === x.projectId);
+      const made = (p.parts || []).filter(exists);
+      const pending = parts.filter((part) => !made.some((x) => x.from === part.from && x.to === part.to));
+      const created = pending.map((part) => {
+        const index = parts.indexOf(part) + 1;
+        return { part, project: buildPartProject(p, part, index, parts.length, `Part ${index}/${parts.length}`) };
+      });
+      if (created.length) {
+        app().addProjects(created.map((x) => x.project));
+        patchProject(projectId, (q) => ({ splitCuts: cuts, parts: [...(q.parts || []).filter(exists), ...created.map((x) => ({ from: x.part.from, to: x.part.to, projectId: x.project.id, title: x.project.title }))] }));
+      } else {
+        patchProject(projectId, { splitCuts: cuts });
+      }
+      await settle();
+      return {
+        parts: parts.map((part, k) => {
+          const row = created.find((x) => x.part === part)?.project || made.find((x) => x.from === part.from && x.to === part.to);
+          return { index: k + 1, scenes: [part.from + 1, part.to + 1], projectId: row?.id || row?.projectId || null, title: row?.title || null, created: !!created.find((x) => x.part === part) };
+        }),
+        note: 'Parts are independent copies; later edits in the original do not flow into them. Continue in each part with storyreel_run_stage 4 / storyreel_create_prompts as usual.',
+      };
     },
   },
   {

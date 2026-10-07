@@ -140,3 +140,9 @@ save each changed shot's camera view (rendered off-screen), which
 Units for the layout tools: metres; `facingDeg` 0 = toward +z, 90 = +x;
 `yawDeg` = the camera's place around its target (0 = +z side);
 `elevationDeg` positive = looking down; `lensMm` one of 18, 24, 35, 50, 85.
+
+## Added in 2.16: engines in status, parts
+
+- `storyreel_status.services`: `image` now reads "gemini (<model name>)", "krea (<model>)" or "comfyui (Flux.2 Klein, local)"; `videoEngine` reads "minimax (H3 local, <steps> steps)", "ltx (local)", "kling (<model>)" or "krea (<model>)"; `kreaKeySet` added.
+- `storyreel_get_project`: `partOf` on a part project, `parts` on an original that was split.
+- `storyreel_split_project { projectId, cutAfter?: [sceneNo…], every?: n }` — Stage 3 split into part projects (see the guide, "Parts"). No attempt counted.
