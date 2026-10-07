@@ -15,7 +15,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
 import { generateImage, generateGeminiVoice, GEMINI_VOICES } from '../lib/gemini.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
-import { generateComfyVideo, generateComfyRefVideo, generateComfyMultiVideo, generateComfyImage, saveToLocalOutputs, VIDEO_RESOLUTIONS, VIDEO_MODES, H3_VIDEO_MODES, resolveVideoMode, resolveH3VideoMode, h3Seconds } from '../lib/comfy.js';
+import { generateComfyVideo, generateComfyRefVideo, generateComfyMultiVideo, generateComfyImage, saveToLocalOutputs, VIDEO_RESOLUTIONS, VIDEO_MODES, H3_VIDEO_MODES, resolveVideoMode, resolveH3VideoMode, h3Seconds, h3StepsOf } from '../lib/comfy.js';
 import { stage5Prompt, stage5VideoPrompt, stage5H3VideoPrompt, stage5KlingVideoPrompt, h3ComposePrompt, voiceSourceFor, stage5GeminiVoicePrompt, finalFramePrompt, tweakPromptSpec } from '../lib/prompts.js';
 import { useI18n } from '../lib/i18n.js';
 import { aspectDescription } from '../lib/aspect.js';
@@ -411,7 +411,8 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const curEngine = engineOf(settings.videoEngine);
   const engineName = (e) => (e === 'minimax' ? 'H3' : e === 'kling' ? 'Kling' : e === 'krea' ? 'Krea' : 'LTX');
   const kreaVid = kreaVideoModelOf(settings); // the Krea model in use (its family picks the prompt format)
-  const engineHintName = curEngine === 'minimax' ? 'MiniMax H3' : curEngine === 'kling' ? klingModelOf(settings).label : curEngine === 'krea' ? `Krea · ${kreaVid.label}` : 'LTX-2';
+  const h3Steps = h3StepsOf(settings); // 20 | 8 | 4 — H3 sampling, shown in the model picker
+  const engineHintName = curEngine === 'minimax' ? `MiniMax H3 · ${t('mdl.steps', { n: h3Steps })}` : curEngine === 'kling' ? klingModelOf(settings).label : curEngine === 'krea' ? `Krea · ${kreaVid.label}` : 'LTX-2';
   // The video-prompt spec for an engine — each model has its own prompt
   // format (H3's three fields, LTX's motion prose, Kling's formula).
   const videoSpec = (engine, proj, sceneArg, sceneShots, block) =>
@@ -658,24 +659,41 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   // model (the same setting as in Settings): confirm first, then offer to
   // rewrite THIS shot's prompt in the new model's format.
   const IMAGE_MODELS = [['gemini', 'Nano Banana'], ['comfy', 'Flux.2 Klein'], ['krea', `Krea · ${kreaImageModelOf(settings).label}`]];
-  const VIDEO_ENGINES = [['minimax', 'MiniMax H3'], ['ltx', 'LTX-2'], ['kling', klingModelOf(settings).label], ['krea', `Krea · ${kreaVid.label}`]];
+  // H3 appears once per step count: the value "minimax@8" means the H3
+  // engine with the 8-step LoRA; plain "minimax" is the full 20-step run.
+  const VIDEO_ENGINES = [
+    ['minimax', `MiniMax H3 · ${t('mdl.steps', { n: 20 })}`],
+    ['minimax@8', `MiniMax H3 · ${t('mdl.steps', { n: 8 })}`],
+    ['minimax@4', `MiniMax H3 · ${t('mdl.steps', { n: 4 })}`],
+    ['ltx', 'LTX-2'],
+    ['kling', klingModelOf(settings).label],
+    ['krea', `Krea · ${kreaVid.label}`],
+  ];
+  const videoPick = curEngine === 'minimax' && h3Steps !== 20 ? `minimax@${h3Steps}` : curEngine;
   const pickModel = (shot, kind, value) => {
     if (!setSettings) return;
     const list = kind === 'image' ? IMAGE_MODELS : VIDEO_ENGINES;
     const label = (list.find(([v]) => v === value) || [])[1] || value;
-    if (value === (kind === 'image' ? imageSvc : curEngine)) return;
+    if (value === (kind === 'image' ? imageSvc : videoPick)) return;
+    const [engine, stepStr] = value.split('@');
+    const steps = engine === 'minimax' ? Number(stepStr) || 20 : null;
+    if (kind === 'video' && engine === curEngine) {
+      // same engine, another H3 step count: prompts stay valid, no confirmation
+      setSettings({ ...settings, h3Steps: steps });
+      return;
+    }
     if (!window.confirm(t(kind === 'image' ? 'mdl.confirmImage' : 'mdl.confirmVideo', { m: label }))) return;
-    setSettings({ ...settings, ...(kind === 'image' ? { imageService: value } : { videoEngine: value }) });
+    setSettings({ ...settings, ...(kind === 'image' ? { imageService: value } : { videoEngine: engine, ...(steps ? { h3Steps: steps } : {}) }) });
     const has = (project.shotPrompts[shot.id]?.[kind === 'image' ? 'imagePrompt' : 'videoPrompt'] || '').trim();
     if (has && window.confirm(t('mdl.regenAsk', { m: label }))) {
-      regenPrompt(shot, kind, kind === 'image' ? { imageModel: value } : { engine: value });
+      regenPrompt(shot, kind, kind === 'image' ? { imageModel: value } : { engine });
     }
   };
   const modelSelect = (shot, kind) =>
     setSettings ? (
       <select
         className="prompt-model"
-        value={kind === 'image' ? imageSvc : curEngine}
+        value={kind === 'image' ? imageSvc : videoPick}
         title={t(kind === 'image' ? 'mdl.imageTip' : 'mdl.videoTip')}
         aria-label={t(kind === 'image' ? 'mdl.imageTip' : 'mdl.videoTip')}
         disabled={!!regenBusy}
@@ -1357,7 +1375,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         ? slotDur
         : Math.round(shot.duration || 4) + DYNAMICS_CONFIG.generation_padding_sec;
     // progress estimate for the button, from how long this kind of job took before
-    const runKey = etaKey(isKling ? 'kling' : isKrea ? `krea:${krModel.id}` : isH3 ? 'minimax' : 'ltx', cur.videoResolution || 'HD', useMode);
+    const runKey = etaKey(isKling ? 'kling' : isKrea ? `krea:${krModel.id}` : isH3 ? `minimax${h3Steps === 20 ? '' : h3Steps}` : 'ltx', cur.videoResolution || 'HD', useMode);
     const runStart = Date.now();
     setVidProg({ shotId: shot.id, startedAt: runStart, expectedSec: expectedSeconds(runKey, genDuration) });
     const abort = new AbortController();

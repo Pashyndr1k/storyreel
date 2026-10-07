@@ -1,4 +1,5 @@
 import { KLING_MODELS } from '../lib/kling.js';
+import { H3_STEPS, h3StepsOf } from '../lib/comfy.js';
 import { KREA_IMAGE_MODELS, KREA_VIDEO_MODELS, DEFAULT_KREA_IMAGE_MODEL, DEFAULT_KREA_VIDEO_MODEL } from '../lib/krea.js';
 import { loadPolicies, addPolicy, removePolicy } from '../lib/policy.js';
 import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIR, DEFAULT_PROJECTS_DIR, DEFAULT_IMAGE_MODEL } from '../lib/config.js';
@@ -45,7 +46,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
   const [videoService, setVideoService] = useState(settings.videoService || 'comfy');
   const [videoEngine, setVideoEngine] = useState(settings.videoEngine || 'minimax');
   const [h3RefImageSize, setH3RefImageSize] = useState(settings.h3RefImageSize || 'match');
-  const [h3Lightning, setH3Lightning] = useState(!!settings.h3Lightning);
+  const [h3Steps, setH3Steps] = useState(h3StepsOf(settings));
   const [comfyUrl, setComfyUrl] = useState(settings.comfyUrl || DEFAULT_COMFY_URL);
   const [comfyOutputDir, setComfyOutputDir] = useState(settings.comfyOutputDir || DEFAULT_OUTPUT_DIR);
   const [projectsDir, setProjectsDir] = useState(settings.projectsDir || DEFAULT_PROJECTS_DIR);
@@ -179,7 +180,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
       videoService,
       videoEngine,
       h3RefImageSize,
-      h3Lightning,
+      h3Steps,
       comfyUrl: comfyUrl.trim() || DEFAULT_COMFY_URL,
       comfyOutputDir: comfyOutputDir.trim() || DEFAULT_OUTPUT_DIR,
       projectsDir: projectsDir.trim() || DEFAULT_PROJECTS_DIR,
@@ -478,12 +479,13 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
               <option value="max">{t('set.refSizeMax')}</option>
             </select>
             <p className="hint">{t('set.refSizeHint')}</p>
-            <label>{t('set.h3Lightning')}</label>
-            <label className="check-row">
-              <input type="checkbox" checked={h3Lightning} onChange={(e) => setH3Lightning(e.target.checked)} />
-              <span>{t('set.h3LightningOn')}</span>
-            </label>
-            <p className="hint">{t('set.h3LightningHint')}</p>
+            <label>{t('set.h3Steps')}</label>
+            <select title={t('tip.h3Steps')} value={h3Steps} onChange={(e) => setH3Steps(Number(e.target.value))}>
+              {H3_STEPS.map((n) => (
+                <option key={n} value={n}>{t(`set.h3Steps${n}`)}</option>
+              ))}
+            </select>
+            <p className="hint">{t('set.h3StepsHint')}</p>
           </>
         )}
       </div>

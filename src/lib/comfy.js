@@ -352,11 +352,14 @@ async function firstVideo(outputs, settings) {
 // unreachable or an endpoint shape is unknown, the render proceeds and the
 // normal error path speaks.
 const H3_HF = 'https://huggingface.co/Comfy-Org/MiniMax-H3';
-const h3PreflightOk = new Set();
-export async function h3Preflight(settings, template = h3Template, { tag, lora } = {}) {
+// Returns the distilled-LoRA choice for `kind` / `steps` (see h3LoraFor),
+// or null for the full schedule.
+const h3PreflightOk = new Map();
+export async function h3Preflight(settings, template = h3Template, { tag, kind = null, steps = 20 } = {}) {
   const which = tag || (template === h3RefTemplate ? 'r2v' : template === h3MultiTemplate ? 'mfr' : 'i2v');
-  const key = (settings.comfyUrl || '') + '|' + which + (lora ? '|' + lora : '');
-  if (h3PreflightOk.has(key)) return;
+  const wantLora = !!kind && steps < 20;
+  const key = (settings.comfyUrl || '') + '|' + which + (wantLora ? `|${kind}@${steps}` : '');
+  if (h3PreflightOk.has(key)) return h3PreflightOk.get(key);
   const loaderField = { UNETLoader: 'unet_name', CLIPLoader: 'clip_name', VAELoader: 'vae_name' };
   // Model files the graph actually references — read from the template so the
   // check can never drift from the workflow.
@@ -376,7 +379,7 @@ export async function h3Preflight(settings, template = h3Template, { tag, lora }
     }
   };
   const nodeInfo = await info(h3Node);
-  if (nodeInfo === null) return; // ComfyUI unreachable — not a preflight matter
+  if (nodeInfo === null) return wantLora ? h3LoraFor(kind, steps, null) : null; // ComfyUI unreachable — not a preflight matter
   const missing = [];
   if (!nodeInfo[h3Node]) {
     missing.push(`${h3Node} node — update ComfyUI to a build with MiniMax H3 support`);
@@ -390,10 +393,15 @@ export async function h3Preflight(settings, template = h3Template, { tag, lora }
     if (!Array.isArray(avail)) continue; // unknown shape — do not block on it
     for (const f of files) if (!avail.includes(f)) missing.push(f);
   }
-  if (lora) {
+  let accel = null;
+  if (wantLora) {
     const ci = await info('LoraLoaderModelOnly');
     const avail = optionsOf(ci?.LoraLoaderModelOnly?.input?.required?.lora_name);
-    if (Array.isArray(avail) && !avail.includes(lora)) missing.push(`${lora} (Lightning LoRA — or switch it off in Settings)`);
+    accel = h3LoraFor(kind, steps, avail);
+    if (accel?.missing) {
+      missing.push(`a ${steps}-step LoRA for the ${kind === 'fl2v' ? 'first-frame (fl2va)' : 'reference (ref2va)'} model — one of: ${accel.missing.join(', ')} — in ComfyUI/models/loras (or pick MiniMax H3 with 20 steps)`);
+      accel = null;
+    }
   }
   if (missing.length) {
     throw new Error(
@@ -401,7 +409,8 @@ export async function h3Preflight(settings, template = h3Template, { tag, lora }
         `Model files: ${H3_HF} → ComfyUI/models (unet / text_encoders / vae / loras).`
     );
   }
-  h3PreflightOk.add(key);
+  h3PreflightOk.set(key, accel);
+  return accel;
 }
 
 // ---- MiniMax H3 multi-frame reference mode ("MULTI") -----------------------
@@ -411,17 +420,64 @@ export async function h3Preflight(settings, template = h3Template, { tag, lora }
 // at their cut times, a mid-shot beat, an end pose. Picture 1 is the first
 // frame on ref_images; every image guide is ALSO plugged into a ref_images
 // slot (MiniMax's own recommendation) so the encoder reads it as <Picture N>.
-// Default sampling is the same 20-step res_multistep as i2v/r2v; the 4-step
-// Lightning LoRA is an opt-in from Settings.
-export const H3_LIGHTNING_LORA = 'minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors';
+// Default sampling is the same 20-step res_multistep as i2v/r2v; the
+// distilled 8- and 4-step LoRAs below are chosen in Settings / Stage 5.
+
+// Faster H3 sampling: distilled LoRAs cut the 20-step schedule to 8 or 4
+// steps. Candidate files per base model (fl2v = the first-frame model behind
+// i2v / flf2v, ref2v = the reference model behind r2v / MULTI) and step count,
+// in order of preference; the first one present in ComfyUI/models/loras is
+// used. MiniMax's Acc (PDD) adapters are trained for 8 steps and sanctioned
+// for 4, and need Euler; the LightX2V turbo LoRAs keep res_multistep.
+// Distillations do not stack — exactly one LoRA is loaded.
+export const H3_STEPS = [20, 8, 4];
+export const H3_LORAS = {
+  fl2v: {
+    8: ['MiniMax-H3-FL2VA-Acc-8Step_pruned_comfy.safetensors', 'MiniMax-H3-FL2VA-Acc-8Step.safetensors', 'minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors'],
+    4: ['minimax_h3_fl2v_turbo_4step_v1.0_768p_comfyui_bf16.safetensors', 'MiniMax-H3-FL2VA-Acc-8Step_pruned_comfy.safetensors', 'MiniMax-H3-FL2VA-Acc-8Step.safetensors'],
+  },
+  ref2v: {
+    8: ['MiniMax-H3-Ref2VA-Acc-8Step_pruned_comfy.safetensors', 'MiniMax-H3-Ref2VA-Acc-8Step.safetensors', 'minimax_h3_ref2v_turbo_8step_v1.0_comfyui_bf16.safetensors'],
+    4: ['minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors', 'MiniMax-H3-Ref2VA-Acc-8Step_pruned_comfy.safetensors', 'MiniMax-H3-Ref2VA-Acc-8Step.safetensors'],
+  },
+};
+// The step count in force (the pre-2.15 "Lightning" switch meant 4 steps).
+export const h3StepsOf = (settings) => (H3_STEPS.includes(Number(settings?.h3Steps)) ? Number(settings.h3Steps) : settings?.h3Lightning ? 4 : 20);
+// The LoRA for a base model and step count among the files ComfyUI lists
+// (names may sit in sub-folders). null = the full 20-step schedule;
+// { missing } = no candidate is installed; otherwise { name, sampler, steps }.
+export function h3LoraFor(kind, steps, available = null) {
+  if (!steps || steps >= 20) return null;
+  const cands = H3_LORAS[kind]?.[steps] || [];
+  const base = (p) => String(p).split(/[\\/]/).pop().toLowerCase();
+  const found = Array.isArray(available) ? cands.map((c) => available.find((a) => base(a) === c.toLowerCase())).find(Boolean) : null;
+  const name = found || (Array.isArray(available) ? null : cands[0]);
+  if (!name) return { missing: cands, steps };
+  return { name, sampler: /acc/i.test(base(name)) ? 'euler' : 'res_multistep', steps };
+}
+// Wire a distilled LoRA into a graph: LoRA between the UNET loader and the
+// scheduler / guider, its step count and its sampler.
+export function applyH3Speed(graph, ids, accel) {
+  if (!accel?.name) return graph;
+  graph[ids.lora] = { class_type: 'LoraLoaderModelOnly', inputs: { model: [ids.unet, 0], lora_name: accel.name, strength_model: 1 }, _meta: { title: `H3 ${accel.steps}-step LoRA` } };
+  graph[ids.scheduler].inputs.model = [ids.lora, 0];
+  graph[ids.guider].inputs.model = [ids.lora, 0];
+  graph[ids.scheduler].inputs.steps = accel.steps;
+  graph[ids.sampler].inputs.sampler_name = accel.sampler;
+  return graph;
+}
+// node ids of the sampling chain in the two graph families
+export const H3_IDS = {
+  i2v: { unet: '6', scheduler: '9', guider: '16', sampler: '17', lora: '7' },
+  ref: { unet: '127', scheduler: '124', guider: '126', sampler: '123', lora: '145' },
+};
 
 // Pure graph assembly — network-free, so it can be unit-tested. `files` maps
 // every dataURL the plan references to its uploaded ComfyUI filename.
-export function buildH3MultiGraph(settings, { prompt, pictures, guides, refVideos = [], refAudios = [], durationSec, aspectRatio, resolution, name }, files) {
+export function buildH3MultiGraph(settings, { prompt, pictures, guides, refVideos = [], refAudios = [], durationSec, aspectRatio, resolution, name }, files, accel = null) {
   const [w, h] = h3Dims(aspectRatio, resolution);
   const length = h3Frames(durationSec || 4);
   const graph = clone(h3MultiTemplate);
-  const lightning = !!settings.h3Lightning;
   graph['136'].inputs.prompt = prompt;
   graph['136'].inputs.width = w;
   graph['136'].inputs.height = h;
@@ -476,17 +532,7 @@ export function buildH3MultiGraph(settings, { prompt, pictures, guides, refVideo
       prev = [gid, 0];
     });
   graph['126'].inputs.conditioning = prev;
-  // Lightning: LoRA on the model path and 4 steps; otherwise the 20-step default
-  if (lightning) {
-    graph['145'] = {
-      class_type: 'LoraLoaderModelOnly',
-      inputs: { model: ['127', 0], lora_name: H3_LIGHTNING_LORA, strength_model: 1 },
-      _meta: { title: 'Lightning LoRA' },
-    };
-    graph['124'].inputs.model = ['145', 0];
-    graph['126'].inputs.model = ['145', 0];
-    graph['124'].inputs.steps = 4;
-  }
+  applyH3Speed(graph, H3_IDS.ref, accel); // 8 / 4 steps with a distilled LoRA, or the 20-step default
   graph['129'].inputs.noise_seed = rndSeed();
   graph['92'].inputs.filename_prefix = `StoryReel/${sanitize(name)}`;
   return graph;
@@ -494,7 +540,7 @@ export function buildH3MultiGraph(settings, { prompt, pictures, guides, refVideo
 
 export async function generateComfyMultiVideo(settings, args, { onStatus, signal } = {}) {
   await enforcePolicy(settings, { kind: 'video', text: args.prompt });
-  await h3Preflight(settings, h3MultiTemplate, { tag: 'mfr', lora: settings.h3Lightning ? H3_LIGHTNING_LORA : null });
+  const accel = await h3Preflight(settings, h3MultiTemplate, { tag: 'mfr', kind: 'ref2v', steps: h3StepsOf(settings) });
   const stamp = Date.now();
   // upload every distinct media item once
   const files = {};
@@ -507,7 +553,7 @@ export async function generateComfyMultiVideo(settings, args, { onStatus, signal
   for (const g of args.guides || []) await up(g.src, g.kind === 'audio' ? (/^data:audio\/wav/i.test(g.src) ? 'wav' : 'mp3') : 'png');
   for (const r of args.refAudios || []) await up(r.src, /^data:audio\/wav/i.test(r.src) ? 'wav' : 'mp3');
   for (const r of args.refVideos || []) await up(r.src, 'mp4');
-  const graph = buildH3MultiGraph(settings, args, files);
+  const graph = buildH3MultiGraph(settings, args, files, accel);
   const outs = await runGraph(settings, graph, { onStatus, signal, timeoutMs: VIDEO_TIMEOUT_MS });
   return firstVideo(outs, settings);
 }
@@ -523,10 +569,10 @@ export async function generateComfyRefVideo(
   { onStatus, signal } = {}
 ) {
   await enforcePolicy(settings, { kind: 'video', text: prompt });
-  await h3Preflight(settings, h3RefTemplate);
+  const accel = await h3Preflight(settings, h3RefTemplate, { kind: 'ref2v', steps: h3StepsOf(settings) });
   const [w, h] = h3Dims(aspectRatio, resolution);
   const stamp = Date.now();
-  const graph = clone(h3RefTemplate);
+  const graph = applyH3Speed(clone(h3RefTemplate), H3_IDS.ref, accel);
   graph['136'].inputs.prompt = prompt;
   graph['136'].inputs.width = w;
   graph['136'].inputs.height = h;
@@ -592,8 +638,8 @@ export async function generateComfyVideo(
   // One node covers t2va/i2va/fl2va, and it scores itself: dialogue, effects
   // and music come out of the same pass, so no separate voice track is fed in.
   if (engine === 'minimax') {
-    await h3Preflight(settings);
-    graph = clone(h3Template);
+    const accel = await h3Preflight(settings, h3Template, { kind: 'fl2v', steps: h3StepsOf(settings) });
+    graph = applyH3Speed(clone(h3Template), H3_IDS.i2v, accel);
     graph['200'].inputs.image = await uploadInput(settings, firstFrame, `storyreel_${stamp}_first.png`);
     graph['104'].inputs.first_frame = ['200', 0];
     if (lastFrame && useMode !== 'i2v') {

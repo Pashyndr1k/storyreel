@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **H3 in 8 or 4 steps.** The Stage 5 model picker lists MiniMax H3 at 20,
+  8 and 4 sampling steps; 8 and 4 load the distilled LoRA found in
+  ComfyUI/models/loras (MiniMax Acc 8-step or the turbo files) for every H3
+  workflow — about 2.5× faster at 8 steps. The same choice is in Settings
+  and replaces the MULTI-only Lightning switch.
+
 ## 2.14.0 — 2026-10-06
 
 - **Krea (cloud API) for images and videos.** A Krea API token in Settings

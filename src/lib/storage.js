@@ -137,7 +137,7 @@ export function loadSettings() {
     videoEngine: 'minimax', // video model: 'minimax' (MiniMax H3, local, default) | 'ltx' (LTX-2.3, local) | 'kling' (cloud API) | 'krea' (cloud API, model in kreaVideoModel)
     h3NoticeShown: true, // one-time "H3 is now the default" notice (false only for pre-2.0 installs)
     h3RefImageSize: 'match', // ref2va identity strength: 'match' | 'max' (max = stronger identity lock)
-    h3Lightning: false, // MULTI mode only: 4-step Lightning LoRA instead of the 20-step default
+    h3Steps: 20, // MiniMax H3 sampling steps: 20 (full) | 8 | 4 (distilled LoRA, lib/comfy.js H3_LORAS)
     comfyUrl: DEFAULT_COMFY_URL,
     comfyOutputDir: DEFAULT_OUTPUT_DIR,
     projectsDir: DEFAULT_PROJECTS_DIR, // per-project folders (project.md + media files)
@@ -149,6 +149,7 @@ export function loadSettings() {
   try {
     const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY));
     const s = { ...defaults, ...(raw || {}) };
+    if (raw && !('h3Steps' in raw) && raw.h3Lightning) s.h3Steps = 4; // pre-2.15 "Lightning" switch
     // a retired Anthropic model moves to its successor, or to the default
     if (!CLAUDE_MODELS.some((m) => m.id === s.model)) s.model = CLAUDE_MODEL_SUCCESSORS[s.model] || DEFAULT_CLAUDE_MODEL;
     if (s.uiFont === 'courier') s.uiFont = 'archivo-mix'; // scheme replaced in 1.19.x

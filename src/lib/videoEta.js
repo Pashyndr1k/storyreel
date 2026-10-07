@@ -7,7 +7,7 @@
 // project.
 const KEY = 'storyreel.videoEta.v1';
 // first-run guesses, seconds of work per second of video
-const DEFAULT_RATE = { minimax: 45, ltx: 25, kling: 35, krea: 30 };
+const DEFAULT_RATE = { minimax: 45, minimax8: 20, minimax4: 11, ltx: 25, kling: 35, krea: 30 };
 const MIN_EXPECTED_SEC = 20;
 
 function load() {
