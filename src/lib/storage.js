@@ -215,6 +215,8 @@ function projectDefaults() {
     dynamicsPlan: null, // Action Dynamics Plan generated at Stage 3 (see lib/dynamics.js)
     videoGenDurations: {}, // shotId -> raw seconds requested from the video model (+2s padding)
     shotVideoModes: {}, // shotId -> pinned video workflow: 'auto' | 'i2v' | 'flf2v' | 'si2v'
+    shotSeeds: {}, // shotId -> noise seed of the shot's current video (local ComfyUI engines)
+    shotSeedMode: {}, // shotId -> 'same' to reuse that seed on the next render; absent = new seed
     shotVideoEngines: {}, // shotId -> engine that rendered it: 'ltx' | 'minimax' | 'kling' | 'krea:<model>' | 'upload' (drives assembly trim)
     shotPromptEngines: {}, // shotId -> engine the video prompt was WRITTEN for: 'ltx' | 'minimax'
     agentFlags: [], // problems recorded by the AI agent (or auto-flagged after 4 attempts): [{ id, target, kind, issue, note, attempts, resolved, createdAt }]
@@ -308,6 +310,8 @@ export function migrateProject(raw) {
   p.updatedAt = Number(p.updatedAt) || Number(p.createdAt) || Date.now();
   p.pinned = p.pinned === true;
   p.shotVideoModes = p.shotVideoModes && typeof p.shotVideoModes === 'object' ? p.shotVideoModes : {};
+  p.shotSeeds = p.shotSeeds && typeof p.shotSeeds === 'object' ? p.shotSeeds : {};
+  p.shotSeedMode = p.shotSeedMode && typeof p.shotSeedMode === 'object' ? p.shotSeedMode : {};
   p.shotVideoEngines = p.shotVideoEngines && typeof p.shotVideoEngines === 'object' ? p.shotVideoEngines : {};
   p.shotPromptEngines = p.shotPromptEngines && typeof p.shotPromptEngines === 'object' ? p.shotPromptEngines : {};
   for (const k of ['shotCamera', 'shotAction', 'shotPromptDyn', 'agentAttempts', 'sceneLayouts']) p[k] = p[k] && typeof p[k] === 'object' ? p[k] : {};

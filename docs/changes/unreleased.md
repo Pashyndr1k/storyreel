@@ -82,3 +82,51 @@ the Settings select. **No video was generated** — speed and quality of the
 **Open.** The fl2v 4-step turbo LoRA is a 768p model; at other sizes the Acc
 8-step file at 4 steps may be the better choice (swap the candidate order if
 so). Switching between Acc and turbo files is automatic by file name only.
+
+---
+
+## 2. Video seed per shot, "Same seed" for the next render
+
+**Request.** The seed was random on every render. Store it per shot and add
+a same-seed option, so a prompt can be tested at 4 or 8 steps and then
+rendered with the same seed at 20.
+
+**Behaviour.**
+- Every local video generator (H3 i2v / flf2v, H3 reference, H3 MULTI, the
+  three LTX graphs) takes an optional `seed` and returns the seed it used
+  (`seedOr`: the given number, else a fresh random one). One seed feeds every
+  noise node of a graph (LTX-2.5's two passes share it).
+- The seed of the shot's current video is stored in
+  `project.shotSeeds[shotId]` when the video is saved. Cloud engines (Kling,
+  Krea) return no seed and store nothing.
+- Stage 5 video tab, local engines only: a two-state segment **New seed /
+  Same seed** (`project.shotSeedMode[shotId]` = 'same'). "Same seed" is
+  disabled until the shot has a stored seed; its hint shows the number. With
+  "Same seed" the next render replays that seed; the mode stays until
+  switched back, so a shot can be iterated on prompt / steps alone.
+- Deleting a video keeps the seed (it can still be replayed).
+- Agent: `shotView.videoSeed`; `storyreel_create_media` accepts
+  `seed: "same" | "new"` for videos (sets the mode first; "same" without a
+  stored seed → `NOT_READY`).
+
+**Data model.** `project.shotSeeds: { [shotId]: number }`, `project.shotSeedMode:
+{ [shotId]: 'same' | 'new' }`, both default `{}`, normalised in
+`migrateProject`.
+
+**Files.** `src/lib/comfy.js` (`seedOr`; `seed` in / out of
+`generateComfyVideo`, `generateComfyRefVideo`, `generateComfyMultiVideo`,
+`buildH3MultiGraph`), `src/lib/storage.js`, `src/stages/Stage5.jsx`
+(dispatch + segment), `src/lib/agent/api.js`. i18n: `seed.new`, `seed.same`,
+`seed.newTip`, `seed.sameTip`, `seed.tip`, `seed.noneTip`.
+
+**Verified.** In the dev app with the ComfyUI calls stubbed (the queued graph
+captured, nothing rendered): H3 i2v graph carries seed 777 and the 8-step
+LoRA, both LTX pass seeds 999, MULTI graph seed 12345, random when none is
+given; the segment (disabled → enabled with a stored seed, hint with the
+number, switching); the agent's `videoSeed` and the `seed` parameter. No
+real render.
+
+**Open.** A same-seed render at another step count is not the same
+animation (different model weights and schedule) — close in composition,
+often in broad motion, not in detail. Same seed + same settings is
+reproducible only on the same ComfyUI build and GPU.

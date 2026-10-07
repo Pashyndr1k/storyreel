@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Seed per shot.** Each locally rendered video keeps its noise seed, and
+  the video tab has a New seed / Same seed switch: "Same seed" replays the
+  last seed so only your prompt, step count or frames change the result.
 - **H3 in 8 or 4 steps.** The Stage 5 model picker lists MiniMax H3 at 20,
   8 and 4 sampling steps; 8 and 4 load the distilled LoRA found in
   ComfyUI/models/loras (MiniMax Acc 8-step or the turbo files) for every H3

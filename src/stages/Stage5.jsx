@@ -1390,14 +1390,19 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
               seconds: genDuration,
             })
           : vPrompt;
+      // "Same seed" replays the stored seed of this shot's last local render,
+      // so a prompt or step-count change is the only thing that moves.
+      const storedSeed = (cur.shotSeeds || {})[shot.id];
+      const seed = (cur.shotSeedMode || {})[shot.id] === 'same' && Number.isFinite(Number(storedSeed)) ? Number(storedSeed) : null;
       const genArgs = {
         prompt: sendPrompt,
+        seed,
         durationSec: genDuration,
         aspectRatio: project.aspectRatio || '16:9',
         resolution: cur.videoResolution || 'HD',
         name: `${(project.title || 'project').slice(0, 24)}_sc${project.outline.indexOf(scene) + 1}_shot${i + 1}`,
       };
-      const { dataURL, filename, seconds: klingSec } =
+      const { dataURL, filename, seconds: klingSec, seed: usedSeed } =
         isKrea
           ? await generateKreaVideo(settings, {
               prompt: sendPrompt,
@@ -1453,6 +1458,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       update((p) => {
         const base = {
           shotVideos: { ...(p.shotVideos || {}), [shot.id]: dataURL },
+          ...(Number.isFinite(Number(usedSeed)) ? { shotSeeds: { ...(p.shotSeeds || {}), [shot.id]: Number(usedSeed) } } : {}),
           videoGenDurations: {
             ...(p.videoGenDurations || {}),
             [shot.id]: isKling || isKrea ? klingSec || genDuration : isH3 ? Math.round(h3Seconds(genDuration) * 100) / 100 : genDuration,
@@ -2033,6 +2039,11 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           const tabHasMedia = { image: !!genImg, video: !!shotVid, audio: !!shotAud };
           // pinned workflow + the one that will actually run for this shot
           const shotMode = (project.shotVideoModes || {})[shot.id] || 'auto';
+          // seed of the shot's last local render and whether the next one reuses it
+          const shotSeed = (project.shotSeeds || {})[shot.id];
+          const hasSeed = Number.isFinite(Number(shotSeed));
+          const seedMode = hasSeed && (project.shotSeedMode || {})[shot.id] === 'same' ? 'same' : 'new';
+          const localEngine = curEngine === 'minimax' || curEngine === 'ltx'; // cloud engines take no seed
           const effMode =
             curEngine === 'minimax'
               ? resolveH3VideoMode(shotMode, { lastFrame: finalImg, hasRefs: !!refsOf(shot.id), hasKeyframes: hasMultiInput(project, shot.id) })
@@ -2634,6 +2645,27 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         </button>
                       ))}
                     </span>
+                    {localEngine && (
+                      <span className="seg seg-tall seg-compact" title={hasSeed ? t('seed.tip', { n: shotSeed }) : t('seed.noneTip')}>
+                        <button
+                          type="button"
+                          className={`seg-btn ${seedMode === 'new' ? 'on' : ''}`}
+                          title={t('seed.newTip')}
+                          onClick={() => update((p) => ({ shotSeedMode: { ...(p.shotSeedMode || {}), [shot.id]: 'new' } }))}
+                        >
+                          {t('seed.new')}
+                        </button>
+                        <button
+                          type="button"
+                          className={`seg-btn ${seedMode === 'same' ? 'on' : ''}`}
+                          disabled={!hasSeed}
+                          title={hasSeed ? t('seed.sameTip', { n: shotSeed }) : t('seed.noneTip')}
+                          onClick={() => update((p) => ({ shotSeedMode: { ...(p.shotSeedMode || {}), [shot.id]: 'same' } }))}
+                        >
+                          {t('seed.same')}
+                        </button>
+                      </span>
+                    )}
                     <span className="seg seg-tall seg-compact" title={t('vid.wfTip')}>
                       {(curEngine === 'minimax' ? H3_VIDEO_MODES : curEngine === 'kling' ? KLING_VIDEO_MODES : curEngine === 'krea' ? KREA_VIDEO_MODES : VIDEO_MODES).map((m) => {
                         const avail =

@@ -299,6 +299,8 @@ export async function saveToLocalOutputs(settings, filename, dataURL) {
 }
 
 const rndSeed = () => Math.floor(Math.random() * 2 ** 48);
+// a caller-supplied seed (a previous render's) or a fresh one
+const seedOr = (s) => (s !== null && s !== undefined && s !== '' && Number.isFinite(Number(s)) ? Number(s) : rndSeed());
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const sanitize = (s) => (s || 'shot').replace(/[^\w\d-]+/g, '_').slice(0, 60);
 
@@ -474,7 +476,7 @@ export const H3_IDS = {
 
 // Pure graph assembly — network-free, so it can be unit-tested. `files` maps
 // every dataURL the plan references to its uploaded ComfyUI filename.
-export function buildH3MultiGraph(settings, { prompt, pictures, guides, refVideos = [], refAudios = [], durationSec, aspectRatio, resolution, name }, files, accel = null) {
+export function buildH3MultiGraph(settings, { prompt, pictures, guides, refVideos = [], refAudios = [], durationSec, aspectRatio, resolution, name, seed = null }, files, accel = null) {
   const [w, h] = h3Dims(aspectRatio, resolution);
   const length = h3Frames(durationSec || 4);
   const graph = clone(h3MultiTemplate);
@@ -533,7 +535,7 @@ export function buildH3MultiGraph(settings, { prompt, pictures, guides, refVideo
     });
   graph['126'].inputs.conditioning = prev;
   applyH3Speed(graph, H3_IDS.ref, accel); // 8 / 4 steps with a distilled LoRA, or the 20-step default
-  graph['129'].inputs.noise_seed = rndSeed();
+  graph['129'].inputs.noise_seed = seedOr(seed);
   graph['92'].inputs.filename_prefix = `StoryReel/${sanitize(name)}`;
   return graph;
 }
@@ -553,9 +555,10 @@ export async function generateComfyMultiVideo(settings, args, { onStatus, signal
   for (const g of args.guides || []) await up(g.src, g.kind === 'audio' ? (/^data:audio\/wav/i.test(g.src) ? 'wav' : 'mp3') : 'png');
   for (const r of args.refAudios || []) await up(r.src, /^data:audio\/wav/i.test(r.src) ? 'wav' : 'mp3');
   for (const r of args.refVideos || []) await up(r.src, 'mp4');
-  const graph = buildH3MultiGraph(settings, args, files, accel);
+  const seed = seedOr(args.seed);
+  const graph = buildH3MultiGraph(settings, { ...args, seed }, files, accel);
   const outs = await runGraph(settings, graph, { onStatus, signal, timeoutMs: VIDEO_TIMEOUT_MS });
-  return firstVideo(outs, settings);
+  return { ...(await firstVideo(outs, settings)), seed };
 }
 
 // MiniMax H3 reference mode (ref2va checkpoint): the shot is conditioned on
@@ -565,10 +568,11 @@ export const H3_REF_CAPS = { images: 9, videos: 3, audios: 3, total: 12 };
 
 export async function generateComfyRefVideo(
   settings,
-  { prompt, refImages = [], refVideos = [], refAudios = [], durationSec, aspectRatio, resolution, name },
+  { prompt, refImages = [], refVideos = [], refAudios = [], durationSec, aspectRatio, resolution, name, seed = null },
   { onStatus, signal } = {}
 ) {
   await enforcePolicy(settings, { kind: 'video', text: prompt });
+  const seedUsed = seedOr(seed);
   const accel = await h3Preflight(settings, h3RefTemplate, { kind: 'ref2v', steps: h3StepsOf(settings) });
   const [w, h] = h3Dims(aspectRatio, resolution);
   const stamp = Date.now();
@@ -611,15 +615,15 @@ export async function generateComfyRefVideo(
     node.inputs[field] = await uploadInput(settings, dataURL, fname);
     delete node._pendingUpload;
   }
-  graph['129'].inputs.noise_seed = rndSeed();
+  graph['129'].inputs.noise_seed = seedUsed;
   graph['92'].inputs.filename_prefix = `StoryReel/${sanitize(name)}`;
   const outs = await runGraph(settings, graph, { onStatus, signal, timeoutMs: VIDEO_TIMEOUT_MS });
-  return firstVideo(outs, settings);
+  return { ...(await firstVideo(outs, settings)), seed: seedUsed };
 }
 
 export async function generateComfyVideo(
   settings,
-  { prompt, firstFrame, lastFrame, audio, durationSec, aspectRatio, resolution, name, mode = 'auto' },
+  { prompt, firstFrame, lastFrame, audio, durationSec, aspectRatio, resolution, name, mode = 'auto', seed = null },
   { onStatus, signal } = {}
 ) {
   await enforcePolicy(settings, { kind: 'video', text: prompt });
@@ -632,6 +636,7 @@ export async function generateComfyVideo(
   const dur = Math.max(SHOT_MIN_SEC, Math.min(SHOT_MAX_SEC + 2, Math.round(durationSec || 4)));
   const stamp = Date.now();
   const useMode = resolveVideoMode(mode, { lastFrame, audio });
+  const seedUsed = seedOr(seed); // one seed for every noise node of the graph
   let graph;
 
   // ---- MiniMax H3 ----------------------------------------------------------
@@ -651,10 +656,10 @@ export async function generateComfyVideo(
     graph['104'].inputs.width = w;
     graph['104'].inputs.height = h;
     graph['104'].inputs.length = h3Frames(durationSec || 4);
-    graph['15'].inputs.noise_seed = rndSeed();
+    graph['15'].inputs.noise_seed = seedUsed;
     graph['92'].inputs.filename_prefix = `StoryReel/${sanitize(name)}`;
     const outs = await runGraph(settings, graph, { onStatus, signal, timeoutMs: VIDEO_TIMEOUT_MS });
-    return firstVideo(outs, settings);
+    return { ...(await firstVideo(outs, settings)), seed: seedUsed };
   }
 
   if (useMode === 'si2v') {
@@ -671,7 +676,7 @@ export async function generateComfyVideo(
     graph['340:331'].inputs.value = Math.max(SHOT_MIN_SEC, Math.min(SHOT_MAX_SEC + 2, durationSec || 4));
     graph['340:330'].inputs.value = w;
     graph['340:324'].inputs.value = h;
-    graph['340:286'].inputs.noise_seed = rndSeed();
+    graph['340:286'].inputs.noise_seed = seedUsed;
     graph['341'].inputs.filename_prefix = `StoryReel/${sanitize(name)}`;
   } else if (useMode === 'flf2v') {
     graph = clone(flf2vTemplate);
@@ -681,7 +686,7 @@ export async function generateComfyVideo(
     graph['129:102'].inputs.value = dur;
     graph['129:113'].inputs.value = w;
     graph['129:98'].inputs.value = h;
-    graph['129:100'].inputs.noise_seed = rndSeed();
+    graph['129:100'].inputs.noise_seed = seedUsed;
     graph['68'].inputs.filename_prefix = `StoryReel/${sanitize(name)}`;
   } else {
     // LTX-2.5: two passes (half-res sample -> latent upscale -> refine) with
@@ -693,13 +698,13 @@ export async function generateComfyVideo(
     graph['362'].inputs.value = dur;
     graph['372'].inputs.value = w;
     graph['360'].inputs.value = h;
-    graph['339'].inputs.noise_seed = rndSeed();
-    graph['338'].inputs.noise_seed = rndSeed();
+    graph['339'].inputs.noise_seed = seedUsed;
+    graph['338'].inputs.noise_seed = seedUsed;
     graph['75'].inputs.filename_prefix = `StoryReel/${sanitize(name)}`;
   }
 
   const outputs = await runGraph(settings, graph, { onStatus, signal, timeoutMs: VIDEO_TIMEOUT_MS });
-  return firstVideo(outputs, settings);
+  return { ...(await firstVideo(outputs, settings)), seed: seedUsed };
 }
 
 // ---- Stage 5: shot image via Flux.2 Klein 9B --------------------------------

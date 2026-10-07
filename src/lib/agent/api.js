@@ -139,6 +139,7 @@ function shotView(project, scene, shot, i, withPrompts) {
       voice: has(project.shotAudios, shot.id),
     },
     imageVersions: ((project.shotImageHistory || {})[shot.id] || []).length,
+    videoSeed: Number.isFinite(Number((project.shotSeeds || {})[shot.id])) ? Number(project.shotSeeds[shot.id]) : null,
     camera: CAMERA_LEVELS[cameraOf(project, shot, block)],
     dynamics: ACTION_LEVELS[actionOf(project, shot, block)],
     voiceSource: (shot.dialogue || '').trim() ? voiceSourceFor(project, shot.id) : null,
@@ -253,7 +254,7 @@ const MEDIA = {
   voice: { map: 'shotAudios', label: 'The voice of this shot', run: (b, shot, i) => b.genVoice(shot, i) },
 };
 
-async function createMedia({ projectId, shotId, kind }) {
+async function createMedia({ projectId, shotId, kind, seed }) {
   const spec = MEDIA[kind] || fail('BAD_INPUT', `kind must be one of: ${Object.keys(MEDIA).join(', ')}.`);
   const project = projectOf(projectId);
   const { scene, shot, index } = findShot(project, shotId);
@@ -262,6 +263,11 @@ async function createMedia({ projectId, shotId, kind }) {
   if (kind === 'video' && !(pr.videoPrompt || '').trim()) fail('NOT_READY', 'This shot has no video prompt yet.');
   if ((kind === 'video' || kind === 'final_frame') && !has(project.shotImages, shotId)) fail('NOT_READY', 'Create and approve the first frame before this.');
   if (kind === 'voice' && !(shot.dialogue || '').trim()) fail('NOT_READY', 'This shot has no dialogue.');
+  if (kind === 'video' && seed) {
+    if (seed === 'same' && !Number.isFinite(Number((project.shotSeeds || {})[shotId]))) fail('NOT_READY', 'This shot has no stored seed yet — render it once first.');
+    patchProject(projectId, (q) => ({ shotSeedMode: { ...(q.shotSeedMode || {}), [shotId]: seed } }));
+    await settle();
+  }
   const attempt = countAttempt(projectId, { shotId, kind }, spec.label);
   const bench = await openBench(projectId, scene.id, shotId);
   await spec.run(bench, shot, index);
@@ -622,8 +628,8 @@ export const TOOLS = [
   ...layoutTools({ app, projectOf, patchProject, sceneOf, findShot, fail, settle, countAttempt, schema, PROJECT }),
   {
     name: 'storyreel_create_media',
-    description: 'Stage 5: generate one piece of media for a shot — "image" (first frame), "final_frame", "video" (needs the first frame; can take many minutes) or "voice" (TTS for the shot\'s dialogue). Counts as an attempt; after four the target is flagged and further calls are refused. Verify the result with storyreel_review_shot.',
-    inputSchema: schema({ ...PROJECT, shotId: { type: 'string' }, kind: { type: 'string', enum: Object.keys(MEDIA) } }, ['projectId', 'shotId', 'kind']),
+    description: 'Stage 5: generate one piece of media for a shot — "image" (first frame), "final_frame", "video" (needs the first frame; can take many minutes) or "voice" (TTS for the shot\'s dialogue). For video on a local engine, seed "same" replays the seed of the shot\'s previous render (shotView.videoSeed) so only the prompt or quality setting changes; "new" (default) rolls fresh noise. Counts as an attempt; after four the target is flagged and further calls are refused. Verify the result with storyreel_review_shot.',
+    inputSchema: schema({ ...PROJECT, shotId: { type: 'string' }, kind: { type: 'string', enum: Object.keys(MEDIA) }, seed: { type: 'string', enum: ['same', 'new'] } }, ['projectId', 'shotId', 'kind']),
     run: createMedia,
   },
   {
