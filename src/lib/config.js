@@ -23,7 +23,8 @@ export const CLAUDE_MODELS = [
   { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (fastest)' },
 ];
 export const CLAUDE_MODEL_SUCCESSORS = { 'claude-opus-4-8': 'claude-opus-5-5' };
-export const DEFAULT_IMAGE_MODEL = 'gemini-3-pro-image-preview';
+export const DEFAULT_IMAGE_MODEL = 'gemini-nano-banana-2.1'; // Nano Banana 2.1: 1K/2K/4K, up to 14 references (4 characters)
+export const LEGACY_IMAGE_MODELS = ['gemini-3-pro-image-preview']; // earlier defaults, moved to the current one on load
 export const DEFAULT_KLING_MODEL = 'kling-3.0'; // cloud video (first + last frame, 3–15 s)
 
 // Five stages since 2.5 (Generation Prompts and Final Assembly merged).

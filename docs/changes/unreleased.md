@@ -202,3 +202,33 @@ and widths under 720 px.
 
 **Open.** Tiles cycle forward only (no previous); the toggle tiles show a dot
 rather than a count. The audio tab keeps the old two-column layout.
+
+---
+
+## 4. Default Gemini image model: gemini-nano-banana-2.1
+
+**Request.** Set Gemini Nano Banana 2.1 as the default image model (asked
+as "Gemini 3.6 Flash Image" — no such model exists; 3.6 Flash is text-only).
+
+**Behaviour.** `DEFAULT_IMAGE_MODEL` is `gemini-nano-banana-2.1` (1K / 2K / 4K,
+up to 14 reference images with consistency for 4 characters; the app keeps
+asking for 2K). Existing installs whose stored model is the earlier default
+`gemini-3-pro-image-preview` (or none) move to it on load
+(`LEGACY_IMAGE_MODELS`); any other stored id — a model chosen by hand — stays.
+Nano Banana Pro can be chosen again in Settings → Model selection. The Stage
+5 image Model tile and the prompt-header picker now read "Gemini · <name>"
+(`geminiImageLabel`: Nano Banana 2.1 / 2 / 2 Lite / Pro / Nano Banana, else
+the id), and the image-prompt request names that model ("for the Nano
+Banana 2.1 (Gemini) image generation model").
+
+**Files.** `src/lib/config.js`, `src/lib/gemini.js` (`geminiImageLabel`),
+`src/lib/storage.js` (load migration), `src/stages/Stage5.jsx`,
+`src/lib/prompts.js`. No i18n change.
+
+**Verified.** Build; the label mapping. Not run against the Gemini API with
+the new id (the request shape — `generateContent`, `responseModalities`,
+`imageConfig` — is the same one the other Nano Banana models accept).
+
+**Open.** Google documents these models with its newer Interactions API;
+`generateContent` still serves them. If the model ever vanishes from
+"Fetch available models", that is the reason.

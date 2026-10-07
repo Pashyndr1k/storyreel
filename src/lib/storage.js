@@ -1,4 +1,4 @@
-import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIR, DEFAULT_PROJECTS_DIR, DEFAULT_CLAUDE_MODEL, CLAUDE_MODELS, CLAUDE_MODEL_SUCCESSORS, DEFAULT_IMAGE_MODEL, DEFAULT_KLING_MODEL, STAGE_COUNT, MAX_IMAGE_VERSIONS } from './config.js';
+import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIR, DEFAULT_PROJECTS_DIR, DEFAULT_CLAUDE_MODEL, CLAUDE_MODELS, CLAUDE_MODEL_SUCCESSORS, DEFAULT_IMAGE_MODEL, LEGACY_IMAGE_MODELS, DEFAULT_KLING_MODEL, STAGE_COUNT, MAX_IMAGE_VERSIONS } from './config.js';
 import { idbGetAll, idbPutMany, idbDeleteMany } from './idb.js';
 import { isValidAspect } from './aspect.js';
 import { normalizeSceneLocations } from './sceneLocations.js';
@@ -149,6 +149,7 @@ export function loadSettings() {
   try {
     const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY));
     const s = { ...defaults, ...(raw || {}) };
+    if (raw && (!raw.geminiModel || LEGACY_IMAGE_MODELS.includes(raw.geminiModel))) s.geminiModel = DEFAULT_IMAGE_MODEL; // an earlier default, never chosen by hand
     if (raw && !('h3Steps' in raw) && raw.h3Lightning) s.h3Steps = 4; // pre-2.15 "Lightning" switch
     // a retired Anthropic model moves to its successor, or to the default
     if (!CLAUDE_MODELS.some((m) => m.id === s.model)) s.model = CLAUDE_MODEL_SUCCESSORS[s.model] || DEFAULT_CLAUDE_MODEL;

@@ -6,6 +6,17 @@ import { DEFAULT_IMAGE_MODEL } from './config.js';
 import { enforcePolicy } from './policy.js';
 export { DEFAULT_IMAGE_MODEL };
 
+// Marketing names of Google's image models, for the Stage 5 model tile and
+// the prompt request; an unknown id is shown as it is.
+const GEMINI_IMAGE_LABELS = [
+  [/nano-banana-2\.1/, 'Nano Banana 2.1'],
+  [/3\.1-flash-lite-image/, 'Nano Banana 2 Lite'],
+  [/3\.1-flash-image/, 'Nano Banana 2'],
+  [/3-pro-image/, 'Nano Banana Pro'],
+  [/2\.5-flash-image/, 'Nano Banana'],
+];
+export const geminiImageLabel = (id) => (GEMINI_IMAGE_LABELS.find(([re]) => re.test(String(id || DEFAULT_IMAGE_MODEL))) || [null, String(id || DEFAULT_IMAGE_MODEL)])[1];
+
 const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 function extractImage(data) {

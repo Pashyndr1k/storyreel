@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Nano Banana 2.1 by default.** New installs, and installs still on the
+  old default, generate frames with `gemini-nano-banana-2.1` (up to 14
+  references, consistency for 4 characters). Nano Banana Pro remains
+  selectable in Settings; the Stage 5 Model tile names the model in use.
 - **Compact image and video tabs (Stage 5).** One column: the media, one
   wide Create button that turns into the progress bar while rendering (Stop
   at its end), a grid of parameter tiles — mode, camera, dynamics, quality,

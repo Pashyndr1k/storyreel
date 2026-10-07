@@ -13,7 +13,7 @@ export const QUEUE_STOP_EVENT = 'storyreel:queue-stop';
 import { locationsOf, shotLocations, shotLocationRefs, locationLibId } from '../lib/sceneLocations.js';
 import { useEffect, useRef, useState } from 'react';
 import { useGenerate } from '../lib/useGenerate.js';
-import { generateImage, generateGeminiVoice, GEMINI_VOICES } from '../lib/gemini.js';
+import { generateImage, generateGeminiVoice, GEMINI_VOICES, geminiImageLabel } from '../lib/gemini.js';
 import { generateJSON, textKeyError } from '../lib/claude.js';
 import { generateComfyVideo, generateComfyRefVideo, generateComfyMultiVideo, generateComfyImage, saveToLocalOutputs, VIDEO_RESOLUTIONS, VIDEO_MODES, H3_VIDEO_MODES, resolveVideoMode, resolveH3VideoMode, h3Seconds, h3StepsOf } from '../lib/comfy.js';
 import { stage5Prompt, stage5VideoPrompt, stage5H3VideoPrompt, stage5KlingVideoPrompt, h3ComposePrompt, voiceSourceFor, stage5GeminiVoicePrompt, finalFramePrompt, tweakPromptSpec } from '../lib/prompts.js';
@@ -413,7 +413,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
             })
           : stage5VideoPrompt(proj, sceneArg, sceneShots, videoStyle, block);
   // image model the first-frame prompts are written for ('krea:<label>' names the Krea model)
-  const promptImageModel = (svc) => (svc === 'comfy' ? 'comfy' : svc === 'krea' ? `krea:${kreaImageModelOf(settings).label}` : 'gemini');
+  const promptImageModel = (svc) => (svc === 'comfy' ? 'comfy' : svc === 'krea' ? `krea:${kreaImageModelOf(settings).label}` : `gemini:${geminiImageLabel(settings.geminiModel)}`);
   const imageModel = promptImageModel(imageSvc);
 
   // Each generation is up to three calls (image, video, then audio prompts for
@@ -726,7 +726,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   // Model picker in a prompt's header. The choice is the app-wide generation
   // model (the same setting as in Settings): confirm first, then offer to
   // rewrite THIS shot's prompt in the new model's format.
-  const IMAGE_MODELS = [['gemini', 'Nano Banana'], ['comfy', 'Flux.2 Klein'], ['krea', `Krea · ${kreaImageModelOf(settings).label}`]];
+  const IMAGE_MODELS = [['gemini', `Gemini · ${geminiImageLabel(settings.geminiModel)}`], ['comfy', 'Flux.2 Klein'], ['krea', `Krea · ${kreaImageModelOf(settings).label}`]];
   // H3 appears once per step count: the value "minimax@8" means the H3
   // engine with the 8-step LoRA; plain "minimax" is the full 20-step run.
   const VIDEO_ENGINES = [
