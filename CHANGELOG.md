@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Split into parts (Stage 3).** Cut the scene outline anywhere — between
+  any scenes, or every N scenes — and create one project per part. Each part
+  gets its scenes with everything already made for them (shots, prompts,
+  frames, videos, layouts), the storyline, cast and styles; the original
+  project stays whole.
+
 ## 2.15.0 — 2026-10-07
 
 - **Nano Banana 2.1 by default.** New installs, and installs still on the

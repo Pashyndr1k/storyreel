@@ -197,6 +197,9 @@ function projectDefaults() {
     episodeSeconds: 0, // series only: target length of one episode, seconds (30-600; default 105)
     seriesPlan: null, // series master: { arcs, episodes, segmentSize, segments } — see lib/series.js
     seriesPart: null, // series segment project: { parentId, seriesTitle, total, from, to, episodes, … }
+    splitCuts: [], // Stage 3 split: scene indices after which a new part starts (lib/split.js)
+    parts: [], // Stage 3 split: parts created as projects [{ from, to, projectId, title }]
+    partInfo: null, // on a part project: { parentId, parentTitle, index, total, from, to }
     aspectRatio: '16:9', // image/video aspect ratio: 16:9|4:3|1:1|3:4|9:16
     scriptStyleId: '', // selected style from the library (empty = neutral)
     imageStyleId: '',
@@ -312,6 +315,9 @@ export function migrateProject(raw) {
   p.pinned = p.pinned === true;
   p.shotVideoModes = p.shotVideoModes && typeof p.shotVideoModes === 'object' ? p.shotVideoModes : {};
   p.shotSeeds = p.shotSeeds && typeof p.shotSeeds === 'object' ? p.shotSeeds : {};
+  p.splitCuts = Array.isArray(p.splitCuts) ? p.splitCuts : [];
+  p.parts = Array.isArray(p.parts) ? p.parts : [];
+  p.partInfo = p.partInfo && typeof p.partInfo === 'object' ? p.partInfo : null;
   p.shotSeedMode = p.shotSeedMode && typeof p.shotSeedMode === 'object' ? p.shotSeedMode : {};
   p.shotVideoEngines = p.shotVideoEngines && typeof p.shotVideoEngines === 'object' ? p.shotVideoEngines : {};
   p.shotPromptEngines = p.shotPromptEngines && typeof p.shotPromptEngines === 'object' ? p.shotPromptEngines : {};

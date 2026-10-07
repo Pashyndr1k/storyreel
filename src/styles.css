@@ -1350,6 +1350,24 @@ input.episodes-input { width: 110px; }
 .prod-option { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--glass-border-soft); }
 .prod-option h4 { margin: 0 0 4px; font-size: 13.5px; }
 .prod-option .row { margin-bottom: 0; }
+/* Stage 3 split: scene numbers with cut points between them */
+.cut-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; margin: 10px 0 12px; }
+.cut-item { display: inline-flex; align-items: center; }
+.cut-scene {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 30px; height: 30px; padding: 0 8px;
+  border: 1px solid var(--glass-border); border-radius: 3px;
+  font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text);
+  background: rgba(var(--ink-rgb), 0.04);
+}
+.cut-gap {
+  width: 26px; height: 30px; margin: 0 2px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: none; border: 1px dashed transparent; border-radius: 3px;
+  color: var(--muted-3); cursor: pointer;
+}
+.cut-gap:hover { color: var(--text); border-color: var(--glass-border); }
+.cut-gap.cut { color: var(--accent); border-color: rgba(var(--accent-rgb), 0.6); background: rgba(var(--accent-rgb), 0.1); }
 .seg-size { display: inline-flex; align-items: center; gap: 8px; margin: 0; }
 .seg-size select { width: auto; }
 .seg-list { margin-top: 12px; display: grid; gap: 6px; }
