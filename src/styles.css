@@ -3926,10 +3926,9 @@ select.prompt-model:hover:not(:disabled) { border-color: var(--ink); color: var(
 .s5e-strips > div,
 .s5e-strips > .s5e-refrow {
   margin: 0;
-  padding: 10px 12px 11px;
-  background: rgba(var(--ink-rgb), 0.04);
-  border: 1px solid var(--glass-border);
-  border-radius: 3px;
+  padding: 2px 0 0;
+  background: none;
+  border: none;
   min-width: 0;
 }
 .s5e-strips .photos-label,

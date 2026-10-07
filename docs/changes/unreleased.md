@@ -273,3 +273,17 @@ overlay and the final frame's own action icons stay.
 **Files.** `src/stages/Stage5.jsx`. No CSS or i18n change.
 
 **Verified.** Build; the buttons' presence and size in the dev app.
+
+---
+
+## 7. Strips without frames
+
+**Request.** Remove the background and border of the assets, locations and
+references frames.
+
+**Behaviour.** The strips above the prompt box (Assets, Locations,
+References, Keyframes) keep their caption, 48 px thumbnails and side-by-side
+grid, but the frames are plain: no background, no border, no inner padding.
+Only the tiles and the prompt box stay boxed.
+
+**Files.**  ().
