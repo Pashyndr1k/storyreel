@@ -11,7 +11,8 @@
   at its end), a grid of parameter tiles — mode, camera, dynamics, quality,
   seed, model; references and model for images — that step to the next
   value on click, and the prompt in its own box with its workflow and length
-  in the header.
+  in the header. The shot's assets and locations (and, for H3, the
+  reference and keyframe rows) sit as matching boxes above the prompt box.
 - **Seed per shot.** Each locally rendered video keeps its noise seed, and
   the video tab has a New seed / Same seed switch: "Same seed" replays the
   last seed so only your prompt, step count or frames change the result.

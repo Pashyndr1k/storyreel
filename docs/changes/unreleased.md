@@ -232,3 +232,27 @@ the new id (the request shape — `generateContent`, `responseModalities`,
 **Open.** Google documents these models with its newer Interactions API;
 `generateContent` still serves them. If the model ever vanishes from
 "Fetch available models", that is the reason.
+
+---
+
+## 5. Strips above the prompt: assets, locations, references, keyframes
+
+**Request.** Move the assets, locations and references above the prompt
+frame and unify their style.
+
+**Behaviour.** Image tab order is now media → action row → tiles → **strips**
+(the shot's Assets, Locations) → prompt box. Video tab: media → action row →
+tiles → "stale" notice → **strips** (H3 only: References, Keyframes) →
+prompt box. A strip (`.s5e-strips > *`) is a box in the tile style — same
+background, border and padding — with a 10 px upper-case caption and a row
+of 48 px thumbnails and 48 px add / edit buttons; the strips sit in a grid
+that fits two side by side when the card is wide enough (min 240 px each).
+The markup of the rows is unchanged (`photo-row` / `photo-thumb` /
+`photo-add`; `s5e-refrow` / `s5e-refthumb` / `s5e-refbtn`); only their
+container class and the scoped styles differ.
+
+**Files.** `src/stages/Stage5.jsx` (blocks moved; `s5e-refgrid` → `s5e-strips`),
+`src/styles.css` (`.s5e-strips` rules). No i18n change.
+
+**Verified.** Build; both tabs in the dev app (strips above the prompt box,
+boxed, 48 px thumbnails). Not checked under 500 px.

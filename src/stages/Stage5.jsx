@@ -2477,9 +2477,8 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                   {modelTile(shot, 'image')}
                 </div>
 
-                {promptBox(shot, 'image', [])}
-
-                  <div className="s5e-refgrid">
+                {/* what the frame can draw on: the shot's assets and locations */}
+                  <div className="s5e-strips">
                     <div>
                       <label className="photos-label">{t('asset.shotLabel')}</label>
                       <div className="photo-row">
@@ -2516,6 +2515,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     </div>
                     {shotLocationsBlock(shot)}
                   </div>
+
+                {promptBox(shot, 'image', [])}
+
               </div>
               )}
 
@@ -2643,8 +2645,8 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       </div>
                     )}
 
-                {promptBox(shot, 'video', [t(`vid.wf_${effMode}`).split(' — ')[0], `${dur} ${t('unit.sec')}`])}
-
+                {curEngine === 'minimax' && (
+                  <div className="s5e-strips">
                   {/* Reference curation (H3 only): the media the ref2va
                       checkpoint is conditioned on. Thumbnails preview the
                       set; the picker edits it. */}
@@ -2702,6 +2704,11 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       </button>
                     </div>
                   )}
+
+                  </div>
+                )}
+
+                {promptBox(shot, 'video', [t(`vid.wf_${effMode}`).split(' — ')[0], `${dur} ${t('unit.sec')}`])}
 
               </div>
               )}
