@@ -130,3 +130,75 @@ real render.
 animation (different model weights and schedule) — close in composition,
 often in broad motion, not in detail. Same seed + same settings is
 reproducible only on the same ComfyUI build and GPU.
+
+---
+
+## 3. Stage 5 image / video tabs redesigned (compact single column)
+
+**Request.** A clearer, more compact UI for the image and video tabs of the
+shot card, after a reference mock-up: tabs with a media dot; one wide action
+button that doubles as the progress bar (label and percentage left, clock
+and Stop right) with the upload / delete icons beside it; a 3-column grid of
+parameter tiles (caption, value, "k/n"); the prompt in a box whose header
+reads "VIDEO PROMPT · IMAGE-TO-VIDEO · 4 S" with "Recreate prompt" and a copy
+icon on the right.
+
+**Behaviour.** Both tabs now render one column (`.s5e-stack`) instead of
+the two-column prompt / generation grid:
+1. media (image tab: first frame, final frame, versions and the refine row —
+   the refine row only once an image exists; video tab: the player on the
+   full page, nothing in the embedded workbench, whose preview shows the
+   clip);
+2. the action row: `.s5e-big` — "Create image / video", "Recreate …" or
+   "Create prompt" when the prompt is missing — in capitals, without the
+   menu emoji (`plainLabel`); while a video renders it is the progress bar
+   (`GenProgress` with a `label`: "GENERATING · 69%" left, the clock right)
+   and the Stop square sits inside its right end; while an image renders a
+   light sweep runs along its bottom edge; then the icon buttons (upload,
+   final frame, final-frame upload, location reference; video: upload,
+   delete);
+3. the tiles (`.s5e-tiles`, 3 columns, 2 below 720 px). A tile is a button:
+   caption, value, index; click = next value. Video: **Mode** (the workflow
+   list of the engine; options without material are skipped; Auto shows the
+   effective workflow in its hint), **Camera** (6) and **Dynamics** (3) —
+   dotted-underlined while derived from the scene, Shift+click returns to
+   derived —, **Quality** (SD / HD / FHD), **Seed** (New / Same; disabled
+   until a seed is stored; "—" for cloud engines), **Model** (the native
+   model select lies invisibly over the tile, so the existing confirm /
+   rewrite flow is unchanged). Image: **Characters** (with count),
+   **Location**, **Assets**, **Palette** (swatches; the previous-scene
+   palette on a scene's first shot) as on / off tiles with a dot, and
+   **Model**;
+4. the prompt box (`.s5e-promptbox`): "IMAGE PROMPT" or "VIDEO PROMPT ·
+   <workflow> · <n> s", the engine-mismatch badge, Recreate prompt, copy, the
+   fold toggle (compact card); the textarea in the display (mono) font; the
+   tweak row;
+5. below: image — the shot's assets and locations; video — the dynamics
+   "stale" notice, the H3 reference and keyframe rows.
+- Removed: the segmented selectors (resolution, seed, workflow), the camera /
+  dynamics blocks (`dynSlider`), the "Apply" switch pills (`SwitchPill`) and the
+  mode description under the empty-media box (now in the Mode tile's hint
+  and the prompt header). The audio tab is unchanged.
+
+**Files.** `src/stages/Stage5.jsx` (`tile`, `toggleTile`, `dynTile`, `modeTile`,
+`qualityTile`, `seedTile`, `modelTile`, `promptBox`, `plainLabel`; both tab
+bodies rewritten), `src/components/GenProgress.jsx` (`label` prop →
+label + percentage, separate clock), `src/styles.css` (`.s5e-stack`,
+`.s5e-actrow`, `.s5e-big*`, `.s5e-tiles`, `.s5e-tile*`, `.s5e-promptbox`,
+`.s5e-prompthead`, `.s5e-promptmeta`). i18n: `tile.model`, `tile.mode`,
+`tile.quality`, `tile.seed`, `tile.on`, `tile.off`, `tile.none`, `tile.next`,
+`tile.toggle`, `tile.nextAuto`, `tile.nextDerived`, `tile.seedCloud`,
+`tile.imagePrompt`, `tile.videoPrompt`, `unit.sec`, `vid.working`.
+
+**Verified.** In the dev app (embedded workbench, 980 px): the video tab —
+action row, six tiles with the right values and indices (Mode AUTO 1/5,
+Camera 3/6 derived, Quality HD 2/3, Seed 2/2, Model), prompt box header
+"VIDEO PROMPT · IMAGE-TO-VIDEO · 5 S"; the progress state mocked in the DOM
+(red fill, label, clock, Stop); the image tab — action row with upload, the
+reference tiles disabled with "None" when the shot has no references, the
+Model tile, the prompt box. Not exercised: a real render through the new
+button, the tiles' Shift+click, the full (non-embedded) Stage 5 page layout,
+and widths under 720 px.
+
+**Open.** Tiles cycle forward only (no previous); the toggle tiles show a dot
+rather than a count. The audio tab keeps the old two-column layout.

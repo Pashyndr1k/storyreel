@@ -9,7 +9,8 @@ const clock = (sec) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).p
 // long earlier generations took (see lib/videoEta.js) — the generation
 // backends report no step progress — while the clock is the real elapsed
 // time. Ticks on its own so the big workbench does not re-render every second.
-export default function GenProgress({ startedAt, expectedSec }) {
+// With `label`, the bar reads "LABEL · NN%" on the left and the clock on the right.
+export default function GenProgress({ startedAt, expectedSec, label = null }) {
   const { t } = useI18n();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -29,8 +30,9 @@ export default function GenProgress({ startedAt, expectedSec }) {
         aria-valuenow={pct}
         title={t('vid.progressTip', { e: clock(elapsed), x: clock(expectedSec) })}
       >
-        {pct}% · {clock(elapsed)}
+        {label ? `${label} · ${pct}%` : `${pct}% · ${clock(elapsed)}`}
       </span>
+      {label && <span className="gen-time" aria-hidden="true">{clock(elapsed)}</span>}
     </>
   );
 }

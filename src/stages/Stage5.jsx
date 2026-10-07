@@ -61,25 +61,6 @@ const FULL_FRAME_RULE =
   'CRITICAL FRAMING: the described scene must fill the ENTIRE image edge to edge and occupy 100% of the canvas. Do NOT add black bars, letterboxing, pillarboxing, borders, frames, margins or any blank/empty areas at any edge — no black areas at the edges of the image.';
 
 // Pill toggle with an animated switch knob (the Apply block).
-function SwitchPill({ on, disabled, title, label, extra, onToggle }) {
-  return (
-    <button
-      type="button"
-      className={`sw-pill ${on ? 'on' : ''}`}
-      disabled={disabled}
-      aria-pressed={on}
-      title={title}
-      onClick={onToggle}
-    >
-      <span className="sw-track">
-        <span className="sw-knob" />
-      </span>
-      <span className="sw-lbl">{label}</span>
-      {extra}
-    </button>
-  );
-}
-
 // "Create Final Frame" glyph (corner brackets + lens).
 const FinalFrameIcon = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -568,42 +549,129 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       else next[shotId] = value;
       return { [key]: next };
     });
-  // A labelled block: the caption above a segmented selector with the same
-  // height as the resolution selector. All buttons of a block are as wide as
-  // its longest label (CSS grid), so no label ever wraps in any language.
-  // The derived default is outlined until the user picks a segment; clicking
-  // the picked segment again returns to it.
-  const dynSlider = (shot, kind) => {
+  // the wide action buttons are typeset in capitals — no leading emoji there
+  const plainLabel = (str) => String(str).replace(/^[\p{Extended_Pictographic}\uFE0F\u200D]+\s*/u, '');
+  // ---- tiles: the compact parameter controls of the image / video tabs.
+  // A tile shows a caption, the current value and "k/n"; a click moves to
+  // the next value (Shift+click returns a derived setting to auto).
+  const tile = ({ label, value, index, title, onClick, disabled, auto, on, extra, className = '' }) => (
+    <button type="button" className={`s5e-tile ${auto ? 'auto' : ''} ${on ? 'on' : ''} ${className}`} title={title} disabled={disabled} onClick={onClick}>
+      <span className="s5e-tile-k">{label}</span>
+      <span className="s5e-tile-v">
+        {value}
+        {extra}
+      </span>
+      {index != null && <span className="s5e-tile-i">{index}</span>}
+    </button>
+  );
+  // on / off switch as a tile (the references the first frame is made with)
+  const toggleTile = ({ label, on, disabled, title, extra, onToggle }) =>
+    tile({
+      label,
+      on: on && !disabled,
+      value: disabled ? t('tile.none') : on ? t('tile.on') : t('tile.off'),
+      index: <span className={`s5e-tile-dot ${on && !disabled ? 'on' : ''}`} aria-hidden="true" />,
+      title: `${title} — ${t('tile.toggle')}`,
+      disabled,
+      extra,
+      onClick: onToggle,
+    });
+  // camera / dynamics: the six and three levels, derived from the scene until set by hand
+  const dynTile = (shot, kind) => {
     const levels = kind === 'camera' ? CAMERA_LEVELS : ACTION_LEVELS;
     const key = kind === 'camera' ? 'shotCamera' : 'shotAction';
     const value = kind === 'camera' ? cameraOf(project, shot, sceneBlock) : actionOf(project, shot, sceneBlock);
     const manual = (project[key] || {})[shot.id] != null;
+    const lv = levels[value];
+    return tile({
+      label: t(`dyn.${kind}`),
+      value: t(`dyn.${kind}_${lv}`),
+      index: `${value + 1}/${levels.length}`,
+      auto: !manual,
+      title: `${t(`dyn.${kind}`)}: ${t(`dyn.${kind}_${lv}_tip`)} — ${t(manual ? 'tile.nextAuto' : 'tile.nextDerived')}`,
+      onClick: (e) => setDynamics(shot.id, key, e.shiftKey ? null : (value + 1) % levels.length),
+    });
+  };
+  // the video workflow: Auto or a pinned one; options without material are skipped
+  const modeTile = (shot, { shotMode, effMode, genImg, finalImg, shotAud }) => {
+    const list = curEngine === 'minimax' ? H3_VIDEO_MODES : curEngine === 'kling' ? KLING_VIDEO_MODES : curEngine === 'krea' ? KREA_VIDEO_MODES : VIDEO_MODES;
+    const avail = (m) => (m === 'si2v' ? !!shotAud : m === 'flf2v' ? !!finalImg : m === 'r2v' ? !!refsOf(shot.id) : m === 'mfr' ? !!genImg : true);
+    const cur = list.includes(shotMode) ? shotMode : 'auto';
+    const at = list.indexOf(cur);
+    const next = list.find((m, k) => k > at && avail(m)) || list.find((m) => avail(m)) || 'auto';
+    const missing = list.filter((m) => !avail(m)).map((m) => t(`vid.wfNeed_${m}`));
+    return tile({
+      label: t('tile.mode'),
+      value: t(`vid.wfShort_${cur}`),
+      index: `${at + 1}/${list.length}`,
+      auto: cur === 'auto',
+      title: `${cur === 'auto' ? `${t('vid.wfTip')} → ${t(`vid.wf_${effMode}`)}` : t(`vid.wf_${cur}`)} — ${t('tile.next')}${missing.length ? `. ${missing.join('; ')}` : ''}`,
+      onClick: () => pickMode(shot, next),
+    });
+  };
+  const qualityTile = () => {
+    const at = Math.max(0, VIDEO_RESOLUTIONS.indexOf(videoRes));
+    return tile({
+      label: t('tile.quality'),
+      value: videoRes,
+      index: `${at + 1}/${VIDEO_RESOLUTIONS.length}`,
+      title: `${t(`tip.res_${videoRes}`)} — ${t('tile.next')}`,
+      onClick: () => update({ videoResolution: VIDEO_RESOLUTIONS[(at + 1) % VIDEO_RESOLUTIONS.length] }),
+    });
+  };
+  // the noise seed: a fresh one, or the stored one of the last local render
+  const seedTile = (shot, { localEngine, hasSeed, seedMode, shotSeed }) =>
+    !localEngine
+      ? tile({ label: t('tile.seed'), value: '—', disabled: true, title: t('tile.seedCloud') })
+      : tile({
+          label: t('tile.seed'),
+          value: seedMode === 'same' ? t('seed.same') : t('seed.new'),
+          index: hasSeed ? `${seedMode === 'same' ? 2 : 1}/2` : '1/1',
+          disabled: !hasSeed,
+          title: hasSeed ? `${seedMode === 'same' ? t('seed.sameTip', { n: shotSeed }) : t('seed.newTip')} — ${t('tile.next')}` : t('seed.noneTip'),
+          onClick: () => update((q) => ({ shotSeedMode: { ...(q.shotSeedMode || {}), [shot.id]: seedMode === 'same' ? 'new' : 'same' } })),
+        });
+  // the model: the picker's native select lies over the tile
+  const modelTile = (shot, kind) => {
+    const label = kind === 'image' ? (IMAGE_MODELS.find(([v]) => v === imageSvc) || [])[1] : (VIDEO_ENGINES.find(([v]) => v === videoPick) || [])[1];
     return (
-      <div className={`dyn-block dyn-${kind}`}>
-        <span className="s5e-eyebrow" title={t(`tip.dyn_${kind}`)}>{t(`dyn.${kind}`)}</span>
-        <span
-          className={`seg seg-tall seg-compact dyn-seg ${manual ? '' : 'auto'}`}
-          role="radiogroup"
-          aria-label={t(`dyn.${kind}`)}
-          style={{ '--n': levels.length }}
-        >
-        {levels.map((lv, k) => {
-          const on = k === value;
-          return (
-            <button
-              key={lv}
-              type="button"
-              role="radio"
-              aria-checked={on}
-              className={`seg-btn ${on ? 'on' : ''}`}
-              title={`${t(`dyn.${kind}`)}: ${t(`dyn.${kind}_${lv}_tip`)}${on ? ` — ${t(manual ? 'tip.dynAuto' : 'tip.dynIsAuto')}` : ''}`}
-              onClick={() => setDynamics(shot.id, key, on && manual ? null : k)}
-            >
-              {t(`dyn.${kind}_${lv}`)}
-            </button>
-          );
-        })}
-        </span>
+      <span className={`s5e-tile s5e-tile-select ${regenBusy || !setSettings ? 'disabled' : ''}`} title={t(kind === 'image' ? 'mdl.imageTip' : 'mdl.videoTip')}>
+        <span className="s5e-tile-k">{t('tile.model')}</span>
+        <span className="s5e-tile-v">{label || '—'}</span>
+        <span className="s5e-tile-i" aria-hidden="true">▾</span>
+        {modelSelect(shot, kind)}
+      </span>
+    );
+  };
+  // the prompt in its own box: name · workflow · length, the tools, the text, the tweak row
+  const promptBox = (shot, kind, meta) => {
+    const field = kind === 'image' ? 'imagePrompt' : 'videoPrompt';
+    const text = project.shotPrompts[shot.id]?.[field] || '';
+    return (
+      <div className="s5e-promptbox">
+        <div className="s5e-prompthead">
+          <span className="s5e-promptmeta">
+            <span className="s5e-promptname">{t(kind === 'image' ? 'tile.imagePrompt' : 'tile.videoPrompt')}</span>
+            {meta.filter(Boolean).map((m, k) => (
+              <span key={k}>· {m}</span>
+            ))}
+          </span>
+          <span className="prompt-tools">
+            {kind === 'video' && promptEngineBadge(shot)}
+            {regenBtn(shot, kind)}
+            <CopyButton text={text} />
+            {promptToggle()}
+          </span>
+        </div>
+        <AutoTextarea
+          minRows={embed ? 4 : 6}
+          className="s5e-prompt"
+          remeasure={promptOpen}
+          value={text}
+          placeholder={t('s5.ph')}
+          onChange={(e) => setPrompt(shot.id, { [field]: e.target.value })}
+        />
+        {tweakRow(shot, kind)}
       </div>
     );
   };
@@ -2189,108 +2257,8 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                 ))}
 
               {tab === 'image' && (
-              <div className="s5e">
-                {/* LEFT — prompt management */}
-                <div className="s5e-panel">
-                  <div className="prompt-head">
-                    <label>{t('s5.img')}</label>
-                    <span className="prompt-tools">
-                      {modelSelect(shot, 'image')}
-                      {regenBtn(shot, 'image')}
-                      <CopyButton text={p.imagePrompt} />
-                      {promptToggle()}
-                    </span>
-                  </div>
-                  <AutoTextarea
-                    minRows={embed ? 4 : 8}
-                    className="s5e-prompt"
-                    remeasure={promptOpen}
-                    value={p.imagePrompt}
-                    placeholder={t('s5.ph')}
-                    onChange={(e) => setPrompt(shot.id, { imagePrompt: e.target.value })}
-                  />
-                  {tweakRow(shot, 'image')}
-                  <div className="s5e-grow" />
-                  <div>
-                    <div className="s5e-eyebrow">{t('apply.title')}</div>
-                    <div className="s5e-applyrow">
-                      <SwitchPill
-                        on={pref.char}
-                        disabled={!shotCastRefs(project, shot).length}
-                        title={
-                          shotCastRefs(project, shot).length
-                            ? `${t('img.useChar')} — ${shotCastRefs(project, shot).map((c) => c.name || '?').join(', ')}`
-                            : t('img.useChar')
-                        }
-                        label={t('apply.char')}
-                        extra={
-                          shotCastRefs(project, shot).length ? (
-                            <span className="cast-count">{shotCastRefs(project, shot).length}</span>
-                          ) : null
-                        }
-                        onToggle={() => setPref(shot.id, { char: !pref.char })}
-                      />
-                      <SwitchPill
-                        on={pref.loc}
-                        disabled={!shotLocationRefs(project, scene, shot.id).length}
-                        title={t('img.useLoc')}
-                        label={t('apply.loc')}
-                        onToggle={() => setPref(shot.id, { loc: !pref.loc })}
-                      />
-                      <SwitchPill
-                        on={pref.asset}
-                        disabled={!assetsFor(shot.id).length}
-                        title={t('img.useAssets')}
-                        label={t('apply.assets')}
-                        onToggle={() => setPref(shot.id, { asset: !pref.asset })}
-                      />
-                      {/* Shot 1 of a scene: "palette from the previous scene"
-                          (a scene flag; nothing to inherit in the first
-                          scene). Later shots: this scene's first-frame
-                          palette, toggleable per shot. */}
-                      {isFirstShot(shot) ? (
-                        prevScene && (
-                          <SwitchPill
-                            on={!!scene.palettePrev}
-                            disabled={!prevPalette}
-                            title={prevPalette ? t('scene.palettePrevTip', { n: sceneIdx }) : t('scene.palettePrevNone', { n: sceneIdx })}
-                            label={t('scene.palettePrev')}
-                            extra={
-                              prevPalette ? (
-                                <span className="pal-swatches">
-                                  {prevPalette.colors.map((c) => (
-                                    <i key={c} style={{ background: c }} />
-                                  ))}
-                                </span>
-                              ) : null
-                            }
-                            onToggle={() => setScenePalettePrev(!scene.palettePrev)}
-                          />
-                        )
-                      ) : (
-                        <SwitchPill
-                          on={pref.palette}
-                          disabled={!palette || palette.src === shot.id}
-                          title={t('img.paletteTip')}
-                          label={t('apply.palette')}
-                          extra={
-                            palette ? (
-                              <span className="pal-swatches">
-                                {palette.colors.map((c) => (
-                                  <i key={c} style={{ background: c }} />
-                                ))}
-                              </span>
-                            ) : null
-                          }
-                          onToggle={() => setPref(shot.id, { palette: !pref.palette })}
-                        />
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* RIGHT — image generation */}
-                <div className="s5e-panel">
+              <div className="s5e-stack">
+                {/* media: the first frame (and the final frame) with versions */}
                   {genImg ? (
                     finalImg ? (
                       <div className="frame-pair">
@@ -2353,7 +2321,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                   {/* Versions under the frame pair (the small first frame has no room for an overlay). */}
                   {genImg && finalImg && renderVersions(shot, genImg, 's5e-vers')}
 
-                  {/* Image tweak: sits directly beneath the image frame, full width. */}
+                {genImg && (
                   <div className="voice-row refine-row">
                     <input
                       value={refineText[shot.id] || ''}
@@ -2370,26 +2338,28 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       {imgBusy === shot.id ? t('img.generating') : t('ver.refine')}
                     </button>
                   </div>
-
-                  <div className="s5e-btnrow">
-                    {/* no prompt yet: the same button writes it first */}
+                )}
+                {/* one wide action, then the icon actions */}
+                <div className="s5e-actrow">
+                  <span className="s5e-bigwrap">
                     {(p.imagePrompt || '').trim() ? (
                       <button title={t('tip.genImage')}
-                        className="btn small primary s5e-gen fixedw-lg"
+                        className={`btn primary s5e-big ${imgBusy === shot.id ? 'progress busy' : ''}`}
                         disabled={anyBusy || !!regenBusy}
                         onClick={() => genImage(shot)}
                       >
-                        {imgBusy === shot.id ? t('img.generating') : genImg ? t('img.regenerate') : t('img.generate')}
+                        {plainLabel(imgBusy === shot.id ? t('img.generating') : genImg ? t('img.regenerate') : t('img.generate'))}
                       </button>
                     ) : (
                       <button title={t('tip.createPrompt')}
-                        className="btn small primary s5e-gen fixedw-lg"
+                        className="btn primary s5e-big"
                         disabled={anyBusy || !!regenBusy}
                         onClick={() => regenPrompt(shot, 'image')}
                       >
-                        {regenBusy === `${shot.id}:image` ? t('s5.creatingPrompt') : t('s5.createPrompt')}
+                        {plainLabel(regenBusy === `${shot.id}:image` ? t('s5.creatingPrompt') : t('s5.createPrompt'))}
                       </button>
                     )}
+                  </span>
                     <label className="s5e-ico" title={t('img.uploadTip')} aria-label={t('img.uploadTip')}>
                       <Upload size={16} />
                       <input
@@ -2442,12 +2412,73 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         <MapPin size={16} />
                       </button>
                     )}
-                    {(finalBusy || locBusy) && <span className="hint">{t('img.generating')}</span>}
-                    {locSaved === shot.id && <span className="hint">{t('img.locSaved')}</span>}
-                  </div>
+                </div>
+                {(finalBusy || locBusy) && <span className="hint">{t('img.generating')}</span>}
+                {locSaved === shot.id && <span className="hint">{t('img.locSaved')}</span>}
 
-                  <div className="s5e-grow" />
-                  <div className="s5e-div" />
+                {/* what the frame is made with: references on / off, the model */}
+                <div className="s5e-tiles">
+                  {toggleTile({
+                    label: t('apply.char'),
+                    on: pref.char,
+                    disabled: !shotCastRefs(project, shot).length,
+                    title: shotCastRefs(project, shot).length
+                      ? `${t('img.useChar')} — ${shotCastRefs(project, shot).map((c) => c.name || '?').join(', ')}`
+                      : t('img.useChar'),
+                    extra: shotCastRefs(project, shot).length ? <span className="s5e-tile-n">{shotCastRefs(project, shot).length}</span> : null,
+                    onToggle: () => setPref(shot.id, { char: !pref.char }),
+                  })}
+                  {toggleTile({
+                    label: t('apply.loc'),
+                    on: pref.loc,
+                    disabled: !shotLocationRefs(project, scene, shot.id).length,
+                    title: t('img.useLoc'),
+                    onToggle: () => setPref(shot.id, { loc: !pref.loc }),
+                  })}
+                  {toggleTile({
+                    label: t('apply.assets'),
+                    on: pref.asset,
+                    disabled: !assetsFor(shot.id).length,
+                    title: t('img.useAssets'),
+                    onToggle: () => setPref(shot.id, { asset: !pref.asset }),
+                  })}
+                  {/* Shot 1 of a scene: the palette of the previous scene (a
+                      scene flag); later shots: this scene's first-frame palette. */}
+                  {isFirstShot(shot)
+                    ? prevScene &&
+                      toggleTile({
+                        label: t('scene.palettePrev'),
+                        on: !!scene.palettePrev,
+                        disabled: !prevPalette,
+                        title: prevPalette ? t('scene.palettePrevTip', { n: sceneIdx }) : t('scene.palettePrevNone', { n: sceneIdx }),
+                        extra: prevPalette ? (
+                          <span className="pal-swatches">
+                            {prevPalette.colors.map((c) => (
+                              <i key={c} style={{ background: c }} />
+                            ))}
+                          </span>
+                        ) : null,
+                        onToggle: () => setScenePalettePrev(!scene.palettePrev),
+                      })
+                    : toggleTile({
+                        label: t('apply.palette'),
+                        on: pref.palette,
+                        disabled: !palette || palette.src === shot.id,
+                        title: t('img.paletteTip'),
+                        extra: palette ? (
+                          <span className="pal-swatches">
+                            {palette.colors.map((c) => (
+                              <i key={c} style={{ background: c }} />
+                            ))}
+                          </span>
+                        ) : null,
+                        onToggle: () => setPref(shot.id, { palette: !pref.palette }),
+                      })}
+                  {modelTile(shot, 'image')}
+                </div>
+
+                {promptBox(shot, 'image', [])}
+
                   <div className="s5e-refgrid">
                     <div>
                       <label className="photos-label">{t('asset.shotLabel')}</label>
@@ -2485,37 +2516,13 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     </div>
                     {shotLocationsBlock(shot)}
                   </div>
-                </div>
               </div>
-
               )}
 
-              {/* Video tab — same split grid: prompt left, video right. */}
+              {/* Video tab — the same stack: media, action, tiles, prompt. */}
               {tab === 'video' && (
-              <div className="s5e">
-                <div className="s5e-panel">
-                  <div className="prompt-head">
-                    <label>{t('s5.vid', { d: dur })}</label>
-                    <span className="prompt-tools">
-                      {modelSelect(shot, 'video')}
-                      {promptEngineBadge(shot)}
-                      {regenBtn(shot, 'video')}
-                      <CopyButton text={p.videoPrompt} />
-                      {promptToggle()}
-                    </span>
-                  </div>
-                  <AutoTextarea
-                    minRows={embed ? 4 : 6}
-                    className="s5e-prompt"
-                    remeasure={promptOpen}
-                    value={p.videoPrompt}
-                    placeholder={t('s5.ph')}
-                    onChange={(e) => setPrompt(shot.id, { videoPrompt: e.target.value })}
-                  />
-                  {tweakRow(shot, 'video')}
-                </div>
-                <div className="s5e-panel">
-                  {shotVid ? (
+              <div className="s5e-stack">
+                  {!embed && (shotVid ? (
                     // Embedded: the preview frame's transport carries expand /
                     // download, so the card shows no media strip at all.
                     !embed && (
@@ -2546,7 +2553,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                               ? t('vid.modeFLF', { e: engineHintName })
                               : t('vid.modeI2V', { e: engineHintName })}
                     </div>
-                  )}
+                  ))}
                   {curEngine === 'minimax' && isTakeMember(project, shot.id) && (
                     <p className="hint take-note">
                       {t('take.renderNote', {
@@ -2554,24 +2561,13 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       })}
                     </p>
                   )}
-                  <div className="dyn-sliders">
-                    <div className="dyn-line">
-                      {dynSlider(shot, 'camera')}
-                      {dynSlider(shot, 'action')}
-                    </div>
-                    {dynamicsStale(project, shot, sceneBlock) && (
-                      <div className="dyn-stale">
-                        <span className="hint">{t('dyn.stale')}</span>
-                        <button title={t('tip.dynRecreate')} className="btn small" disabled={!!regenBusy || anyBusy} onClick={() => regenPrompt(shot, 'video')}>
-                          {regenBusy === `${shot.id}:video` ? t('s5.creatingPrompt') : t('dyn.recreate')}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <div className="s5e-btnrow">
+
+                {/* one wide action — the progress bar while rendering, with Stop at its end */}
+                <div className="s5e-actrow">
+                  <span className="s5e-bigwrap">
                     {p.videoPrompt?.trim() ? (
                       <button title={t('tip.genVideo')}
-                        className={`btn small primary s5e-gen fixedw-lg ${vidBusy ? 'progress' : ''}`}
+                        className={`btn primary s5e-big ${vidBusy ? 'progress' : ''}`}
                         disabled={
                           anyBusy ||
                           vidElsewhere ||
@@ -2582,28 +2578,26 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         onClick={() => genVideo(shot, i)}
                       >
                         {vidBusy ? (
-                          <GenProgress startedAt={vidProg.startedAt} expectedSec={vidProg.expectedSec} />
-                        ) : shotVid ? (
-                          t('vid.regenerate')
+                          <GenProgress startedAt={vidProg.startedAt} expectedSec={vidProg.expectedSec} label={t('vid.working')} />
                         ) : (
-                          t('vid.generate')
+                          plainLabel(shotVid ? t('vid.regenerate') : t('vid.generate'))
                         )}
                       </button>
-                    ) : null}
-                    {vidBusy && (
-                      <button type="button" className="s5e-ico vid-stop" title={t('vid.stop')} aria-label={t('vid.stop')} onClick={stopVideo}>
-                        <StopSq size={16} />
-                      </button>
-                    )}
-                    {p.videoPrompt?.trim() ? null : (
+                    ) : (
                       <button title={t('tip.createPrompt')}
-                        className="btn small primary s5e-gen fixedw-lg"
+                        className="btn primary s5e-big"
                         disabled={anyBusy || !!regenBusy}
                         onClick={() => regenPrompt(shot, 'video')}
                       >
-                        {regenBusy === `${shot.id}:video` ? t('s5.creatingPrompt') : t('s5.createPrompt')}
+                        {plainLabel(regenBusy === `${shot.id}:video` ? t('s5.creatingPrompt') : t('s5.createPrompt'))}
                       </button>
                     )}
+                    {vidBusy && (
+                      <button type="button" className="s5e-ico vid-stop s5e-bigstop" title={t('vid.stop')} aria-label={t('vid.stop')} onClick={stopVideo}>
+                        <StopSq size={14} />
+                      </button>
+                    )}
+                  </span>
                     <label className="s5e-ico" title={t('vid.uploadTip')} aria-label={t('vid.uploadTip')}>
                       <Upload size={16} />
                       <input
@@ -2629,83 +2623,28 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         <Trash size={16} />
                       </button>
                     )}
-                    {/* Generation parameters share the Generate row: resolution +
-                        workflow. Auto picks the richest workflow the shot's
-                        material allows; a pinned choice overrides it. Options
-                        whose material is missing stay disabled. */}
-                    <span className="seg seg-tall seg-compact" title={t('s5.resTip')}>
-                      {VIDEO_RESOLUTIONS.map((r) => (
-                        <button title={t(`tip.res_${r}`)}
-                          key={r}
-                          type="button"
-                          className={`seg-btn ${videoRes === r ? 'on' : ''}`}
-                          onClick={() => update({ videoResolution: r })}
-                        >
-                          {r}
+                </div>
+
+                {/* the render's parameters: a click moves each to its next value */}
+                <div className="s5e-tiles">
+                  {modeTile(shot, { shotMode, effMode, genImg, finalImg, shotAud })}
+                  {dynTile(shot, 'camera')}
+                  {dynTile(shot, 'action')}
+                  {qualityTile()}
+                  {seedTile(shot, { localEngine, hasSeed, seedMode, shotSeed })}
+                  {modelTile(shot, 'video')}
+                </div>
+                    {dynamicsStale(project, shot, sceneBlock) && (
+                      <div className="dyn-stale">
+                        <span className="hint">{t('dyn.stale')}</span>
+                        <button title={t('tip.dynRecreate')} className="btn small" disabled={!!regenBusy || anyBusy} onClick={() => regenPrompt(shot, 'video')}>
+                          {regenBusy === `${shot.id}:video` ? t('s5.creatingPrompt') : t('dyn.recreate')}
                         </button>
-                      ))}
-                    </span>
-                    {localEngine && (
-                      <span className="seg seg-tall seg-compact" title={hasSeed ? t('seed.tip', { n: shotSeed }) : t('seed.noneTip')}>
-                        <button
-                          type="button"
-                          className={`seg-btn ${seedMode === 'new' ? 'on' : ''}`}
-                          title={t('seed.newTip')}
-                          onClick={() => update((p) => ({ shotSeedMode: { ...(p.shotSeedMode || {}), [shot.id]: 'new' } }))}
-                        >
-                          {t('seed.new')}
-                        </button>
-                        <button
-                          type="button"
-                          className={`seg-btn ${seedMode === 'same' ? 'on' : ''}`}
-                          disabled={!hasSeed}
-                          title={hasSeed ? t('seed.sameTip', { n: shotSeed }) : t('seed.noneTip')}
-                          onClick={() => update((p) => ({ shotSeedMode: { ...(p.shotSeedMode || {}), [shot.id]: 'same' } }))}
-                        >
-                          {t('seed.same')}
-                        </button>
-                      </span>
+                      </div>
                     )}
-                    <span className="seg seg-tall seg-compact" title={t('vid.wfTip')}>
-                      {(curEngine === 'minimax' ? H3_VIDEO_MODES : curEngine === 'kling' ? KLING_VIDEO_MODES : curEngine === 'krea' ? KREA_VIDEO_MODES : VIDEO_MODES).map((m) => {
-                        const avail =
-                          m === 'si2v' ? !!shotAud
-                            : m === 'flf2v' ? !!finalImg
-                            : m === 'r2v' ? !!refsOf(shot.id)
-                            : m === 'mfr' ? !!genImg
-                            : true;
-                        return (
-                          <button
-                            key={m}
-                            type="button"
-                            className={`seg-btn ${shotMode === m ? 'on' : ''}`}
-                            disabled={!avail}
-                            title={avail ? t(`vid.wf_${m}`) : t(`vid.wfNeed_${m}`)}
-                            onClick={() => pickMode(shot, m)}
-                          >
-                            {t(`vid.wfShort_${m}`)}
-                          </button>
-                        );
-                      })}
-                    </span>
-                    {(genImg || effMode === 'r2v') && (
-                      <span className="hint">
-                        {effMode === 'mfr'
-                          ? t('vid.modeMFR', {
-                              n: h3MultiPlan(project, shot.id, {
-                                durationSec: (() => { const tk = takeOf(project, shot.id); return tk ? takeTotal(project, tk) : Number(shot.duration || 4); })(),
-                              }).guides.length,
-                            })
-                          : effMode === 'r2v'
-                          ? t('vid.modeR2V')
-                          : effMode === 'si2v'
-                            ? t('vid.modeSI2V', { e: engineHintName })
-                            : effMode === 'flf2v'
-                              ? t('vid.modeFLF', { e: engineHintName })
-                              : t('vid.modeI2V', { e: engineHintName })}
-                      </span>
-                    )}
-                  </div>
+
+                {promptBox(shot, 'video', [t(`vid.wf_${effMode}`).split(' — ')[0], `${dur} ${t('unit.sec')}`])}
+
                   {/* Reference curation (H3 only): the media the ref2va
                       checkpoint is conditioned on. Thumbnails preview the
                       set; the picker edits it. */}
@@ -2763,9 +2702,8 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       </button>
                     </div>
                   )}
-                </div>
-              </div>
 
+              </div>
               )}
 
               {/* Audio tab — prompt left, voice generation right. */}
