@@ -256,3 +256,20 @@ container class and the scoped styles differ.
 
 **Verified.** Build; both tabs in the dev app (strips above the prompt box,
 boxed, 48 px thumbnails). Not checked under 500 px.
+
+---
+
+## 6. Download as an action-row button
+
+**Request.** Make the download button the same style and size as the upload
+button.
+
+**Behaviour.** The first frame's and the video's download are now 48 px icon
+buttons (`.s5e-ico`) in the action row, right after Upload — image tab when a
+first frame exists, video tab when a clip exists. The small round download
+overlays on the media (`.s5e-dl`) are gone from both tabs; the video's expand
+overlay and the final frame's own action icons stay.
+
+**Files.** `src/stages/Stage5.jsx`. No CSS or i18n change.
+
+**Verified.** Build; the buttons' presence and size in the dev app.

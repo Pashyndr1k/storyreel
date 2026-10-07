@@ -2265,9 +2265,6 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         <figure>
                           <div className="s5e-imgwrap">
                             <img decoding="async" loading="lazy" src={genImg} alt="" className="zoomable" onClick={() => setLightbox({ kind: 'img', src: genImg })} />
-                            <button type="button" className="s5e-dl" title={t('img.download')} onClick={() => downloadImage(shot, i)}>
-                              <Download size={14} />
-                            </button>
                           </div>
                           <figcaption>{t('img.first')}</figcaption>
                         </figure>
@@ -2306,9 +2303,6 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     ) : (
                       <div className="s5e-imgwrap">
                         <img decoding="async" loading="lazy" src={genImg} alt="" className="zoomable" onClick={() => setLightbox({ kind: 'img', src: genImg })} />
-                        <button type="button" className="s5e-dl" title={t('img.download')} onClick={() => downloadImage(shot, i)}>
-                          <Download size={14} />
-                        </button>
                         {/* Version stack hovers over the preview: every version
                             incl. the current one (highlighted); ✕ removes a variant. */}
                         {renderVersions(shot, genImg, 's5e-vers-overlay')}
@@ -2373,6 +2367,11 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         }}
                       />
                     </label>
+                    {genImg && (
+                      <button type="button" className="s5e-ico" title={t('img.download')} aria-label={t('img.download')} onClick={() => downloadImage(shot, i)}>
+                        <Download size={16} />
+                      </button>
+                    )}
                     {genImg && !finalImg && (
                       <button
                         type="button"
@@ -2538,9 +2537,6 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         >
                           <Expand size={14} />
                         </button>
-                        <button type="button" className="s5e-dl" title={t('vid.download')} onClick={() => downloadVideo(shot, i)}>
-                          <Download size={14} />
-                        </button>
                       </div>
                     )
                   ) : (
@@ -2613,6 +2609,11 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         }}
                       />
                     </label>
+                    {shotVid && (
+                      <button type="button" className="s5e-ico" title={t('vid.download')} aria-label={t('vid.download')} onClick={() => downloadVideo(shot, i)}>
+                        <Download size={16} />
+                      </button>
+                    )}
                     {shotVid && (
                       <button
                         type="button"
