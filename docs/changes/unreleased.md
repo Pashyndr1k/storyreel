@@ -99,3 +99,44 @@ in `run_stage` 3 / 4), layout views in `review_shot`. Gaps found and closed:
 strings, `parts` / `partOf`, `BAD_INPUT` without cuts, a split with
 `cutAfter: [1]` creating two projects, a repeat creating none, 24 tools.
 Not run through the MCP bridge.
+
+---
+
+## 3. Series: production projects of any size, cuts between episodes
+
+**Request.** Split the main (series master) project into smaller projects
+with any number of episodes each — the "Episodes per project" select was
+limited to 5–10.
+
+**Behaviour** (Stage 3 of a series master, "Split into projects"):
+- "Episodes per project" offers 1 … all episodes. `planSegments` divides each
+  section into round(len / N) near-equal projects, so a project still never
+  straddles a section boundary (closes on an intermediate finale); N ≥ total
+  gives one project. The old 5–10 clamp and the merge-short-sections rule are
+  gone (`SEGMENT_MIN` 1, `SEGMENT_MAX` = the series maximum, `clampSegment(n,
+  total)`).
+- A strip of episode numbers with a scissors button in every gap: a click
+  cuts there (`seriesPlan.cuts` = episode numbers after which a new project
+  starts). Hand-made cuts replace the "every N" rule entirely
+  (`segmentsFromCuts`; each project is titled with the section its first
+  episode is in); boundaries that come from the rule show as grey, hand-made
+  ones in the accent. "Clear cuts" returns to the rule; choosing an "every N"
+  value also clears the cuts. The select shows "—" while cuts are set.
+- Creating projects is unchanged (`buildSegmentProject` per segment, "Open"
+  on created ones).
+
+**Data model.** `seriesPlan.cuts: number[]` (new, optional).
+
+**Files.** `src/lib/series.js` (constants, `clampSegment`, `planSegments`,
+`normalizeEpisodeCuts`, `segmentsFromCuts`), `src/stages/Stage3Series.jsx`
+(strip, select 1…all, Clear cuts), `src/styles.css` (`.cut-gap.auto`). i18n:
+`ser.cutTip`, `ser.uncutTip`, `ser.epShort`; reworded `ser.splitHint`,
+`tip.serSegSize`, `ser.prodHint`.
+
+**Verified.** In the dev app on a 6-episode master with two sections (1–3,
+4–6): planSegments every 1 / every 4 / N ≥ total, segmentsFromCuts with
+stray values; the strip (6 chips, 5 gaps), a cut after episode 2 →
+"Ep 1–2" / "Ep 3–6", select showing "—", "every 1" → 6 rows with grey
+boundaries, "every 4" → 1–3 / 4–6 along the sections, then a cut and
+"Create projects (2)" → two projects "Series Test · Ep 1–2" and "· Ep 3–6"
+(the second with 4 episodes in its approved plot).

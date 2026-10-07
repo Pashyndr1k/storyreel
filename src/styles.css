@@ -1368,6 +1368,8 @@ input.episodes-input { width: 110px; }
 }
 .cut-gap:hover { color: var(--text); border-color: var(--glass-border); }
 .cut-gap.cut { color: var(--accent); border-color: rgba(var(--accent-rgb), 0.6); background: rgba(var(--accent-rgb), 0.1); }
+/* a boundary the "every N" rule gives, not set by hand */
+.cut-gap.auto { color: var(--text-2); border-color: var(--glass-border); background: rgba(var(--ink-rgb), 0.05); }
 .seg-size { display: inline-flex; align-items: center; gap: 8px; margin: 0; }
 .seg-size select { width: auto; }
 .seg-list { margin-top: 12px; display: grid; gap: 6px; }

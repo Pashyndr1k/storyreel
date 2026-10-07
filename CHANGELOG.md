@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Series projects of any size.** A series can be split into production
+  projects of any number of episodes — one to all — or cut between any two
+  episodes in the new episode strip at Stage 3.
 - **Agent: engines and parts.** The agent's status names the image and video
   models in use (including Krea and the H3 step count); the project view
   shows parts; a new tool splits a project into parts.

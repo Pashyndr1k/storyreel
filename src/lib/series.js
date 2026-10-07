@@ -27,8 +27,9 @@ export const episodeRange = (p) => {
   const d = clampEpisodeSec(p?.seriesPart?.episodeSeconds || p?.episodeSeconds);
   return { min: Math.max(15, d - EPISODE_TOLERANCE_SEC), max: d + EPISODE_TOLERANCE_SEC };
 };
-export const SEGMENT_MIN = 5;
-export const SEGMENT_MAX = 10;
+// episodes per production project: any number from one to the whole series
+export const SEGMENT_MIN = 1;
+export const SEGMENT_MAX = SERIES_MAX_EPISODES;
 export const SEGMENT_DEFAULT = 8;
 // episodes written per text-model call when the plan is created
 export const EPISODES_PER_CALL = 10;
@@ -37,7 +38,7 @@ export const SHORT_DRAMA_STYLE_ID = 'bi5.script.short_drama';
 
 export const clampEpisodes = (n) =>
   Math.max(SERIES_MIN_EPISODES, Math.min(SERIES_MAX_EPISODES, Math.round(Number(n) || SERIES_DEFAULT_EPISODES)));
-export const clampSegment = (n) => Math.max(SEGMENT_MIN, Math.min(SEGMENT_MAX, Math.round(Number(n) || SEGMENT_DEFAULT)));
+export const clampSegment = (n, total = SEGMENT_MAX) => Math.max(SEGMENT_MIN, Math.min(Math.max(SEGMENT_MIN, total), Math.round(Number(n) || SEGMENT_DEFAULT)));
 
 export const isSeries = (p) => p?.scriptType === 'series';
 // "inline": the series is produced inside its own master project instead of
@@ -90,15 +91,16 @@ export function arcChunks(arc) {
 // Split the series into production segments of SEGMENT_MIN..SEGMENT_MAX
 // episodes, about `size` each. Segments end where a section ends whenever the
 // section lengths allow it, so a segment closes on an intermediate finale.
+// Projects of about `size` episodes, cut inside each section so that a
+// project never straddles a section boundary (each ends on an intermediate
+// finale); a section is divided into round(len / size) near-equal projects.
 export function planSegments(arcs, total, size) {
-  const want = clampSegment(size);
-  if (total <= SEGMENT_MAX && total < want + SEGMENT_MIN) return [{ from: 1, to: total, arcTitle: arcs[0]?.title || '' }];
-  let segs = [];
+  const want = clampSegment(size, total);
+  if (want >= total) return [{ from: 1, to: total, arcTitle: arcs[0]?.title || '' }];
+  const segs = [];
   for (const arc of arcs.length ? arcs : [{ from: 1, to: total, title: '' }]) {
     const len = arc.to - arc.from + 1;
-    let k = Math.max(1, Math.round(len / want));
-    while (k > 1 && len / k < SEGMENT_MIN) k--;
-    while (len / k > SEGMENT_MAX) k++;
+    const k = Math.max(1, Math.round(len / want));
     let from = arc.from;
     for (let i = 0; i < k; i++) {
       const n = Math.ceil((arc.to - from + 1) / (k - i));
@@ -106,17 +108,23 @@ export function planSegments(arcs, total, size) {
       from += n;
     }
   }
-  // a section shorter than the minimum joins its neighbour when the pair fits
-  for (let i = 0; i < segs.length; i++) {
-    const s = segs[i];
-    if (s.to - s.from + 1 >= SEGMENT_MIN || segs.length === 1) continue;
-    const j = i > 0 ? i - 1 : i + 1;
-    const o = segs[j];
-    if (o.to - o.from + 1 + (s.to - s.from + 1) > SEGMENT_MAX) continue;
-    const merged = { from: Math.min(s.from, o.from), to: Math.max(s.to, o.to), arcTitle: segs[Math.min(i, j)].arcTitle };
-    segs = [...segs.slice(0, Math.min(i, j)), merged, ...segs.slice(Math.max(i, j) + 1)];
-    i = Math.max(-1, Math.min(i, j) - 1);
+  return segs;
+}
+
+// Projects from explicit cuts: `cuts` are episode numbers after which a new
+// project starts. Each project is titled with the section its first episode is in.
+export const normalizeEpisodeCuts = (cuts, total) =>
+  [...new Set((Array.isArray(cuts) ? cuts : []).map(Number).filter((k) => Number.isInteger(k) && k >= 1 && k < total))].sort((a, b) => a - b);
+export function segmentsFromCuts(cuts, total, arcs = []) {
+  const c = normalizeEpisodeCuts(cuts, total);
+  const arcOf = (ep) => (arcs || []).find((x) => ep >= x.from && ep <= x.to)?.title || '';
+  const segs = [];
+  let from = 1;
+  for (const k of c) {
+    segs.push({ from, to: k, arcTitle: arcOf(from) });
+    from = k + 1;
   }
+  segs.push({ from, to: total, arcTitle: arcOf(from) });
   return segs;
 }
 
