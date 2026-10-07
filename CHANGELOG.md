@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.15.0 — 2026-10-07
 
 - **Nano Banana 2.1 by default.** New installs, and installs still on the
   old default, generate frames with `gemini-nano-banana-2.1` (up to 14
