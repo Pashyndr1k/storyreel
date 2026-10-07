@@ -286,4 +286,7 @@ References, Keyframes) keep their caption, 48 px thumbnails and side-by-side
 grid, but the frames are plain: no background, no border, no inner padding.
 Only the tiles and the prompt box stay boxed.
 
-**Files.**  ().
+**Files.** `src/styles.css` (`.s5e-strips > *`).
+
+**Verified.** Computed styles in the dev app: transparent background, no
+border, 2 px top padding on both strips.
