@@ -222,6 +222,14 @@ async function renderJob(job, onProgress) {
 
     fs.mkdirSync(path.dirname(job.outPath), { recursive: true });
     const { args, totalSec } = buildArgs({ ...job, segments, audioClips });
+    // A long timeline's filter graph overflows the Windows command-line limit
+    // (spawn ENAMETOOLONG), so ffmpeg reads it from a file instead.
+    const fcIdx = args.indexOf('-filter_complex');
+    if (fcIdx !== -1) {
+      const script = path.join(tmp, 'filter_complex.txt');
+      fs.writeFileSync(script, args[fcIdx + 1]);
+      args.splice(fcIdx, 2, '-filter_complex_script', script);
+    }
 
     return await new Promise((resolve) => {
       canceled = false;

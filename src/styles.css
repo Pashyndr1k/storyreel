@@ -1720,6 +1720,8 @@ input.episodes-input { width: 110px; }
 .s6-controls .btn.primary:hover:not(:disabled) { background: rgba(var(--accent-rgb), 0.16); }
 .s6-controls .icon-btn { background: rgba(var(--ink-rgb), 0.06); border-radius: 3px; }
 .s6-controls .icon-btn:hover:not(:disabled) { background: rgba(var(--ink-rgb), 0.11); }
+/* what Render exports (series): the whole film, one episode, every episode */
+.s6-controls select.render-target { width: auto; max-width: 220px; height: 36px; padding: 0 28px 0 10px; font-size: 12px; }
 
 /* background music modal */
 .modal.music-modal { width: min(560px, 94vw); max-width: min(560px, 94vw); }

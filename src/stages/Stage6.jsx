@@ -465,6 +465,29 @@ export default function Stage6({ project, update, settings, ...workbench }) {
   };
   const total = items.reduce((a, it) => a + (it.shot.duration || 0), 0);
   const startOf = (idx) => items.slice(0, idx).reduce((a, it) => a + (it.shot.duration || 0), 0);
+  // A series (short drama) labels each scene with its episode: the episodes
+  // of the film as time windows, so Render can export them one by one.
+  const episodes = (() => {
+    const out = [];
+    let acc = 0;
+    for (const it of items) {
+      const d = it.shot.duration || 0;
+      const ep = Number(project.outline.find((sc) => sc.id === it.sceneId)?.episode) || 0;
+      if (ep) {
+        const cur = out[out.length - 1];
+        if (cur && cur.n === ep) cur.out = acc + d;
+        else out.push({ n: ep, in: acc, out: acc + d });
+      }
+      acc += d;
+    }
+    return out;
+  })();
+  // what Render exports: 'range' = the active segment (the whole film by
+  // default), 'all' = every episode to its own file, 'ep:N' = one episode
+  const [renderTarget, setRenderTarget] = useState('range');
+  const renderTargetOk = renderTarget === 'range' || (renderTarget === 'all' && episodes.length > 1) || episodes.some((e) => `ep:${e.n}` === renderTarget);
+  // m:ss.s once the film is longer than two minutes, plain seconds below
+  const clock = (sec, long = total > 120) => (long ? `${Math.floor(sec / 60)}:${(sec % 60).toFixed(1).padStart(4, '0')}` : `${sec.toFixed(1).padStart(4, '0')}s`);
 
   // Active timeline segment (two ruler markers). Default: the whole film
   // (rangeOut null = "track the end"). Playback runs and Render exports only
@@ -1155,15 +1178,10 @@ export default function Stage6({ project, update, settings, ...workbench }) {
 
   // FFmpeg engine (Electron): frame-exact assembly in the main process — no
   // realtime capture, no playback stalls, H.264 mp4 out, full xfade palette.
-  const doRenderFfmpeg = async () => {
-    if (rendering || total <= 0) return;
-    setRendering(true);
-    setPlaying(false);
+  // One window [rIn, rOut] of the film to a file: clips outside the window
+  // are dropped, boundary clips are trimmed into on the fly.
+  const renderWindow = async (rIn, rOut, suffix) => {
     const [w, h] = videoDims(project.aspectRatio || '16:9', project.videoResolution);
-    // Only the active segment [effIn, effOut] is rendered: clips outside the
-    // window are dropped, boundary clips are trimmed into on the fly.
-    const rIn = effIn;
-    const rOut = effOut;
     const included = [];
     {
       let acc = 0;
@@ -1200,7 +1218,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
     });
     const safe = (project.title || 'storyreel').replace(/[^\w\d\- ]+/g, '').trim().replace(/\s+/g, '-') || 'storyreel';
     const outDir = (settings.comfyOutputDir || DEFAULT_OUTPUT_DIR).replace(/[\\/]+$/, '');
-    const outPath = `${outDir || '.'}/${safe}-final.mp4`;
+    const outPath = `${outDir || '.'}/${safe}${suffix || '-final'}.mp4`;
     // Audio timeline: every clip of every ENABLED layer mixes over the
     // per-shot clip audio (with its trims, fades and the layer volume).
     const audioClips = (project.audioLayers || [])
@@ -1233,16 +1251,44 @@ export default function Stage6({ project, update, settings, ...workbench }) {
           .filter(Boolean)
       );
     const off = window.ffmpegBridge.onProgress((p) =>
-      setRenderProg({ pct: Math.min(100, Math.round((p.sec / (p.total || 1)) * 100)) })
+      setRenderProg((cur) => ({ ...(cur || {}), pct: Math.min(100, Math.round((p.sec / (p.total || 1)) * 100)) }))
     );
     try {
-      const res = await window.ffmpegBridge.render({ width: w, height: h, fps: 25, segments, transitions, audioClips, outPath });
-      if (res?.ok) showToast(t('s6.renderedTo', { p: res.path }));
-      else if (!res?.canceled) showToast(res?.error || 'ffmpeg failed', 'error');
+      return await window.ffmpegBridge.render({ width: w, height: h, fps: 25, segments, transitions, audioClips, outPath });
+    } finally {
+      off?.();
+    }
+  };
+
+  const doRenderFfmpeg = async () => {
+    if (rendering || total <= 0) return;
+    setRendering(true);
+    setPlaying(false);
+    // the active segment, one episode, or every episode in turn
+    const epTag = (n) => `-ep${String(n).padStart(2, '0')}`;
+    const targets =
+      renderTarget === 'all' && episodes.length
+        ? episodes.map((e) => ({ in: e.in, out: e.out, suffix: epTag(e.n), label: t('s6.renderEpLabel', { n: e.n }) }))
+        : episodes.find((e) => `ep:${e.n}` === renderTarget)
+          ? [episodes.find((e) => `ep:${e.n}` === renderTarget)].map((e) => ({ in: e.in, out: e.out, suffix: epTag(e.n), label: t('s6.renderEpLabel', { n: e.n }) }))
+          : [{ in: effIn, out: effOut, suffix: '', label: '' }];
+    const done = [];
+    try {
+      for (let k = 0; k < targets.length; k++) {
+        const tg = targets[k];
+        setRenderProg(targets.length > 1 ? { pct: 0, k: k + 1, n: targets.length, label: tg.label } : { pct: 0 });
+        const res = await renderWindow(tg.in, tg.out, tg.suffix);
+        if (res?.ok) done.push(res.path);
+        else {
+          if (!res?.canceled) showToast(res?.error || 'ffmpeg failed', 'error');
+          break;
+        }
+      }
+      if (done.length === 1) showToast(t('s6.renderedTo', { p: done[0] }));
+      else if (done.length > 1) showToast(t('s6.renderedEps', { n: done.length, p: done[0].replace(/[^\\/]+$/, '') }));
     } catch (e) {
       showToast(String(e?.message || e), 'error');
     } finally {
-      off?.();
       setRendering(false);
       setRenderProg(null);
     }
@@ -2366,7 +2412,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
             </span>
           );
         })()}
-        <span className="nle-timecode" title={t('ind.timecode')}>{elapsed.toFixed(1).padStart(4, '0')} / {total.toFixed(1).padStart(4, '0')}s</span>
+        <span className="nle-timecode" title={t('ind.timecode')}>{clock(elapsed)} / {clock(total)}</span>
       </div>
 
       <div className="row s6-controls">
@@ -2379,9 +2425,6 @@ export default function Stage6({ project, update, settings, ...workbench }) {
           }}
         >
           {playing ? <><StopSq size={14} />{t('sb.stop')}</> : <><Play size={14} />{t('sb.play')}</>}
-        </button>
-        <button title={t('tip.render')} className="btn small fixedw" disabled={rendering} onClick={doRender}>
-          <Download size={14} />{rendering ? t('s6.rendering') : t('s6.render')}
         </button>
         {/* Auto queue: the missing videos of every ready scene, one after another */}
         {/* One dual-state button: Auto queue → Abort creation (interrupts the
@@ -2440,10 +2483,14 @@ export default function Stage6({ project, update, settings, ...workbench }) {
           <AudioPlus size={16} />
         </button>
         <DynamicsVisualizer plan={project.dynamicsPlan} playhead={playing || elapsed > 0 ? elapsed : null} />
+        {/* Render sits at the right end; a series also chooses what to export:
+            the whole film, one episode, or every episode to its own file */}
+        <span className="push-right" />
         {rendering && (
           <>
             {renderProg && (
               <span className="total-badge">
+                {renderProg.n > 1 ? `${renderProg.label} ${renderProg.k}/${renderProg.n} · ` : ''}
                 {renderProg.pct != null
                   ? t('s6.renderPct', { p: renderProg.pct })
                   : t('s6.renderProg', { a: renderProg.a, b: renderProg.b })}
@@ -2460,6 +2507,25 @@ export default function Stage6({ project, update, settings, ...workbench }) {
             </button>
           </>
         )}
+        {episodes.length > 0 && (
+          <select
+            className="render-target"
+            title={t('tip.renderTarget')}
+            aria-label={t('tip.renderTarget')}
+            disabled={rendering}
+            value={renderTargetOk ? renderTarget : 'range'}
+            onChange={(e) => setRenderTarget(e.target.value)}
+          >
+            <option value="range">{t('s6.renderWhole')}</option>
+            {episodes.length > 1 && <option value="all">{t('s6.renderAll', { n: episodes.length })}</option>}
+            {episodes.map((e) => (
+              <option key={e.n} value={`ep:${e.n}`}>{t('s6.renderEp', { n: e.n, t: clock(e.out - e.in, true) })}</option>
+            ))}
+          </select>
+        )}
+        <button title={t('tip.render')} className="btn small fixedw" disabled={rendering} onClick={doRender}>
+          <Download size={14} />{rendering ? t('s6.rendering') : t('s6.render')}
+        </button>
       </div>
 
       {/* Transitions reference: what each cut does, with checkboxes to trim

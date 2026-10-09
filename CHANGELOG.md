@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Render by episode (assembly).** Render now sits at the right end of the
+  control row; a series picks what to export — the whole film, one episode,
+  or every episode to its own file. The timecode shows minutes once the film
+  passes two minutes.
 - **Series projects of any size.** A series can be split into production
   projects of any number of episodes, from one to all, at Stage 3.
 - **Agent: engines and parts.** The agent's status names the image and video

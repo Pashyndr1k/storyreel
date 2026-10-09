@@ -128,3 +128,41 @@ interim build is ignored).
 4–6): every 1 → six projects, every 4 → 1–3 / 4–6 along the sections, N ≥
 total → one; creating two projects. The scene-level split of section 1
 (which has its own cut strip) is unchanged.
+
+---
+
+## 4. Assembly: Render on the right, minutes past two, episodes for a series
+
+**Request.** At Stage 5 (assembly): move the Render button to the right side
+of the frame; show the total film length in minutes once it is above two
+minutes; for the short-drama template add an episode selector to the Render
+button to render by episodes (1.5–2 min each).
+
+**Behaviour.**
+- The control row keeps Play, Auto queue, Background music, Sound FX and the
+  icon buttons on the left; a spacer pushes **Render** to the right end, with
+  the render progress badge and Cancel beside it while rendering.
+- The timecode "elapsed / total" switches to `m:ss.s` for both numbers once
+  the film is longer than 120 s (e.g. `1:05.3 / 12:40.0`); below that it stays
+  in seconds.
+- When the project's scenes carry episode numbers (a series part or an inline
+  series — the short-drama template), a select stands before Render: **Whole
+  film** (the active segment, as before), **All episodes (n files)** (when
+  there are at least two), and **Episode n · m:ss** per episode. Episodes are
+  the time windows of their scenes in timeline order (`episodes`). One
+  episode renders `<title>-epNN.mp4`; "All episodes" renders each in turn
+  (progress badge "Episode n k/m · p%", Cancel stops the sequence) and ends
+  with one toast naming the folder. The ffmpeg path was refactored into
+  `renderWindow(rIn, rOut, suffix)` + the `doRenderFfmpeg` loop; the in-browser
+  canvas fallback is unchanged (whole film / active segment only).
+
+**Files.** `src/stages/Stage6.jsx`, `src/styles.css` (`.render-target`). i18n:
+`s6.renderWhole`, `s6.renderAll`, `s6.renderEp`, `s6.renderEpLabel`,
+`s6.renderedEps`, `tip.renderTarget`.
+
+**Verified.** In the dev app (no ffmpeg there): the row with Render at the
+right end, the timecode in minutes on a 3-minute timeline, the episode
+select on a project whose scenes carry episode numbers (options and the
+episode lengths), the chosen target reaching the render targets list with
+the right windows and suffixes (checked through a stubbed `ffmpegBridge`).
+Not run with the real ffmpeg render in the desktop app.
