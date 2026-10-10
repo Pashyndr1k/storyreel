@@ -1,6 +1,7 @@
 import { SHORT_DRAMA_STYLE_ID } from '../lib/series.js';
-import { Fragment, useState } from 'react';
+import { useState } from 'react';
 import ProjectCard from '../components/ProjectCard.jsx';
+import ProjectGroupModal from '../components/ProjectGroupModal.jsx';
 import NewProjectModal from '../components/NewProjectModal.jsx';
 import AppShell from '../components/AppShell.jsx';
 import Dropdown from '../components/Dropdown.jsx';
@@ -35,16 +36,9 @@ export default function Home({
     localStorage.setItem('storyreel.homeSort.v1', v);
   };
   const [showNew, setShowNew] = useState(false);
-  // split projects (a series master with its episode projects, a project
-  // with its parts) opened on the page — their inner projects are shown
-  const [openGroups, setOpenGroups] = useState(() => new Set());
-  const toggleGroup = (id) =>
-    setOpenGroups((s) => {
-      const n = new Set(s);
-      if (n.has(id)) n.delete(id);
-      else n.add(id);
-      return n;
-    });
+  // the split project (a series master with its episode projects, a project
+  // with its parts) whose inner projects are shown in the pop-up
+  const [openGroup, setOpenGroup] = useState(null);
 
   const active = projects.filter((p) => !p.archived);
 
@@ -207,34 +201,34 @@ export default function Home({
                 {...extra}
               />
             );
-            // A split project is one card that opens to the projects inside
-            // it (the master, then its parts in story order); a part that was
-            // split again opens the same way inside. Searching shows every
-            // match flat.
-            const node = (p) => {
+            // A split project is one card; clicking it opens a pop-up with the
+            // projects inside it (the master, then its parts in story order,
+            // nested parts navigable there). Searching shows every match flat.
+            return groupProjects(sorted, active).map(({ project: p }) => {
               const children = q ? [] : childrenOf(active, p.id);
               if (!children.length) return card(p, { span: childSpan(p) });
-              const open = openGroups.has(p.id);
-              return (
-                <Fragment key={p.id}>
-                  {card(p, { group: { count: children.length, expanded: open }, onToggle: () => toggleGroup(p.id), span: childSpan(p) })}
-                  {open && (
-                    <div className="pgroup" role="group" aria-label={p.title}>
-                      <div className="pgrid pgrid-nested">
-                        {card(p, { master: true })}
-                        {children.map(node)}
-                      </div>
-                    </div>
-                  )}
-                </Fragment>
-              );
-            };
-            return groupProjects(sorted, active).map(({ project: p }) => node(p));
+              return card(p, { group: { count: children.length, expanded: openGroup === p.id }, onToggle: () => setOpenGroup(p.id), span: childSpan(p) });
+            });
           })()}
         </div>
       )}
 
       {showNew && <NewProjectModal onCreate={create} onClose={() => setShowNew(false)} settings={settings} />}
+      {openGroup && (
+        <ProjectGroupModal
+          rootId={openGroup}
+          pool={active}
+          onClose={() => setOpenGroup(null)}
+          actions={{
+            open: (id) => onOpen(id),
+            archive: (p) => updateProject(p.id, { archived: true }, { touch: false }),
+            pin: (p) => updateProject(p.id, { pinned: !p.pinned }, { touch: false }),
+            exportZip: (p) => exportProjectZip(p, lang).catch((e) => window.alert(e.message || String(e))),
+            duplicate,
+            remove: del,
+          }}
+        />
+      )}
     </AppShell>
   );
 }

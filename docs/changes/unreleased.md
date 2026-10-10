@@ -759,12 +759,16 @@ Stage 2 asset images were created at too low a resolution.
   from / scenes from); `groupProjects` drops from the page every project
   whose parent is on it.
 - Home: such a project is one card with a chip "N projects inside ▾" (its
-  own actions stay on the card); clicking the card opens a full-width panel
-  under it — the master itself ("Master project", click to open) and its
-  parts as ordinary cards with every action, each labelled "Episodes 1–5 of
-  10" / "Scenes 4–6 · part 2 of 3". A part that was split again is a group
-  inside the group (recursive). Several groups can be open at once; a search
-  shows every match flat. The archive page is unchanged (flat).
+  own actions stay on the card); clicking the card opens a POP-UP
+  (`ProjectGroupModal`) listing the master itself ("Master project") and its
+  parts as compact rows without a cover — title, "Episodes 1–5 of 10" /
+  "Scenes 4–6 · part 2 of 3", date, stage progress, and pin / export /
+  duplicate / archive / delete; a click on a row opens that project. A part
+  that was split again carries "N projects inside ›": it opens inside the
+  same pop-up, with a Back button. The grid itself never changes shape
+  (the first version put the list inline under the card, which distorted
+  the grid — replaced on request). A search shows every match flat; the
+  archive page is unchanged.
 - `ProjectCard` gained `group` / `onToggle` / `master` / `span` props; i18n
   `card.group`, `card.group1`, `card.groupTip`, `card.master`, `card.masterTip`,
   `card.episodes`, `card.scenes`, `card.spanTip` (EN/RU/UK); CSS `.pc-kind`,
@@ -777,7 +781,7 @@ Stage 2 asset images were created at too low a resolution.
   640, the character-photo size).
 
 **Verified.** In the dev app with a seeded master → two episode projects →
-one scene part: the single card with the chip, the opened panel (master +
-episodes), the nested group inside the first episode, the actions on every
-card. Found on the way: Vite's dev server served a stale transform after
+one scene part: the single card with the chip, the pop-up (master +
+episodes as rows), entering the first episode's group inside it and going
+back, the actions on every row. Found on the way: Vite's dev server served a stale transform after
 two quick edits of the same file (a touch fixed it) — nothing in the app.
