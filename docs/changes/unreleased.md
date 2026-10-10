@@ -943,7 +943,7 @@ viewpoint, framing or layout. Same rule for several locations.
 
 ---
 
-## 23. Layout camera: minimum distances, lenses that keep the framing, no obstruction
+## 24. Layout camera: minimum distances, lenses that keep the framing, no obstruction
 
 **Request.** After §12 the planner's cameras came out worse: right up
 against the characters in almost every shot, or behind an interior object.
@@ -982,7 +982,7 @@ camera inside a wall box moved out. **Not run with the real planner model.**
 
 ---
 
-## 24. The agent knows the H3 prompt rules
+## 25. The agent knows the H3 prompt rules
 
 **Request.** The agent must be familiar with MiniMax H3 prompt-writing,
 especially dialogue and direct speech.
