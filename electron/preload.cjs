@@ -36,6 +36,12 @@ contextBridge.exposeInMainWorld('nativeDialogs', {
   confirm: (message, ok, cancel) => ipcRenderer.sendSync('dialog-message', { kind: 'confirm', message, ok, cancel }),
 });
 
+// The local Claude Code CLI as a text service (electron/claudeCli.cjs).
+contextBridge.exposeInMainWorld('claudeCliBridge', {
+  check: () => ipcRenderer.invoke('claude-cli-check'),
+  run: (req) => ipcRenderer.invoke('claude-cli-run', req),
+});
+
 // Cloud APIs that send no CORS headers (Kling) via the main process.
 contextBridge.exposeInMainWorld('netBridge', {
   request: (opts) => ipcRenderer.invoke('net-request', opts),

@@ -131,6 +131,38 @@ Conventions: metres; x to the right, z toward the default camera;
 `facingDeg` 0 = toward +z, 90 = +x, 180 = -z, 270 = -x; `yawDeg` is where
 the camera stands around its target (0 = the +z side).
 
+## Short drama (series projects)
+
+A series is written by the app's short-drama engine: vertical 9:16, one
+dramatic unit per 1–2 minute episode, the conflict visible in the first 3–5
+seconds, a turn about every 30 seconds, every episode cut on a labelled hook
+(identity / emotion / realisation, never the same type twice in a row), the
+first win by episode 5, the paid checkpoint after the first quarter of the
+season (the strongest hook so far), lines under 20 words, no em dashes, no
+voice-over. `storyreel_drama_rules` gives the rules and this project's
+landmarks; `projectView.shortDrama` the plan's hook types, turns and open
+questions; scenes and shots carry a `beat` (open / orient / turn / squeeze /
+reversal / cliff).
+
+Work order for a series:
+1. Stage 1–2 as usual; choose a sub-genre with `storyreel_update_project
+   { dramaStyleId }` from `storyreel_list_styles { category: "drama" }` if the
+   brief names one (it colours tone and plot types; the mechanics are fixed).
+2. After Stage 3 (and again after Stage 4) run `storyreel_drama_check`. Fix
+   errors before writing prompts: `storyreel_drama_fix { mechanical: true }`
+   for em dashes; `storyreel_drama_fix { sceneId }` to have the model rewrite
+   a scene's shots against the listed issues (frames and videos stay
+   attached); `storyreel_edit_script` for a single line. Check again.
+3. Judge the plan with the rules, not taste: does episode N end on the
+   expected hook, does the paid-checkpoint episode carry the biggest reveal,
+   does the first win land by episode 5, does each episode's first action
+   answer the previous question?
+4. When reviewing media, `storyreel_review_shot` returns `expected.shortDrama`:
+   the beat and position of the shot, the vertical-frame expectations, and
+   for the first / last shot of an episode the opening and hook-frame
+   requirements. Flag `kind: "script"` for convention breaks the rewrite
+   cannot fix.
+
 ## Engines, quality and cost
 
 `storyreel_status.services` tells you what renders: the image service and

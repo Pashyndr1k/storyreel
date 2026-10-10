@@ -13,7 +13,7 @@ export default function ProjectSettingsModal({ project, update, styles, setStyle
   const [manageCat, setManageCat] = useState(null); // opens the library manager at a category
   const [showExport, setShowExport] = useState(false);
 
-  const idField = { script: 'scriptStyleId', image: 'imageStyleId', video: 'videoStyleId' };
+  const idField = { script: 'scriptStyleId', image: 'imageStyleId', video: 'videoStyleId', drama: 'dramaStyleId' };
 
   const selector = (cat) => (
     <div className="style-select" key={cat}>
@@ -80,7 +80,7 @@ export default function ProjectSettingsModal({ project, update, styles, setStyle
         </label>
 
         <label className="section-label">{t('pset.styles')}</label>
-        {STYLE_CATEGORIES.map((c) => selector(c))}
+        {STYLE_CATEGORIES.filter((c) => c !== 'drama' || project.scriptType === 'series').map((c) => selector(c))}
 
         <label className="section-label">{t('sx.title')}</label>
         <p className="hint">{scriptReady(project) ? t('sx.hint') : t('sx.notReady')}</p>

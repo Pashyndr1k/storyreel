@@ -27,6 +27,10 @@ import { kreaImageModelOf, kreaVideoModelOf } from '../krea.js';
 import { geminiImageLabel } from '../gemini.js';
 import { h3StepsOf } from '../comfy.js';
 import { planParts, cutsEvery, normalizeCuts, buildPartProject } from '../split.js';
+import { isShortDrama, dramaRulesSummary, DRAMA_CORE, DRAMA_STAGE, DRAMA_FRAME_RULE, seasonLandmarks, HOOK_TYPES, BEATS } from '../shortDrama/rules.js';
+import { checkProject, autoFixProject, episodesOf } from '../shortDrama/check.js';
+import { dramaFixPrompt } from '../prompts.js';
+import { loadStyles } from '../styles.js';
 import { layoutTools } from './layoutTools.js';
 import { CAMERA_LEVELS, ACTION_LEVELS, cameraOf, actionOf } from '../shotDynamics.js';
 import { blockForScene } from '../dynamics.js';
@@ -134,6 +138,7 @@ function shotView(project, scene, shot, i, withPrompts) {
     action: shot.action || '',
     dialogue: shot.dialogue || '',
     notes: shot.notes || '',
+    ...(shot.beat ? { beat: shot.beat } : {}),
     has: {
       imagePrompt: !!(pr.imagePrompt || '').trim(),
       videoPrompt: !!(pr.videoPrompt || '').trim(),
@@ -164,6 +169,15 @@ function projectView(project, { prompts = false } = {}) {
     aspectRatio: project.aspectRatio,
     useLayout: layoutEnabled(project),
     ...(project.partInfo ? { partOf: project.partInfo } : {}),
+    ...(isShortDrama(project)
+      ? {
+          shortDrama: {
+            subgenre: (() => { try { return (loadStyles().drama || []).find((s) => s.id === project.dramaStyleId)?.name || null; } catch { return null; } })(),
+            landmarks: seasonLandmarks(project.seriesPart?.total || project.episodeCount),
+            episodes: (project.seriesPlan?.episodes || project.seriesPart?.episodes || []).map((e) => ({ number: e.number, title: e.title, hookType: e.hookType || null, goal: e.goal || null, powerStart: e.powerStart || null, powerEnd: e.powerEnd || null, turns: e.turns || [], cliffhanger: e.cliffhanger, question: e.cliffhangerQuestion || null, nextOpensOn: e.firstActionNext || null })),
+          },
+        }
+      : {}),
     ...((project.parts || []).length ? { parts: project.parts.map((x) => ({ scenes: [x.from + 1, x.to + 1], projectId: x.projectId, title: x.title })) } : {}),
     styles: {
       script: { id: project.scriptStyleId, name: styleName('script', project.scriptStyleId) },
@@ -186,6 +200,8 @@ function projectView(project, { prompts = false } = {}) {
       title: scene.title,
       summary: scene.summary,
       plannedSec: Number(scene.duration) || 0,
+      ...(scene.episode ? { episode: scene.episode } : {}),
+      ...(scene.beat ? { beat: scene.beat } : {}),
       locations: locationsOf(scene).map((l) => ({ name: l.name, referencePhotos: (l.photos || []).length })),
       ...(layoutEnabled(project) ? { hasLayout: hasLayout(project, scene.id) } : {}),
       shots: (project.sceneDetails[scene.id]?.shots || []).map((s, i) => shotView(project, scene, s, i, prompts)),
@@ -383,6 +399,24 @@ async function reviewShot({ projectId, shotId, frames = 6, transcript = false })
       imagePrompt: pr.imagePrompt || '',
       videoPrompt: pr.videoPrompt || '',
       spatialLayout: describeShot(project, scene, shot.id) || null,
+      ...(isShortDrama(project)
+        ? (() => {
+            const ep = episodesOf(project).find((e) => e.scenes.some((sc) => sc.id === scene.id));
+            const firstOfEp = !!ep && ep.shots[0]?.id === shot.id;
+            const lastOfEp = !!ep && ep.shots[ep.shots.length - 1]?.id === shot.id;
+            return {
+              shortDrama: {
+                beat: shot.beat || null,
+                episode: ep?.number || null,
+                position: firstOfEp ? 'first shot of the episode' : lastOfEp ? 'last shot of the episode (hook frame)' : 'inside the episode',
+                frame: 'vertical 9:16: the subject fills the frame, faces and hands carry it; tight singles for dialogue; foreground = power, background = threat; the lower fifth free for captions; at most 4 people in frame',
+                ...(firstOfEp ? { opening: 'the conflict must be visible in the first frame and the first 3 s — a face, an object or a line, not a setting' } : {}),
+                ...(lastOfEp ? { hook: 'the clip must end on a face holding the unresolved action or line (no fade, no settled state)' } : {}),
+                dialogue: 'spoken lines under 20 words, no em dashes, no voice-over; in the voice clip the words must match the shot text',
+              },
+            };
+          })()
+        : {}),
     },
     checks,
     attempts: Object.fromEntries(Object.entries(project.agentAttempts || {}).filter(([k]) => k.startsWith(`shot:${shot.id}:`))),
@@ -410,7 +444,7 @@ export const TOOLS = [
         version: a.version,
         openProject: ps ? { id: ps.id, stage: ps.view } : null,
         services: {
-          text: (s.textService || 'claude') === 'gemini' ? 'gemini' : `claude (${s.model})`,
+          text: (s.textService || 'claude') === 'gemini' ? 'gemini' : s.textService === 'claude-cli' ? `claude code CLI, local console (${s.model})` : `claude API (${s.model})`,
           textKeySet: !textKeyError(s),
           image: s.imageService === 'comfy' ? 'comfyui (Flux.2 Klein, local)' : s.imageService === 'krea' ? `krea (${kreaImageModelOf(s).label})` : `gemini (${geminiImageLabel(s.geminiModel)})`,
           geminiKeySet: !!s.geminiKey,
@@ -483,13 +517,14 @@ export const TOOLS = [
         imageStyleId: { type: 'string' },
         videoStyleId: { type: 'string' },
         useLayout: { type: 'boolean' },
+        dramaStyleId: { type: 'string', description: 'Short-drama sub-genre brief id from storyreel_list_styles (category "drama"), "" for none. Series only.' },
       },
       ['projectId']
     ),
     run: async ({ projectId, ...patch }) => {
       projectOf(projectId);
       const styles = app().styles;
-      for (const [key, cat] of [['scriptStyleId', 'script'], ['imageStyleId', 'image'], ['videoStyleId', 'video']]) {
+      for (const [key, cat] of [['scriptStyleId', 'script'], ['imageStyleId', 'image'], ['videoStyleId', 'video'], ['dramaStyleId', 'drama']]) {
         if (patch[key] && !(styles[cat] || []).some((s) => s.id === patch[key])) fail('BAD_INPUT', `${key}: no ${cat} style with id "${patch[key]}".`);
       }
       if (patch.genres) patch.genres = patch.genres.slice(0, 3);
@@ -501,11 +536,11 @@ export const TOOLS = [
   },
   {
     name: 'storyreel_list_styles',
-    description: 'The style library: script styles (how the text is written), image styles (the look of every frame) and video styles (camera and motion character). Returns id, name and the style text.',
-    inputSchema: schema({ category: { type: 'string', enum: ['script', 'image', 'video'] } }),
+    description: 'The style library: script styles (how the text is written), image styles (the look of every frame), video styles (camera and motion character) and drama styles (short-drama sub-genre briefs — comedy, dark comedy, action, romance, mystery, sci-fi, fantasy, brainrot, surrealism — for series). Returns id, name and the style text.',
+    inputSchema: schema({ category: { type: 'string', enum: ['script', 'image', 'video', 'drama'] } }),
     run: async ({ category }) => {
       const styles = app().styles;
-      const cats = category ? [category] : ['script', 'image', 'video'];
+      const cats = category ? [category] : ['script', 'image', 'video', 'drama'];
       return Object.fromEntries(cats.map((c) => [c, (styles[c] || []).map((s) => ({ id: s.id, name: s.name, text: s.instructions }))]));
     },
   },
@@ -583,6 +618,73 @@ export const TOOLS = [
       });
       await settle();
       return { newShotId: copy.id, number: index + 2, sceneId: scene.id };
+    },
+  },
+  {
+    name: 'storyreel_drama_rules',
+    description: 'The short-drama conventions the app writes series by (vertical 9:16, 1–2 minute episodes): opening inside 3–5 s, turns every ~30 s, the three hook types and their rotation, the first five episodes, the season landmarks for this project (first win, first reversal, paid checkpoint after the first quarter, mid-season betrayal, climax), dialogue limits, the vertical frame — as data plus the full brief. Read it before judging or fixing a series.',
+    inputSchema: schema({ ...PROJECT, brief: { type: 'boolean', description: 'true also returns the full text brief the model is given (long).' } }, ['projectId']),
+    run: async ({ projectId, brief }) => {
+      const p = projectOf(projectId);
+      if (!isShortDrama(p)) fail('NOT_READY', 'This is not a series project; the short-drama rules apply to series only.');
+      return { ...dramaRulesSummary({ ...p, episodeCount: p.seriesPart?.total || p.episodeCount }), beats: BEATS, hookTypes: HOOK_TYPES, ...(brief ? { brief: DRAMA_CORE, stages: DRAMA_STAGE, frame: DRAMA_FRAME_RULE } : {}) };
+    },
+  },
+  {
+    name: 'storyreel_drama_check',
+    description: 'Pacing and convention analysis of a series against the short-drama rules: hook types and their rotation, the paid checkpoint and first win, episode lengths, the opening shot (≤ 5 s, conflict visible), turns per episode, 15-second shifts, dialogue (line length, em dashes, voice-over, speakable density), locations, the hook frame. Returns a score, per-episode metrics and issues with the episode / scene / shot they point at. Free (no attempt).',
+    inputSchema: schema({ ...PROJECT, episode: { type: 'integer', minimum: 1, description: 'Only this episode\'s issues.' } }, ['projectId']),
+    run: async ({ projectId, episode }) => {
+      const p = projectOf(projectId);
+      if (!isShortDrama(p)) fail('NOT_READY', 'This is not a series project.');
+      const rep = checkProject(p);
+      const issues = episode ? rep.issues.filter((i) => i.episode === episode) : rep.issues;
+      return { ...rep, issues, episodes: episode ? rep.episodes.filter((m) => m.number === episode) : rep.episodes, next: issues.some((i) => i.fixable) ? 'storyreel_drama_fix with mechanical=true removes the em dashes; the rest needs a rewrite (storyreel_drama_fix with sceneId, or storyreel_edit_script).' : 'Rewrite with storyreel_drama_fix (sceneId) or storyreel_edit_script, then check again.' };
+    },
+  },
+  {
+    name: 'storyreel_drama_fix',
+    description: 'Correct a series against the short-drama rules. mechanical=true applies the no-model fixes (em dashes in dialogue → full stops) to the whole project, free. With sceneId, the text model rewrites that scene\'s shots to resolve the issues the check found there (plus any \'issues\' you add), keeping the number and order of shots so their frames and videos stay attached; counts as an attempt. Recreate the prompts of changed shots afterwards.',
+    inputSchema: schema({ ...PROJECT, mechanical: { type: 'boolean' }, sceneId: { type: 'string' }, issues: { type: 'array', items: { type: 'string' }, description: 'Extra instructions for the rewrite.' } }, ['projectId']),
+    run: async ({ projectId, mechanical, sceneId, issues = [] }) => {
+      const p = projectOf(projectId);
+      if (!isShortDrama(p)) fail('NOT_READY', 'This is not a series project.');
+      if (mechanical) {
+        const { changed, patch } = autoFixProject(p);
+        if (changed) patchProject(projectId, patch);
+        await settle();
+        return { changedShots: changed };
+      }
+      const scene = sceneOf(p, sceneId || fail('BAD_INPUT', 'Give sceneId (or mechanical: true).'));
+      const shots = p.sceneDetails?.[scene.id]?.shots || [];
+      if (!shots.length) fail('NOT_READY', 'This scene has no shots yet.');
+      const a = app();
+      if (textKeyError(a.settings)) fail('NO_KEY', 'The text model API key is not set in StoryReel Settings.');
+      const found = checkProject(p).issues.filter((i) => i.sceneId === scene.id || shots.some((s) => s.id === i.shotId)).map((i) => i.message);
+      const list = [...found, ...issues.map(String)];
+      if (!list.length) fail('NOT_READY', 'The check found nothing in this scene and no issues were given.');
+      const attempt = countAttempt(projectId, { sceneId: scene.id, kind: 'drama_fix' }, 'The genre fix of this scene');
+      const data = await generateJSON(a.settings, dramaFixPrompt(p, scene, shots, list, a.lang, ''));
+      const rows = Array.isArray(data?.shots) ? data.shots : [];
+      if (!rows.length) fail('GENERATION_FAILED', 'The model returned no shots.');
+      let changed = 0;
+      patchProject(projectId, (q) => {
+        const cur = q.sceneDetails[scene.id]?.shots || [];
+        const next = cur.map((s, i) => {
+          const r = rows.find((x) => Number(x.shot) === i + 1) || rows[i];
+          if (!r) return s;
+          const patch = {};
+          for (const [k, f] of [['shotType', 'shot_type'], ['location', 'location'], ['action', 'action'], ['dialogue', 'dialogue'], ['notes', 'notes']]) if (typeof r[f] === 'string' && r[f] !== s[k]) patch[k] = r[f];
+          if (r.duration_sec != null) { const d = Math.max(2, Math.min(10, Math.round(Number(r.duration_sec) * 2) / 2)); if (d !== s.duration) patch.duration = d; }
+          if (BEATS.includes(String(r.beat || '').toLowerCase()) && r.beat !== s.beat) patch.beat = String(r.beat).toLowerCase();
+          if (Object.keys(patch).length) changed++;
+          return { ...s, ...patch };
+        });
+        return { sceneDetails: { ...q.sceneDetails, [scene.id]: { ...q.sceneDetails[scene.id], shots: next } } };
+      });
+      await settle();
+      const after = checkProject(projectOf(projectId)).issues.filter((i) => i.sceneId === scene.id || shots.some((s) => s.id === i.shotId));
+      return { attempt, changedShots: changed, remainingIssues: after.map((i) => i.message), next: changed ? 'Recreate the prompts of the changed shots (storyreel_create_prompts with sceneId).' : 'Nothing changed.' };
     },
   },
   {
@@ -739,7 +841,7 @@ let running = null;
 export async function callAgent(method, params = {}) {
   const tool = TOOLS.find((t) => t.name === method);
   if (!tool) return { ok: false, error: { code: 'UNKNOWN_TOOL', message: `No tool named "${method}".` } };
-  const readOnly = ['storyreel_guide', 'storyreel_status', 'storyreel_list_projects', 'storyreel_get_project', 'storyreel_list_styles', 'storyreel_list_flags', 'storyreel_get_layout'].includes(method);
+  const readOnly = ['storyreel_guide', 'storyreel_status', 'storyreel_list_projects', 'storyreel_get_project', 'storyreel_list_styles', 'storyreel_list_flags', 'storyreel_get_layout', 'storyreel_drama_rules', 'storyreel_drama_check'].includes(method);
   if (running && !readOnly) return { ok: false, error: { code: 'BUSY', message: `StoryReel is still running "${running}". Wait for it to finish.` } };
   if (!readOnly) running = method;
   try {

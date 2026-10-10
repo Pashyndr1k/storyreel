@@ -3973,3 +3973,18 @@ select.prompt-model:hover:not(:disabled) { border-color: var(--ink); color: var(
 .s5e-strips .s5e-refthumb { width: 48px; height: 48px; border-color: var(--glass-border); }
 .s5e-strips .s5e-refbtn { width: 48px; height: 48px; min-width: 48px; }
 .s5e-strips .s5e-key i { font-size: 9px; }
+
+/* ---- short-drama engine: hook row on the episode plan, the genre check ---- */
+.ep-hook { align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.ep-hook .seg.seg-compact .seg-btn { padding: 0 8px; font-size: 10px; }
+.ep-question { margin: 0; font-style: italic; }
+.drama-modal { max-width: 760px; }
+.drama-metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; margin: 8px 0 12px; }
+.drama-metric { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border: 1px solid var(--glass-border-soft); border-radius: 3px; font-size: 11.5px; color: var(--muted); }
+.drama-metric strong { color: var(--text); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
+.drama-issues { max-height: 50vh; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
+.drama-ep h4 { margin: 0 0 4px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted-2); }
+.drama-issue { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; padding: 4px 0; font-size: 12.5px; border-top: 1px dotted var(--glass-border-soft); }
+.drama-level { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted-3); padding-top: 2px; }
+.drama-issue.error .drama-level { color: var(--accent); }
+.drama-issue.warn .drama-level { color: var(--text-2); }

@@ -140,7 +140,7 @@ export function seriesChunkProject(project, part, from, to) {
 }
 
 export const episodeLine = (e) =>
-  `Episode ${e.number}${e.title ? ` — "${e.title}"` : ''}: ${e.summary || ''}${e.cliffhanger ? `\n  Cliffhanger: ${e.cliffhanger}` : ''}`;
+  `Episode ${e.number}${e.title ? ` — "${e.title}"` : ''}: ${e.summary || ''}${e.turns?.length ? `\n  Turns: ${e.turns.join(' · ')}` : ''}${e.cliffhanger ? `\n  Cliffhanger: ${e.cliffhanger}${e.hookType ? ` [HOOK · ${String(e.hookType).toUpperCase()}]` : ''}` : ''}${e.cliffhangerQuestion ? `\n  Question left open: ${e.cliffhangerQuestion}` : ''}${e.firstActionNext ? `\n  Next episode opens on: ${e.firstActionNext}` : ''}`;
 
 // A production project for episodes seg.from..seg.to of the master series.
 // Stages 1–2 arrive filled (plot, storyline, cast with photos); it opens at

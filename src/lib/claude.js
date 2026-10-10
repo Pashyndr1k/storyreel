@@ -86,10 +86,26 @@ function extractJSON(text) {
 // Which key the selected text service needs; returns the error code the UI
 // already knows ('NO_KEY' / 'NO_GEMINI_KEY') or null when the key is present.
 export function textKeyError(settings) {
-  if ((settings.textService || 'claude') === 'gemini') {
-    return settings.geminiKey ? null : 'NO_GEMINI_KEY';
-  }
+  const svc = settings.textService || 'claude';
+  if (svc === 'gemini') return settings.geminiKey ? null : 'NO_GEMINI_KEY';
+  // the local Claude Code CLI needs the desktop app (the main process runs it)
+  if (svc === 'claude-cli') return typeof window !== 'undefined' && window.claudeCliBridge ? null : 'NO_CLAUDE_CLI';
   return settings.apiKey ? null : 'NO_KEY';
+}
+
+// One request through the installed Claude Code CLI: the user's console
+// agent and its subscription instead of an API key. Same spec as the API
+// path; the CLI returns the answer text, extractJSON reads it.
+async function callClaudeCli(settings, { system, user }) {
+  const bridge = typeof window !== 'undefined' ? window.claudeCliBridge : null;
+  if (!bridge) throw new Error('NO_CLAUDE_CLI');
+  const res = await bridge.run({ system, user, model: settings.model || '' });
+  if (!res?.ok) {
+    const err = new Error(res?.error || 'Claude Code CLI failed.');
+    err.status = 0;
+    throw err;
+  }
+  return res.text;
 }
 
 // All script/prompt generation funnels through here; the text service setting
@@ -109,7 +125,9 @@ export async function generateJSON(settings, spec, { signal, noPolicy } = {}) {
     const text =
       (settings.textService || 'claude') === 'gemini'
         ? await generateGeminiText(settings, spec)
-        : await callClaude(settings, { ...spec, signal });
+        : settings.textService === 'claude-cli'
+          ? await callClaudeCli(settings, spec)
+          : await callClaude(settings, { ...spec, signal });
     const out = extractJSON(text);
     if (policy && out && !Array.isArray(out) && out.policy_refusal) refuse(policy, out.policy_refusal);
     return out;

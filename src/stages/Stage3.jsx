@@ -1,4 +1,6 @@
 import { useAgentScope } from '../lib/agent/registry.js';
+import { BEATS, isShortDrama } from '../lib/shortDrama/rules.js';
+import DramaCheckModal from '../components/DramaCheckModal.jsx';
 import { planParts, cutsEvery, normalizeCuts, buildPartProject } from '../lib/split.js';
 import { useGenerate } from '../lib/useGenerate.js';
 import { stage3Prompt, durationOf } from '../lib/prompts.js';
@@ -46,6 +48,7 @@ function Stage3Outline({ project, update, settings, goNext, onSettings, onProjec
   const { busy: runBusy, error: runError, run } = useGenerate(settings);
   const [chunk, setChunk] = useState(null); // inline series: { a, b } episodes being outlined
   const [chunkErr, setChunkErr] = useState('');
+  const [showCheck, setShowCheck] = useState(false);
   const busy = runBusy || !!chunk;
   const error = chunkErr || runError;
   const outline = project.outline;
@@ -60,6 +63,7 @@ function Stage3Outline({ project, update, settings, goNext, onSettings, onProjec
     ...(project.seriesPart && Number(s.episode) ? { episode: Number(s.episode) } : {}),
     summary: s.summary || '',
     duration: Number(s.duration_sec) || 20,
+    ...(project.seriesPart && BEATS.includes(String(s.beat || '').toLowerCase()) ? { beat: String(s.beat).toLowerCase() } : {}),
   });
 
   // Inline series: the outline of the whole series, written a few episodes
@@ -189,6 +193,10 @@ function Stage3Outline({ project, update, settings, goNext, onSettings, onProjec
           {!outline.length && <Stars size={14} />} {chunk ? t('ser.outlineProg', { a: chunk.a, b: chunk.b }) : busy ? t('gen.generating') : outline.length ? t('s3.regenerate') : t('s3.generate')}
         </button>
         <StyleChip project={project} styles={styles} cat="script" onClick={onProjectSettings} />
+        {isShortDrama(project) && <StyleChip project={project} styles={styles} cat="drama" onClick={onProjectSettings} />}
+        {isShortDrama(project) && outline.length > 0 && (
+          <button type="button" className="btn small" title={t('drama.checkBtnTip')} onClick={() => setShowCheck(true)}>{t('drama.checkBtn')}</button>
+        )}
         {outline.length > 0 && (
           <span className={`total-badge ${total > maxDuration ? 'over' : ''}`}>
             {t('s3.total', { t: fmt(total) })} / ≤{fmt(maxDuration)}
@@ -355,6 +363,7 @@ function Stage3Outline({ project, update, settings, goNext, onSettings, onProjec
         </div>
       )}
 
+      {showCheck && <DramaCheckModal project={project} update={update} onClose={() => setShowCheck(false)} />}
       <footer className="stage-footer">
         <button title={t('tip.continue')} className="btn primary big" disabled={!outline.length} onClick={goNext}>
           {t('s3.continue')}

@@ -131,7 +131,7 @@ export function loadSettings() {
     kreaKey: '', // Krea API key (cloud images and videos, many models)
     kreaImageModel: 'nano-banana-pro', // Krea image model (lib/krea.js KREA_IMAGE_MODELS)
     kreaVideoModel: 'kling-3.0', // Krea video model (lib/krea.js KREA_VIDEO_MODELS)
-    textService: 'claude', // 'claude' | 'gemini' — plots, scripts and prompts
+    textService: 'claude', // 'claude' (API key) | 'claude-cli' (the local Claude Code console, its subscription) | 'gemini' — plots, scripts and prompts
     storyboardService: 'gemini', // 'gemini' | 'comfy' — Stage-4 storyboard frames
     videoService: 'comfy', // shot video generation (only ComfyUI for now)
     videoEngine: 'minimax', // video model: 'minimax' (MiniMax H3, local, default) | 'ltx' (LTX-2.3, local) | 'kling' (cloud API) | 'krea' (cloud API, model in kreaVideoModel)
@@ -204,6 +204,7 @@ function projectDefaults() {
     scriptStyleId: '', // selected style from the library (empty = neutral)
     imageStyleId: '',
     videoStyleId: '',
+    dramaStyleId: '', // short-drama sub-genre brief from the style library (series only; '' = none)
     randomization: [], // Stage-1 plot randomization method ids (max 2, ordered)
     stage: 1,
     cover: '', // generated project cover image (data URL)
@@ -316,6 +317,7 @@ export function migrateProject(raw) {
   p.shotVideoModes = p.shotVideoModes && typeof p.shotVideoModes === 'object' ? p.shotVideoModes : {};
   p.shotSeeds = p.shotSeeds && typeof p.shotSeeds === 'object' ? p.shotSeeds : {};
   p.splitCuts = Array.isArray(p.splitCuts) ? p.splitCuts : [];
+  p.dramaStyleId = typeof p.dramaStyleId === 'string' ? p.dramaStyleId : '';
   p.parts = Array.isArray(p.parts) ? p.parts : [];
   p.partInfo = p.partInfo && typeof p.partInfo === 'object' ? p.partInfo : null;
   p.shotSeedMode = p.shotSeedMode && typeof p.shotSeedMode === 'object' ? p.shotSeedMode : {};

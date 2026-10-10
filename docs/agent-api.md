@@ -146,3 +146,13 @@ Units for the layout tools: metres; `facingDeg` 0 = toward +z, 90 = +x;
 - `storyreel_status.services`: `image` now reads "gemini (<model name>)", "krea (<model>)" or "comfyui (Flux.2 Klein, local)"; `videoEngine` reads "minimax (H3 local, <steps> steps)", "ltx (local)", "kling (<model>)" or "krea (<model>)"; `kreaKeySet` added.
 - `storyreel_get_project`: `partOf` on a part project, `parts` on an original that was split.
 - `storyreel_split_project { projectId, cutAfter?: [sceneNo…], every?: n }` — Stage 3 split into part projects (see the guide, "Parts"). No attempt counted.
+
+## Added in 2.16: the short-drama engine
+
+| Tool | What it does | Attempt |
+| --- | --- | --- |
+| `storyreel_drama_rules` | The conventions as data (hooks, timing grids, dialogue limits, landmarks for this project); `brief: true` adds the full text brief. Read-only. | no |
+| `storyreel_drama_check` | Score, per-episode metrics and issues (level, code, episode / scene / shot). Read-only. | no |
+| `storyreel_drama_fix` | `mechanical: true` → em dashes fixed project-wide; `sceneId` → the model rewrites that scene's shots against the issues, shot count and order kept. | scene rewrite: `scene:<id>:drama_fix` |
+
+`storyreel_update_project` accepts `dramaStyleId`; `storyreel_list_styles` has the `drama` category; `storyreel_get_project` returns `shortDrama` (sub-genre, landmarks, the plan's hook types / turns / questions) and `beat` on scenes and shots; `storyreel_review_shot` returns `expected.shortDrama`.

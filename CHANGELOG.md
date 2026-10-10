@@ -11,6 +11,22 @@
 - **Agent: engines and parts.** The agent's status names the image and video
   models in use (including Krea and the H3 step count); the project view
   shows parts; a new tool splits a project into parts.
+- **Short-drama engine.** Every series is now written by a built-in
+  short-drama mechanism: the conflict in the first 3–5 seconds, a turn
+  every ~30 seconds, each episode cut on a labelled hook (identity /
+  emotion / realisation, rotating), the first win by episode 5, the paid
+  checkpoint after the first quarter, short caption-ready lines, no
+  voice-over, the vertical frame — at every stage from plot directions to
+  shots and prompts. Plot randomization works inside the format.
+- **Short-drama sub-genres.** A new style-library section — comedy, dark
+  comedy, action, romance, mystery, sci-fi, fantasy, brainrot, surrealism —
+  colours a series' tone and plot types without touching the mechanics.
+- **Genre check.** "Genre check" at Stage 3 and 4 scores a series against
+  the conventions (hooks, openings, turns, dialogue, locations) and fixes
+  em dashes; the agent gets the rules, the check and a scene rewrite tool.
+- **Claude Code as the text service.** Scripts and prompts can be written
+  by the Claude Code CLI installed on this computer, through your
+  subscription, instead of an API key.
 - **Split into parts (Stage 3).** Cut the scene outline anywhere — between
   any scenes, or every N scenes — and create one project per part. Each part
   gets its scenes with everything already made for them (shots, prompts,

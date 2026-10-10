@@ -2233,11 +2233,13 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
               {/* Errors surface above the tab content so they're visible from
                   any tab (image/video/audio failures all report here). */}
               {imgErr?.id === shot.id &&
-                (['NO_GEMINI_KEY', 'NO_KEY', 'COMFY_UNREACHABLE', 'NO_KLING_KEY', 'KLING_NEEDS_APP', 'NO_KREA_KEY', 'KREA_NEEDS_APP'].includes(imgErr.msg) ? (
+                (['NO_GEMINI_KEY', 'NO_KEY', 'NO_CLAUDE_CLI', 'COMFY_UNREACHABLE', 'NO_KLING_KEY', 'KLING_NEEDS_APP', 'NO_KREA_KEY', 'KREA_NEEDS_APP'].includes(imgErr.msg) ? (
                   <div className="note warn">
                     {t(
                       imgErr.msg === 'NO_KEY'
                         ? 'err.noKey'
+                        : imgErr.msg === 'NO_CLAUDE_CLI'
+                          ? 'err.noClaudeCli'
                         : imgErr.msg === 'COMFY_UNREACHABLE'
                           ? 'err.comfyDown'
                           : imgErr.msg === 'NO_KLING_KEY'

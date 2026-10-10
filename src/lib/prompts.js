@@ -6,7 +6,9 @@ import { densityRange, buildShotPayload } from './dynamics.js';
 import { scenePhotos } from './sceneLocations.js';
 import { dynamicsFor, DYNAMICS_RULE } from './shotDynamics.js';
 import { describeShot } from './spatial/describe.js';
-import { episodeRange, clampEpisodes, episodeLine } from './series.js';
+import { episodeRange, clampEpisodes, episodeLine, SHORT_DRAMA_STYLE_ID } from './series.js';
+import { isShortDrama, DRAMA_CORE, DRAMA_STAGE, DRAMA_FRAME_RULE, HOOK_TYPES, OPENING_HOOKS, seasonLandmarks, timingText } from './shortDrama/rules.js';
+import { loadStyles, resolveStyleText } from './styles.js';
 
 const LANG_NAMES = { en: 'English', ru: 'Russian', uk: 'Ukrainian' };
 
@@ -61,6 +63,40 @@ Rules:
 export const cardNames = (project) =>
   [...(project.storyline?.characters || []), ...(project.storyline?.groups || [])].map((c) => (c.name || '').trim()).filter(Boolean);
 
+// ---- the short-drama engine: every text stage of a series gets the format's
+// mechanics (lib/shortDrama/rules.js) plus the sub-genre brief from the style
+// library's "drama" category. The legacy "Short Drama Series" script style is
+// superseded by the engine and not repeated; any other script style still
+// applies as additional instructions.
+const dramaStyleText = (project) => {
+  try {
+    return (resolveStyleText(loadStyles(), 'drama', project.dramaStyleId) || '').trim();
+  } catch {
+    return '';
+  }
+};
+export function dramaSystem(lang, scriptStyle, project, stage, extra = '') {
+  const style = project.scriptStyleId === SHORT_DRAMA_STYLE_ID ? '' : scriptStyle;
+  const sub = dramaStyleText(project);
+  const lm = seasonLandmarks(seriesTotal(project));
+  const r = episodeRange(project);
+  return `${system(lang, style)}
+
+${DRAMA_CORE}
+
+THIS SERIES: ${lm.total} episodes of ${r.min}–${r.max} seconds. Landmarks: first win by episode ${lm.firstWinBy}; first reversal around episode ${lm.firstReversal}; PAID CHECKPOINT at episode ${lm.paywall} (the strongest hook so far); mid-season betrayal around episode ${lm.midBetrayal}; climax around episode ${lm.climax}; finale in episode ${lm.finale}.${sub ? `
+
+SUB-GENRE BRIEF (colours tone, world and plot types; it never overrides the engine):
+${sub}` : ''}
+
+${DRAMA_STAGE[stage] || ''}${extra}`;
+}
+// Randomization directives (oblique constraints, an auteur lens, a micro-tone,
+// forced variance) shape the execution inside the format, never the format.
+const DRAMA_RANDOM_BRIDGE = `
+
+RANDOMIZATION INSIDE THE FORMAT: any constraint, directorial lens or micro-tone given above shapes the EXECUTION — the specific humiliation, secret, world, voice and imagery — and must be expressed through the engine's beats (opening pressure, turns, hooks, the paid checkpoint, the first win). It never removes the trope, the one-unit episode, the cliffhanger rotation or the dialogue rules. Four directions must still differ in trope, antagonist, secret or relationship.`;
+
 function characterBlock(project) {
   const chars = project.storyline?.characters || [];
   const list = chars.map((c) => `- ${c.name} (${c.role}): ${c.description}`).join('\n');
@@ -100,8 +136,8 @@ export function stage1Prompt(project, lang, scriptStyle, randomizationMethods) {
   if (project.scriptType === 'series') {
     return {
       applied,
-      system: system(lang, scriptStyle) + `\n\n${STAGE1_PRODUCTION_CONSTRAINTS}` + persona + systemAppend,
-      maxTokens: 3500,
+      system: dramaSystem(lang, scriptStyle, project, 'ideas') + `\n\n${STAGE1_PRODUCTION_CONSTRAINTS}` + persona + systemAppend + (systemAppend ? DRAMA_RANDOM_BRIDGE : ''),
+      maxTokens: 4500,
       user: `Brief concept for a series:
 
 """
@@ -113,7 +149,7 @@ ${seriesFormat(project)}
 Generate exactly 4 distinct directions for developing this concept into the series. Make them genuinely different from each other (a different central trope, antagonist, secret or relationship) — not four variations of one idea. Each must stay faithful to the core of the original and be big enough to fill all ${seriesTotal(project)} episodes: name the protagonist and the wrong done to them, the secret or reversal that drives the story, the chain of escalating antagonists or obstacles, and the final payoff.
 
 JSON schema:
-{"ideas":[{"title":"catchy series title","pitch":"the series in 5-8 sentences: premise, protagonist and the wrong, the engine of reversals, the central secret, how it escalates, the ending","why_it_works":"1-2 sentences on why viewers keep watching episode after episode"}]}`,
+{"ideas":[{"title":"catchy series title","pitch":"the series in 5-8 sentences (premise, protagonist and the wrong, the engine of reversals, the central secret, how it escalates, the ending), then these labelled lines: Trope: … / Opening (0–3 s): … / Episode 1 trap: … / First win (ep N): … / Quarter hook (ep N): … / Season promise: …","why_it_works":"1-2 sentences on why viewers keep watching episode after episode"}]}`,
     };
   }
   return {
@@ -137,8 +173,8 @@ JSON schema:
 export function stage2Prompt(project, lang, scriptStyle) {
   if (project.scriptType === 'series') {
     return {
-      system: system(lang, scriptStyle),
-      maxTokens: 5000,
+      system: dramaSystem(lang, scriptStyle, project, 'storyline'),
+      maxTokens: 6000,
       user: `Original concept:
 """
 ${project.logline}
@@ -154,7 +190,7 @@ ${seriesFormat(project)}
 Create the final storyline of the whole series. The synopsis must tell the complete story from the first episode to the last, sized for ${seriesTotal(project)} episodes: the wrong and the inciting incident, the early big reveal, each escalating cycle of the middle with its antagonist and its reversal, the main turning points, the full truth coming out, the villain's comeuppance and the final payoff. Keep the cast small.
 
 JSON schema:
-{"title":"a strong final series title","genres":["2-3 short genre tags, e.g. revenge, romance, drama"],"synopsis":"the complete series story, 350-600 words, in chronological order","characters":[{"name":"character name","role":"protagonist / love interest / antagonist / supporting","description":"2-4 sentences: age, physical appearance (specific enough to keep the character visually consistent across AI image generation), personality, motivation, and their secret if they have one"}]}`,
+{"title":"a strong final series title","genres":["2-3 short genre tags, e.g. revenge, romance, drama"],"synopsis":"the complete series story, 350-600 words, in chronological order","characters":[{"name":"character name","role":"protagonist / love interest / antagonist / supporting","description":"the production profile: age and physical appearance (specific enough to keep the character visually consistent across AI image generation); then active want, visible method, hidden leverage, shame trigger, speech rhythm, physical strategy under pressure, recurring physical motif — one or two sentences each; the secret if they have one"}]}`,
     };
   }
   return {
@@ -180,9 +216,10 @@ JSON schema:
 // Series master, step 1: the main sections of the series.
 export function seriesArcsPrompt(project, lang, scriptStyle) {
   const n = seriesTotal(project);
+  const lm = seasonLandmarks(n);
   const sections = n <= 8 ? '1 or 2 sections' : `one section per roughly 8–12 episodes (a section may run 5–15 episodes; about ${Math.max(2, Math.round(n / 10))} sections in total)`;
   return {
-    system: system(lang, scriptStyle),
+    system: dramaSystem(lang, scriptStyle, project, 'arcs'),
     names: cardNames(project),
     maxTokens: 5000,
     user: `Series title: ${project.title}
@@ -202,7 +239,7 @@ Break the series into its MAIN SECTIONS — the large movements of the story. Us
 - The sections cover episodes 1 to ${n} with no gaps and no overlaps, in order.
 - Each section is a complete movement with its own antagonist or obstacle and its own escalation.
 - Each section ENDS on an INTERMEDIATE FINALE in its last episode: a major twist, reveal or reversal that closes the movement and opens the next one. The last section ends on the series finale, which resolves everything.
-- The first section contains the wrong done to the protagonist, the inciting incident and the first big reveal.
+- The first section contains the wrong done to the protagonist, the inciting incident and the first big reveal.${n >= 12 ? `\n- One section ends EXACTLY at episode ${lm.paywall}, the paid checkpoint: its finale is the strongest hook of the first quarter.` : ''}
 
 JSON schema:
 {"arcs":[{"title":"short section title","episode_from":1,"episode_to":10,"summary":"3-5 sentences: what happens across this section, who opposes the protagonist, how the power balance changes","finale":"1-2 sentences: the intermediate finale that ends the section's last episode"}]}`,
@@ -212,14 +249,23 @@ JSON schema:
 // Series master, step 2: the episodes of one section (a chunk of it at a time).
 export function seriesEpisodesPrompt(project, lang, scriptStyle, { arcs, arc, from, to, previous }) {
   const n = seriesTotal(project);
+  const lm = seasonLandmarks(n);
+  const prevHook = (previous || []).length ? String(previous[previous.length - 1].hookType || '').toLowerCase() : '';
+  const hookRules = [];
+  for (let k = from; k <= to; k++) if (OPENING_HOOKS[k - 1]) hookRules.push(`episode ${k} ends on ${OPENING_HOOKS[k - 1].toUpperCase()}`);
+  const drama = `
+- Hook types: ${hookRules.length ? hookRules.join(', ') + '; ' : ''}never the same type in two consecutive episodes${prevHook ? ` (episode ${from - 1} ended on ${prevHook.toUpperCase()})` : ''}. Each episode names its "hook_type".
+- "turns": 2–3 moments where leverage changes or an option is removed, in order; "summary" places them on the timing grid of a ${episodeRange(project).min}–${episodeRange(project).max} s episode (0–5 s the conflict visible, a turn about every 30 s, the hook in the last seconds).
+- "power_start" / "power_end": who holds the power when the episode opens and when it cuts.
+- "cliffhanger" is the exact final image or line at the cut (a face, an action, a line — never a summary); "cliffhanger_question" the one question it leaves; "first_action_next" the first action of the next episode, which answers it before anything new.${from <= lm.firstWinBy && to >= 4 ? `\n- The lead's FIRST GENUINE WIN lands by episode ${lm.firstWinBy}, and the bigger problem behind it is revealed right after.` : ''}${lm.paywall >= from && lm.paywall <= to ? `\n- Episode ${lm.paywall} is the PAID CHECKPOINT: the biggest jaw-drop reveal or reversal so far, on an identity or realisation hook; episode ${lm.paywall - 1} carries the biggest payoff so far.` : ''}${lm.midBetrayal >= from && lm.midBetrayal <= to ? `\n- Episode ${lm.midBetrayal} carries the mid-season betrayal.` : ''}`;
   const arcList = arcs.map((a, i) => `${i + 1}. "${a.title}" — episodes ${a.from}–${a.to}. ${a.summary} Finale: ${a.finale}`).join('\n');
   const prev = (previous || []).length
     ? `The episodes written just before these (continue directly from the last cliffhanger):\n${previous.map(episodeLine).join('\n')}`
     : 'These are the first episodes of the series.';
   return {
-    system: system(lang, scriptStyle),
+    system: dramaSystem(lang, scriptStyle, project, 'episodes'),
     names: cardNames(project),
-    maxTokens: 6000,
+    maxTokens: 9000,
     user: `Series title: ${project.title}
 
 Series synopsis:
@@ -241,10 +287,10 @@ Write episodes ${from} to ${to} — part of the section "${arc.title}" (episodes
 - Exactly one entry per episode, numbered ${from} to ${to}.
 - Each episode is ONE dramatic unit (one confrontation, discovery or decision) in 1–2 locations, and works as a mini-story: it opens on the previous cliffhanger, escalates, turns, and changes the balance of power.
 - Each episode ENDS on a cliffhanger — a concrete event (a reveal, a threat, an entrance, a line, an act) that the next episode must pick up. State it in "cliffhanger".${to === arc.to ? `\n- Episode ${to} is the last of its section: its ending is the section's intermediate finale given above.` : ''}${to === n ? `\n- Episode ${n} is the series finale: it resolves the story completely; its "cliffhanger" field holds the closing image instead.` : ''}
-- Do not repeat the same kind of cliffhanger in consecutive episodes.
+- Do not repeat the same kind of cliffhanger in consecutive episodes.${drama}
 
 JSON schema:
-{"episodes":[{"number":${from},"title":"short episode title","summary":"3-4 sentences: what happens in this episode, beat by beat","cliffhanger":"1 sentence: the event the episode ends on"}]}`,
+{"episodes":[{"number":${from},"title":"short episode title","goal":"what the lead tries to get in this episode","main_conflict":"who opposes it and how","power_start":"who holds the power at the open","power_end":"who holds it at the cut","turns":["turn 1","turn 2"],"summary":"3-5 sentences, beat by beat on the timing grid","cliffhanger":"the exact final image or line at the cut","hook_type":"identity | emotion | realisation","cliffhanger_question":"the one question left open","first_action_next":"the first action of the next episode"}]}`,
   };
 }
 
@@ -253,7 +299,7 @@ export function stage3Prompt(project, lang, scriptStyle) {
     const sp = project.seriesPart;
     const n = sp.to - sp.from + 1;
     return {
-      system: system(lang, scriptStyle),
+      system: dramaSystem(lang, scriptStyle, project, 'outline'),
       names: cardNames(project),
       maxTokens: 9000,
       user: `Series: ${sp.seriesTitle} — a vertical short-drama series of ${sp.total} episodes, each ${episodeRange(project).min}–${episodeRange(project).max} seconds. This project produces episodes ${sp.from}–${sp.to}${sp.arcTitle ? ` (section "${sp.arcTitle}")` : ''}.
@@ -274,7 +320,7 @@ Create the scene-by-scene outline for these ${n} episodes. Rules:
 - Go episode by episode, in order. Each episode gets 1–3 scenes whose durations total ${episodeRange(project).min}–${episodeRange(project).max} seconds; put the episode's number in "episode".
 - Each scene is a single continuous location and moment. Keep to 1–2 locations per episode and reuse locations across episodes.
 - The first scene of an episode opens mid-conflict, answering the previous episode's cliffhanger within the first seconds — no setup, no establishing scene.
-- The last scene of an episode ends exactly on that episode's cliffhanger; say so in its summary.
+- The last scene of an episode ends exactly on that episode's cliffhanger; say so in its summary. Mark every scene's "beat": open (the conflict visible in 0–5 s), orient, turn, squeeze, reversal or cliff (the hook).
 - The whole outline runs between ${n * episodeRange(project).min} and ${n * episodeRange(project).max} seconds.
 
 Alongside the outline, create the ACTION DYNAMICS PLAN — the pacing schedule. Rules for the plan:
@@ -286,7 +332,7 @@ Alongside the outline, create the ACTION DYNAMICS PLAN — the pacing schedule. 
 - "global_pacing_curve": one of "flat", "accelerating", "decelerating", "wave", "front_loaded".
 
 JSON schema:
-{"scenes":[{"number":1,"episode":${sp.from},"title":"short scene title","summary":"2-3 sentences describing exactly what happens in the scene","duration_sec":45}],"dynamics_plan":{"genre_baseline":"snake_case dominant genre","global_pacing_curve":"wave","rhythm_blocks":[{"block_id":"blk_01","timestamp_start":0,"intended_duration_sec":100,"scene_numbers":[1,2],"kinetic_energy_level":5,"dialogue_volume":7,"shot_density":"high","required_camera_momentum":"steady_tracking"}]}}`,
+{"scenes":[{"number":1,"episode":${sp.from},"title":"short scene title","summary":"2-3 sentences describing exactly what happens in the scene","duration_sec":45,"beat":"open | orient | turn | squeeze | reversal | cliff"}],"dynamics_plan":{"genre_baseline":"snake_case dominant genre","global_pacing_curve":"wave","rhythm_blocks":[{"block_id":"blk_01","timestamp_start":0,"intended_duration_sec":100,"scene_numbers":[1,2],"kinetic_energy_level":5,"dialogue_volume":7,"shot_density":"high","required_camera_momentum":"steady_tracking"}]}}`,
     };
   }
   return {
@@ -378,6 +424,19 @@ export function stage4Prompt(project, scene, lang, scriptStyle, block) {
   const sceneIdx = project.outline.findIndex((x) => x.id === scene.id);
   const prevShots = sceneIdx > 0 ? project.sceneDetails?.[project.outline[sceneIdx - 1].id]?.shots || [] : [];
   const compNote = compositionRules(block || null, prevShots.slice(-2).map((x) => x.shotType));
+  // short drama: where this scene sits inside its episode, the episode's hook
+  const drama = (() => {
+    if (!isShortDrama(project)) return { system: system(lang, scriptStyle), note: '', beat: '' };
+    const ep = Number(scene.episode) || 0;
+    const sib = project.outline.filter((x) => Number(x.episode) === ep);
+    const first = ep && sib[0]?.id === scene.id;
+    const last = ep && sib[sib.length - 1]?.id === scene.id;
+    const epSec = sib.reduce((a, x) => a + (Number(x.duration) || 0), 0) || scene.duration;
+    const planned = (project.seriesPart?.episodes || project.seriesPlan?.episodes || []).find((e) => Number(e.number) === ep);
+    const hook = planned?.hookType && HOOK_TYPES.includes(planned.hookType) ? planned.hookType.toUpperCase() : null;
+    const note = `\n\nSHORT DRAMA — this scene is${first ? ' the FIRST scene' : ''}${first && last ? ' and' : ''}${last ? ' the LAST scene' : ''}${!first && !last ? ' a middle scene' : ''} of episode ${ep || '?'} (${epSec} s in all). Timing grid of the episode:\n${timingText(epSec)}${first ? '\n- Shot 1 runs at most 5 seconds and shows the conflict (a face, an object or a line), answering the previous cliffhanger through action — no establishing shot, no recap.' : ''}${last ? `\n- The final shot is the hook frame: a face holding the unresolved action or line${planned?.cliffhanger ? ` — "${planned.cliffhanger}"` : ''}; its "notes" end with "HOOK · ${hook || 'IDENTITY / EMOTION / REALISATION'}".` : ''}${planned?.turns?.length ? `\n- Turns of this episode: ${planned.turns.join(' · ')}.` : ''}\n- Every shot names its "beat"; something visibly or emotionally shifts at least every 15 seconds; dialogue lines under 20 words, no em dashes, no voice-over.`;
+    return { system: dramaSystem(lang, scriptStyle, project, 'shots'), note, beat: ',"beat":"open | orient | turn | squeeze | reversal | cliff"' };
+  })();
   const dynNote = block
     ? `\n\nACTION DYNAMICS (this scene belongs to rhythm block "${block.block_id}" — these constraints are mandatory):
 - Kinetic energy ${block.kinetic_energy_level}/10: ${block.kinetic_energy_level >= 6 ? 'stage visible physical motion in almost every shot; actions overlap and interrupt' : 'keep physical action restrained and deliberate; let stillness carry tension'}.
@@ -386,9 +445,9 @@ export function stage4Prompt(project, scene, lang, scriptStyle, block) {
 - Camera momentum contract: "${block.required_camera_momentum.replace(/_/g, ' ')}" — reflect it in shot types and notes.`
     : '';
   return {
-    system: system(lang, scriptStyle),
+    system: drama.system,
     names: cardNames(project),
-    maxTokens: 5000,
+    maxTokens: 6000,
     user: withPhotos(scenePhotos(scene), `Title: ${project.title}
 
 Synopsis:
@@ -413,7 +472,7 @@ Requirements:
 - CHARACTER NAMES: in "action", "dialogue" (speaker prefixes and names spoken inside the lines) and "notes", write every character's name EXACTLY as it is written in the Characters list above — the same English spelling in Latin letters, character for character${names.length ? ` (${names.join(', ')})` : ''}. Never translate, transliterate into another script, shorten, decline or otherwise inflect a name, whatever language the rest of the text is in: the name stays unchanged inside the sentence. The same applies to group names.
 
 JSON schema:
-{"shots":[{"duration_sec":4,"shot_type":"framing + camera angle, e.g. low-angle medium close-up / top-down wide / eye-level medium / POV tracking","location":"specific location, time of day","action":"what happens and what the camera sees","dialogue":"NAME: line — or empty string","notes":"mood, lighting, sound or continuity note — may be empty"}]}` + dynNote + compNote + envNote),
+{"shots":[{"duration_sec":4,"shot_type":"framing + camera angle, e.g. low-angle medium close-up / top-down wide / eye-level medium / POV tracking","location":"specific location, time of day","action":"what happens and what the camera sees","dialogue":"NAME: line — or empty string","notes":"mood, lighting, sound or continuity note — may be empty"${drama.beat}}]}` + drama.note + dynNote + compNote + envNote),
   };
 }
 
@@ -421,6 +480,12 @@ JSON schema:
 // measured description of its opening frame (lib/spatial/describe.js) and the
 // prompt writers must stage the shot exactly so.
 const SPATIAL_RULE = `SPATIAL LAYOUT — where a shot has a "spatial_layout", it is the MEASURED staging of that shot's opening frame, taken from the scene's 3D floor plan: the shot size and camera height, who is in frame and in what order from screen-left to screen-right, how far each person is from the camera, which way each body and head faces, who looks at whom, how far apart they stand, and which set pieces are visible. It is BINDING. Write the frame exactly so: the same people on the same sides, the same facing and eyelines, the same shot size and camera height. Never move a character to another side of the frame or turn them another way than the layout states, and keep positions consistent with the neighbouring shots — a character changes place only when the layout changes. The colours in the layout only identify the figures on the floor plan: never mention them, the block figures or the floor plan in a prompt.`;
+// Short drama: the vertical frame rule rides with every image / video prompt
+// request of a series, and the engine with the smart edit.
+const withDrama = (fn, extra) => (project, ...rest) => {
+  const spec = fn(project, ...rest);
+  return isShortDrama(project) && spec?.system ? { ...spec, system: `${spec.system}\n\n${extra}` } : spec;
+};
 const spatialOf = (project, scene, shot) => {
   const text = scene?.id ? describeShot(project, scene, shot.id) : '';
   return text ? { spatial_layout: text } : {};
@@ -458,7 +523,7 @@ FRAME CONTINUITY (STATE TRACKING): The shots of a scene form one continuous, rea
 // `imageStylePlus` marks an "image+" style: a detailed, binding style sheet
 // that the prompts must reproduce literally (many of its exact terms) rather
 // than paraphrase as a mood.
-export function stage5Prompt(project, scene, shots, lang, imageStyle, imageStylePlus = false, block = null, imageModel = 'gemini') {
+function stage5Prompt__plain(project, scene, shots, lang, imageStyle, imageStylePlus = false, block = null, imageModel = 'gemini') {
   const envNote = scenePhotos(scene).length
     ? `\n\nAttached are reference photos of this scene's environment. Ground the image prompts in what these photos show: architecture, interior details, colors, lighting and atmosphere.`
     : '';
@@ -549,7 +614,7 @@ Example output (assuming a 'Dramatic Film' style injection):
 const MOMENTUM_SOURCE =
   "the ending motion state of the immediately preceding shot in the provided shot list, as established by that shot's action and your own previous video_prompt; for the FIRST shot of the scene, derive the entry momentum from its own action description (if the action implies the character is already moving, they enter the shot mid-motion)";
 
-export function stage5VideoPrompt(project, scene, shots, videoStyle, block) {
+function stage5VideoPrompt__plain(project, scene, shots, videoStyle, block) {
   const injection = (videoStyle || '').trim() || DEFAULT_VIDEO_MOTION_STYLE;
   // Action Dynamics Plan: attach each shot's dynamics payload so the written
   // prompts directly cite their assigned kinetic/dialogue/camera parameters.
@@ -739,7 +804,7 @@ JSON schema:
 // characters must appear in the final frame but are missing from the first one,
 // so the caller can attach their reference photos. Returns
 // { image_prompt, characters_to_add: ["Name", ...] }.
-export function finalFramePrompt(project, scene, shot, firstFrame, lang) {
+function finalFramePrompt__plain(project, scene, shot, firstFrame, lang) {
   const chars = project.storyline?.characters || [];
   const charList = chars.length ? characterBlock(project) : '(none defined)';
   return {
@@ -811,7 +876,7 @@ JSON schema:
 
 // Targeted-edit agent: applies one specific change (rename, time of day, location…)
 // consistently across every stage without regenerating anything else.
-export function smartEditPrompt(project, instruction, lang) {
+function smartEditPrompt__plain(project, instruction, lang) {
   const content = {
     title: project.title,
     logline: project.logline,
@@ -899,6 +964,7 @@ JSON schema:
 // image styles are pasted into the image prompt, video styles are substituted
 // into {{VIDEO_STYLE_INJECTION}} of the LTX motion system prompt.
 const STYLE_RULES = {
+  drama: `CATEGORY: short-drama SUB-GENRE brief. The text is appended to the short-drama engine's rules for a vertical series (9:16, one dramatic unit per 1–2 minute episode, a labelled hook at every cut, lines under 20 words). It colours TONE, WORLD and PLOT TYPES only: the opening pressure typical of the sub-genre, what the turns tend to be, what villains do, which hook types dominate, how the dialogue sounds, what to keep legible for AI video. Never restate the format's mechanics and never contradict them. 90–160 words, English, written as a brief to the writer ("Sub-genre: NAME. …").`,
   script: `SCRIPT STYLE — appended to the screenwriting instructions for stages 1–4 (ideas, synopsis, scene outline, shot breakdown).
 - Write 2–4 imperative sentences addressed to the writer: "Write as…", "Focus on…", "Keep dialogue…".
 - Cover the narrative voice, what the dialogue does, where the tension lives, and what to avoid.
@@ -1083,7 +1149,7 @@ export function voiceSourceFor(project, shotId) {
 // Rewrite a scene's shots into H3 three-field prompts. Mirrors stage5VideoPrompt
 // (same scene context and continuity chain) but targets the H3 schema and asks
 // for the sound design the model can actually render.
-export function stage5H3VideoPrompt(project, scene, shots, videoStyle, block, seconds) {
+function stage5H3VideoPrompt__plain(project, scene, shots, videoStyle, block, seconds) {
   const chars = characterBlock(project);
   const styleNote = (videoStyle || DEFAULT_VIDEO_MOTION_STYLE).trim();
   const dyn = block
@@ -1241,7 +1307,7 @@ JSON schema:
 // /ai-video-start-end-frames.
 //   opts.seconds(shot) → the clip length Kling will render for that shot
 //   opts.modelLabel    → the model's display name
-export function stage5KlingVideoPrompt(project, scene, shots, videoStyle, block, { seconds = () => 5, modelLabel = 'Kling', lastFrame = true } = {}) {
+function stage5KlingVideoPrompt__plain(project, scene, shots, videoStyle, block, { seconds = () => 5, modelLabel = 'Kling', lastFrame = true } = {}) {
   const styleNote = (videoStyle || DEFAULT_VIDEO_MOTION_STYLE).trim();
   const finals = project.shotFinalImages || {};
   const shotList = stage5ShotList(shots).map((s, i) => ({
@@ -1297,5 +1363,41 @@ JSON schema:
 {"prompts":[{"shot":1,"video_prompt":"..."}]}
 
 Return exactly one entry per shot, in order.`,
+  };
+}
+
+// ---- short-drama wrappers
+export const stage5Prompt = withDrama(stage5Prompt__plain, DRAMA_FRAME_RULE);
+export const stage5VideoPrompt = withDrama(stage5VideoPrompt__plain, DRAMA_FRAME_RULE);
+export const stage5H3VideoPrompt = withDrama(stage5H3VideoPrompt__plain, DRAMA_FRAME_RULE);
+export const stage5KlingVideoPrompt = withDrama(stage5KlingVideoPrompt__plain, DRAMA_FRAME_RULE);
+export const finalFramePrompt = withDrama(finalFramePrompt__plain, DRAMA_FRAME_RULE);
+export const smartEditPrompt = withDrama(smartEditPrompt__plain, `${DRAMA_CORE}\n\n${DRAMA_STAGE.shots}`);
+
+// The agent's genre fix: the shots of one scene rewritten to the engine's
+// rules with the listed issues resolved; the same number of shots, in order.
+export function dramaFixPrompt(project, scene, shots, issues, lang, scriptStyle) {
+  const sceneIdx = project.outline.findIndex((x) => x.id === scene.id);
+  const block = null;
+  const base = stage4Prompt(project, { ...scene, number: sceneIdx + 1 }, lang, scriptStyle, block);
+  return {
+    system: base.system,
+    names: base.names,
+    maxTokens: 6000,
+    user: `Title: ${project.title}
+
+Characters:
+${characterBlock(project)}
+
+Scene ${sceneIdx + 1}: "${scene.title}" (${scene.summary})
+
+CURRENT SHOTS (keep this number and order; rewrite only what the issues require, and keep everything that is right):
+${JSON.stringify(shots.map((s, i) => ({ shot: i + 1, duration_sec: s.duration, shot_type: s.shotType, location: s.location, action: s.action, dialogue: s.dialogue, notes: s.notes, beat: s.beat || '' })), null, 0)}
+
+ISSUES TO RESOLVE:
+${issues.map((x) => `- ${x}`).join('\n')}
+
+Return the corrected shots. JSON schema:
+{"shots":[{"shot":1,"duration_sec":4,"shot_type":"framing + angle","location":"place, time","action":"what the camera sees","dialogue":"NAME (tone): line — or empty string","notes":"notes; the last shot of an episode ends with HOOK · TYPE","beat":"open | orient | turn | squeeze | reversal | cliff"}]}`,
   };
 }

@@ -12,11 +12,14 @@
 // defaults on later launches. They are also included in Settings → Backup.
 import videoMotionPresets from '../data/video_motion_presets.json';
 import { SHORT_DRAMA_STYLE, SHORT_DRAMA_STYLE_NAME, SHORT_DRAMA_V6_REWRITES } from '../data/shortDramaStyle.js';
+import { DRAMA_STYLES } from '../data/dramaStyles.js';
 
 const STYLES_KEY = 'storyreel.styles.v1';
 const STYLES_BACKUP_KEY = 'storyreel.styles.corrupt'; // last unreadable value, for recovery
-export const STYLES_VERSION = 7;
-export const STYLE_CATEGORIES = ['script', 'image', 'video'];
+export const STYLES_VERSION = 8;
+// drama — short-drama sub-genre briefs (series projects only; lib/shortDrama)
+export const STYLE_CATEGORIES = ['script', 'image', 'video', 'drama'];
+export const SHORT_DRAMA_LEGACY_NAME = 'Short Drama Series (legacy brief)';
 
 // v2 built-ins, imported from text_styles.pdf (script) and visual styles.pdf
 // (image). Added idempotently by id during migration so existing libraries gain
@@ -182,6 +185,7 @@ function seedDefaults() {
       { id: 'bi.image.anime', builtin: true, name: 'Anime', instructions: 'Modern cel-shaded anime illustration: clean linework, expressive faces, vibrant flat colour with soft gradients, dramatic key light, detailed painted backgrounds.' },
       { id: 'bi.image.watercolor', builtin: true, name: 'Watercolor', instructions: 'Soft hand-painted watercolour illustration: visible paper texture, bleeding pigments, gentle washes, loose edges, a muted organic palette.' },
     ],
+    drama: DRAMA_STYLES.map((st) => ({ ...st, builtin: true })),
     video: [
       { id: 'bi.video.handheld', builtin: true, name: 'Handheld documentary', instructions: 'Naturalistic handheld camera: subtle breathing movement, quick reframes, imperfect follow focus, vérité energy — motivated and unshowy.' },
       { id: 'bi.video.epic', builtin: true, name: 'Epic cinematic', instructions: 'Sweeping cinematic motion: slow dollies, cranes and orbits, deliberate push-ins on emotional beats, smooth stabilised moves, grand scale.' },
@@ -264,6 +268,16 @@ function migrate(fromVersion, styles) {
       video: (s.video || []).map((st) =>
         st.id in V6_VIDEO_NAMES && st.name === V6_VIDEO_NAMES[st.id] && freshVideo.has(st.id) ? { ...st, name: freshVideo.get(st.id).name } : st
       ),
+    };
+  }
+  if (fromVersion < 8) {
+    // v8: the short-drama engine (lib/shortDrama) carries the format's rules
+    // itself; the sub-genre briefs are a new category and the old script
+    // brief is marked legacy (its text is kept for anyone who edited it).
+    s = addMissingBuiltins(s, { script: [], image: [], video: [], drama: DRAMA_STYLES.map((st) => ({ ...st, builtin: true })) });
+    s = {
+      ...s,
+      script: (s.script || []).map((st) => (st.id === 'bi5.script.short_drama' && st.name === SHORT_DRAMA_STYLE_NAME ? { ...st, name: SHORT_DRAMA_LEGACY_NAME } : st)),
     };
   }
   return s;

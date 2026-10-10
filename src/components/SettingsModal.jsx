@@ -41,6 +41,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
   const [kreaVideoModel, setKreaVideoModel] = useState(settings.kreaVideoModel || DEFAULT_KREA_VIDEO_MODEL);
   const [geminiModel, setGeminiModel] = useState(settings.geminiModel || DEFAULT_IMAGE_MODEL);
   const [textService, setTextService] = useState(settings.textService || 'claude');
+  const [cliState, setCliState] = useState(null); // the Claude Code CLI check result
   const [storyboardService, setStoryboardService] = useState(settings.storyboardService || 'gemini');
   const [imageService, setImageService] = useState(settings.imageService || 'gemini');
   const [videoService, setVideoService] = useState(settings.videoService || 'comfy');
@@ -405,8 +406,31 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
         <label>{t('set.textService')}</label>
         <select title={t('tip.textService')} value={textService} onChange={(e) => setTextService(e.target.value)}>
           <option value="claude">{t('set.svcClaude')}</option>
+          <option value="claude-cli">{t('set.svcClaudeCli')}</option>
           <option value="gemini">{t('set.svcGeminiText')}</option>
         </select>
+        {textService === 'claude-cli' && (
+          <>
+            <p className="hint">{t('set.svcClaudeCliHint')}</p>
+            <div className="row">
+              <button
+                type="button"
+                className="btn small"
+                title={t('tip.cliCheck')}
+                disabled={cliState?.busy}
+                onClick={async () => {
+                  if (!window.claudeCliBridge) return setCliState({ ok: false, text: t('err.noClaudeCli') });
+                  setCliState({ busy: true });
+                  const r = await window.claudeCliBridge.check();
+                  setCliState(r.ok ? { ok: true, text: r.version } : { ok: false, text: r.error });
+                }}
+              >
+                {cliState?.busy ? t('set.cliChecking') : t('set.cliCheck')}
+              </button>
+              {cliState?.text && <span className={`hint ${cliState.ok ? '' : 'error-text'}`}>{cliState.text}</span>}
+            </div>
+          </>
+        )}
         <label>{t('set.storyboardService')}</label>
         <select title={t('tip.sbService')} value={storyboardService} onChange={(e) => setStoryboardService(e.target.value)}>
           <option value="gemini">{t('set.svcGemini')}</option>

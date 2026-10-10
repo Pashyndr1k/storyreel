@@ -1,4 +1,6 @@
 import { useAgentScope } from '../lib/agent/registry.js';
+import { HOOK_TYPES, seasonLandmarks } from '../lib/shortDrama/rules.js';
+import DramaCheckModal from '../components/DramaCheckModal.jsx';
 import { useRef, useState } from 'react';
 import { generateJSON, textKeyError } from '../lib/claude.js';
 import { seriesArcsPrompt, seriesEpisodesPrompt } from '../lib/prompts.js';
@@ -94,11 +96,21 @@ export default function Stage3Series({ project, update, settings, onSettings, on
         for (let n = from; n <= to; n++) {
           const e = got.find((x) => Number(x?.number) === n) || got[n - from];
           if (!e) continue;
+          const hook = String(e.hook_type || e.hookType || '').trim().toLowerCase().replace('realization', 'realisation');
           written.push({
             number: n,
             title: String(e.title || '').trim(),
             summary: String(e.summary || '').trim(),
             cliffhanger: String(e.cliffhanger || '').trim(),
+            // the short-drama engine's fields
+            ...(hook ? { hookType: hook } : {}),
+            ...(e.goal ? { goal: String(e.goal).trim() } : {}),
+            ...(e.main_conflict ? { mainConflict: String(e.main_conflict).trim() } : {}),
+            ...(e.power_start ? { powerStart: String(e.power_start).trim() } : {}),
+            ...(e.power_end ? { powerEnd: String(e.power_end).trim() } : {}),
+            ...(Array.isArray(e.turns) ? { turns: e.turns.map((x) => String(x).trim()).filter(Boolean).slice(0, 4) } : {}),
+            ...(e.cliffhanger_question ? { cliffhangerQuestion: String(e.cliffhanger_question).trim() } : {}),
+            ...(e.first_action_next ? { firstActionNext: String(e.first_action_next).trim() } : {}),
           });
         }
         if (!written.length) throw new Error(t('ser.noEpisodes', { a: from, b: to }));
@@ -119,6 +131,8 @@ export default function Stage3Series({ project, update, settings, onSettings, on
 
   // ---- split into production projects
   const segSize = clampSegment(plan?.segmentSize, planTotal);
+  const landmarks = seasonLandmarks(planTotal);
+  const [showCheck, setShowCheck] = useState(false);
   const segs = arcs.length ? planSegments(arcs, planTotal, segSize) : [];
   const createdFor = (s) => (plan?.segments || []).find((x) => x.from === s.from && x.to === s.to && projectExists?.(x.projectId));
   const pendingSegs = segs.filter((s) => !createdFor(s));
@@ -189,6 +203,8 @@ export default function Stage3Series({ project, update, settings, onSettings, on
           </button>
         )}
         <StyleChip project={project} styles={styles} cat="script" onClick={onProjectSettings} />
+        <StyleChip project={project} styles={styles} cat="drama" onClick={onProjectSettings} />
+        <button type="button" className="btn small" title={t('drama.checkBtnTip')} onClick={() => setShowCheck(true)}>{t('drama.checkBtn')}</button>
         <span className="total-badge" title={t('ind.serEpisodes')}>
           {t('ser.badge', { n: total, a: episodeRange(project).min, b: episodeRange(project).max })}
         </span>
@@ -272,6 +288,25 @@ export default function Stage3Series({ project, update, settings, onSettings, on
                         placeholder={t('ser.cliffPh')}
                         onChange={(e) => updateEpisode(ep.number, { cliffhanger: e.target.value })}
                       />
+                      {/* the short-drama engine: the hook type (editable) and the question the cut leaves */}
+                      <div className="row ep-hook">
+                        <span className="seg seg-compact" title={t('drama.hookTip')}>
+                          {HOOK_TYPES.map((h) => (
+                            <button
+                              key={h}
+                              type="button"
+                              className={`seg-btn ${ep.hookType === h ? 'on' : ''}`}
+                              title={t(`drama.hook_${h}_tip`)}
+                              onClick={() => updateEpisode(ep.number, { hookType: ep.hookType === h ? '' : h })}
+                            >
+                              {t(`drama.hook_${h}`)}
+                            </button>
+                          ))}
+                        </span>
+                        {ep.cliffhangerQuestion && <span className="hint ep-question" title={t('drama.questionTip')}>? {ep.cliffhangerQuestion}</span>}
+                        {ep.number === landmarks.paywall && <span className="total-badge" title={t('drama.paywallTip')}>{t('drama.paywall')}</span>}
+                        {ep.number <= landmarks.firstWinBy && ep.number === landmarks.firstWinBy && <span className="total-badge" title={t('drama.firstWinTip')}>{t('drama.firstWin')}</span>}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -352,6 +387,7 @@ export default function Stage3Series({ project, update, settings, onSettings, on
       <footer className="stage-footer">
         <p className="hint">{inline ? t('ser.keptFooter') : t('ser.masterNote')}</p>
       </footer>
+      {showCheck && <DramaCheckModal project={project} update={update} onClose={() => setShowCheck(false)} />}
     </section>
   );
 }

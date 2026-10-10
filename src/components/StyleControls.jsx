@@ -3,7 +3,7 @@ import { useI18n } from '../lib/i18n.js';
 // Shared bits for showing/choosing the project's styles outside the project
 // settings modal. Both write/read the same project fields the modal edits
 // (scriptStyleId / imageStyleId / videoStyleId), so they stay in sync with it.
-const ID_FIELD = { script: 'scriptStyleId', image: 'imageStyleId', video: 'videoStyleId' };
+const ID_FIELD = { script: 'scriptStyleId', image: 'imageStyleId', video: 'videoStyleId', drama: 'dramaStyleId' };
 
 function styleNameOf(styles, cat, id, t) {
   if (!id) return t('pset.styleNone');

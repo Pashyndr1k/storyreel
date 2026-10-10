@@ -1,4 +1,6 @@
 import { useAgentScope } from '../lib/agent/registry.js';
+import { BEATS, isShortDrama } from '../lib/shortDrama/rules.js';
+import DramaCheckModal from '../components/DramaCheckModal.jsx';
 import { SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC } from '../lib/config.js';
 import { useRef, useState } from 'react';
 import { Grip, Stars, Copy, Box } from '../components/icons.jsx';
@@ -53,6 +55,7 @@ const mapShots = (rawShots, range = { min: SHOT_MIN_SEC, max: SHOT_MAX_SEC }) =>
     action: s.action || '',
     dialogue: s.dialogue || '',
     notes: s.notes || '',
+    ...(BEATS.includes(String(s.beat || '').toLowerCase()) ? { beat: String(s.beat).toLowerCase() } : {}),
   }));
 
 export default function Stage4({ project, update, settings, goNext, onSettings, onProjectSettings, genLang, styles, scriptStyle, imageStyle, library, libUpsert }) {
@@ -66,6 +69,7 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
   const shots = (scene && project.sceneDetails[scene.id]?.shots) || [];
   const [showExport, setShowExport] = useState(false);
   const [showLayout, setShowLayout] = useState(false);
+  const [showCheck, setShowCheck] = useState(false);
   const doneCount = project.outline.filter((s) => project.sceneDetails[s.id]?.shots?.length).length;
   const allDone = doneCount === project.outline.length && project.outline.length > 0;
 
@@ -195,6 +199,9 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
         </button>
         {prog && (
           <span className="total-badge" title={t('ind.batchProgress')}>{t('batch.progress', { a: prog.a, b: prog.b })}</span>
+        )}
+        {isShortDrama(project) && (
+          <button type="button" className="btn" title={t('drama.checkBtnTip')} disabled={!shots.length} onClick={() => setShowCheck(true)}>{t('drama.checkBtn')}</button>
         )}
         {layoutEnabled(project) && (
           <button title={shots.length ? t('tip.spOpen') : t('sp.noShots')} className={`btn ${scene && hasLayout(project, scene.id) ? 'has-layout' : ''}`} disabled={!shots.length} onClick={() => setShowLayout(true)}>
@@ -335,6 +342,7 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
       </footer>
       <Lightbox item={lightbox} onClose={() => setLightbox(null)} />
       {showExport && <ScriptExportModal project={project} onClose={() => setShowExport(false)} />}
+      {showCheck && <DramaCheckModal project={project} update={update} onClose={() => setShowCheck(false)} />}
       {showLayout && scene && <SpatialModal project={project} update={update} scene={scene} settings={settings} onClose={() => setShowLayout(false)} />}
     </section>
   );

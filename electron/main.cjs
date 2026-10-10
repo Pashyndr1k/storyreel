@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { comfyRequest } = require('./comfyRequest.cjs');
 const { netRequest } = require('./netRequest.cjs');
+const { claudeCliCheck, claudeCliRun } = require('./claudeCli.cjs');
 const { ffmpegVersion, renderJob, cancelActive } = require('./ffmpegRender.cjs');
 const { resolveProjectDir, listStrayDirs, deleteDirs } = require('./projectDirs.cjs');
 const { createAgentServer } = require('./agentServer.cjs');
@@ -42,6 +43,9 @@ ipcMain.on('dialog-message', (e, { kind, message, ok, cancel } = {}) => {
 
 // Cloud video APIs without CORS headers (Kling) are called from here too.
 ipcMain.handle('net-request', (_e, opts) => netRequest(opts));
+// Text generation through the local Claude Code CLI (Settings → text service)
+ipcMain.handle('claude-cli-check', () => claudeCliCheck());
+ipcMain.handle('claude-cli-run', (_e, req) => claudeCliRun(req));
 
 // The renderer derives its default folders from the OS Documents folder
 // instead of a path baked into the source (see src/lib/config.js).

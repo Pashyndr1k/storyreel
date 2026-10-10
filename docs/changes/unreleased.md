@@ -166,3 +166,251 @@ select on a project whose scenes carry episode numbers (options and the
 episode lengths), the chosen target reaching the render targets list with
 the right windows and suffixes (checked through a stubbed `ffmpegBridge`).
 Not run with the real ffmpeg render in the desktop app.
+
+---
+
+## 5. The short-drama engine (scriptwriting mechanism for the genre)
+
+**Request.** Overhaul the video-creation process for the short-drama genre
+after the "Short Drama Production Craft Guide" (2026) and its references:
+not a narrative template but a scriptwriting mechanism that knows the
+genre's conventions at every stage — the opening (first 3–5 s), the end of
+each episode, dialogue style, cliffhangers, plot progression including the
+hook that drives the transition to the paid part after the first quarter;
+scripts optimised for timing and action, later turned into model prompts.
+Also: the randomization and non-standard plot tools must work with it.
+
+**Sources distilled** (the guide + SceneMixer, OutlierKit, Lollipop, the
+short-drama toolkit, the vertical-showrunner and open-drama skills,
+clipcurator's episode sheet, hamlog's 15-second cuts; js-mark's document
+chain). Everything prescriptive lives as data and text in
+`src/lib/shortDrama/rules.js`:
+- `isShortDrama(project)` = every series project (the "Short drama" template).
+- `DRAMA_CORE`: the brief — the dramatic unit (excavate, not compress), the
+  0–3 s opening formula (ordinary state + disruption + unanswered
+  question), progression (options lost, a turn every ~30 s, a shift every
+  15 s), the three hook types with rotation and the fixed hooks of episodes
+  1–5, the season engine (first trap, antagonist and stakes, first
+  reversal, first win by episode 5, the PAID CHECKPOINT after the first
+  quarter, mid-season betrayal, a climax that forces a choice between two
+  values, the finale answering the opening humiliation before the same
+  witnesses), the plot mechanisms table, villains who err on screen,
+  characters as pressure functions with playable profiles, the dialogue
+  rules (< 20 words a line, < 40 an action block, ~3 words/s, 18–25 lines,
+  no em dashes, no voice-over / inner monologue, on the nose about stakes
+  and never about shown emotion), the vertical frame and the AI-generation
+  constraints (≤ 4 locations, no crowds / fights / readable text).
+- `DRAMA_STAGE`: stage-specific instructions (ideas, storyline, arcs,
+  episodes, outline, shots); `DRAMA_FRAME_RULE` for the image / video
+  prompt writers; `seasonLandmarks(total)` (first win ≤ 5, first reversal ≈
+  16 %, paid checkpoint = round(total / 4) ≥ 3, betrayal ≈ 50 %, climax ≈
+  96 %); `timingGrid(sec)` (the guide's 60 / 90 / 120 s grids, scaled);
+  `dramaRulesSummary(project)` for tools.
+- `prompts.js`: `dramaSystem(lang, scriptStyle, project, stage)` builds the
+  system prompt of every series stage = the base rules + DRAMA_CORE + this
+  series' landmarks + the sub-genre brief + the stage block. The legacy
+  "Short Drama Series" script style is skipped (the engine supersedes it);
+  any other script style still applies. Builders: Stage 1 (series) — four
+  directions each with labelled lines Trope / Opening (0–3 s) / Episode 1
+  trap / First win (ep N) / Quarter hook (ep N) / Season promise inside the
+  pitch; Stage 2 — the synopsis as the season spine and each character a
+  production profile (want, method, leverage, shame trigger, speech rhythm,
+  physical strategy, motif); sections — one must end exactly at the paid
+  checkpoint (12+ episodes); episodes — new fields `goal, main_conflict,
+  power_start, power_end, turns[], hook_type, cliffhanger_question,
+  first_action_next`, hook rules per chunk (fixed types for 1–5, "not the
+  previous episode's type", the first win, the paid checkpoint, the
+  betrayal when inside the chunk); outline — scenes carry a `beat` (open /
+  orient / turn / squeeze / reversal / cliff), the first scene of an
+  episode opens inside the disruption, the last ends on the hook; shots —
+  the scene's position in its episode (first / middle / last), the
+  episode's timing grid, the planned turns and hook, shot 1 ≤ 5 s with the
+  conflict visible, the last shot a hook frame whose notes end with
+  "HOOK · TYPE", every shot a `beat`. Image / video prompt writers and the
+  smart edit get the frame rule / the engine through `withDrama` wrappers
+  (`stage5Prompt`, `stage5VideoPrompt`, `stage5H3VideoPrompt`,
+  `stage5KlingVideoPrompt`, `finalFramePrompt`, `smartEditPrompt`).
+- **Randomization.** Stage 1's plot randomization (oblique constraints,
+  auteur lens, genre mashup, forced variance) stays on for series; when any
+  method is active a bridge rule (`DRAMA_RANDOM_BRIDGE`) tells the model the
+  directives shape the execution inside the format and never remove the
+  trope, the episode unit, the hook rotation or the dialogue rules. The
+  auteur persona still replaces the showrunner persona; the engine's rules
+  stand above both.
+- `series.js`: `episodeLine` carries turns, the hook label, the open question
+  and the next episode's first action (so parts and the next chunk see
+  them).
+- **Genre check** (`src/lib/shortDrama/check.js`): `checkProject(project)` —
+  the plan (hook missing / repeated / unexpected for 1–5, cliffhanger
+  missing, paid-checkpoint episode on an emotion hook, no first win in
+  1–5), per episode (length vs target, scene count, first / last scene
+  beats, locations > 4, opening shot > 5 s or without visible disruption,
+  action blocks > 40 words, voice-over / inner monologue, lines > 20 words,
+  em dashes, flat runs > 15 s without a marked shift, turns < 1 per 30 s,
+  speakable density, the hook tag on the last shot); a score (100 − 8 per
+  error − 3 per warning); per-episode metrics. `autoFixProject` replaces
+  em dashes in dialogue with full stops (capitalising the next word).
+  `DramaCheckModal` ("Genre check" button at Stage 3 (series plan and
+  outline) and Stage 4) shows metrics, issues by episode, "Fix em dashes".
+- Stage 3 (series plan): each episode row has a hook-type selector
+  (Identity / Emotion / Realisation), the open question, and badges "Paid
+  checkpoint" and "First win here" on the landmark episodes.
+- Data model: `seriesPlan.episodes[]` gain `hookType, goal, mainConflict,
+  powerStart, powerEnd, turns, cliffhangerQuestion, firstActionNext`;
+  scenes and shots gain `beat`; `project.dramaStyleId` (see 6).
+
+**Files.** `src/lib/shortDrama/rules.js`, `src/lib/shortDrama/check.js`,
+`src/components/DramaCheckModal.jsx` (new); `src/lib/prompts.js`,
+`src/lib/series.js`, `src/lib/storage.js`, `src/stages/Stage3.jsx`,
+`src/stages/Stage3Series.jsx`, `src/stages/Stage4.jsx`, `src/styles.css`.
+i18n: `drama.*` (check modal, hooks, badges).
+
+**Verified.** In the dev app, by building the prompts for a 40-episode
+series: the engine and the stage block in Stage 1 with two randomization
+methods active and the bridge present; the legacy brief skipped; the
+sub-genre brief present; the landmarks line (win ≤ 5, reversal ≈ 6,
+checkpoint 10, betrayal 20, climax 38); plain (non-series) prompts
+untouched; the episode prompt for 1–5 with the fixed hooks and the first
+win, for 9–10 with the previous hook and the checkpoint; the sections rule
+at episode 10; Stage 4 for a first and a last scene (position, grid, hook
+line, turns, beat schema); the frame rule on image prompts for a series
+only; the check on a seeded part (opening too long, em dash, voice-over,
+few turns, missing hook tag…), the em-dash fix; the Stage 3 hook row with
+the open question, the Genre check modal at Stage 3 and 4. **No real model
+run** — how well the models follow the engine is untested.
+
+---
+
+## 6. Short-drama sub-genres in the style library
+
+**Request.** A dedicated section in the style library for short-drama
+sub-genres that influence nuance and plot types without touching the core
+mechanics.
+
+**Behaviour.** New style category `drama` (`STYLE_CATEGORIES` = script,
+image, video, drama; `STYLES_VERSION` 8). Built-ins (`src/data/dramaStyles.js`):
+Comedy, Dark comedy, Action, Romance, Mystery, Sci-fi, Fantasy, Brainrot,
+Surrealism — each a 90–160-word brief on tone, typical opening pressure,
+turns, villains, hook flavour, dialogue sound and what to keep legible for
+AI, editable like any style; the user adds their own. Project field
+`dramaStyleId` ('' = none); Project settings shows the "Short drama
+sub-genre" selector for series only; a sub-genre chip at Stage 3. The
+brief rides in every series prompt as "SUB-GENRE BRIEF (never overrides the
+engine)". The style assistant knows the category (`STYLE_RULES.drama`). The
+v8 migration adds the built-ins to existing libraries and renames the old
+"Short Drama Series (vertical)" script style to "… (legacy brief)" (text
+kept; the engine ignores it when selected).
+
+**Files.** `src/data/dramaStyles.js` (new), `src/lib/styles.js`,
+`src/lib/storage.js`, `src/components/ProjectSettingsModal.jsx`,
+`src/components/StyleControls.jsx`, `src/lib/prompts.js`. i18n:
+`styles.cat_drama`, `pset.style_drama`, `pset.styleHint_drama`, `stind.drama`.
+
+**Verified.** The migrated library (version 8, nine drama styles, the legacy
+name), the selector in Project settings for a series, the brief in the
+prompts.
+
+---
+
+## 7. Agent: short-drama tools
+
+**Request.** Short-drama tools in the MCP so the agent understands the
+genre, corrects script errors, analyses pacing and evaluates results.
+
+**Behaviour.** Three tools (27 in all):
+- `storyreel_drama_rules { projectId, brief? }` — the conventions as data
+  (timing grids, hook types and rotation, dialogue limits, this project's
+  landmarks); `brief: true` adds the full brief and stage blocks.
+- `storyreel_drama_check { projectId, episode? }` — `checkProject`: score,
+  metrics, issues with episode / scene / shot ids and a `next` hint.
+- `storyreel_drama_fix { projectId, mechanical? | sceneId, issues? }` —
+  mechanical: em dashes fixed project-wide (free); sceneId: the model
+  rewrites that scene's shots against the issues the check found there
+  (plus the agent's own), through `dramaFixPrompt` (the Stage 4 engine
+  prompt + the current shots + the issue list; same number and order of
+  shots; only text fields, duration and beat change, so frames and videos
+  stay attached); counts an attempt (`scene:<id>:drama_fix`); returns the
+  remaining issues.
+- `storyreel_update_project` accepts `dramaStyleId`; `storyreel_list_styles`
+  the `drama` category; `storyreel_get_project` returns `shortDrama`
+  (sub-genre, landmarks, the plan's hook types / turns / questions / next
+  openings) and `beat` on scenes and shots; `storyreel_review_shot` returns
+  `expected.shortDrama` (beat, position in the episode, the vertical-frame
+  expectations, the opening / hook-frame requirement for the first / last
+  shot of an episode).
+- Guide: a "Short drama" section (the rules in one paragraph, the work
+  order: check after Stage 3 and 4, fix, check again; judging by the rules;
+  reviewing media against `expected.shortDrama`).
+
+**Files.** `src/lib/agent/api.js`, `agent/AGENT_GUIDE.md`, `docs/agent-api.md`.
+
+**Verified.** Through `window.__storyreelAgent`: rules, list_styles drama,
+update_project with a valid / invalid id, the project view's shortDrama,
+the check on one episode, the mechanical fix, a scene rewrite with the
+model stubbed (two shots rewritten in place, ids kept, no remaining
+issues), the error without issues. Not run through the MCP bridge.
+
+---
+
+## 8. Text service: the local Claude Code console as an alternative to the API key
+
+**Request.** Revise how Anthropic models are used for scripts and prompts:
+let the user choose between an agent running locally in the console and an
+API key, if it does not conflict with the MCP agent driving the app.
+
+**Behaviour.** Settings → Model selection → Text generation has a third
+option, **Claude Code (local console, your subscription)**. Each request
+runs the installed CLI headless from the app's main process
+(`electron/claudeCli.cjs`): `claude -p --output-format json
+--no-session-persistence --max-turns 1 --tools "" --system-prompt-file
+<tmp> --mcp-config <empty> --strict-mcp-config --setting-sources ""`, the
+user prompt on stdin, cwd a temp folder — so the call carries the app's
+own system prompt only: no tools, no MCP servers, no plugins / hooks /
+skills, no project CLAUDE.md. The answer's `result` text goes through the
+same JSON extraction, policy and name enforcement as the API path
+(`callClaudeCli` in `claude.js`; `generateJSON` routes on
+`settings.textService === 'claude-cli'`). The model select still applies
+(`--model`). A "Check Claude Code" button runs `claude --version`.
+`textKeyError` returns `NO_CLAUDE_CLI` outside the desktop app (shown by
+`ErrorNote` and the Stage 5 notes). The agent's status names the service.
+`--bare` is NOT used: it drops the stored login, so the subscription
+could not be used.
+- **MCP agent:** no conflict — the agent's calls into the app and the app's
+  CLI runs are separate processes; the CLI is started with `CLAUDECODE`
+  cleared so it does not refuse to run under a console session.
+- **Cost / quota:** a call is billed to the subscription's usage, not per
+  token. Measured in this session: with the default context a tiny call
+  consumed ~56k cached input tokens (MCP tool definitions, plugins); with
+  the empty MCP config and no setting sources: 6933 tokens of
+  context write, 4410 ms — see the verification note.
+
+**Files.** `electron/claudeCli.cjs` (new), `electron/main.cjs`,
+`electron/preload.cjs` (`window.claudeCliBridge`), `src/lib/claude.js`,
+`src/lib/storage.js`, `src/components/SettingsModal.jsx`,
+`src/components/ErrorNote.jsx`, `src/stages/Stage5.jsx`, `src/lib/agent/api.js`.
+i18n: `set.svcClaudeCli`, `set.svcClaudeCliHint`, `set.cliCheck`,
+`set.cliChecking`, `tip.cliCheck`, `err.noClaudeCli`.
+
+**Verified.** `claudeCli.cjs` under Node on this machine (Claude Code
+2.1.292, logged in): version check; a JSON request on Haiku answered in
+4410 ms (answer {"ok":true,"n":7} (in a code fence)). The Settings option and
+hint in the dev app. **Not run inside the packaged app** (the IPC path from
+the renderer) and not with a full script request.
+
+**Open.** No cancel for a running CLI call (the Stop in the UI only ends
+the wait). The CLI wraps JSON in a code fence at times — `extractJSON`
+copes.
+
+---
+
+## 9. Jev model: where it fits
+
+**Request.** Think about where the Jev model (TypeSafe System One: Choice /
+Score / Noul judgements, no generation) can be used in the pipeline.
+
+**Delivered.** `docs/jev-in-the-pipeline.md`: nine candidate points ranked
+(hook-type verification, opening test, turn detection, line hygiene,
+ranking Stage 1 directions, prompt–shot agreement, best-of-N prompts,
+agent triage, policy pre-check), what it is not for, how it would be wired
+(`src/lib/jev.js`, a semantic layer on the genre check, a Settings key),
+and the adoption order. No code.
