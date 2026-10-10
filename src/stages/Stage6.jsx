@@ -558,6 +558,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
   // what Render exports: 'range' = the active segment (the whole film by
   // default), 'all' = every episode to its own file, 'ep:N' = one episode
   const [renderTarget, setRenderTarget] = useState('range');
+  const [showRender, setShowRender] = useState(false); // the render options pop-up
   const renderTargetOk = renderTarget === 'range' || (renderTarget === 'all' && episodes.length > 1) || episodes.some((e) => `ep:${e.n}` === renderTarget);
   // m:ss.s once the film is longer than two minutes, plain seconds below
   const clock = (sec, long = total > 120) => (long ? `${Math.floor(sec / 60)}:${(sec % 60).toFixed(1).padStart(4, '0')}` : `${sec.toFixed(1).padStart(4, '0')}s`);
@@ -2698,26 +2699,60 @@ export default function Stage6({ project, update, settings, ...workbench }) {
             </button>
           </>
         )}
-        {episodes.length > 0 && (
-          <select
-            className="render-target"
-            title={t('tip.renderTarget')}
-            aria-label={t('tip.renderTarget')}
-            disabled={rendering}
-            value={renderTargetOk ? renderTarget : 'range'}
-            onChange={(e) => setRenderTarget(e.target.value)}
-          >
-            <option value="range">{t('s6.renderWhole')}</option>
-            {episodes.length > 1 && <option value="all">{t('s6.renderAll', { n: episodes.length })}</option>}
-            {episodes.map((e) => (
-              <option key={e.n} value={`ep:${e.n}`}>{t('s6.renderEp', { n: e.n, t: clock(e.out - e.in, true) })}</option>
-            ))}
-          </select>
-        )}
-        <button title={t('tip.render')} className="btn small fixedw" disabled={rendering} onClick={doRender}>
+        {/* a series asks what to export in a pop-up; a plain film renders at once */}
+        <button title={t('tip.render')} className="btn small fixedw" disabled={rendering} onClick={() => (episodes.length ? setShowRender(true) : doRender())}>
           <Download size={14} />{rendering ? t('s6.rendering') : t('s6.render')}
         </button>
       </div>
+
+      {/* Render options: the whole film (or the marked range), one episode,
+          or every episode to its own file. */}
+      {showRender && (
+        <div className="overlay" onClick={() => setShowRender(false)}>
+          <div className="modal render-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={t('s6.renderTitle')}>
+            <div className="modal-head-row">
+              <h2 title={t('tip.renderTarget')}>{t('s6.renderTitle')}</h2>
+              <button type="button" className="modal-x" title={t('tip.close')} aria-label={t('tip.close')} onClick={() => setShowRender(false)}>✕</button>
+            </div>
+            <p className="hint">{t('s6.renderChoose')}</p>
+            <div className="render-options" role="radiogroup" aria-label={t('s6.renderChoose')}>
+              {[
+                { v: 'range', label: hasRange ? t('s6.renderRange', { t: clock(effOut - effIn, true) }) : t('s6.renderWhole'), hint: clock(effOut - effIn, true) },
+                ...(episodes.length > 1 ? [{ v: 'all', label: t('s6.renderAll', { n: episodes.length }), hint: clock(total, true) }] : []),
+                ...episodes.map((e) => ({ v: `ep:${e.n}`, label: t('s6.renderEpLabel', { n: e.n }), hint: clock(e.out - e.in, true) })),
+              ].map((o) => (
+                <button
+                  key={o.v}
+                  type="button"
+                  role="radio"
+                  aria-checked={(renderTargetOk ? renderTarget : 'range') === o.v}
+                  className={`render-opt ${(renderTargetOk ? renderTarget : 'range') === o.v ? 'on' : ''}`}
+                  title={t('tip.renderOpt')}
+                  onClick={() => setRenderTarget(o.v)}
+                >
+                  <span className="render-opt-label">{o.label}</span>
+                  <span className="render-opt-hint">{o.hint}</span>
+                </button>
+              ))}
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn" title={t('tip.cancel')} onClick={() => setShowRender(false)}>{t('new.cancel')}</button>
+              <button
+                type="button"
+                className="btn primary"
+                title={t('tip.render')}
+                disabled={rendering}
+                onClick={() => {
+                  setShowRender(false);
+                  doRender();
+                }}
+              >
+                <Download size={14} />{t('s6.render')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Transitions reference: what each cut does, with checkboxes to trim
           the list — disabled types leave the auto-picker and the cut menu. */}

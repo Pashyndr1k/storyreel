@@ -4121,3 +4121,16 @@ select.prompt-model:hover:not(:disabled) { border-color: var(--ink); color: var(
 .pcc-acts .icon-btn.on { color: var(--accent); }
 .sclip-x { margin-left: auto; flex: none; opacity: 0; }
 .sclip:hover .sclip-x { opacity: 1; }
+
+/* ---- Render options pop-up (series): what the file contains */
+.modal.render-modal { width: min(520px, 94vw); max-width: min(520px, 94vw); }
+.render-options { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.render-opt {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 12px; border: 1px solid var(--hairline); border-radius: 3px;
+  background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer;
+}
+.render-opt:hover { border-color: var(--text); }
+.render-opt.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.render-opt-label { font-weight: 700; font-size: 13px; }
+.render-opt-hint { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
