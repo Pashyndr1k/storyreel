@@ -20,6 +20,8 @@
   native toggle are gone (LTX keeps its talking-video voice).
 - **Render pop-up.** The render options (whole film, episode, all episodes)
   open in a pop-up from the Render button.
+- **No second split.** A project that is itself a part (an episode project
+  or a scene part) is not split again at Stage 3.
 - **Nested projects.** A project split into episode projects or parts is
   one card on the main screen; click it for a pop-up with the projects
   inside as compact rows, each with open, duplicate, archive, delete and

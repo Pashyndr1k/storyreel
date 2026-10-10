@@ -900,3 +900,22 @@ once as before. `src/stages/Stage6.jsx`, i18n `s6.renderTitle` / `renderChoose`
 / `renderRange`, `tip.renderOpt`. Verified in the dev app on a two-episode
 seed. The subtitle layer also lost its lane-wide Clear button in favour of
 a ✕ on every block (§14 amended).
+
+---
+
+## 22. No second split for a project that is itself a part
+
+**Request.** Projects that came out of a split must not offer splitting
+again at Stage 3.
+
+**Behaviour.** At Stage 3 the "Split into parts" block (the scissors strip,
+"every N", Create parts) is not shown when the project carries `partInfo`
+(a scene part) or `seriesPart` (an episode project of a series); the banner
+naming the parent stays. The agent's `storyreel_split_project` refuses such
+a project (NOT_READY, "split the original project instead").
+
+**Files.** `src/stages/Stage3.jsx` (`canSplit`), `src/lib/agent/api.js`.
+
+**Verified.** Dev app: a seeded scene part at Stage 3 shows the parent
+banner and no split block; an ordinary project still shows it; the agent's
+split call on the part is refused.

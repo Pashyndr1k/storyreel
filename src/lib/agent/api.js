@@ -758,10 +758,11 @@ export const TOOLS = [
   {
     name: 'storyreel_split_project',
     description:
-      'Stage 3: split the project into parts, one new project per part, each with its run of scenes and everything already made for them (shots, prompts, frames, videos, layouts) plus the storyline, cast and styles; the original is unchanged. Give either cutAfter — the scene numbers (1-based) after which a new part begins — or every — a part size in scenes (the last part takes the rest). Parts that already have a project are skipped. Returns the new projects.',
+      'Stage 3: split the project into parts, one new project per part, each with its run of scenes and everything already made for them (shots, prompts, frames, videos, layouts) plus the storyline, cast and styles; the original is unchanged. Give either cutAfter — the scene numbers (1-based) after which a new part begins — or every — a part size in scenes (the last part takes the rest). Parts that already have a project are skipped; a project that is itself a part (episode project, scene part) is not split again. Returns the new projects.',
     inputSchema: schema({ ...PROJECT, cutAfter: { type: 'array', items: { type: 'integer', minimum: 1 } }, every: { type: 'integer', minimum: 1 } }, ['projectId']),
     run: async ({ projectId, cutAfter, every }) => {
       const p = projectOf(projectId);
+      if (p.partInfo || p.seriesPart) fail('NOT_READY', 'This project is itself a part of a split project (an episode project or a scene part) and is not split again. Split the original project instead.');
       const n = p.outline.length;
       if (n < 2) fail('NOT_READY', 'The project needs at least two scenes to split.');
       const cuts = normalizeCuts(every ? cutsEvery(n, every) : (cutAfter || []).map((k) => Number(k) - 1), n);

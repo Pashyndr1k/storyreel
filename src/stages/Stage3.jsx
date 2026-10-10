@@ -164,7 +164,9 @@ function Stage3Outline({ project, update, settings, goNext, onSettings, onProjec
   // becomes its own project with everything already made for those scenes
   const cuts = normalizeCuts(project.splitCuts, outline.length);
   const parts = planParts(outline.length, cuts);
-  const canSplit = outline.length >= 2 && typeof addProjects === 'function';
+  // a project that is itself a part (an episode project of a series, a scene
+  // part) is not split again
+  const canSplit = outline.length >= 2 && typeof addProjects === 'function' && !project.partInfo && !project.seriesPart;
   const toggleCut = (k) => update((p) => ({ splitCuts: cuts.includes(k) ? cuts.filter((x) => x !== k) : [...cuts, k].sort((a, b) => a - b) }));
   const partMade = (part) => (project.parts || []).find((x) => x.from === part.from && x.to === part.to && projectExists?.(x.projectId));
   const pendingParts = cuts.length ? parts.filter((part) => !partMade(part)) : [];
