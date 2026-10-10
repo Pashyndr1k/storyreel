@@ -4069,3 +4069,49 @@ select.prompt-model:hover:not(:disabled) { border-color: var(--ink); color: var(
   white-space: pre-wrap;
   paint-order: stroke fill;
 }
+
+/* ---- Split projects on the Home page: one card that opens to the projects
+   inside it (the master and its episode / scene parts). */
+.pc-kind { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.pc-group,
+.pc-span {
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.pc-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  color: var(--text);
+}
+.pc-chev { font-style: normal; display: inline-block; transition: transform 0.18s var(--ease); }
+.pc-chev.open { transform: rotate(180deg); }
+.pc-open { box-shadow: inset 0 0 0 1px var(--ink); }
+.pc-master .pc-group { border-color: var(--accent); color: var(--accent); }
+.pgroup {
+  grid-column: 1 / -1;
+  padding: 12px 12px 12px 28px;
+  border-right: 1px solid var(--hairline-soft);
+  border-bottom: 1px solid var(--hairline-soft);
+  background: rgba(var(--ink-rgb), 0.04);
+  position: relative;
+}
+.pgroup::before {
+  content: '';
+  position: absolute;
+  left: 14px;
+  top: 12px;
+  bottom: 12px;
+  width: 2px;
+  background: var(--accent);
+}
+.pgrid-nested { margin-top: 0; border-top: 1px solid var(--hairline-soft); }
+.pgrid-nested .pc,
+.pgrid-nested .pc-in { min-height: 210px; }
+.pgrid-nested .pc { animation: none; }
+.pgrid-nested .pc-title { font-size: 20px; }

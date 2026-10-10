@@ -34,7 +34,7 @@ export default function StoryAssets({ project, update, settings, genLang, imageS
   const withLib = (a) => (a.libId ? {} : { libId: storyAssetLibId(project, a) });
   const addPhoto = async (id, file) => {
     try {
-      const dataURL = await fileToResizedDataURL(file);
+      const dataURL = await fileToResizedDataURL(file, 1024, 0.85); // an object reference keeps more detail than a face
       updateAsset(id, (a) => ({ photos: [...(a.photos || []), dataURL].slice(0, MAX_ASSET_PHOTOS), ...withLib(a) }));
     } catch (e) {
       window.alert(e.message || String(e));

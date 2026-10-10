@@ -16,7 +16,11 @@ function posterOf(project) {
 // Dashboard project cell (design 5a): the whole card is the open action.
 // The still sits grayscale under a paper wash and regains full colour on
 // hover; progress is five accent segments plus a tabular counter.
-export default function ProjectCard({ project, onOpen, onArchive, onRestore, onDuplicate, onDelete, onPin, onExport }) {
+// `group` = { count, expanded } turns the card into the head of a split
+// project: the click shows / hides the projects inside it (onToggle); `master`
+// marks that project inside the opened group; `span` labels a part ("Episodes
+// 1–5 of 10", "Scenes 4–6 · part 2 of 3").
+export default function ProjectCard({ project, onOpen, onArchive, onRestore, onDuplicate, onDelete, onPin, onExport, group = null, onToggle = null, master = false, span = null }) {
   const { t, lang } = useI18n();
   const [exporting, setExporting] = useState(false);
   // exporting a big project takes a moment; one click per run
@@ -41,17 +45,22 @@ export default function ProjectCard({ project, onOpen, onArchive, onRestore, onD
     e.stopPropagation();
     fn();
   };
+  // a group head opens the group, not the project
+  const main = group ? onToggle : onOpen;
+  const spanText = span ? (span.kind === 'episodes' ? t('card.episodes', { a: span.from, b: span.to, m: span.total }) : t('card.scenes', { a: span.from, b: span.to, n: span.index, m: span.total })) : '';
 
   return (
     <div
-      className="pc"
+      className={`pc ${group ? 'pc-head' : ''} ${group?.expanded ? 'pc-open' : ''} ${master ? 'pc-master' : ''}`}
       role="button"
       tabIndex={0}
-      onClick={onOpen}
+      aria-expanded={group ? !!group.expanded : undefined}
+      title={group ? t('card.groupTip', { n: group.count }) : master ? t('card.masterTip') : undefined}
+      onClick={main}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          onOpen();
+          main();
         }
       }}
     >
@@ -82,6 +91,17 @@ export default function ProjectCard({ project, onOpen, onArchive, onRestore, onD
           </span>
         </div>
         <h4 className="pc-title" title={project.title}>{project.title}</h4>
+        {(group || master || spanText) && (
+          <div className="pc-kind">
+            {group && (
+              <span className="pc-group" title={t('card.groupTip', { n: group.count })}>
+                {t(group.count === 1 ? 'card.group1' : 'card.group', { n: group.count })} <i className={`pc-chev ${group.expanded ? 'open' : ''}`} aria-hidden="true">▾</i>
+              </span>
+            )}
+            {master && <span className="pc-group" title={t('card.masterTip')}>{t('card.master')}</span>}
+            {spanText && <span className="pc-span" title={t('card.spanTip')}>{spanText}</span>}
+          </div>
+        )}
         <div className="pc-tags">
           {project.genres.slice(0, 3).map((g) => (
             <span key={g} className="pc-tag" title={t('ind.genre')}>{g}</span>

@@ -742,3 +742,42 @@ engines), and a real H3 render went to the GPU. It completed through the
 new native-mix code without error: generated 5.17 s for a 5 s slot, the mix
 clip stayed at the slot (the 0.1 s threshold), nothing grew. The seeded test
 project holds that video; delete it from the dev profile when convenient.
+
+---
+
+## 18. Split projects as nested cards; asset images at full size
+
+**Request.** A short-drama project split into episode projects must appear
+on the main screen as one card; clicking it reveals the projects it was
+split into, each with open / duplicate / archive / delete / export. And the
+Stage 2 asset images were created at too low a resolution.
+
+**Behaviour.**
+- `src/lib/projectGroups.js`: a project's parent is `seriesPart.parentId`
+  (episode projects of a series master) or `partInfo.parentId` (Stage 3
+  parts); `childrenOf` lists a project's parts in story order (episodes
+  from / scenes from); `groupProjects` drops from the page every project
+  whose parent is on it.
+- Home: such a project is one card with a chip "N projects inside ▾" (its
+  own actions stay on the card); clicking the card opens a full-width panel
+  under it — the master itself ("Master project", click to open) and its
+  parts as ordinary cards with every action, each labelled "Episodes 1–5 of
+  10" / "Scenes 4–6 · part 2 of 3". A part that was split again is a group
+  inside the group (recursive). Several groups can be open at once; a search
+  shows every match flat. The archive page is unchanged (flat).
+- `ProjectCard` gained `group` / `onToggle` / `master` / `span` props; i18n
+  `card.group`, `card.group1`, `card.groupTip`, `card.master`, `card.masterTip`,
+  `card.episodes`, `card.scenes`, `card.spanTip` (EN/RU/UK); CSS `.pc-kind`,
+  `.pc-group`, `.pc-span`, `.pgroup`, `.pgrid-nested`.
+- Asset images: the generated image was passed through `resizeDataURL(raw,
+  1024, …)` — the second argument is a TOTAL pixel count, so every generated
+  asset reference came out 32 × 32 (fixed in §10's follow-up to 1024 × 1024;
+  the agent's tool and the new location image had the same mistake, fixed
+  too). Uploaded asset photos now keep up to 1024 px on the long side (was
+  640, the character-photo size).
+
+**Verified.** In the dev app with a seeded master → two episode projects →
+one scene part: the single card with the chip, the opened panel (master +
+episodes), the nested group inside the first episode, the actions on every
+card. Found on the way: Vite's dev server served a stale transform after
+two quick edits of the same file (a touch fixed it) — nothing in the app.

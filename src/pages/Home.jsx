@@ -1,5 +1,5 @@
 import { SHORT_DRAMA_STYLE_ID } from '../lib/series.js';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import ProjectCard from '../components/ProjectCard.jsx';
 import NewProjectModal from '../components/NewProjectModal.jsx';
 import AppShell from '../components/AppShell.jsx';
@@ -11,6 +11,7 @@ import { parseProjectFile } from '../lib/exportScript.js';
 import { importProjectZip, exportProjectZip } from '../lib/projectFiles.js';
 import { useI18n } from '../lib/i18n.js';
 import { appLog } from '../lib/actionLog.js';
+import { groupProjects, childrenOf, childSpan } from '../lib/projectGroups.js';
 
 export default function Home({
   projects,
@@ -34,6 +35,16 @@ export default function Home({
     localStorage.setItem('storyreel.homeSort.v1', v);
   };
   const [showNew, setShowNew] = useState(false);
+  // split projects (a series master with its episode projects, a project
+  // with its parts) opened on the page — their inner projects are shown
+  const [openGroups, setOpenGroups] = useState(() => new Set());
+  const toggleGroup = (id) =>
+    setOpenGroups((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
 
   const active = projects.filter((p) => !p.archived);
 
@@ -182,18 +193,44 @@ export default function Home({
         </div>
       ) : (
         <div className="pgrid">
-          {sorted.map((p) => (
-            <ProjectCard
-              key={p.id}
-              project={p}
-              onOpen={() => onOpen(p.id)}
-              onArchive={() => updateProject(p.id, { archived: true }, { touch: false })}
-              onPin={() => updateProject(p.id, { pinned: !p.pinned }, { touch: false })}
-              onExport={() => exportProjectZip(p, lang).catch((e) => window.alert(e.message || String(e)))}
-              onDuplicate={() => duplicate(p)}
-              onDelete={() => del(p)}
-            />
-          ))}
+          {(() => {
+            const card = (x, extra = {}) => (
+              <ProjectCard
+                key={x.id}
+                project={x}
+                onOpen={() => onOpen(x.id)}
+                onArchive={() => updateProject(x.id, { archived: true }, { touch: false })}
+                onPin={() => updateProject(x.id, { pinned: !x.pinned }, { touch: false })}
+                onExport={() => exportProjectZip(x, lang).catch((e) => window.alert(e.message || String(e)))}
+                onDuplicate={() => duplicate(x)}
+                onDelete={() => del(x)}
+                {...extra}
+              />
+            );
+            // A split project is one card that opens to the projects inside
+            // it (the master, then its parts in story order); a part that was
+            // split again opens the same way inside. Searching shows every
+            // match flat.
+            const node = (p) => {
+              const children = q ? [] : childrenOf(active, p.id);
+              if (!children.length) return card(p, { span: childSpan(p) });
+              const open = openGroups.has(p.id);
+              return (
+                <Fragment key={p.id}>
+                  {card(p, { group: { count: children.length, expanded: open }, onToggle: () => toggleGroup(p.id), span: childSpan(p) })}
+                  {open && (
+                    <div className="pgroup" role="group" aria-label={p.title}>
+                      <div className="pgrid pgrid-nested">
+                        {card(p, { master: true })}
+                        {children.map(node)}
+                      </div>
+                    </div>
+                  )}
+                </Fragment>
+              );
+            };
+            return groupProjects(sorted, active).map(({ project: p }) => node(p));
+          })()}
         </div>
       )}
 

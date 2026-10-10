@@ -11,6 +11,11 @@
 - **Agent: engines and parts.** The agent's status names the image and video
   models in use (including Krea and the H3 step count); the project view
   shows parts; a new tool splits a project into parts.
+- **Nested projects.** A project split into episode projects or parts is
+  one card on the main screen; click it to reveal the projects inside, each
+  with open, duplicate, archive, delete and export.
+- **Fix.** Stage 2 asset images were generated at 32 × 32 pixels; they are
+  full size now, and uploaded asset photos keep up to 1024 px.
 - **Subtitles.** A subtitle layer under the video track in the assembly:
   blocks from every shot's dialogue (compact text at the bottom), free text
   anywhere on the frame, double-click to edit font, size, colours and
