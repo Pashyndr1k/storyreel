@@ -36,7 +36,8 @@
   em dashes; the agent gets the rules, the check and a scene rewrite tool.
 - **Claude Code as the text service.** Scripts and prompts can be written
   by the Claude Code CLI installed on this computer, through your
-  subscription, instead of an API key.
+  subscription, instead of an API key. An `ANTHROPIC_API_KEY` in the
+  environment no longer overrides the login ("Invalid API key").
 - **Split into parts (Stage 3).** Cut the scene outline anywhere — between
   any scenes, or every N scenes — and create one project per part. Each part
   gets its scenes with everything already made for them (shots, prompts,

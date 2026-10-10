@@ -52,7 +52,12 @@ function claudeCliRun({ system = '', user = '', model = '', timeoutMs = 10 * 60 
     };
     let child;
     try {
-      child = spawn(CLI, args, { cwd: dir, shell: WIN, windowsHide: true, env: { ...process.env, CLAUDECODE: '' }, stdio: ['pipe', 'pipe', 'pipe'] });
+      // This mode is the console login (the subscription). An ANTHROPIC_API_KEY
+      // / AUTH_TOKEN in the user's environment would make the CLI bill (or
+      // fail on) that key instead, so the child never sees them.
+      const env = { ...process.env, CLAUDECODE: '' };
+      for (const k of Object.keys(env)) if (/^ANTHROPIC_(API_KEY|AUTH_TOKEN)$/i.test(k)) delete env[k];
+      child = spawn(CLI, args, { cwd: dir, shell: WIN, windowsHide: true, env, stdio: ['pipe', 'pipe', 'pipe'] });
     } catch (e) {
       return finish({ ok: false, error: `Claude Code CLI could not be started: ${e.message}` });
     }
@@ -81,8 +86,11 @@ function claudeCliRun({ system = '', user = '', model = '', timeoutMs = 10 * 60 
         /* not JSON */
       }
       if (data && typeof data.result === 'string' && !data.is_error) return finish({ ok: true, text: data.result, usage: data.usage || null, cost: data.total_cost_usd ?? null, model: Object.keys(data.modelUsage || {})[0] || model || null });
-      const msg = (data && (data.result || data.error)) || errText.trim() || out.trim() || `exit code ${code}`;
-      finish({ ok: false, error: `Claude Code CLI: ${String(msg).slice(0, 600)}` });
+      let msg = String((data && (data.result || data.error)) || errText.trim() || out.trim() || `exit code ${code}`).slice(0, 600);
+      // the CLI took a key from an apiKeyHelper / its own settings and it was refused
+      if (/invalid api key|external api key/i.test(msg)) msg += ' — the console used an API key of its own instead of the login. In a terminal run "claude", then /login, and remove any apiKeyHelper from ~/.claude/settings.json.';
+      else if (/not logged in|login/i.test(msg) && !/valid/i.test(msg)) msg += ' — in a terminal run "claude" and /login once.';
+      finish({ ok: false, error: `Claude Code CLI: ${msg}` });
     });
     child.stdin.on('error', () => {});
     child.stdin.end(String(user || ''), 'utf8');

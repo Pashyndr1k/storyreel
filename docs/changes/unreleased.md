@@ -401,6 +401,21 @@ the renderer) and not with a full script request.
 the wait). The CLI wraps JSON in a code fence at times — `extractJSON`
 copes.
 
+**Fix after first real use (2026-10-09).** Creating improvement ideas with
+the console service failed with "Claude Code CLI: Invalid API key · Fix
+external API key". Cause: a persistent `ANTHROPIC_API_KEY` in the user's
+Windows environment; the app inherits it when started from the desktop,
+the CLI then authenticates with that key (stale) instead of the console
+login. `claudeCliRun` now removes `ANTHROPIC_API_KEY` and
+`ANTHROPIC_AUTH_TOKEN` from the child's environment — this mode is the
+login by definition; the API-key mode is the other setting. The error text
+for the remaining cases (an `apiKeyHelper`, or no login) now says what to
+do: run `claude` in a terminal and `/login`. Verified: the bridge under Node
+with a fake `ANTHROPIC_API_KEY` set answers through the login after the
+change (before it, a key the CLI had not approved was ignored anyway, so
+the failure needs a key the user once approved in the console — the
+situation on this machine).
+
 ---
 
 ## 9. Jev model: where it fits
