@@ -295,10 +295,6 @@ export default function Stage6({ project, update, settings, ...workbench }) {
     setSubs((s) => ({ ...s, items: s.items.filter((x) => x.id !== id) }), 'subtitles.delete');
     setSubModal(null);
   };
-  const clearSubs = () => {
-    if (!subs.items.length || !window.confirm(t('sub.clearConfirm'))) return;
-    setSubs((s) => ({ ...s, items: [] }), 'subtitles.clear');
-  };
   // drag a block along the timeline (its start); a double-click opens the editor
   const startSubDrag = (e, item) => {
     if (e.button !== 0) return;
@@ -2213,11 +2209,6 @@ export default function Stage6({ project, update, settings, ...workbench }) {
             <button type="button" className="lane-more" title={t('sub.addTip')} aria-label={t('sub.add')} onClick={addCustomSub}>
               +
             </button>
-            {subs.items.length > 0 && (
-              <button type="button" className="lane-more" title={t('sub.clearTip')} aria-label={t('sub.clear')} onClick={clearSubs}>
-                ✕
-              </button>
-            )}
           </span>
           <div className="lane-strip">
             {subs.items.map((it) => (
@@ -2239,6 +2230,21 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                 }}
               >
                 <span className="aclip-name">{it.text}</span>
+                {/* delete this block (drag-safe) */}
+                <button
+                  type="button"
+                  className="aclip-btn sclip-x"
+                  title={t('sub.deleteTip')}
+                  aria-label={t('sub.delete')}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onDoubleClick={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteSub(it.id);
+                  }}
+                >
+                  ✕
+                </button>
               </div>
             ))}
           </div>

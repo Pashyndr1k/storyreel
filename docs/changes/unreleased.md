@@ -661,7 +661,8 @@ centre / top); custom text anywhere on the frame; an MCP tool.
   clips; lane buttons ≡ "From dialogue" (`autoSubtitles`: each shot's lines
   share the slot minus its silence pads, in proportion to their length;
   custom text is kept), + "Add text" (a free block at the playhead, placed
-  by X / Y), ✕ "Clear". Drag a block to move it; double-click opens
+  by X / Y). Each block has its own small ✕ (the lane-wide "Clear" was
+  removed on request). Drag a block to move it; double-click opens
   `SubtitleModal` (text, start, length, font, size, colour, outline colour,
   placement bottom / centre / top / anywhere with X / Y, a live sample,
   "Use this look for all subtitles", Delete, Save).

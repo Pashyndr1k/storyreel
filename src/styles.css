@@ -4119,3 +4119,5 @@ select.prompt-model:hover:not(:disabled) { border-color: var(--ink); color: var(
 .pcc-acts { display: flex; gap: 4px; flex: none; }
 .pcc-acts .icon-btn { width: 30px; height: 30px; }
 .pcc-acts .icon-btn.on { color: var(--accent); }
+.sclip-x { margin-left: auto; flex: none; opacity: 0; }
+.sclip:hover .sclip-x { opacity: 1; }
