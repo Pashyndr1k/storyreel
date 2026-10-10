@@ -734,5 +734,11 @@ Windows.
 ## 17. Verification of §11–16 in the dev app
 
 See each section's "Verified" line; the dev app has no Electron bridge, so
-the ffmpeg burn-in, the app log file and the real generation paths are
-untested here.
+the ffmpeg burn-in and the app log file are untested here. One real run
+happened by mistake: a test of the voice-before-video guard called
+`storyreel_create_media` kind `video` on a seeded shot while the settings
+engine was MiniMax (the guard rightly does not apply to native-speech
+engines), and a real H3 render went to the GPU. It completed through the
+new native-mix code without error: generated 5.17 s for a 5 s slot, the mix
+clip stayed at the slot (the 0.1 s threshold), nothing grew. The seeded test
+project holds that video; delete it from the dev profile when convenient.
