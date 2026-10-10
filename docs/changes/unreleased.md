@@ -998,3 +998,35 @@ silent shot — a failing prompt is refused with the reasons. Guide: a new
 section "Writing MiniMax H3 prompts yourself (dialogue and direct
 speech)". Verified in the dev app: the tool's content, a bad prompt
 refused with its reasons, a correct one accepted.
+
+---
+
+## 26. Console text service: requests with photos, and a sturdier JSON reader
+
+**Request.** "Generation failed: The model returned data that could not be
+read (incomplete or malformed)" when writing a scene's shots through the
+local Claude Code console.
+
+**Cause.** A request that attaches reference photos (the shot breakdown
+with the scene's location photos, the final-frame prompt, the character
+helpers) carries its text as content blocks; the console bridge wrote
+`String(user)` to stdin — "[object Object],[object Object]" — and the model
+answered whatever it could make of that. A long structured answer itself
+goes through fine (checked: 14,500 output tokens, 12 scenes, parsed), and
+the CLI cannot take images at all (stream-json input was tried: "the image
+didn't come through").
+
+**Fix.**
+- `callClaudeCli` flattens content blocks to their text and prefixes a note
+  that N reference photos are attached in the app but not available to the
+  console, so the model works from the written descriptions.
+- `extractJSON` prefers a fenced ```json block, then scans for the first
+  BALANCED object or array (honouring strings), so prose around the answer
+  — even with stray braces — no longer breaks the read; a failure is logged
+  to the app log (`text.parseFail`: length, head and tail of the answer).
+
+**Files.** `src/lib/claude.js`.
+
+**Verified.** Node runs of the bridge (a long outline parses; an image is
+not delivered); the reader on fenced, prose-wrapped and truncated samples
+in the dev app. **Not run again through the packaged app's console path.**

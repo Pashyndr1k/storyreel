@@ -27,6 +27,10 @@
   set piece.
 - **H3 prompt rules for the agent.** A tool returns the H3 prompt brief;
   hand-written video prompts are checked for the dialogue format.
+- **Console text service fix.** Requests that attach reference photos (the
+  shot breakdown, the final frame) no longer reach the Claude Code console
+  as garbage; the console gets the text and a note about the photos. The
+  JSON reader also copes with prose and code fences around an answer.
 - **Nested projects.** A project split into episode projects or parts is
   one card on the main screen; click it for a pop-up with the projects
   inside as compact rows, each with open, duplicate, archive, delete and

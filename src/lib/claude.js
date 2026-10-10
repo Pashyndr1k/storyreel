@@ -3,6 +3,7 @@ import { enforceNames } from './names.js';
 import { withRetry } from './retry.js';
 import { generateGeminiText } from './gemini.js';
 import { activePolicy, policySystemBlock, refuse } from './policy.js';
+import { appLog } from './actionLog.js';
 
 export const MODELS = CLAUDE_MODELS;
 
@@ -68,19 +69,60 @@ async function callClaude(settings, { system, user, maxTokens = 4096, signal }, 
     .join('\n');
 }
 
-function extractJSON(text) {
-  const firstObj = text.indexOf('{');
-  const firstArr = text.indexOf('[');
-  const candidates = [firstObj, firstArr].filter((i) => i !== -1);
+// The JSON inside a model's answer: a fenced ```json block when there is
+// one, else the first balanced object or array (prose around it, even with
+// stray braces, is ignored). A failure is logged with the answer's ends so
+// the cause can be read later.
+export function extractJSON(text) {
+  text = String(text ?? '');
   if (!text.trim()) throw new Error('The model returned an empty answer. Please try again.');
-  if (!candidates.length) throw new Error('The model answered in plain text instead of the expected data. Please try again.');
-  const start = Math.min(...candidates);
-  const end = Math.max(text.lastIndexOf('}'), text.lastIndexOf(']'));
-  try {
-    return JSON.parse(text.slice(start, end + 1));
-  } catch {
-    throw new Error('The model returned data that could not be read (incomplete or malformed). Please try again.');
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const bodies = [];
+  if (fence && /[{[]/.test(fence[1])) bodies.push(fence[1]);
+  bodies.push(text);
+  for (const body of bodies) {
+    for (let i = 0; i < body.length; i++) {
+      const c = body[i];
+      if (c !== '{' && c !== '[') continue;
+      const end = balancedEnd(body, i);
+      // an unbalanced candidate is a truncated answer: never accept a
+      // fragment from inside it as the whole
+      if (end < 0) break;
+      try {
+        return JSON.parse(body.slice(i, end + 1));
+      } catch {
+        i = end; // a brace in prose: look past it
+      }
+    }
   }
+  const plain = !/[{[]/.test(text);
+  try {
+    appLog('text.parseFail', { plain, length: text.length, head: text.slice(0, 240), tail: text.slice(-240) });
+  } catch {
+    /* logging never breaks generation */
+  }
+  if (plain) throw new Error('The model answered in plain text instead of the expected data. Please try again.');
+  throw new Error('The model returned data that could not be read (incomplete or malformed). Please try again.');
+}
+// index of the bracket closing the one at `start`, honouring strings; -1 when unbalanced
+function balancedEnd(s, start) {
+  const stack = [];
+  let inStr = false;
+  for (let i = start; i < s.length; i++) {
+    const c = s[i];
+    if (inStr) {
+      if (c === '\\') i++;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === '{' || c === '[') stack.push(c === '{' ? '}' : ']');
+    else if (c === '}' || c === ']') {
+      if (stack.pop() !== c) return -1;
+      if (!stack.length) return i;
+    }
+  }
+  return -1;
 }
 
 // Which key the selected text service needs; returns the error code the UI
@@ -99,7 +141,17 @@ export function textKeyError(settings) {
 async function callClaudeCli(settings, { system, user }) {
   const bridge = typeof window !== 'undefined' ? window.claudeCliBridge : null;
   if (!bridge) throw new Error('NO_CLAUDE_CLI');
-  const res = await bridge.run({ system, user, model: settings.model || '' });
+  // The console takes text only: a request that attaches reference photos
+  // (content blocks) is flattened to its text, and the model is told the
+  // photos exist but are not attached — otherwise "[object Object]" went
+  // down the pipe and the answer was garbage.
+  let text = user;
+  if (Array.isArray(user)) {
+    const images = user.filter((b) => b?.type === 'image').length;
+    text = user.filter((b) => b?.type === 'text').map((b) => b.text).join('\n\n');
+    if (images) text = `(${images} reference photo${images > 1 ? 's are' : ' is'} attached in the app but not available to this console session — work from the text; where the task says to match attached photos, follow the written descriptions instead.)\n\n${text}`;
+  }
+  const res = await bridge.run({ system, user: String(text || ''), model: settings.model || '' });
   if (!res?.ok) {
     const err = new Error(res?.error || 'Claude Code CLI failed.');
     err.status = 0;
