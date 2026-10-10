@@ -920,3 +920,81 @@ a project (NOT_READY, "split the original project instead").
 **Verified.** Dev app: a seeded scene part at Stage 3 shows the parent
 banner and no split block; an ordinary project still shows it; the agent's
 split call on the part is refused.
+
+---
+
+## 23. Location reference no longer fixes the camera viewpoint
+
+**Problem.** Once a scene had a location reference (e.g. the one cut from its
+first frame), Gemini copied that photo's viewpoint into every frame and
+pasted the characters into it: shot / reverse shot and low or high angles all
+came out with the same background, whatever the prompt's (layout) camera said.
+The only instruction sent with the photo was "match its architecture, colors
+and lighting".
+
+**Behaviour.** The location photos are now described as showing the place
+only, not the shot's camera view: the model is told to take the place's
+materials, colours and lighting from them and compose the frame from the
+camera in the prompt (angle, height, lens, facing direction), showing only
+what lies behind the subject from that side, without copying the reference's
+viewpoint, framing or layout. Same rule for several locations.
+
+**Files.** `src/stages/Stage5.jsx` (`genImage`).
+
+---
+
+## 23. Layout camera: minimum distances, lenses that keep the framing, no obstruction
+
+**Request.** After §12 the planner's cameras came out worse: right up
+against the characters in almost every shot, or behind an interior object.
+
+**Cause.** `fitCamera` set the distance from the frame height with a fixed
+lens per framing; in a vertical (9:16) frame the vertical field of view is
+the wide side, so the same frame height is reached from half the distance
+(a medium shot at 50 mm from 1.9 m, a medium close-up from 1.3 m) — the
+figures were right in size but the camera stood in the actors' faces; and
+nothing checked what stood between the lens and the subject.
+
+**Fix (`src/lib/spatial/build.js`).**
+- Each framing has a frame height AND a closest distance (ECU 0.8 m, CU
+  1.4, MCU 2.0, medium 2.8, medium-full / two-shot 3.5, full 4.5, wide 6,
+  extreme wide 10; 1.2 m when the shot type has no framing word).
+  `lensAndDistance` picks, among the lenses that reach the height from at
+  least that distance, the one that stands nearest — the longest lens that
+  works — so a vertical close-up is an 85 mm from about 1.4 m and a medium
+  an 85 mm from ~3.5 m, never a wide lens in the face; when even 85 mm is
+  too wide for the height at the minimum, the camera stays at the minimum,
+  a touch looser than asked.
+- `cameraBlocked` walks the line of sight to the target and reports a set
+  box taller than the sight line in the way, a camera standing inside a
+  box, or on top of a present character; `unblockCamera` then swings the
+  camera around the target in growing steps on the same side of the line
+  of action, raises it to look over the box, or changes the distance —
+  the first clear position wins. Applied to every planner camera after the
+  fit and the side rule.
+- The planner prompt states the minimum distances and the clear line of
+  sight.
+
+**Verified.** In the dev app with the pure functions: lens / distance per
+framing on 9:16 and 16:9; a camera planned 1 m from a character at 85 mm
+for a medium shot; a camera behind a counter moved to the open side; a
+camera inside a wall box moved out. **Not run with the real planner model.**
+
+---
+
+## 24. The agent knows the H3 prompt rules
+
+**Request.** The agent must be familiar with MiniMax H3 prompt-writing,
+especially dialogue and direct speech.
+
+**Behaviour.** New read-only tool `storyreel_h3_rules`: the exact H3 brief
+the app's writer is given (`H3_SYSTEM`, now exported), the six-section
+keyframe format, and the take / reference / dialogue conventions.
+`storyreel_set_prompt` kind video on H3 is checked (`h3PromptProblems`):
+the three fields, `non_diegetic_music: N/A`, every line inside
+`<d>[English] …</d>` with a speaker ID when the shot has dialogue, no
+non-English tags, no speech in the soundscape, no invented lines on a
+silent shot — a failing prompt is refused with the reasons. Guide: a new
+section "Writing MiniMax H3 prompts yourself (dialogue and direct
+speech)". Verified in the dev app: the tool's content, a bad prompt
+refused with its reasons, a correct one accepted.

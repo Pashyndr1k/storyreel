@@ -17,7 +17,7 @@ import { agentScope, waitScope, inAgentCall, takeAgentAlerts } from './registry.
 import { still, contactSheet, videoFrame, audioReport } from './evidence.js';
 import { newProject, uid } from '../storage.js';
 import { generateJSON, textKeyError } from '../claude.js';
-import { smartEditPrompt, voiceSourceFor } from '../prompts.js';
+import { smartEditPrompt, voiceSourceFor, H3_SYSTEM, H3_MULTI_FORMAT } from '../prompts.js';
 import { computeSmartPatch } from '../../components/SmartEditModal.jsx';
 import { shotCastRefs } from '../castRefs.js';
 import { locationsOf, shotLocationRefs } from '../sceneLocations.js';
@@ -298,6 +298,25 @@ const nativeVoiceEngine = () => {
 };
 const voiceSourceOf = (project, shotId) => (nativeVoiceEngine() ? 'native' : voiceSourceFor(project, shotId));
 
+// What a hand-written H3 video prompt must have (the app's own writer obeys
+// H3_SYSTEM; an agent's text is checked for the parts that break a render).
+export function h3PromptProblems(text, shot) {
+  const problems = [];
+  const t = String(text || '');
+  if (!/integrated_multimodal_description\s*:/i.test(t)) problems.push('Missing the "integrated_multimodal_description:" field (the main body along the timeline).');
+  if (!/overall_soundscape\s*:/i.test(t)) problems.push('Missing the "overall_soundscape:" field.');
+  if (!/non_diegetic_music\s*:\s*N\/A/i.test(t)) problems.push('"non_diegetic_music:" must be exactly N/A (StoryReel scores the film in the edit).');
+  const hasLine = (shot?.dialogue || '').trim() !== '';
+  const dTags = t.match(/<d>\s*\[English\][^<]*<\/d>/g) || [];
+  if (hasLine && !dTags.length) problems.push('The shot has dialogue but no <d>[English] …</d> tag: every spoken line must be inside one, in English, with a speaker ID such as (S1) before it — H3 speaks exactly what is in the tags.');
+  if (/<d>\s*\[(?!English\])/i.test(t)) problems.push('Every <d> tag must start with [English]: translate the line, keep the names.');
+  if (dTags.length && !/\(S\d(,\s*S\d)*\)/.test(t)) problems.push('Give each speaker a stable ID — (S1), (S2) — before the <d> tag.');
+  const sound = t.split(/overall_soundscape\s*:/i)[1]?.split(/non_diegetic_music/i)[0] || '';
+  if (/<d>/.test(sound)) problems.push('No dialogue in overall_soundscape: speech belongs in the main body only.');
+  if (!hasLine && dTags.length) problems.push('The shot has no dialogue, yet the prompt makes someone speak: do not invent lines.');
+  return problems;
+}
+
 async function createMedia({ projectId, shotId, kind, seed }) {
   const spec = MEDIA[kind] || fail('BAD_INPUT', `kind must be one of: ${Object.keys(MEDIA).join(', ')}.`);
   const project = projectOf(projectId);
@@ -485,6 +504,21 @@ export const TOOLS = [
     description: 'Read this first. The operating guide for StoryReel: the pipeline, the checks to run at every stage, how to fix failures, the four-attempt rule and the flag system.',
     inputSchema: schema({}),
     run: async () => ({ guide: GUIDE }),
+  },
+  {
+    name: 'storyreel_h3_rules',
+    description: 'The prompt-writing rules of MiniMax H3 exactly as StoryReel\'s own prompt writer is given them — the three fields, speaker IDs and <d>[English] …</d> direct speech, how dialogue and monologue are described, internal cuts ([Shot N] At MM:SS.mmm), the detail standard, the soundscape and the "N/A" music rule — plus the keyframe (MULTI) format and the take / reference conventions. Read before writing or judging an H3 video prompt (storyreel_set_prompt kind "video", storyreel_review_shot). Free.',
+    inputSchema: schema({}),
+    run: async () => ({
+      system: H3_SYSTEM,
+      multiFormat: H3_MULTI_FORMAT,
+      conventions: [
+        'A GROUP TAKE (several shots in one generation, project.shotGroups) is ONE video_prompt under the lead shot: [Shot 1] with no timestamp, every later segment "[Shot N] At MM:SS.mmm" at the take\'s cut times, <scenetrans> at each cut, continuity across the cuts; the members get no prompt of their own.',
+        'REFERENCE MODE (shotRefs / an extended take): open with subject bindings — "<Subject 1> is the woman from <Picture 1>" — state retention ("Use <Picture 1> exactly as it is"), and mention every attached reference by its label; MULTI-FRAME mode uses the six-section keyframe format instead of the three fields.',
+        'Dialogue: every line of the script is spoken in the video (there is no separate voice track on H3). Describe the exchange — who speaks to whom, delivery, pauses, the listener\'s reactions — and put the words, and only the words, inside <d>[English] …</d> after the speaker\'s ID. Never drop, add or reorder lines; split a long line exactly as the script does.',
+        'The app\'s own writer (storyreel_create_prompts) already obeys all of this; rewrite by hand only when you must, and keep the format.',
+      ],
+    }),
   },
   {
     name: 'storyreel_status',
@@ -815,11 +849,15 @@ export const TOOLS = [
   },
   {
     name: 'storyreel_set_prompt',
-    description: 'Stage 5: replace a shot\'s prompt with your own text (kind: "image", "video" or "voice"). Free — does not count as an attempt; the media made from it does.',
+    description: 'Stage 5: replace a shot\'s prompt with your own text (kind: "image", "video" or "voice"). A video prompt on MiniMax H3 must follow the H3 format — read storyreel_h3_rules first: the three fields (integrated_multimodal_description / overall_soundscape / non_diegetic_music: N/A), every spoken line inside <d>[English] …</d> with a speaker ID, the soundscape without dialogue — a prompt that breaks these is refused. Free — does not count as an attempt; the media made from it does.',
     inputSchema: schema({ ...PROJECT, shotId: { type: 'string' }, kind: { type: 'string', enum: ['image', 'video', 'voice'] }, text: { type: 'string' } }, ['projectId', 'shotId', 'kind', 'text']),
     run: async ({ projectId, shotId, kind, text }) => {
-      findShot(projectOf(projectId), shotId);
+      const { shot } = findShot(projectOf(projectId), shotId);
       const key = { image: 'imagePrompt', video: 'videoPrompt', voice: 'voicePrompt' }[kind] || fail('BAD_INPUT', 'kind must be image, video or voice.');
+      if (kind === 'video' && nativeVoiceEngine()) {
+        const problems = h3PromptProblems(String(text), shot);
+        if (problems.length) fail('BAD_INPUT', `Not a valid MiniMax H3 prompt: ${problems.join(' ')} Read storyreel_h3_rules.`);
+      }
       patchProject(projectId, (q) => ({ shotPrompts: { ...q.shotPrompts, [shotId]: { ...(q.shotPrompts[shotId] || {}), [key]: String(text) } } }));
       await settle();
       return { set: key };
@@ -936,7 +974,7 @@ let running = null;
 export async function callAgent(method, params = {}) {
   const tool = TOOLS.find((t) => t.name === method);
   if (!tool) return { ok: false, error: { code: 'UNKNOWN_TOOL', message: `No tool named "${method}".` } };
-  const readOnly = ['storyreel_guide', 'storyreel_status', 'storyreel_list_projects', 'storyreel_get_project', 'storyreel_list_styles', 'storyreel_list_flags', 'storyreel_get_layout', 'storyreel_drama_rules', 'storyreel_drama_check', 'storyreel_assets', 'storyreel_transitions', 'storyreel_subtitles'].includes(method);
+  const readOnly = ['storyreel_guide', 'storyreel_status', 'storyreel_list_projects', 'storyreel_get_project', 'storyreel_list_styles', 'storyreel_list_flags', 'storyreel_get_layout', 'storyreel_drama_rules', 'storyreel_drama_check', 'storyreel_assets', 'storyreel_transitions', 'storyreel_subtitles', 'storyreel_h3_rules'].includes(method);
   if (running && !readOnly) return { ok: false, error: { code: 'BUSY', message: `StoryReel is still running "${running}". Wait for it to finish.` } };
   if (!readOnly) running = method;
   if (!readOnly) appLog('agent.call', { tool: method, ...(params?.projectId ? { projectId: params.projectId } : {}), ...(params?.shotId ? { shotId: params.shotId } : {}), ...(params?.kind ? { kind: params.kind } : {}) });

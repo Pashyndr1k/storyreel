@@ -1,47 +1,67 @@
 // "Build layout": the text model reads the scene and its shots and places the
 // characters, a few set boxes and the camera for every shot. The result is a
 // starting point the user adjusts in the 3D window.
-import { layoutFor, namedInShot, sceneCast, normalizeChar, normalizeCamera, normalizeProp, LENSES, POSES, MAX_PROPS, POSE_TOP, verticalFov, aspectValue, actionAxis, cameraSide, mirrorCamera, crossesLineOnPurpose } from './layout.js';
+import { layoutFor, namedInShot, sceneCast, normalizeChar, normalizeCamera, normalizeProp, LENSES, POSES, MAX_PROPS, POSE_TOP, verticalFov, aspectValue, actionAxis, cameraSide, mirrorCamera, crossesLineOnPurpose, cameraPosition } from './layout.js';
 import { cameraFrame } from './describe.js';
 
 // ---- framing from the shot type
 // The frame height at the subject (metres) a shot size implies, and the lens
 // that suits it. Read from the words of the shot type ("low-angle medium
 // close-up"); the order matters (extreme close-up before close-up, …).
+// Each framing: the frame height at the subject (metres) and the CLOSEST the
+// camera may stand (metres) — a real camera never sits in an actor's face;
+// the lens is then chosen so the framing holds from at least that distance.
 const FRAMINGS = [
-  [/extreme[- ]close|\becu\b|macro|detail shot/i, 0.28, 85],
-  [/medium[- ]close|\bmcu\b/i, 0.95, 50],
-  [/close[- ]?up|\bcu\b/i, 0.55, 85],
-  [/medium[- ]full|cowboy|american/i, 2.1, 35],
-  [/over[- ]the[- ]shoulder|\bots\b/i, 1.1, 50],
-  [/two[- ]shot/i, 2.2, 35],
-  [/medium|\bms\b|mid[- ]shot/i, 1.4, 50],
-  [/full[- ]?(shot|body|figure|length)|\bfs\b|head[- ]to[- ]toe/i, 3.0, 35],
-  [/extreme[- ]wide|\bews\b|\bels\b|establishing|aerial|drone|bird/i, 12, 18],
-  [/wide|\bws\b|\bls\b|long shot|master/i, 6, 24],
-  [/insert/i, 0.4, 85],
+  [/extreme[- ]close|\becu\b|macro|detail shot/i, 0.3, 0.8],
+  [/medium[- ]close|\bmcu\b/i, 1.0, 2.0],
+  [/close[- ]?up|\bcu\b/i, 0.6, 1.4],
+  [/medium[- ]full|cowboy|american/i, 2.2, 3.5],
+  [/over[- ]the[- ]shoulder|\bots\b/i, 1.1, 2.0],
+  [/two[- ]shot/i, 2.3, 3.5],
+  [/medium|\bms\b|mid[- ]shot/i, 1.5, 2.8],
+  [/full[- ]?(shot|body|figure|length)|\bfs\b|head[- ]to[- ]toe/i, 3.2, 4.5],
+  [/extreme[- ]wide|\bews\b|\bels\b|establishing|aerial|drone|bird/i, 12, 10],
+  [/wide|\bws\b|\bls\b|long shot|master/i, 6, 6],
+  [/insert/i, 0.45, 0.8],
 ];
 export function framingOf(shotType) {
   const t = String(shotType || '');
   const hit = FRAMINGS.find(([re]) => re.test(t));
-  return hit ? { height: hit[1], lens: hit[2] } : null;
+  return hit ? { height: hit[1], minDist: hit[2] } : null;
 }
 const rad = (d) => (d * Math.PI) / 180;
+const MIN_DIST = 1.2; // no framing word: never closer than this
 
-// Fit the camera to the shot type: the distance that gives the shot size at
-// the target with the lens (a lens more than one step off the one the size
-// suits is replaced — a telephoto planned for a wide view puts the camera in
-// the subject's face), then, for medium shots and wider, far enough back
-// that every named present character is inside the frame.
+// The lens and distance that give the frame height from no closer than
+// minDist: of the lenses that reach the height from at least minDist, the
+// one that stands nearest (the longest lens that works — flattering, and
+// out of the actors' way); when even the longest lens is too wide for the
+// height at minDist, the camera stays at minDist with the longest lens
+// (a touch looser than asked). The frame's aspect ratio is in verticalFov.
+export function lensAndDistance(height, minDist, aspect) {
+  let best = null;
+  for (const lens of LENSES) {
+    const d = height / (2 * Math.tan(rad(verticalFov(lens, aspect)) / 2));
+    // nearest to the minimum: standing further back costs little, standing
+    // closer than the minimum costs three times as much
+    const score = d >= minDist ? d - minDist : (minDist - d) * 3;
+    if (!best || score < best.score) best = { lens, dist: Math.max(d, minDist * 0.9), score };
+  }
+  return { lens: best.lens, dist: best.dist };
+}
+
+// Fit the camera to the shot type: the lens and distance the framing calls
+// for (never closer than the framing's minimum), then, for medium shots and
+// wider, far enough back that every named present character is in frame.
 export function fitCamera(cam, shotType, aspect, heads = []) {
   const f = framingOf(shotType);
   const out = { ...cam };
   if (f) {
-    if (Math.abs(LENSES.indexOf(out.lens) - LENSES.indexOf(f.lens)) > 1) out.lens = f.lens;
-    const tanV = Math.tan(rad(verticalFov(out.lens, aspect)) / 2);
-    out.dist = f.height / (2 * tanV);
-  }
-  if (heads.length && (!f || f.height >= 1.4)) {
+    const ld = lensAndDistance(f.height, f.minDist, aspect);
+    out.lens = ld.lens;
+    out.dist = ld.dist;
+  } else if (out.dist < MIN_DIST) out.dist = MIN_DIST;
+  if (heads.length && (!f || f.height >= 1.5)) {
     // at most twice the framing's distance: a medium shot may become a
     // full shot to hold everyone, never a wide one (the warnings say the rest)
     const maxDist = f ? out.dist * 2 : 40;
@@ -56,6 +76,53 @@ export function fitCamera(cam, shotType, aspect, heads = []) {
     }
   }
   return normalizeCamera(out);
+}
+
+// ---- obstruction: set pieces and people between the camera and its target
+const inFootprint = (pr, x, z) => {
+  // the box's footprint, rotated by its facing
+  const a = rad(-pr.rot);
+  const dx = x - pr.x;
+  const dz = z - pr.z;
+  const lx = dx * Math.cos(a) - dz * Math.sin(a);
+  const lz = dx * Math.sin(a) + dz * Math.cos(a);
+  return Math.abs(lx) <= pr.w / 2 && Math.abs(lz) <= pr.d / 2;
+};
+// Is the line of sight from the camera to its target blocked by a set box
+// (taller than the sight line where it crosses), or is the camera standing
+// inside a box or on top of a present character?
+export function cameraBlocked(cam, props, chars = []) {
+  const p = cameraPosition(cam);
+  const t = { x: cam.tx, y: cam.ty, z: cam.tz };
+  for (const pr of props) if (inFootprint(pr, p.x, p.z) && pr.h > p.y - 0.1) return 'inside';
+  for (const c of chars) if (!c.off && Math.hypot(c.x - p.x, c.z - p.z) < 0.6) return 'person';
+  const steps = 24;
+  for (let k = 1; k < steps; k++) {
+    const f = k / steps;
+    const x = p.x + (t.x - p.x) * f;
+    const y = p.y + (t.y - p.y) * f;
+    const z = p.z + (t.z - p.z) * f;
+    for (const pr of props) if (pr.h > y && inFootprint(pr, x, z) && !inFootprint(pr, t.x, t.z)) return 'blocked';
+  }
+  return null;
+}
+
+// Move a blocked camera: swing it around the target in growing steps on
+// the same side of the line of action, then raise it to look over the box;
+// the first clear position wins. Returns the camera (unchanged when clear).
+export function unblockCamera(cam, props, chars = [], keepSideOf = null) {
+  if (!cameraBlocked(cam, props, chars)) return cam;
+  const sideOk = (c) => !keepSideOf || cameraSide(keepSideOf.axis, c) === keepSideOf.side || cameraSide(keepSideOf.axis, c) === 0;
+  const tries = [];
+  for (const step of [15, -15, 30, -30, 45, -45, 60, -60, 80, -80]) tries.push({ ...cam, yaw: cam.yaw + step });
+  for (const pitch of [25, 40]) tries.push({ ...cam, pitch });
+  for (const step of [15, -15, 30, -30, 45, -45]) tries.push({ ...cam, yaw: cam.yaw + step, pitch: 30 });
+  tries.push({ ...cam, dist: cam.dist * 1.3 }, { ...cam, dist: cam.dist * 0.75 });
+  for (const t of tries) {
+    const c = normalizeCamera(t);
+    if (!cameraBlocked(c, props, chars) && sideOk(c)) return c;
+  }
+  return cam;
 }
 
 // Keep the camera on the side of the line it had in the previous shot (the
@@ -96,7 +163,7 @@ RULES
 - CONTINUITY: a character stays exactly where they were in the previous shot unless this shot's action moves them; then move them only as far as the action says. Never swap two characters' places.
 - People who talk to each other face each other, 1 to 1.5 metres apart. Nobody stands closer than 0.6 metres to anyone else. People walking together face the same way.
 - THE LINE: for two characters in conversation, keep the camera on the same side of the line between them for the whole scene, so the one on screen-left stays on screen-left. Cross the line only when a shot's description demands it.
-- FRAMING: choose distance and lens from the shot type — extreme close-up: 85 mm at about 1 m; close-up: 85 mm at 1.5–2.5 m; medium close-up: 50 mm at 2–2.5 m; medium: 50 mm at 3–4 m; full: 35 mm at 5–6 m; wide: 24 mm at 6–9 m; extreme wide: 18 mm at 10 m or more. Low angle: negative elevation with the camera low; high angle: elevation 25–45; top-down: elevation 80; ground-level: target_height 0.3 and elevation 0 to -10.
+- FRAMING: choose distance and lens from the shot type — extreme close-up: 85 mm at about 1 m; close-up: 85 mm at 1.5–2.5 m; medium close-up: 50 mm at 2–2.5 m; medium: 50 mm at 3–4 m; full: 35 mm at 5–6 m; wide: 24 mm at 6–9 m; extreme wide: 18 mm at 10 m or more. The camera never stands closer than 1.2 m to anyone (0.8 m for an extreme close-up) and never inside a set piece; nothing may stand between the camera and its subject — place the camera on the open side of tables, counters and walls, or above them. Low angle: negative elevation with the camera low; high angle: elevation 25–45; top-down: elevation 80; ground-level: target_height 0.3 and elevation 0 to -10.
 - The camera must see every PRESENT character the shot's action or dialogue names. Aim it ("aim_at") at the character who is the subject of the shot, or give target_x / target_z for a group.
 - Add up to ${MAX_PROPS} set pieces as plain boxes: ALWAYS the landmarks that define the place and its background (the window, the shop front, the door, the counter, the bar, the table, the bed, the car, a wall with a sign) and anything the action uses. They do not move between shots.
 - THE SET KEEPS ITS SIDE: because the set pieces never move, a camera that stays on one side of the action keeps the window / door / counter on the same side of the screen in every shot. Placing the camera on the opposite side (yaw about 180° away, so the background swaps sides) is a line crossing: do it only when the shot's description asks for it.`,
@@ -160,6 +227,12 @@ export function layoutFromModel(project, scene, shots, data) {
     // camera stays on its side of the line
     camera = fitCamera(camera, shot.shotType, aspect, namedHeads(project, shot, cast, chars));
     camera = keepSide(prevLayout, { chars, camera }, cast, shot);
+    // nothing between the lens and the subject, nobody under the tripod
+    {
+      const axis = actionAxis(chars, cast, camera);
+      const side = axis ? cameraSide(axis, camera) : 0;
+      camera = unblockCamera(camera, out.props, Object.values(chars), axis && side ? { axis, side } : null);
+    }
     if (Object.keys(chars).length) {
       out.shots[shot.id] = { chars, camera };
       prevChars = chars;

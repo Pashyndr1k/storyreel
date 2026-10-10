@@ -178,6 +178,46 @@ Conventions: metres; x to the right, z toward the default camera;
 `facingDeg` 0 = toward +z, 90 = +x, 180 = -z, 270 = -x; `yawDeg` is where
 the camera stands around its target (0 = the +z side).
 
+## Writing MiniMax H3 prompts yourself (dialogue and direct speech)
+
+`storyreel_create_prompts` writes H3 prompts in the model's own format; when
+you rewrite one with `storyreel_set_prompt` kind `video`, or judge one in a
+review, read `storyreel_h3_rules` first — it is the exact brief the app's
+writer works from. The parts that break a render if you get them wrong:
+
+- Three fields, as one text block: `integrated_multimodal_description:`
+  (the body, along the timeline), `overall_soundscape:` (ambience and
+  effects, 1–4 sentences, NEVER dialogue, no music), `non_diegetic_music:
+  N/A` (always — the film is scored in the edit).
+- Direct speech: every line of the script is spoken in the video. Give the
+  speaker a stable ID on first appearance with their voice identity — "The
+  woman (S1), mid-thirties, low warm voice, says:" — and put the words, and
+  only the words, inside `<d>[English] …</d>`. Identity, action and
+  delivery stay OUTSIDE the tag. The words are English: translate a line
+  written in another language, keep names. Never drop, add, shorten or
+  reorder the script's lines; split a long line across beats exactly as
+  the script does. A prompt that only says "she speaks" is wrong; a prompt
+  that invents a line for a silent shot is wrong.
+- Describe the exchange, not only its words: who speaks to whom and in what
+  order, tone, volume, pace, pauses, and what the listener does meanwhile.
+  A voiceover uses the phrase "says in an off-screen voiceover" and states
+  after the tag that the lips stay closed.
+- Internal cuts: `[Shot 1]` has no timestamp; later cuts are `[Shot 2] At
+  00:03.500` inside the shot's duration, at most one cut per two seconds,
+  each introducing new information. A take (several shots in one
+  generation) is one prompt with the cuts at the take's times and
+  `<scenetrans>` at each.
+- Reference mode binds each reference to a role ("<Subject 1> is the woman
+  from <Picture 1>", "Use <Picture 1> exactly as it is") and names every
+  attached reference; MULTI mode uses the six-section keyframe format.
+- Detail standard: the body is long and exact (typically 150–350 words),
+  beat by beat — the camera's move or its stillness, every person's action,
+  diegetic sound synchronized to the action — structured, not adjectives.
+
+`storyreel_set_prompt` refuses a video prompt on H3 that lacks the three
+fields, puts speech outside `<d>[English] …</d>`, omits speaker IDs, puts
+dialogue in the soundscape, or gives lines to a silent shot.
+
 ## Extended shots (Stage 4 option)
 
 `storyreel_run_stage` 4 with `mode: "extended"` cuts a scene into complex

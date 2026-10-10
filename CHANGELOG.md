@@ -22,6 +22,11 @@
   open in a pop-up from the Render button.
 - **No second split.** A project that is itself a part (an episode project
   or a scene part) is not split again at Stage 3.
+- **Layout camera.** The planner's cameras keep a minimum distance per
+  shot size with a lens that holds the framing, and never shoot through a
+  set piece.
+- **H3 prompt rules for the agent.** A tool returns the H3 prompt brief;
+  hand-written video prompts are checked for the dialogue format.
 - **Nested projects.** A project split into episode projects or parts is
   one card on the main screen; click it for a pop-up with the projects
   inside as compact rows, each with open, duplicate, archive, delete and

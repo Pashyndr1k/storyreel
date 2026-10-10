@@ -193,3 +193,5 @@ camera changes in one H3 take; the sub-shots come back as consecutive shots
 grouped in a take, `breakdownMode` on the project). On MiniMax H3
 `storyreel_create_media` kind `voice` is refused: the lines are in the video
 prompt and the model speaks them.
+
+| `storyreel_h3_rules` | The MiniMax H3 prompt brief (three fields, <d>[English] …</d> direct speech, internal cuts, keyframe format, take / reference conventions). | no |

@@ -920,8 +920,13 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
             return { name: g.name, n };
           })
           .filter((g) => g.n);
+        // The reference shows the PLACE, not the shot: without saying so the
+        // model keeps the photo's viewpoint and pastes the people into it, so
+        // every frame of the scene gets the same background whatever the
+        // prompt's (layout) camera says.
+        const viewRule = ' It shows the place only, NOT the camera view of this shot: compose the frame from the camera the prompt describes (angle, height, lens, direction it faces), showing only the part of the place that lies behind the subject from that side; do not copy the reference photo\'s viewpoint, framing or layout.';
         if (shown.length === 1) {
-          text += ` The location/environment is shown in ${range(useLoc.length)} — match its architecture, colors and lighting.`;
+          text += ` The location/environment is shown in ${range(useLoc.length)} — use it for the place's materials, colors and lighting.${viewRule}`;
           off += useLoc.length;
         } else {
           const parts = shown.map((g) => {
@@ -929,7 +934,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
             off += g.n;
             return part;
           });
-          text += ` The shot's locations/environments are shown as follows: ${parts.join('; ')}. Match each one's architecture, colors and lighting where the prompt places it.`;
+          text += ` The shot's locations/environments are shown as follows: ${parts.join('; ')}. Use each one for its materials, colors and lighting where the prompt places it.${viewRule.replace('It shows the place', 'Each shows the place')}`;
         }
       }
       if (useAssets.length) {

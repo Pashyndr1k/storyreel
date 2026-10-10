@@ -1053,7 +1053,7 @@ const H3_CAMERA = `Camera vocabulary (motion type, then OPTIONAL amplitude and s
 - speed (only when it matters): "at slow speed" | "at fast speed"
 Example: "The camera pushes in with small amplitude at slow speed toward the folded letter in her hands."`;
 
-const H3_SYSTEM = `You write prompts for MiniMax H3, an omni-modal video model that generates picture AND stereo audio in a single pass.
+export const H3_SYSTEM = `You write prompts for MiniMax H3, an omni-modal video model that generates picture AND stereo audio in a single pass.
 
 Respond with VALID JSON ONLY. No markdown, no commentary.
 
