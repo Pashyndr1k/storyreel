@@ -414,3 +414,99 @@ ranking Stage 1 directions, prompt–shot agreement, best-of-N prompts,
 agent triage, policy pre-check), what it is not for, how it would be wired
 (`src/lib/jev.js`, a semantic layer on the genre check, a Settings key),
 and the adoption order. No code.
+
+---
+
+## 10. Story assets: cards at Stage 2, context-true images, automatic attachment
+
+**Request.** Identify the assets characters interact with (objects used in
+actions across shots, repeatedly mentioned), give them cards like the
+characters': an "Assets" tab at Stage 2, each card with a description and an
+uploaded or generated image; the look must match the story's world (a key
+in sci-fi vs medieval fantasy); unique English names the generation models
+cannot misread; automatic attachment to the scenes / shots that mention
+them.
+
+**Behaviour.**
+- Data: `project.storyline.assets[] = { id, name, type (prop | wardrobe |
+  logo | ui | other), description, photos[≤3], libId?, mentions? }`
+  (normalised in `migrateProject`). A card mirrors to a library `asset`
+  entry (`useLibrarySync`, id `liba_<project>_<asset>`) once it has a photo or
+  is attached to a shot, so Stage 5's per-shot references (`shotAssets`,
+  `assetsFor`) resolve it unchanged.
+- **Stage 2** now has two tabs under the synopsis / cover: Characters (the
+  cast and groups as before) and **Assets**. A card: name (unique English
+  label; live warning for empty / non-Latin / duplicate (against characters,
+  groups, locations, assets) / too generic), type, description, "in N shots"
+  badge, up to three reference images with upload, "from the assets
+  library", and **Create an image from the description** (Gemini,
+  `assetImagePrompt`: the object alone on a neutral background, rendered in
+  the story's genre / world from the synopsis, with the project's image
+  style). Buttons: "+ Add asset", **Find assets** (the text model lists the
+  story's key objects from synopsis, scenes and shots — `findAssetsPrompt`:
+  3–12 recurring objects, each a 2–3-word unique label such as "Halvard
+  Signet Ring", a description in the story's world written for an image
+  model, a type, and the words the script uses — new names added as cards),
+  "Attach to shots".
+- The Stage 2 storyline generation now proposes assets too (`stage2Prompt`
+  schema gains `assets[{ name, description }]`); regenerating the storyline
+  keeps cards that already carry images and adds the new names.
+- **Names in scripts and prompts.** Asset names join `cardNames`, so every
+  script stage is told to use them verbatim and the name enforcement puts
+  Cyrillic forms back to the card name; `characterBlock` (used by Stage 3,
+  Stage 4, the series plan, the H3 prompt and the image prompt writer)
+  appends a KEY ASSETS block — exact names, descriptions — so shots mention
+  the object by name and image prompts describe it as the card does.
+- **Automatic attachment** (`syncShotAssets`): every shot whose action,
+  dialogue or notes names an asset (exact name, tolerant of inflection) is
+  attached to its library entry; nothing attached by hand is removed. Runs
+  after every Stage 4 breakdown, whenever the cards change at Stage 2, from
+  the "Attach to shots" button, and from the agent. `assetUsage` drives the
+  badges.
+- **New project.** Templates reordered: Short drama first (then 10–30 s,
+  1–4 min, 5–10 min; the default selection stays 1–4 min). For Short drama
+  an **episode length** segment (60 / 90 / 120 s) sits beside the episode
+  count; defaults: 10 episodes (was 30), 90 s (was 105). `onCreate` /
+  `Home.create` / `newProject` carry `episodeSeconds`; the agent's
+  `storyreel_create_project` accepts it.
+- **Agent.** `storyreel_assets` (cards + the scenes' locations as
+  environment references), `storyreel_set_asset` (create / edit / delete,
+  name validation), `storyreel_asset_image` (render the card's reference;
+  attempt `asset:<id>:image`), `storyreel_find_assets` (attempt),
+  `storyreel_sync_assets`; `storyreel_get_project` returns `assets`;
+  `storyreel_review_shot` returns `expected.assets` (name, description,
+  whether a reference exists, what to check) and `expected.environments`,
+  and its reference images are labelled "REFERENCE — asset … must look like
+  this" / "REFERENCE — location …", including assets the shot names but is
+  not attached to; new flag kind `asset`. Guide: "Assets and environments"
+  (give cards images, sync, compare the render with the card, flag
+  `asset` / `environment`, fix the description or the prompt).
+
+**Files.** `src/lib/storyAssets.js`, `src/components/StoryAssets.jsx`,
+`src/lib/agent/assetTools.js` (new); `src/lib/prompts.js`, `src/lib/storage.js`,
+`src/lib/series.js`, `src/lib/useLibrarySync.js`, `src/stages/Stage2.jsx`,
+`src/stages/Stage4.jsx`, `src/components/NewProjectModal.jsx`,
+`src/pages/Home.jsx`, `src/lib/agent/api.js`, `agent/AGENT_GUIDE.md`,
+`docs/agent-api.md`, `src/styles.css`. i18n: `s2.tabCast*`, `s2.tabAssets*`,
+`asset.*` (intro, name / description / type / photos, used, remove, genImage,
+needsDesc, add, find, noneFound, sync, synced, issue_*), `new.epSeconds*`.
+
+**Verified.** In the dev app: `syncShotAssets` on Russian shot text naming
+two assets (both attached, libIds assigned, the unmentioned one untouched),
+`assetUsage`, the name checks (ok / generic / duplicate / non-Latin),
+`cardNames` with assets, the KEY ASSETS block in the Stage 4 prompt, the
+Stage 2 schema, the find prompt; the Assets tab (cards, Find assets with
+the model stubbed adding only new names, Create image with Gemini stubbed,
+the library entry created by the sync hook); the agent's list / create
+(duplicate name refused) / edit / sync / image / review (`expected.assets`
+and the labelled reference) / delete; the new-project modal (order, 10
+episodes, 60 / 90 / 120 with 90 preset; creating with 120 s stores
+episodeSeconds 120, 10 episodes, 9:16). Found and fixed on the way:
+`migrateProject` rebuilt the storyline without `assets` (cards vanished on
+reload). **Not run with real models**: the quality of found assets and of
+the rendered references is untested.
+
+**Open.** Asset images come from Gemini regardless of the image service
+(like character portraits). Attachment matches names, not the script's
+other words for the object (the "mentions" the finder returns are stored
+but not yet used for matching).

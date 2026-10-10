@@ -156,3 +156,15 @@ Units for the layout tools: metres; `facingDeg` 0 = toward +z, 90 = +x;
 | `storyreel_drama_fix` | `mechanical: true` → em dashes fixed project-wide; `sceneId` → the model rewrites that scene's shots against the issues, shot count and order kept. | scene rewrite: `scene:<id>:drama_fix` |
 
 `storyreel_update_project` accepts `dramaStyleId`; `storyreel_list_styles` has the `drama` category; `storyreel_get_project` returns `shortDrama` (sub-genre, landmarks, the plan's hook types / turns / questions) and `beat` on scenes and shots; `storyreel_review_shot` returns `expected.shortDrama`.
+
+## Added in 2.16: assets and environments
+
+| Tool | What it does | Attempt |
+| --- | --- | --- |
+| `storyreel_assets` | Asset cards (name, type, description, reference images, name problems, shots that name them) and the scenes' locations with photo counts. Read-only. | no |
+| `storyreel_set_asset` | Create / edit / delete a card. | no |
+| `storyreel_asset_image` | Render the card's reference image from its description in the story's world. | `asset:<id>:image` |
+| `storyreel_find_assets` | The text model lists the story's key objects as new cards. | `stage:find_assets` |
+| `storyreel_sync_assets` | Attach assets to the shots whose text names them. | no |
+
+`storyreel_create_project` accepts `episodeSeconds` (60 / 90 / 120); `storyreel_get_project` returns `assets`; `storyreel_review_shot` returns `expected.assets` / `expected.environments` and labelled reference images; flag kind `asset` added.

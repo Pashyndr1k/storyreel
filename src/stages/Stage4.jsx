@@ -1,4 +1,5 @@
 import { useAgentScope } from '../lib/agent/registry.js';
+import { syncShotAssets } from '../lib/storyAssets.js';
 import { BEATS, isShortDrama } from '../lib/shortDrama/rules.js';
 import DramaCheckModal from '../components/DramaCheckModal.jsx';
 import { SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC } from '../lib/config.js';
@@ -76,12 +77,12 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
   const blockOf = (s) => blockForScene(project.dynamicsPlan, project.outline.indexOf(s) + 1);
 
   const applyShots = (targetSceneId, rawShots, block) =>
-    update((p) => ({
-      sceneDetails: {
-        ...p.sceneDetails,
-        [targetSceneId]: { shots: mapShots(rawShots, block ? densityRange(block) : undefined) },
-      },
-    }));
+    update((p) => {
+      const sceneDetails = { ...p.sceneDetails, [targetSceneId]: { shots: mapShots(rawShots, block ? densityRange(block) : undefined) } };
+      // the story's assets attach to the shots that name them
+      const { patch } = syncShotAssets({ ...p, sceneDetails });
+      return { sceneDetails, ...patch };
+    });
 
   // for the agent: one scene by id, or every scene, each returning its promise
   useAgentScope('stage4', {

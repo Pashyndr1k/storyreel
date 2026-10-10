@@ -194,7 +194,7 @@ function projectDefaults() {
     lang: '', // '' = follow the app language; 'en'/'ru'/'uk' = per-project override
     scriptType: 'medium', // 'short' 10-30s | 'medium' 1-4min | 'long' 5-10min | 'series' short-drama serial (lib/series.js)
     episodeCount: 0, // series only: number of episodes (1-200)
-    episodeSeconds: 0, // series only: target length of one episode, seconds (30-600; default 105)
+    episodeSeconds: 0, // series only: target length of one episode, seconds (30-600; default 90)
     seriesPlan: null, // series master: { arcs, episodes, segmentSize, segments } — see lib/series.js
     seriesPart: null, // series segment project: { parentId, seriesTitle, total, from, to, episodes, … }
     splitCuts: [], // Stage 3 split: scene indices after which a new part starts (lib/split.js)
@@ -267,7 +267,7 @@ export function newProject({ title, logline, scriptType, aspectRatio, episodeCou
     scriptType: SCRIPT_TYPES.includes(scriptType) ? scriptType : 'medium',
     aspectRatio: isValidAspect(aspectRatio) ? aspectRatio : '16:9',
     episodeCount: scriptType === 'series' ? Math.max(1, Math.min(200, Math.round(Number(episodeCount) || 30))) : 0,
-    episodeSeconds: scriptType === 'series' ? Math.max(30, Math.min(600, Math.round(Number(episodeSeconds) || 105))) : 0,
+    episodeSeconds: scriptType === 'series' ? Math.max(30, Math.min(600, Math.round(Number(episodeSeconds) || 90))) : 0,
     scriptStyleId: scriptStyleId || '',
   };
 }
@@ -359,6 +359,18 @@ export function migrateProject(raw) {
                 name: g.name || '',
                 description: g.description || '',
                 memberIds: Array.isArray(g.memberIds) ? g.memberIds.filter((x) => typeof x === 'string') : [],
+              }))
+            : [],
+          // story assets: the objects characters handle across shots (lib/storyAssets.js)
+          assets: Array.isArray(p.storyline.assets)
+            ? p.storyline.assets.map((a) => ({
+                id: a.id || uid(),
+                name: a.name || '',
+                type: a.type || 'prop',
+                description: a.description || '',
+                photos: Array.isArray(a.photos) ? a.photos : [],
+                libId: typeof a.libId === 'string' ? a.libId : '',
+                ...(Array.isArray(a.mentions) ? { mentions: a.mentions } : {}),
               }))
             : [],
         }

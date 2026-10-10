@@ -163,6 +163,26 @@ Work order for a series:
    requirements. Flag `kind: "script"` for convention breaks the rewrite
    cannot fix.
 
+## Assets and environments
+
+The story's key objects — the ones characters handle across shots — have
+cards at Stage 2 (`storyreel_assets`): a unique English name the scripts use
+verbatim, a description of the object in the story's world, and a
+reference image. Scenes' locations are the environment references. After
+Stage 2 (and again after Stage 4) run `storyreel_find_assets` if the cards
+are missing, give each card an image (`storyreel_asset_image`, or the user
+uploads one), then `storyreel_sync_assets` so every shot that names an asset
+carries it into its prompts.
+
+When reviewing a frame, `storyreel_review_shot` lists `expected.assets` and
+`expected.environments` and returns their reference images labelled
+"REFERENCE — asset …" / "REFERENCE — location …". Compare the rendered
+object and place with those images, not with your idea of the word: same
+material, colour, shape, marks; same architecture and lighting. A mismatch
+is a flag of kind `asset` or `environment`; a fix is a better description on
+the card (`storyreel_set_asset`), a new reference image, or a prompt that
+names the asset by its exact name.
+
 ## Engines, quality and cost
 
 `storyreel_status.services` tells you what renders: the image service and

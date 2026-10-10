@@ -11,6 +11,16 @@
 - **Agent: engines and parts.** The agent's status names the image and video
   models in use (including Krea and the H3 step count); the project view
   shows parts; a new tool splits a project into parts.
+- **Story assets.** Stage 2 has an Assets tab: cards for the objects the
+  characters handle across shots, each with a unique English name, a
+  description in the story's world and a reference image (uploaded or
+  generated from the description). The storyline proposes them, "Find
+  assets" lists them from the script, scripts use the names verbatim, and
+  every shot that names an asset is attached to it automatically. The agent
+  can manage them and checks rendered objects and places against the cards.
+- **New project.** Short drama is the first template, with an episode
+  length choice (60 / 90 / 120 s) beside the episode count; 10 episodes and
+  90 s by default.
 - **Short-drama engine.** Every series is now written by a built-in
   short-drama mechanism: the conflict in the first 3–5 seconds, a turn
   every ~30 seconds, each episode cut on a labelled hook (identity /

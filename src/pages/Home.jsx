@@ -55,7 +55,7 @@ export default function Home({
   };
   const sorted = [...filtered].sort((a, b) => (a.pinned === b.pinned ? order(a, b) : a.pinned ? -1 : 1));
 
-  const create = (title, logline, scriptType, aspectRatio, episodeCount) => {
+  const create = (title, logline, scriptType, aspectRatio, episodeCount, episodeSeconds = 0) => {
     // a series starts with the Short Drama Series rules from the style library
     const p = newProject({
       title,
@@ -63,6 +63,7 @@ export default function Home({
       scriptType,
       aspectRatio,
       episodeCount,
+      episodeSeconds,
       scriptStyleId: scriptType === 'series' ? SHORT_DRAMA_STYLE_ID : '',
     });
     setProjects((ps) => [p, ...ps]);

@@ -2,8 +2,8 @@
 // A character or a scene location that carries a libId mirrors its name,
 // description and photos to that library entry whenever they change in the
 // project — whichever stage (or undo) made the change. An entry is created
-// the first time a card gets photos. Assets need no mirroring: shots reference
-// library assets by id, so there is only one copy.
+// the first time a card gets photos. Story asset cards (Stage 2 → Assets)
+// mirror the same way; shots reference the library entry by id.
 import { useEffect, useRef } from 'react';
 import { locationsOf } from './sceneLocations.js';
 
@@ -13,6 +13,9 @@ function cardsOf(project) {
   const cards = new Map();
   for (const c of project.storyline?.characters || []) {
     cards.set(`c:${c.id}`, { libId: c.libId || '', kind: 'character', name: c.name || '', description: c.description || '', photos: c.photos || [] });
+  }
+  for (const a of project.storyline?.assets || []) {
+    cards.set(`a:${a.id}`, { libId: a.libId || '', kind: 'asset', name: a.name || '', description: a.description || '', photos: a.photos || [] });
   }
   for (const s of project.outline || []) {
     for (const l of locationsOf(s)) {
@@ -60,7 +63,7 @@ export function useLibrarySync(project, library, libUpsert) {
         kind: c.kind,
         name: c.name,
         type: ex?.type || 'other',
-        description: c.kind === 'character' ? c.description : ex?.description ?? c.seedDescription,
+        description: c.kind === 'location' ? ex?.description ?? c.seedDescription : c.description,
         photos: c.photos.length ? c.photos : ex?.photos || [],
         projectId: ex?.projectId || project.id,
         projectTitle: ex?.projectTitle || project.title,
@@ -73,7 +76,7 @@ export function useLibrarySync(project, library, libUpsert) {
       timer.current = setTimeout(flush, 400);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project.id, project.storyline?.characters, project.outline]);
+  }, [project.id, project.storyline?.characters, project.storyline?.assets, project.outline]);
 
   useEffect(() => flush, []); // eslint-disable-line react-hooks/exhaustive-deps
 }

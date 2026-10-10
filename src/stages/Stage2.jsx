@@ -15,6 +15,8 @@ import Lightbox from '../components/Lightbox.jsx';
 import CharacterHelp from '../components/CharacterHelp.jsx';
 import VoiceButton from '../components/VoiceButton.jsx';
 import LibraryPicker from '../components/LibraryPicker.jsx';
+import StoryAssets from '../components/StoryAssets.jsx';
+import { storyAssetsOf, syncShotAssets } from '../lib/storyAssets.js';
 import { StylePicker } from '../components/StyleControls.jsx';
 import { RestoreIcon, Upload, Layers } from '../components/icons.jsx';
 import { isSeriesMaster, clampEpisodes, clampEpisodeSec, episodeRange, SERIES_MIN_EPISODES, SERIES_MAX_EPISODES, EPISODE_SEC_MIN, EPISODE_SEC_MAX } from '../lib/series.js';
@@ -24,10 +26,18 @@ export default function Stage2({ project, update, rawUpdate, settings, goNext, o
   const { t } = useI18n();
   const [lightbox, setLightbox] = useState(null); // full-size photo pop-up
   const [charHelp, setCharHelp] = useState(false); // the character-profile rules panel
+  const [tab, setTab] = useState('cast'); // 'cast' | 'assets'
   const { busy, error, run } = useGenerate(settings);
   const storyline = project.storyline;
 
   useAgentScope('stage2', { projectId: project.id, generate: () => generate(), error });
+  // shots that name an asset stay attached to it as the cards change
+  const assetKey = JSON.stringify(storyAssetsOf(project).map((a) => [a.id, a.name, a.libId || '']));
+  useEffect(() => {
+    const { patch } = syncShotAssets(project);
+    if (Object.keys(patch).length) update(patch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assetKey]);
   const [coverBusy, setCoverBusy] = useState(false);
   const [coverErr, setCoverErr] = useState('');
   const coverTried = useRef(false);
@@ -48,6 +58,15 @@ export default function Stage2({ project, update, rawUpdate, settings, goNext, o
           // groups survive a regenerated storyline, but the cast is new —
           // their members have to be picked again
           groups: (p.storyline?.groups || []).map((g) => ({ ...g, memberIds: [] })),
+          // assets: the model's list, plus cards that already carry images
+          assets: (() => {
+            const kept = storyAssetsOf(p).filter((a) => (a.photos || []).length);
+            const have = new Set(kept.map((a) => (a.name || '').toLowerCase()));
+            const fresh = (Array.isArray(data.assets) ? data.assets : [])
+              .map((x) => ({ id: uid(), name: String(x.name || '').trim(), description: String(x.description || '').trim(), type: 'prop', photos: [] }))
+              .filter((x) => x.name && !have.has(x.name.toLowerCase()));
+            return [...kept, ...fresh].slice(0, 24);
+          })(),
         },
         title: data.title || p.title,
         genres: Array.isArray(data.genres) && data.genres.length ? data.genres.slice(0, 3) : p.genres,
@@ -342,6 +361,20 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
             />
           </div>
 
+          {/* Characters (with groups) and the story's assets, as two tabs */}
+          <div className="s5e-tabs s2-tabs" role="tablist">
+            <button type="button" role="tab" aria-selected={tab === 'cast'} className={`s5e-tab ${tab === 'cast' ? 'active' : ''}`} title={t('s2.tabCastTip')} onClick={() => setTab('cast')}>
+              {t('s2.tabCast')} <span className="s5e-tabcount">{storyline.characters.length}</span>
+            </button>
+            <button type="button" role="tab" aria-selected={tab === 'assets'} className={`s5e-tab ${tab === 'assets' ? 'active' : ''}`} title={t('s2.tabAssetsTip')} onClick={() => setTab('assets')}>
+              {t('s2.tabAssets')} <span className="s5e-tabcount">{storyAssetsOf(project).length}</span>
+            </button>
+          </div>
+          {tab === 'assets' && (
+            <StoryAssets project={project} update={update} settings={settings} genLang={genLang} imageStyle={imageStyle} library={library} onSettings={onSettings} setLightbox={setLightbox} />
+          )}
+          {tab === 'cast' && (
+          <>
           <div className="section-head">
             <label title={t('chelp.intro')}>{t('s2.characters')}</label>
             <button type="button" className="help-btn" title={t('chelp.open')} aria-label={t('chelp.open')} onClick={() => setCharHelp(true)}>
@@ -486,6 +519,8 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
               </div>
             );
           })}
+          </>
+          )}
         </>
       )}
 

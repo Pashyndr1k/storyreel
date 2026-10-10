@@ -14,10 +14,11 @@ import { newProject, uid } from './storage.js';
 
 export const SERIES_MIN_EPISODES = 1;
 export const SERIES_MAX_EPISODES = 200;
-export const SERIES_DEFAULT_EPISODES = 30;
+export const SERIES_DEFAULT_EPISODES = 10;
 // Episode length: the user sets a target in seconds; prompts ask for the
 // target ± EPISODE_TOLERANCE_SEC (the default 105 gives the classic 90–120).
-export const EPISODE_DEFAULT_SEC = 105;
+export const EPISODE_DEFAULT_SEC = 90;
+export const EPISODE_SEC_CHOICES = [60, 90, 120]; // the new-project selector
 export const EPISODE_SEC_MIN = 30;
 export const EPISODE_SEC_MAX = 600;
 export const EPISODE_TOLERANCE_SEC = 15;

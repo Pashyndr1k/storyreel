@@ -32,6 +32,7 @@ import { checkProject, autoFixProject, episodesOf } from '../shortDrama/check.js
 import { dramaFixPrompt } from '../prompts.js';
 import { loadStyles } from '../styles.js';
 import { layoutTools } from './layoutTools.js';
+import { assetTools, assetsView } from './assetTools.js';
 import { CAMERA_LEVELS, ACTION_LEVELS, cameraOf, actionOf } from '../shotDynamics.js';
 import { blockForScene } from '../dynamics.js';
 import { transcribeAudio } from '../gemini.js';
@@ -39,7 +40,7 @@ import { SHORT_DRAMA_STYLE_ID, isSeriesMaster } from '../series.js';
 import { MAX_CHARACTER_REFS } from '../config.js';
 
 export const MAX_ATTEMPTS = 4;
-export const FLAG_KINDS = ['likeness', 'continuity', 'environment', 'audio', 'artifact', 'style', 'script', 'other'];
+export const FLAG_KINDS = ['likeness', 'continuity', 'environment', 'asset', 'audio', 'artifact', 'style', 'script', 'other'];
 
 class AgentError extends Error {
   constructor(code, message) {
@@ -189,6 +190,7 @@ function projectView(project, { prompts = false } = {}) {
     approvedPlot: project.approvedPlot || '',
     synopsis: project.storyline?.synopsis || '',
     characters: (project.storyline?.characters || []).map((c) => ({ id: c.id, name: c.name, role: c.role, description: c.description, referencePhotos: (c.photos || []).length })),
+    assets: assetsView(project),
     groups: (project.storyline?.groups || []).map((g) => ({ name: g.name, members: (g.memberIds || []).map((mid) => project.storyline.characters.find((c) => c.id === mid)?.name).filter(Boolean) })),
     pacingPlan: project.dynamicsPlan
       ? project.dynamicsPlan.rhythm_blocks.map((b) => ({ scenes: b.scene_numbers, energy: b.kinetic_energy_level, dialogue: b.dialogue_volume, cutting: b.shot_density, camera: b.required_camera_momentum }))
@@ -325,7 +327,11 @@ async function reviewShot({ projectId, shotId, frames = 6, transcript = false })
   }
   for (const aid of (project.shotAssets || {})[shot.id] || []) {
     const a = library.find((e) => e.id === aid && e.kind === 'asset');
-    if (a?.photos?.[0]) await push(`REFERENCE — asset "${a.name}"`, a.photos[0]);
+    if (a?.photos?.[0]) await push(`REFERENCE — asset "${a.name}": the object in the shot must look like this (material, colour, shape, marks)`, a.photos[0]);
+  }
+  // story assets the shot names but is not attached to yet (no image or not synced)
+  for (const a of (project.storyline?.assets || []).filter((x) => x.photos?.[0] && !((project.shotAssets || {})[shot.id] || []).includes(x.libId) && new RegExp(x.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(`${shot.action} ${shot.dialogue}`))) {
+    await push(`REFERENCE — asset "${a.name}" (named in the shot, not attached): the object must look like this`, a.photos[0]);
   }
 
   // what came just before this shot
@@ -399,6 +405,11 @@ async function reviewShot({ projectId, shotId, frames = 6, transcript = false })
       imagePrompt: pr.imagePrompt || '',
       videoPrompt: pr.videoPrompt || '',
       spatialLayout: describeShot(project, scene, shot.id) || null,
+      // what to compare with the REFERENCE images: each named asset and the location
+      assets: (project.storyline?.assets || [])
+        .filter((a) => ((project.shotAssets || {})[shot.id] || []).includes(a.libId) || new RegExp(String(a.name || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(`${shot.action} ${shot.dialogue}`))
+        .map((a) => ({ name: a.name, description: a.description, referenceImage: !!a.photos?.[0], check: 'the rendered object must match the reference image and description: same material, colour, shape and marks; if it differs, flag kind "asset"' })),
+      environments: shotLocationRefs(project, scene, shot.id).map((g) => ({ name: g.name || scene.title, referencePhotos: g.photos.length, check: 'architecture, colours and lighting must match the location reference; if they differ, flag kind "environment"' })),
       ...(isShortDrama(project)
         ? (() => {
             const ep = episodesOf(project).find((e) => e.scenes.some((sc) => sc.id === scene.id));
@@ -484,13 +495,14 @@ export const TOOLS = [
         scriptType: { type: 'string', enum: ['short', 'medium', 'long', 'series'] },
         aspectRatio: { type: 'string', enum: ['16:9', '9:16', '1:1', '4:3', '3:4'] },
         episodeCount: { type: 'integer', minimum: 1, maximum: 200 },
+        episodeSeconds: { type: 'integer', enum: [60, 90, 120], description: 'Series: the episode length (default 90).' },
       },
       ['logline']
     ),
-    run: async ({ title, logline, scriptType = 'medium', aspectRatio, episodeCount }) => {
+    run: async ({ title, logline, scriptType = 'medium', aspectRatio, episodeCount, episodeSeconds }) => {
       if (!(logline || '').trim()) fail('BAD_INPUT', 'logline is required.');
       const series = scriptType === 'series';
-      const p = newProject({ title, logline: logline.trim(), scriptType, aspectRatio: aspectRatio || (series ? '9:16' : '16:9'), episodeCount, scriptStyleId: series ? SHORT_DRAMA_STYLE_ID : '' });
+      const p = newProject({ title, logline: logline.trim(), scriptType, aspectRatio: aspectRatio || (series ? '9:16' : '16:9'), episodeCount, episodeSeconds, scriptStyleId: series ? SHORT_DRAMA_STYLE_ID : '' });
       app().addProjects([p]);
       await settle();
       return { projectId: p.id, next: 'storyreel_run_stage with stage 1.' };
@@ -777,6 +789,7 @@ export const TOOLS = [
     },
   },
   ...layoutTools({ app, projectOf, patchProject, sceneOf, findShot, fail, settle, countAttempt, schema, PROJECT }),
+  ...assetTools({ app, projectOf, patchProject, sceneOf, fail, settle, countAttempt, schema, PROJECT }),
   {
     name: 'storyreel_create_media',
     description: 'Stage 5: generate one piece of media for a shot — "image" (first frame), "final_frame", "video" (needs the first frame; can take many minutes) or "voice" (TTS for the shot\'s dialogue). For video on a local engine, seed "same" replays the seed of the shot\'s previous render (shotView.videoSeed) so only the prompt or quality setting changes; "new" (default) rolls fresh noise. Counts as an attempt; after four the target is flagged and further calls are refused. Verify the result with storyreel_review_shot.',
@@ -841,7 +854,7 @@ let running = null;
 export async function callAgent(method, params = {}) {
   const tool = TOOLS.find((t) => t.name === method);
   if (!tool) return { ok: false, error: { code: 'UNKNOWN_TOOL', message: `No tool named "${method}".` } };
-  const readOnly = ['storyreel_guide', 'storyreel_status', 'storyreel_list_projects', 'storyreel_get_project', 'storyreel_list_styles', 'storyreel_list_flags', 'storyreel_get_layout', 'storyreel_drama_rules', 'storyreel_drama_check'].includes(method);
+  const readOnly = ['storyreel_guide', 'storyreel_status', 'storyreel_list_projects', 'storyreel_get_project', 'storyreel_list_styles', 'storyreel_list_flags', 'storyreel_get_layout', 'storyreel_drama_rules', 'storyreel_drama_check', 'storyreel_assets'].includes(method);
   if (running && !readOnly) return { ok: false, error: { code: 'BUSY', message: `StoryReel is still running "${running}". Wait for it to finish.` } };
   if (!readOnly) running = method;
   try {

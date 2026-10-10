@@ -3988,3 +3988,12 @@ select.prompt-model:hover:not(:disabled) { border-color: var(--ink); color: var(
 .drama-level { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted-3); padding-top: 2px; }
 .drama-issue.error .drama-level { color: var(--accent); }
 .drama-issue.warn .drama-level { color: var(--text-2); }
+
+/* ---- Stage 2 tabs (characters / assets) and asset cards ---- */
+.s2-tabs { margin: 18px 0 12px; }
+.s5e-tabcount { font-size: 10px; color: var(--muted-3); margin-left: 4px; font-variant-numeric: tabular-nums; }
+.asset-card select { width: auto; height: 34px; padding: 0 8px; font-size: 12px; }
+.asset-card .total-badge { white-space: nowrap; }
+.error-text { color: var(--accent); }
+.new-episodes-row { align-items: center; gap: 10px; flex-wrap: wrap; }
+.new-episodes-row .episodes-input { width: 90px; }

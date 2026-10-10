@@ -9,6 +9,7 @@ import { describeShot } from './spatial/describe.js';
 import { episodeRange, clampEpisodes, episodeLine, SHORT_DRAMA_STYLE_ID } from './series.js';
 import { isShortDrama, DRAMA_CORE, DRAMA_STAGE, DRAMA_FRAME_RULE, HOOK_TYPES, OPENING_HOOKS, seasonLandmarks, timingText } from './shortDrama/rules.js';
 import { loadStyles, resolveStyleText } from './styles.js';
+import { assetBlock, storyAssetsOf } from './storyAssets.js';
 
 const LANG_NAMES = { en: 'English', ru: 'Russian', uk: 'Ukrainian' };
 
@@ -61,7 +62,7 @@ Rules:
 // Names as written on the Stage 2 cards (characters, then groups). A request
 // that carries them as `names` has its answer checked by lib/names.js.
 export const cardNames = (project) =>
-  [...(project.storyline?.characters || []), ...(project.storyline?.groups || [])].map((c) => (c.name || '').trim()).filter(Boolean);
+  [...(project.storyline?.characters || []), ...(project.storyline?.groups || []), ...storyAssetsOf(project)].map((c) => (c.name || '').trim()).filter(Boolean);
 
 // ---- the short-drama engine: every text stage of a series gets the format's
 // mechanics (lib/shortDrama/rules.js) plus the sub-genre brief from the style
@@ -108,11 +109,11 @@ function characterBlock(project) {
       return `- "${g.name}"${g.description ? ` — ${g.description}` : ''}. Members: ${members.join(', ')}.`;
     })
     .filter(Boolean);
-  if (!groups.length) return list;
+  if (!groups.length) return list + assetBlock(project);
   return `${list}
 
 Groups (each is ONE entity made of the characters listed — when the script names the group, ALL its members are present together and act as a unit, unless a line singles one out; refer to it by the group's name, and name a member only for an individual action):
-${groups.join('\n')}`;
+${groups.join('\n')}` + assetBlock(project);
 }
 
 // Hard realizability rules for Stage-1 ideas: every pitched direction must be
@@ -190,7 +191,7 @@ ${seriesFormat(project)}
 Create the final storyline of the whole series. The synopsis must tell the complete story from the first episode to the last, sized for ${seriesTotal(project)} episodes: the wrong and the inciting incident, the early big reveal, each escalating cycle of the middle with its antagonist and its reversal, the main turning points, the full truth coming out, the villain's comeuppance and the final payoff. Keep the cast small.
 
 JSON schema:
-{"title":"a strong final series title","genres":["2-3 short genre tags, e.g. revenge, romance, drama"],"synopsis":"the complete series story, 350-600 words, in chronological order","characters":[{"name":"character name","role":"protagonist / love interest / antagonist / supporting","description":"the production profile: age and physical appearance (specific enough to keep the character visually consistent across AI image generation); then active want, visible method, hidden leverage, shame trigger, speech rhythm, physical strategy under pressure, recurring physical motif — one or two sentences each; the secret if they have one"}]}`,
+{"title":"a strong final series title","genres":["2-3 short genre tags, e.g. revenge, romance, drama"],"synopsis":"the complete series story, 350-600 words, in chronological order","characters":[{"name":"character name","role":"protagonist / love interest / antagonist / supporting","description":"the production profile: age and physical appearance (specific enough to keep the character visually consistent across AI image generation); then active want, visible method, hidden leverage, shame trigger, speech rhythm, physical strategy under pressure, recurring physical motif — one or two sentences each; the secret if they have one"}],"assets":[{"name":"a UNIQUE English label of 2-3 words for a key object the characters handle across the story (e.g. Halvard Signet Ring — never a bare generic word)","description":"1-3 sentences: the object's exact look in this story's world and period, for an image model"}]}`,
     };
   }
   return {
@@ -209,7 +210,7 @@ ${project.approvedPlot}
 Create the final storyline for this short video (target length: ${durationOf(project).min}–${durationOf(project).max} seconds).
 
 JSON schema:
-{"title":"a strong final title","genres":["2-3 short genre tags, e.g. drama, comedy, thriller"],"synopsis":"a complete story summary of 150-300 words with a clear beginning, middle and end","characters":[{"name":"character name","role":"protagonist / antagonist / supporting","description":"2-4 sentences: age, physical appearance (specific enough to keep the character visually consistent across AI image generation), personality, motivation"}]}`,
+{"title":"a strong final title","genres":["2-3 short genre tags, e.g. drama, comedy, thriller"],"synopsis":"a complete story summary of 150-300 words with a clear beginning, middle and end","characters":[{"name":"character name","role":"protagonist / antagonist / supporting","description":"2-4 sentences: age, physical appearance (specific enough to keep the character visually consistent across AI image generation), personality, motivation"}],"assets":[{"name":"a UNIQUE English label of 2-3 words for a key object the characters handle across the story (e.g. Halvard Signet Ring — never a bare generic word)","description":"1-3 sentences: the object's exact look in this story's world and period, for an image model"}]}`,
   };
 }
 

@@ -3,10 +3,10 @@ import { useI18n } from '../lib/i18n.js';
 import AutoTextarea from './AutoTextarea.jsx';
 import VoiceButton from './VoiceButton.jsx';
 import AspectSelector from './AspectSelector.jsx';
-import { SERIES_MIN_EPISODES, SERIES_MAX_EPISODES, SERIES_DEFAULT_EPISODES, clampEpisodes } from '../lib/series.js';
+import { SERIES_MIN_EPISODES, SERIES_MAX_EPISODES, SERIES_DEFAULT_EPISODES, EPISODE_DEFAULT_SEC, EPISODE_SEC_CHOICES, clampEpisodes } from '../lib/series.js';
 
-// 'series' is the short-drama template: a vertical serial planned by episodes
-const TYPES = ['short', 'medium', 'long', 'series'];
+// 'series' is the short-drama template: a vertical serial planned by episodes — first in the list
+const TYPES = ['series', 'short', 'medium', 'long'];
 
 export default function NewProjectModal({ onCreate, onClose, settings }) {
   const { t } = useI18n();
@@ -15,6 +15,7 @@ export default function NewProjectModal({ onCreate, onClose, settings }) {
   const [type, setType] = useState('medium');
   const [aspect, setAspect] = useState('16:9');
   const [episodes, setEpisodes] = useState(String(SERIES_DEFAULT_EPISODES));
+  const [epSec, setEpSec] = useState(EPISODE_DEFAULT_SEC); // 60 / 90 / 120 s per episode
   // the series template is vertical; leaving it restores the usual default
   const pickType = (k) => {
     if (k === 'series' && type !== 'series') setAspect('9:16');
@@ -51,17 +52,27 @@ export default function NewProjectModal({ onCreate, onClose, settings }) {
           <>
             <label htmlFor="new-episodes">{t('new.episodes')}</label>
             <p className="hint">{t('new.episodesHint')}</p>
-            <input
-              id="new-episodes"
-              type="number"
-              className="episodes-input"
-              title={t('tip.episodes')}
-              min={SERIES_MIN_EPISODES}
-              max={SERIES_MAX_EPISODES}
-              value={episodes}
-              onChange={(e) => setEpisodes(e.target.value)}
-              onBlur={() => setEpisodes(String(clampEpisodes(episodes)))}
-            />
+            <div className="row new-episodes-row">
+              <input
+                id="new-episodes"
+                type="number"
+                className="episodes-input"
+                title={t('tip.episodes')}
+                min={SERIES_MIN_EPISODES}
+                max={SERIES_MAX_EPISODES}
+                value={episodes}
+                onChange={(e) => setEpisodes(e.target.value)}
+                onBlur={() => setEpisodes(String(clampEpisodes(episodes)))}
+              />
+              {/* episode length: the three lengths of the format */}
+              <span className="seg seg-compact" role="radiogroup" aria-label={t('new.epSeconds')} title={t('new.epSecondsTip')}>
+                {EPISODE_SEC_CHOICES.map((s) => (
+                  <button key={s} type="button" role="radio" aria-checked={epSec === s} className={`seg-btn ${epSec === s ? 'on' : ''}`} title={t('new.epSecondsOpt', { s })} onClick={() => setEpSec(s)}>
+                    {s} {t('unit.sec')}
+                  </button>
+                ))}
+              </span>
+            </div>
           </>
         )}
         <label>{t('new.aspect')}</label>
@@ -87,7 +98,7 @@ export default function NewProjectModal({ onCreate, onClose, settings }) {
           <button title={t('tip.create')}
             className="btn primary"
             disabled={!logline.trim()}
-            onClick={() => onCreate(title, logline.trim(), type, aspect, type === 'series' ? clampEpisodes(episodes) : 0)}
+            onClick={() => onCreate(title, logline.trim(), type, aspect, type === 'series' ? clampEpisodes(episodes) : 0, type === 'series' ? epSec : 0)}
           >
             {t('new.create')}
           </button>
