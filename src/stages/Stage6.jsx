@@ -296,6 +296,10 @@ export default function Stage6({ project, update, settings, ...workbench }) {
     setSubs((s) => ({ ...s, items: s.items.filter((x) => x.id !== id) }), 'subtitles.delete');
     setSubModal(null);
   };
+  const clearSubs = () => {
+    if (!subs.items.length || !window.confirm(t('sub.clearConfirm', { n: subs.items.length }))) return;
+    setSubs((s) => ({ ...s, items: [] }), 'subtitles.clear');
+  };
   // drag a block along the timeline (its start); a double-click opens the editor
   const startSubDrag = (e, item) => {
     if (e.button !== 0) return;
@@ -2397,6 +2401,22 @@ export default function Stage6({ project, update, settings, ...workbench }) {
               >
                 + {t('sub.add')}
               </button>
+              <div className="lane-menu-row">
+                <button
+                  type="button"
+                  className="icon-btn sq36 danger"
+                  title={t('sub.clearTip')}
+                  aria-label={t('sub.clear')}
+                  disabled={!subs.items.length}
+                  onClick={() => {
+                    setSubMenu(null);
+                    clearSubs();
+                  }}
+                >
+                  <Trash size={16} />
+                </button>
+                <span className="lane-menu-lbl">{t('sub.clear')}</span>
+              </div>
             </div>
           </>
         )}

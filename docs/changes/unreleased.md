@@ -663,8 +663,9 @@ centre / top); custom text anywhere on the frame; an MCP tool.
   custom text is kept), + "Add text" (a free block at the playhead, placed
   by X / Y). Each block has its own small ✕. The lane head is the same as an
   audio lane's — the ST tag, the on / off dot (hides the layer in the
-  preview and the render, `subtitles.enabled`) and ⋯ with "From dialogue"
-  and "Add text" in a pop-up. Drag a block to move it; double-click opens
+  preview and the render, `subtitles.enabled`) and ⋯ with "From dialogue",
+  "Add text" and "Delete all titles" (confirmed; asked for again after the
+  lane button was removed) in a pop-up. Drag a block to move it; double-click opens
   `SubtitleModal` (text, start, length, font, size, colour, outline colour,
   placement bottom / centre / top / anywhere with X / Y, a live sample,
   "Use this look for all subtitles", Delete, Save).
