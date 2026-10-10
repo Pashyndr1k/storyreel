@@ -187,3 +187,9 @@ returns `warnings` when the video is shorter than the new slot or the voice
 longer. `storyreel_review_shot` adds `environmentNote` when the location has
 no reference. `storyreel_get_layout` warnings gain `lineCross` and `setFlip`.
 `storyreel_status` returns `appLogFile`; every writing call is logged there.
+
+`storyreel_run_stage` 4 takes `mode` "normal" | "extended" (extended shots: 2–3
+camera changes in one H3 take; the sub-shots come back as consecutive shots
+grouped in a take, `breakdownMode` on the project). On MiniMax H3
+`storyreel_create_media` kind `voice` is refused: the lines are in the video
+prompt and the model speaks them.

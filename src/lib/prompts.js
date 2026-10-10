@@ -3,6 +3,7 @@ import { latinNames } from './names.js';
 import { aspectDescription } from './aspect.js';
 import { buildRandomization } from './randomization.js';
 import { densityRange, buildShotPayload } from './dynamics.js';
+import { EXTENDED_SUBSHOTS, EXTENDED_SHOT_MIN_TOTAL, EXTENDED_SHOT_MAX_TOTAL } from './config.js';
 import { scenePhotos } from './sceneLocations.js';
 import { dynamicsFor, DYNAMICS_RULE } from './shotDynamics.js';
 import { describeShot } from './spatial/describe.js';
@@ -408,7 +409,9 @@ export function compositionRules(block, prevTypes = [], mode = 'breakdown') {
 - ${t}${carry}`;
 }
 
-export function stage4Prompt(project, scene, lang, scriptStyle, block) {
+// `mode` 'extended': complex shots of 2–3 camera set-ups rendered as ONE
+// MiniMax H3 take (≤ 14 s); the model returns each as { segments: [shot…] }.
+export function stage4Prompt(project, scene, lang, scriptStyle, block, mode = 'normal') {
   const outlineList = project.outline
     .map((s, i) => `${i + 1}. ${latinNames(s.title, cardNames(project))} — ${latinNames(s.summary, cardNames(project))} (~${s.duration}s)`)
     .join('\n');
@@ -472,8 +475,15 @@ Requirements:
 - "location" is the specific place plus time of day / lighting condition.
 - CHARACTER NAMES: in "action", "dialogue" (speaker prefixes and names spoken inside the lines) and "notes", write every character's name EXACTLY as it is written in the Characters list above — the same English spelling in Latin letters, character for character${names.length ? ` (${names.join(', ')})` : ''}. Never translate, transliterate into another script, shorten, decline or otherwise inflect a name, whatever language the rest of the text is in: the name stays unchanged inside the sentence. The same applies to group names.
 
+${
+      mode === 'extended'
+        ? `EXTENDED SHOTS. Write the scene as EXTENDED SHOTS: each one is ONE continuous video generation of ${EXTENDED_SHOT_MIN_TOTAL}–${EXTENDED_SHOT_MAX_TOTAL} seconds made of ${EXTENDED_SUBSHOTS.min}–${EXTENDED_SUBSHOTS.max} camera set-ups ("segments") of 3–7 seconds each, cut together inside the generation — a change of framing or angle, never of place or time. The segments of one extended shot share the same moment, place and light; the characters continue their action across the cut (an action that starts in one segment ends in the next; a line begun in one is finished in the next). Give every segment its own "shot_type" (a different framing or angle from the segment before) and its own "action"; "dialogue" stays inside the segment in which it is spoken. The segments' "duration_sec" add up to at most ${EXTENDED_SHOT_MAX_TOTAL} seconds per extended shot. A short beat that does not need a camera change may still be a single-segment extended shot.
+
 JSON schema:
-{"shots":[{"duration_sec":4,"shot_type":"framing + camera angle, e.g. low-angle medium close-up / top-down wide / eye-level medium / POV tracking","location":"specific location, time of day","action":"what happens and what the camera sees","dialogue":"NAME: line — or empty string","notes":"mood, lighting, sound or continuity note — may be empty"${drama.beat}}]}` + drama.note + dynNote + compNote + envNote),
+{"shots":[{"segments":[{"duration_sec":5,"shot_type":"framing + camera angle, e.g. low-angle medium close-up / top-down wide / eye-level medium / POV tracking","location":"specific location, time of day","action":"what happens and what the camera sees","dialogue":"NAME: line — or empty string","notes":"mood, lighting, sound or continuity note — may be empty"${drama.beat}},{"duration_sec":4,"shot_type":"…","location":"…","action":"…","dialogue":"","notes":""${drama.beat}}]}]}`
+        : `JSON schema:
+{"shots":[{"duration_sec":4,"shot_type":"framing + camera angle, e.g. low-angle medium close-up / top-down wide / eye-level medium / POV tracking","location":"specific location, time of day","action":"what happens and what the camera sees","dialogue":"NAME: line — or empty string","notes":"mood, lighting, sound or continuity note — may be empty"${drama.beat}}]}`
+    }` + drama.note + dynNote + compNote + envNote),
   };
 }
 
@@ -1071,7 +1081,7 @@ Produce exactly three fields, in MiniMax's training format:
 Hard rules:
 - Everything in English, including the speech inside <d>…</d> (translated when the script is in another language). Only on-screen text keeps its original language.
 - Structured long, not verbose long: spend length on action, timeline, camera and audio, never on stacked adjectives.
-- If a shot has a spoken line, the line itself MUST appear in the prompt inside <d>[English] …</d> (unless the shot is marked [VOICE ADDED IN POST]); a prompt that only says "she speaks" is wrong.
+- If a shot has a spoken line, the line itself MUST appear in the prompt inside <d>[English] …</d>; a prompt that only says "she speaks" is wrong. There is never a separate voice track: every line of the script is spoken in the video.
 - Do not invent dialogue that the shot does not have. If the shot is silent, say so through the soundscape instead.
 - Describe only what is seeable or hearable.`;
 
@@ -1204,15 +1214,12 @@ function stage5H3VideoPrompt__plain(project, scene, shots, videoStyle, block, se
     ].join('\n');
     return lines ? `\n  REFERENCE MODE — attached media:\n${lines}` : '';
   };
+  // H3 always speaks the lines itself: the dialogue goes into the video
+  // prompt (never a separate voice track)
   const shotLine = (s) => {
     const line = (s.dialogue || '').trim();
-    const native = voiceSourceFor(project, s.id) === 'native';
     const spk = ((project.shotSpeakerNotes || {})[s.id] || '').trim();
-    const dialogue = !line
-      ? '(no speech)'
-      : native
-        ? `[NATIVE VOICE] "${line}"${spk ? ` (speaker: ${spk})` : ''}`
-        : `[VOICE ADDED IN POST] "${line}"`;
+    const dialogue = !line ? '(no speech)' : `[NATIVE VOICE] "${line}"${spk ? ` (speaker: ${spk})` : ''}`;
     const dyn = dynamicsFor(project, s, block || null, 'minimax');
     return `action: ${s.action || '(none)'}; dialogue: ${dialogue}; CAMERA: ${dyn.camera_setting}; ACTION: ${dyn.action_setting}`;
   };
@@ -1246,16 +1253,9 @@ ${inner}
       }
       const dur = Number(s.duration || 4);
       const line = (s.dialogue || '').trim();
-      // Voice source decides whether H3 generates the speech (native) or the
-      // line is laid on later from a TTS/recorded take (post) — the prompt
-      // must never let H3 speak a post-voiced line.
-      const native = voiceSourceFor(project, s.id) === 'native';
+      // H3 generates the speech itself: every line is spoken in the video
       const spk = ((project.shotSpeakerNotes || {})[s.id] || '').trim();
-      const dialogue = !line
-        ? '(none — this shot has no speech)'
-        : native
-          ? `[NATIVE VOICE] "${line}"${spk ? `\n  speaker: ${spk}` : ''}`
-          : `[VOICE ADDED IN POST] "${line}"`;
+      const dialogue = !line ? '(none — this shot has no speech)' : `[NATIVE VOICE] "${line}"${spk ? `\n  speaker: ${spk}` : ''}`;
       return `Shot ${i + 1} (id ${s.id}, ${dur}s${s.shotType ? `, ${s.shotType}` : ''}):
   action: ${s.action || '(none)'}
   dialogue: ${dialogue}
@@ -1279,7 +1279,7 @@ ${list}
 
 ${anySpatial(project, scene, shots) ? `${SPATIAL_RULE} It describes [Shot 1]'s opening composition; when a shot has internal cuts, every later [Shot N] must keep the same people on the same sides of the line between them.\n\n` : ''}${DYNAMICS_RULE} Each shot's CAMERA and ACTION lines hold them; write the camera in H3's own vocabulary (motion type, amplitude, speed).
 
-For EACH shot write the three H3 fields describing only that shot's own duration. Write them to the DETAIL STANDARD, and use shot changes inside a shot wherever the rule for them applies (longer than 4 seconds, more than one beat); the internal [Shot N] cut times must lie inside that shot's own duration. Shots marked REFERENCE MODE are rendered by H3's reference checkpoint: open their integrated_multimodal_description with subject definitions binding each reference to a role (“<Subject 1> is the woman from <Picture 1>”), state retention explicitly (“Use <Picture 1> exactly as it is” / “retain the voice of <Audio 1>”), then describe the shot; every attached reference must be mentioned by its label. References tagged [STORYBOARD FRAME] use MiniMax's official storyboard declaration — “<Picture N> is a storyboard reference for [Shot K], defining its viewpoint, subject placement, and shot order” — bound to the shot the frame belongs to (its scene/shot number is in the label). Shots marked MULTI-FRAME MODE are rendered by the reference checkpoint with stills pinned to exact timestamps: for those shots IGNORE the three-field layout and write "video_prompt" in the ${'SIX-SECTION KEYFRAME FORMAT'} defined at the end of this brief — the anchor table lists every picture with its role and its exact time, and [Shot N] markers inside the take must land on those times. GROUP TAKE entries are ONE multi-shot generation: write ONE video_prompt for the whole take — open with [Shot 1] (no timestamp), start every later segment with [Shot N] At MM:SS.mmm exactly matching the listed times, put <scenetrans> at each internal cut, keep continuity across the cuts — and return it under the take's shot number only; folded shots get NO entry of their own. Dialogue handling: where a line is marked [NATIVE VOICE], H3 speaks it. Describe the dialogue or monologue it belongs to (who speaks to whom, delivery, pauses, the listener's reactions) and give each spoken line inside <d>[English] …</d> with a speaker ID and an established voice identity (honor the speaker notes). The spoken words must be in English — translate the script's line faithfully if it is in another language; split a long line across the speakers and beats exactly as the script has it; never drop or add lines. Where a line is marked [VOICE ADDED IN POST], the character visibly delivers it — mouth and body act the words, and you still describe who speaks and how — but NO speech may appear in any audio field: no <d> tags for that shot, the soundscape stays ambience and effects, the voice track is laid on in editing.
+For EACH shot write the three H3 fields describing only that shot's own duration. Write them to the DETAIL STANDARD, and use shot changes inside a shot wherever the rule for them applies (longer than 4 seconds, more than one beat); the internal [Shot N] cut times must lie inside that shot's own duration. Shots marked REFERENCE MODE are rendered by H3's reference checkpoint: open their integrated_multimodal_description with subject definitions binding each reference to a role (“<Subject 1> is the woman from <Picture 1>”), state retention explicitly (“Use <Picture 1> exactly as it is” / “retain the voice of <Audio 1>”), then describe the shot; every attached reference must be mentioned by its label. References tagged [STORYBOARD FRAME] use MiniMax's official storyboard declaration — “<Picture N> is a storyboard reference for [Shot K], defining its viewpoint, subject placement, and shot order” — bound to the shot the frame belongs to (its scene/shot number is in the label). Shots marked MULTI-FRAME MODE are rendered by the reference checkpoint with stills pinned to exact timestamps: for those shots IGNORE the three-field layout and write "video_prompt" in the ${'SIX-SECTION KEYFRAME FORMAT'} defined at the end of this brief — the anchor table lists every picture with its role and its exact time, and [Shot N] markers inside the take must land on those times. GROUP TAKE entries are ONE multi-shot generation: write ONE video_prompt for the whole take — open with [Shot 1] (no timestamp), start every later segment with [Shot N] At MM:SS.mmm exactly matching the listed times, put <scenetrans> at each internal cut, keep continuity across the cuts — and return it under the take's shot number only; folded shots get NO entry of their own. Dialogue handling: every line is marked [NATIVE VOICE] — H3 speaks it; there is no separate voice track. Describe the dialogue or monologue it belongs to (who speaks to whom, delivery, pauses, the listener's reactions) and give each spoken line inside <d>[English] …</d> with a speaker ID and an established voice identity (honor the speaker notes). The spoken words must be in English — translate the script's line faithfully if it is in another language; split a long line across the speakers and beats exactly as the script has it; never drop or add lines.
 
 Return one entry per shot, in order, numbered from 1. "video_prompt" holds the three fields as ONE text block written exactly like this, blank line between fields:
 

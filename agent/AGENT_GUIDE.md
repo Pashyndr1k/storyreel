@@ -69,12 +69,14 @@ state in your report why you chose them. One image style for the whole film.
    later frame of the scene is made with it and reviewed against it, so the
    place and the side its landmarks are on stay the same. (A reference from
    nothing but the text: `storyreel_location_image`.)
-4. A shot with dialogue voiced by TTS: `storyreel_create_media` kind `voice`
-   BEFORE the video. The shot grows to hold the whole line when the voice is
+4. Dialogue. On MiniMax H3 (local, or the H3 models through Krea) there is
+   NO voice step: the lines are in the H3 video prompt and the model speaks
+   them with the video (`kind "voice"` is refused). Only on the local LTX
+   engine a shot with dialogue needs `storyreel_create_media` kind `voice`
+   BEFORE the video; the shot grows to hold the whole line when the voice is
    longer than its slot (`shotExtendedTo` in the result) — never shorten it
-   below the voice afterwards. On the local engine the video of a spoken
-   shot is refused until the voice exists (the talking-video workflow syncs
-   the lips to it).
+   below the voice afterwards; the video of a spoken shot is refused until
+   the voice exists (the talking-video workflow syncs the lips to it).
 5. If the frame passes, `storyreel_create_media` kind `video`, then
    `storyreel_review_shot` again. A native-audio engine (H3, Seedance) may
    speak past the slot: the shot grows to the generated length instead of
@@ -175,6 +177,24 @@ Skip it for single-character scenes, montage and inserts.
 Conventions: metres; x to the right, z toward the default camera;
 `facingDeg` 0 = toward +z, 90 = +x, 180 = -z, 270 = -x; `yawDeg` is where
 the camera stands around its target (0 = the +z side).
+
+## Extended shots (Stage 4 option)
+
+`storyreel_run_stage` 4 with `mode: "extended"` cuts a scene into complex
+shots of 2–3 camera changes (up to ~14 s each) instead of single set-ups.
+Each extended shot comes back as consecutive shots grouped in a TAKE
+(`shotGroups`): one MiniMax H3 generation renders the whole take with its
+internal cuts. The take's lead carries the video prompt (one `video_prompt`
+with `[Shot N] At MM:SS.mmm` at the cut times and `<scenetrans>` at each
+cut), the mode `mfr` (multiframe_reference: the members' first frames
+become stills at the cut times) and the references the take renders with
+(the cast photos, the location photos, the attached assets) — the same
+faces, objects and place through the whole shot. Create the first frame of
+EVERY member (kind `image`) before the take's video, review each, then
+`storyreel_create_media` kind `video` on the lead only (members are
+rendered inside it). Use `mode: "normal"` for montage, inserts and fast
+action where every shot is its own generation. The project remembers the
+choice (`breakdownMode`); the user is asked the same question in the app.
 
 ## Short drama (series projects)
 

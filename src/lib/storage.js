@@ -200,6 +200,7 @@ function projectDefaults() {
     seriesPlan: null, // series master: { arcs, episodes, segmentSize, segments } — see lib/series.js
     seriesPart: null, // series segment project: { parentId, seriesTitle, total, from, to, episodes, … }
     splitCuts: [], // Stage 3 split: scene indices after which a new part starts (lib/split.js)
+    breakdownMode: 'normal', // Stage 4: 'normal' shots or 'extended' shots (2–3 camera changes in one H3 take)
     parts: [], // Stage 3 split: parts created as projects [{ from, to, projectId, title }]
     partInfo: null, // on a part project: { parentId, parentTitle, index, total, from, to }
     aspectRatio: '16:9', // image/video aspect ratio: 16:9|4:3|1:1|3:4|9:16
@@ -323,6 +324,7 @@ export function migrateProject(raw) {
   p.splitCuts = Array.isArray(p.splitCuts) ? p.splitCuts : [];
   p.dramaStyleId = typeof p.dramaStyleId === 'string' ? p.dramaStyleId : '';
   p.parts = Array.isArray(p.parts) ? p.parts : [];
+  p.breakdownMode = p.breakdownMode === 'extended' ? 'extended' : 'normal';
   p.partInfo = p.partInfo && typeof p.partInfo === 'object' ? p.partInfo : null;
   p.shotSeedMode = p.shotSeedMode && typeof p.shotSeedMode === 'object' ? p.shotSeedMode : {};
   p.shotVideoEngines = p.shotVideoEngines && typeof p.shotVideoEngines === 'object' ? p.shotVideoEngines : {};

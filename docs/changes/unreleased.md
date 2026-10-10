@@ -786,3 +786,103 @@ one scene part: the single card with the chip, the pop-up (master +
 episodes as rows), entering the first episode's group inside it and going
 back, the actions on every row. Found on the way: Vite's dev server served a stale transform after
 two quick edits of the same file (a touch fixed it) — nothing in the app.
+
+---
+
+## 19. H3 speaks the lines: no separate voice step
+
+**Request.** Voice generation must not be a separate process: on MiniMax H3
+the voice is generated with the video, and the characters' lines always go
+into the H3 video prompt (no separate voice prompt).
+
+**Behaviour.** On H3 (local, or the H3 models through Krea) every line is
+`[NATIVE VOICE]` in the H3 prompt — the `[VOICE ADDED IN POST]` branch and the
+per-shot TTS / native toggle are gone; the system rule now says there is
+never a separate voice track. The Audio tab of a spoken shot on H3 shows
+only the speaker notes with "The dialogue is spoken by the video model";
+the TTS panel (voice prompt, voice, pads, create / upload / record) remains
+for the local LTX engine, whose talking-video workflow needs a clip.
+Agent: `storyreel_create_media` kind `voice` is refused on H3 (NOT_READY,
+"the voice is part of the video"); `voiceSource` in the views is `native`
+on H3 whatever was stored; guide step 4 rewritten. `shotVoiceSources` stays
+in the data for LTX projects.
+
+**Files.** `src/lib/prompts.js` (H3 builder, system rule), `src/stages/Stage5.jsx`
+(`nativeVoiceOn`, Audio tab), `src/lib/agent/api.js`, `agent/AGENT_GUIDE.md`.
+
+**Verified.** Dev app on the H3 engine: the Audio tab of a spoken shot shows
+the hint and no toggle; the agent's voice call is refused; `voiceSource`
+reads `native`. **Not run with the real H3 model** (the prompt text changed
+only in its tags and one rule).
+
+---
+
+## 20. Stage 4: normal or extended shots (2–3 camera changes in one H3 take)
+
+**Request.** "Create shot breakdown" and "Break down all scenes" must ask
+whether to make normal shots or extended shots of up to 15 s with several
+camera changes, built from 2–3 short shots; choose the H3 workflow that
+keeps characters, assets and the environment consistent (reference /
+multiframe); the prompt must follow the H3 guidelines.
+
+**Behaviour.**
+- Both buttons open `BreakdownModeModal`: "Normal shots" (one set-up, 2–10 s)
+  or "Extended shots (up to 15 s)". The choice is stored as
+  `project.breakdownMode` and preselected next time; the agent's
+  `storyreel_run_stage` 4 takes `mode` (default: the project's).
+- Extended: `stage4Prompt` asks for EXTENDED SHOTS — each one continuous
+  generation of 8–14 s made of 2–3 "segments" of 3–7 s (a change of framing
+  or angle, never of place or time; the same moment and light; the action
+  and a line may continue across the cut; every segment has its own
+  shot_type and action; dialogue stays in the segment where it is spoken) —
+  returned as `{ segments: [shot…] }` per extended shot.
+- `applyShots` flattens the segments into consecutive shots and makes each
+  extended shot a TAKE (`shotGroups`, the machinery of the manual +1 / +2
+  take buttons): member durations are fitted to the 345-frame ceiling
+  (`fitTakeDurations`: 8 + 8 → 7 + 7), the lead is pinned to `mfr`
+  (multiframe_reference) and gets the references the take renders with
+  (`autoTakeRefs`: the first photo of every character the take names, the
+  location photos, the attached assets' images; ≤ 9). Stage 4 shows a
+  "Take n" badge (and "· 2/3" on members); existing groups of the scene's
+  old shots are dropped on a recreate.
+- Stage 5 `genVideo` on a take lead: when nothing was picked by hand it
+  gathers the same references at generation time (location references made
+  later count), seeds the keyframes from the members' first frames at the
+  cut times and renders in **multiframe_reference** (first frame + a still at
+  every internal cut + the references); without member frames it falls to
+  **reference_to_video** with the references, else the plain first-frame
+  workflow. The take's H3 prompt is the existing GROUP TAKE format: one
+  video_prompt, `[Shot N] At MM:SS.mmm` at the fitted cut times,
+  `<scenetrans>` at each cut, subject bindings for the references and the
+  six-section keyframe format in MULTI mode — the H3 field guide's rules
+  for internal cuts (≤ 1 per 2 s, each segment its own framing).
+- Constants: `EXTENDED_SHOT_MAX_SEC` 15, `EXTENDED_SUBSHOTS` 2–3,
+  `EXTENDED_SHOT_MIN/MAX_TOTAL` 8 / 14 (`src/lib/config.js`).
+
+**Files.** `src/components/BreakdownModeModal.jsx` (new), `src/stages/Stage4.jsx`,
+`src/lib/prompts.js`, `src/lib/takes.js`, `src/stages/Stage5.jsx`,
+`src/lib/storage.js`, `src/lib/agent/api.js`, `agent/AGENT_GUIDE.md`; i18n
+`s4.mode*`, `s4.takeBadge`, `s4.takeTip`, `s4.voiceInVideo` (EN/RU/UK).
+
+**Verified.** Dev app with the text model stubbed: the dialog on "Recreate
+this scene", the extended prompt text and schema sent, a two-take answer
+(3 + 2 segments) stored as five shots, two groups, both leads `mfr` with
+references, the 16-s group fitted to 14 s, the badges. **Not run with a real
+breakdown model or a real H3 take.** Open: Krea's H3 models have no
+reference / multiframe workflow, so an extended take on Krea renders as a
+plain first-frame clip of the take's length.
+
+---
+
+## 21. Render options in a pop-up
+
+**Request.** Remove the selector beside Render at Stage 5; show the options
+in a pop-up when Render is clicked.
+
+**Behaviour.** For a series the Render button opens a pop-up — "Whole film"
+(or "Marked range (m:ss)" when a range is set), "All episodes (N files)",
+"Episode n" with its length — with Cancel / Render; a plain film renders at
+once as before. `src/stages/Stage6.jsx`, i18n `s6.renderTitle` / `renderChoose`
+/ `renderRange`, `tip.renderOpt`. Verified in the dev app on a two-episode
+seed. The subtitle layer also lost its lane-wide Clear button in favour of
+a ✕ on every block (§14 amended).

@@ -11,6 +11,15 @@
 - **Agent: engines and parts.** The agent's status names the image and video
   models in use (including Krea and the H3 step count); the project view
   shows parts; a new tool splits a project into parts.
+- **Extended shots.** Stage 4 asks whether to cut a scene into normal
+  shots or extended shots: complex shots of 2–3 camera changes (up to 15 s)
+  rendered as one MiniMax H3 take in multiframe-reference mode with the
+  characters, assets and location as references.
+- **Voice with the video.** On MiniMax H3 the lines are always in the video
+  prompt and spoken by the model; the separate voice step and the TTS /
+  native toggle are gone (LTX keeps its talking-video voice).
+- **Render pop-up.** The render options (whole film, episode, all episodes)
+  open in a pop-up from the Render button.
 - **Nested projects.** A project split into episode projects or parts is
   one card on the main screen; click it for a pop-up with the projects
   inside as compact rows, each with open, duplicate, archive, delete and

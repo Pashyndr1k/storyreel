@@ -34,6 +34,14 @@ export const STAGE_COUNT = 5;
 export const SHOT_MIN_SEC = 2;
 export const SHOT_MAX_SEC = 10;
 export const SHOT_STEP_SEC = 0.5;
+// Extended shots (Stage 4 option): one complex shot of up to this many
+// seconds made of 2–3 camera set-ups, rendered as ONE MiniMax H3 take
+// (345 frames at 24 fps = 14.4 s — see lib/takes.js).
+export const EXTENDED_SHOT_MAX_SEC = 15;
+export const EXTENDED_SUBSHOTS = { min: 2, max: 3 };
+// what the breakdown model is asked for: the segments' total per extended shot
+export const EXTENDED_SHOT_MIN_TOTAL = 8;
+export const EXTENDED_SHOT_MAX_TOTAL = 14;
 
 // Character face references attached to one first frame (picked per shot,
 // see lib/castRefs.js). Local Flux.2 Klein still takes two images in total.

@@ -158,7 +158,7 @@ function shotView(project, scene, shot, i, withPrompts) {
     videoSeed: Number.isFinite(Number((project.shotSeeds || {})[shot.id])) ? Number(project.shotSeeds[shot.id]) : null,
     camera: CAMERA_LEVELS[cameraOf(project, shot, block)],
     dynamics: ACTION_LEVELS[actionOf(project, shot, block)],
-    voiceSource: (shot.dialogue || '').trim() ? voiceSourceFor(project, shot.id) : null,
+    voiceSource: (shot.dialogue || '').trim() ? voiceSourceOf(project, shot.id) : null,
     ...(withPrompts ? { imagePrompt: pr.imagePrompt || '', videoPrompt: pr.videoPrompt || '', voicePrompt: pr.voicePrompt || '' } : {}),
   };
 }
@@ -224,7 +224,7 @@ const str = (description) => ({ type: 'string', description });
 const PROJECT = { projectId: str('Project id (from storyreel_list_projects).') };
 const schema = (properties, required = []) => ({ type: 'object', properties, required, additionalProperties: false });
 
-async function runStage({ projectId, stage, sceneId }) {
+async function runStage({ projectId, stage, sceneId, mode }) {
   const n = Number(stage);
   if (![1, 2, 3, 4].includes(n)) fail('BAD_INPUT', 'stage must be 1, 2, 3 or 4.');
   const keyErr = textKeyError(app().settings);
@@ -235,8 +235,13 @@ async function runStage({ projectId, stage, sceneId }) {
   const scope = await openStage(projectId, n);
   if (n === 4) {
     if (!before.outline.length) fail('NOT_READY', 'Stage 3 has no scene outline yet.');
-    if (sceneId) await scope.generateScene(sceneOf(before, sceneId).id);
-    else await scope.generateAll();
+    const m = mode === 'extended' || mode === 'normal' ? mode : before.breakdownMode || 'normal';
+    if (m !== (before.breakdownMode || 'normal')) {
+      patchProject(projectId, { breakdownMode: m });
+      await settle();
+    }
+    if (sceneId) await scope.generateScene(sceneOf(before, sceneId).id, m);
+    else await scope.generateAll(m);
   } else {
     if (n === 1 && !(before.logline || '').trim()) fail('NOT_READY', 'The project has no plot description (logline).');
     if (n === 2 && !(before.approvedPlot || '').trim()) fail('NOT_READY', 'No approved plot yet — pick an idea or set approvedPlot first.');
@@ -285,6 +290,13 @@ const MEDIA = {
   location_ref: { map: null, label: 'The location reference cut from this shot', run: (b, shot) => b.makeLocationRef(shot) },
 };
 const locPhotoCount = (project, scene, shotId) => shotLocationRefs(project, scene, shotId, 99).reduce((a, g) => a + g.photos.length, 0);
+// MiniMax H3 (local, or through Krea) speaks the lines itself: the dialogue
+// is in the video prompt and there is no separate voice step.
+const nativeVoiceEngine = () => {
+  const s = app().settings;
+  return s.videoEngine === 'minimax' || (s.videoEngine === 'krea' && kreaVideoModelOf(s).family === 'minimax');
+};
+const voiceSourceOf = (project, shotId) => (nativeVoiceEngine() ? 'native' : voiceSourceFor(project, shotId));
 
 async function createMedia({ projectId, shotId, kind, seed }) {
   const spec = MEDIA[kind] || fail('BAD_INPUT', `kind must be one of: ${Object.keys(MEDIA).join(', ')}.`);
@@ -295,6 +307,7 @@ async function createMedia({ projectId, shotId, kind, seed }) {
   if (kind === 'video' && !(pr.videoPrompt || '').trim()) fail('NOT_READY', 'This shot has no video prompt yet.');
   if ((kind === 'video' || kind === 'final_frame' || kind === 'location_ref') && !has(project.shotImages, shotId)) fail('NOT_READY', 'Create and approve the first frame before this.');
   if (kind === 'voice' && !(shot.dialogue || '').trim()) fail('NOT_READY', 'This shot has no dialogue.');
+  if (kind === 'voice' && nativeVoiceEngine()) fail('NOT_READY', 'On MiniMax H3 the voice is part of the video: the dialogue lines are in the H3 video prompt and the model speaks them. Create the video; there is no separate voice step.');
   // A spoken shot on the local LTX engine is a talking video synced to its
   // voice: the voice comes first, and the shot has grown to hold all of it.
   const engine = app().settings.videoEngine || 'ltx';
@@ -430,7 +443,7 @@ async function reviewShot({ projectId, shotId, frames = 6, transcript = false })
     expected: {
       action: shot.action,
       dialogue: shot.dialogue || null,
-      voiceSource: (shot.dialogue || '').trim() ? voiceSourceFor(project, shot.id) : null,
+      voiceSource: (shot.dialogue || '').trim() ? voiceSourceOf(project, shot.id) : null,
       imagePrompt: pr.imagePrompt || '',
       videoPrompt: pr.videoPrompt || '',
       spatialLayout: describeShot(project, scene, shot.id) || null,
@@ -589,8 +602,8 @@ export const TOOLS = [
   },
   {
     name: 'storyreel_run_stage',
-    description: 'Run a text stage with the app\'s own generator. 1 = four plot directions (then storyreel_pick_idea); 2 = storyline and characters (WARNING: replaces the cast and their reference photos); 3 = scene outline (for a series master: the series plan); 4 = shot breakdown, for one scene (sceneId) or every scene. Counts as an attempt. Returns the updated project.',
-    inputSchema: schema({ ...PROJECT, stage: { type: 'integer', enum: [1, 2, 3, 4] }, sceneId: str('Stage 4 only: limit to this scene.') }, ['projectId', 'stage']),
+    description: 'Run a text stage with the app\'s own generator. 1 = four plot directions (then storyreel_pick_idea); 2 = storyline and characters (WARNING: replaces the cast and their reference photos); 3 = scene outline (for a series master: the series plan); 4 = shot breakdown, for one scene (sceneId) or every scene — mode "normal" (one camera set-up per shot, 2–10 s) or "extended" (complex shots of 2–3 camera changes, up to 14 s, each rendered as ONE MiniMax H3 take with the characters, assets and location as references; the sub-shots appear as consecutive shots grouped in a take; the default is the project\'s breakdownMode). Counts as an attempt. Returns the updated project.',
+    inputSchema: schema({ ...PROJECT, stage: { type: 'integer', enum: [1, 2, 3, 4] }, sceneId: str('Stage 4 only: limit to this scene.'), mode: { type: 'string', enum: ['normal', 'extended'], description: 'Stage 4 only.' } }, ['projectId', 'stage']),
     run: runStage,
   },
   {

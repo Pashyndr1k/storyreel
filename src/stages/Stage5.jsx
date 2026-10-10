@@ -32,7 +32,7 @@ import Lightbox from '../components/Lightbox.jsx';
 import RefPicker from '../components/RefPicker.jsx';
 import KeyframePicker from '../components/KeyframePicker.jsx';
 import { h3MultiPlan, keyframesOf, seedTakeKeyframes, hasMultiInput, h3Stamp } from '../lib/h3multi.js';
-import { takeOf, isTakeMember, takeTotal, canCombine } from '../lib/takes.js';
+import { takeOf, isTakeMember, takeTotal, canCombine, autoTakeRefs } from '../lib/takes.js';
 import { padAudioWithSilence, mediaDuration, decodeMediaAudio, audioBufferToWavDataURL } from '../lib/audio.js';
 import LibraryPicker from '../components/LibraryPicker.jsx';
 import { newLibraryEntry } from '../lib/library.js';
@@ -1409,8 +1409,31 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const voiceAud = (cur.shotAudios || {})[shot.id] || null;
     // A pinned workflow wins over the automatic choice (and silently falls
     // back to auto when its material is missing).
-    const mode = (cur.shotVideoModes || {})[shot.id] || 'auto';
-    const refs = (cur.shotRefs || {})[shot.id] || null;
+    let mode = (cur.shotVideoModes || {})[shot.id] || 'auto';
+    let refs = (cur.shotRefs || {})[shot.id] || null;
+    // An extended take (Stage 4 option) renders in the workflow that keeps the
+    // characters, assets and place consistent across its internal cuts:
+    // multiframe_reference when the members' first frames exist (they become
+    // the keyframes at the cut times) — else reference_to_video — with the
+    // cast photos, the location photos and the attached assets as references,
+    // gathered here when nothing was picked by hand.
+    if (isH3 && take && take.shotIds[0] === shot.id) {
+      if (!refs || !((refs.images || []).length || (refs.videos || []).length || (refs.audios || []).length)) {
+        const auto = autoTakeRefs(cur, scene.id, take.shotIds, library || []);
+        if (auto) {
+          refs = auto;
+          update((p) => ({ shotRefs: { ...(p.shotRefs || {}), [shot.id]: auto } }));
+        }
+      }
+      if ((mode === 'auto' || mode === 'mfr') && !hasMultiInput(cur, shot.id)) {
+        const seeded = first ? seedTakeKeyframes(cur, take, t) : [];
+        if (seeded.length) {
+          update((p) => ({ shotKeyframes: { ...(p.shotKeyframes || {}), [shot.id]: seeded }, shotVideoModes: { ...(p.shotVideoModes || {}), [shot.id]: 'mfr' } }));
+          cur.shotKeyframes = { ...(cur.shotKeyframes || {}), [shot.id]: seeded };
+          mode = 'mfr';
+        } else if (mode === 'auto' && refs) mode = 'r2v';
+      } else if (mode === 'auto' && hasMultiInput(cur, shot.id)) mode = 'mfr';
+    }
     const hasRefs = !!refs && ((refs.images || []).length || (refs.videos || []).length || (refs.audios || []).length) > 0;
     // H3 has its own workflow set: it never takes audio in (it scores itself),
     // and reference mode replaces the first-frame anchor entirely.
@@ -1729,8 +1752,10 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const r = (project.shotRefs || {})[shotId];
     return r && ((r.images || []).length || (r.videos || []).length || (r.audios || []).length) ? r : null;
   };
+  // MiniMax H3 (local, or through Krea) always speaks the lines itself: the
+  // dialogue goes into the video prompt; there is no separate voice.
   const nativeVoiceOn = (shot) =>
-    curEngine === 'minimax' && (shot.dialogue || '').trim() !== '' && voiceSourceOf(shot.id) === 'native';
+    (curEngine === 'minimax' || (curEngine === 'krea' && kreaVideoModelOf(settings).family === 'minimax')) && (shot.dialogue || '').trim() !== '';
   const padsOf = (shotId) => {
     const raw = (project.shotAudioPads || {})[shotId] || {};
     return { lead: Number(raw.lead) || 0, tail: Number(raw.tail) || 0 };
@@ -2751,26 +2776,9 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                       model's own voice — the TTS panel then gives way to a
                       speaker block that feeds the video prompt. */}
                   <div className="s5e-panel">
-                    {curEngine === 'minimax' && (shot.dialogue || '').trim() !== '' && (
-                      <div className="s5e-vsrc">
-                        <span className="s5e-eyebrow">{t('vsrc.label')}</span>
-                        <span className="seg">
-                          {['tts', 'native'].map((v) => (
-                            <button title={t(`tip.vsrc_${v}`)}
-                              key={v}
-                              type="button"
-                              className={`seg-btn ${voiceSourceOf(shot.id) === v ? 'on' : ''}`}
-                              onClick={() => setVoiceSource(shot.id, v)}
-                            >
-                              {t(`vsrc.${v}`)}
-                            </button>
-                          ))}
-                        </span>
-                      </div>
-                    )}
                     {nativeVoiceOn(shot) ? (
                       <div className="s5e-speaker">
-                        <p className="hint">{t('vsrc.nativeHint')}</p>
+                        <p className="hint">{t('s4.voiceInVideo')}</p>
                         <div className="prompt-head">
                           <label>{t('vsrc.speaker')}</label>
                         </div>

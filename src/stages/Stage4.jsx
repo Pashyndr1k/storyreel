@@ -2,7 +2,8 @@ import { useAgentScope } from '../lib/agent/registry.js';
 import { syncShotAssets } from '../lib/storyAssets.js';
 import { BEATS, isShortDrama } from '../lib/shortDrama/rules.js';
 import DramaCheckModal from '../components/DramaCheckModal.jsx';
-import { SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC } from '../lib/config.js';
+import { SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC, EXTENDED_SUBSHOTS } from '../lib/config.js';
+import { takeOf, fitTakeDurations, autoTakeRefs } from '../lib/takes.js';
 import { useRef, useState } from 'react';
 import { Grip, Stars, Copy, Box } from '../components/icons.jsx';
 import { useGenerate } from '../lib/useGenerate.js';
@@ -18,6 +19,7 @@ import Lightbox from '../components/Lightbox.jsx';
 import SceneNav from '../components/SceneNav.jsx';
 import ScriptExportModal from '../components/ScriptExportModal.jsx';
 import SpatialModal from '../components/SpatialModal.jsx';
+import BreakdownModeModal from '../components/BreakdownModeModal.jsx';
 import { hasLayout, layoutEnabled } from '../lib/spatial/layout.js';
 import { Download } from '../components/icons.jsx';
 
@@ -44,6 +46,21 @@ export function sceneStartTime(project, sceneId) {
 }
 
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, Number(n) || lo));
+
+// An extended breakdown returns { segments: [shot…] } per extended shot: the
+// segments become consecutive shots and the whole becomes one take (groups).
+const flattenShots = (rawShots) => {
+  const shots = [];
+  const groups = []; // arrays of indexes into `shots`
+  for (const row of rawShots || []) {
+    if (Array.isArray(row?.segments) && row.segments.length) {
+      const segs = row.segments.slice(0, EXTENDED_SUBSHOTS.max);
+      const idx = segs.map((s) => shots.push(s) - 1);
+      if (idx.length > 1) groups.push(idx);
+    } else if (row && typeof row === 'object') shots.push(row);
+  }
+  return { shots, groups };
+};
 
 const mapShots = (rawShots, range = { min: SHOT_MIN_SEC, max: SHOT_MAX_SEC }) =>
   (rawShots || []).map((s) => ({
@@ -76,42 +93,74 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
 
   const blockOf = (s) => blockForScene(project.dynamicsPlan, project.outline.indexOf(s) + 1);
 
-  const applyShots = (targetSceneId, rawShots, block) =>
+  const applyShots = (targetSceneId, rawShots, block, mode = 'normal') =>
     update((p) => {
-      const sceneDetails = { ...p.sceneDetails, [targetSceneId]: { shots: mapShots(rawShots, block ? densityRange(block) : undefined) } };
+      const { shots: flat, groups } = flattenShots(rawShots);
+      // an extended shot's segments may be shorter than the rhythm block's
+      // range asks of a normal shot — they are cuts inside one generation
+      const range = mode === 'extended' ? { min: SHOT_MIN_SEC, max: SHOT_MAX_SEC } : block ? densityRange(block) : undefined;
+      const mapped = mapShots(flat, range);
+      // extended: each group becomes one H3 take (durations fitted to the
+      // take ceiling), rendered with the cast / location / asset references
+      const oldIds = new Set((p.sceneDetails[targetSceneId]?.shots || []).map((s) => s.id));
+      const shotGroups = Object.fromEntries(Object.entries(p.shotGroups || {}).filter(([k, g]) => !oldIds.has(k) && !(g.shotIds || []).some((id) => oldIds.has(id))));
+      const shotVideoModes = { ...(p.shotVideoModes || {}) };
+      for (const id of oldIds) delete shotVideoModes[id];
+      for (const idx of groups) {
+        const members = idx.map((k) => mapped[k]);
+        const fitted = fitTakeDurations(members.map((m) => m.duration), SHOT_MIN_SEC);
+        members.forEach((m, k) => (m.duration = fitted[k]));
+        shotGroups[members[0].id] = { shotIds: members.map((m) => m.id) };
+        shotVideoModes[members[0].id] = 'mfr';
+      }
+      const sceneDetails = { ...p.sceneDetails, [targetSceneId]: { shots: mapped } };
       // the story's assets attach to the shots that name them
       const { patch } = syncShotAssets({ ...p, sceneDetails });
-      return { sceneDetails, ...patch };
+      const next = { sceneDetails, ...patch, shotGroups, shotVideoModes };
+      // the references the take renders with (what exists now; Stage 5 fills the rest)
+      if (groups.length) {
+        const shotRefs = { ...(p.shotRefs || {}) };
+        for (const id of oldIds) delete shotRefs[id];
+        for (const g of Object.values(shotGroups)) {
+          if (!mapped.some((m) => m.id === g.shotIds[0])) continue;
+          const refs = autoTakeRefs({ ...p, ...next }, targetSceneId, g.shotIds, library || []);
+          if (refs) shotRefs[g.shotIds[0]] = refs;
+        }
+        next.shotRefs = shotRefs;
+      }
+      return next;
     });
 
   // for the agent: one scene by id, or every scene, each returning its promise
   useAgentScope('stage4', {
     projectId: project.id,
     error,
-    generateScene: (sid) => {
+    generateScene: (sid, mode = project.breakdownMode || 'normal') => {
       const sc = project.outline.find((x) => x.id === sid);
       const block = blockOf(sc);
-      return run(stage4Prompt(project, { ...sc, number: project.outline.indexOf(sc) + 1 }, genLang, scriptStyle, block), (data) => applyShots(sc.id, data.shots, block));
+      return run(stage4Prompt(project, { ...sc, number: project.outline.indexOf(sc) + 1 }, genLang, scriptStyle, block, mode), (data) => applyShots(sc.id, data.shots, block, mode));
     },
-    generateAll: () =>
+    generateAll: (mode = project.breakdownMode || 'normal') =>
       runBatch(
         project.outline,
-        (s) => stage4Prompt(project, { ...s, number: project.outline.indexOf(s) + 1 }, genLang, scriptStyle, blockOf(s)),
-        (s, data) => applyShots(s.id, data.shots, blockOf(s)),
+        (s) => stage4Prompt(project, { ...s, number: project.outline.indexOf(s) + 1 }, genLang, scriptStyle, blockOf(s), mode),
+        (s, data) => applyShots(s.id, data.shots, blockOf(s), mode),
         (a, b) => setProg(b ? { a, b } : null)
       ),
   });
 
-  const generate = () => {
-    if (shots.length && !window.confirm(t('s4.replaceConfirm'))) return;
+  // Both breakdown buttons first ask: normal shots, or extended shots (complex
+  // shots of 2–3 camera changes rendered as one H3 take). The answer is kept
+  // on the project (breakdownMode) and used by the agent too.
+  const [askMode, setAskMode] = useState(null); // 'scene' | 'all'
+  const runGenerate = (mode) => {
     const block = blockOf(scene);
     run(
-      stage4Prompt(project, { ...scene, number: project.outline.indexOf(scene) + 1 }, genLang, scriptStyle, block),
-      (data) => applyShots(scene.id, data.shots, block)
+      stage4Prompt(project, { ...scene, number: project.outline.indexOf(scene) + 1 }, genLang, scriptStyle, block, mode),
+      (data) => applyShots(scene.id, data.shots, block, mode)
     );
   };
-
-  const processAll = () => {
+  const runAll = (mode) => {
     let targets = project.outline.filter((s) => !project.sceneDetails[s.id]?.shots?.length);
     if (!targets.length) {
       if (!window.confirm(t('batch.confirmAll4'))) return;
@@ -119,10 +168,22 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
     }
     runBatch(
       targets,
-      (s) => stage4Prompt(project, { ...s, number: project.outline.indexOf(s) + 1 }, genLang, scriptStyle, blockOf(s)),
-      (s, data) => applyShots(s.id, data.shots, blockOf(s)),
+      (s) => stage4Prompt(project, { ...s, number: project.outline.indexOf(s) + 1 }, genLang, scriptStyle, blockOf(s), mode),
+      (s, data) => applyShots(s.id, data.shots, blockOf(s), mode),
       (a, b) => setProg(b ? { a, b } : null)
     );
+  };
+  const generate = () => {
+    if (shots.length && !window.confirm(t('s4.replaceConfirm'))) return;
+    setAskMode('scene');
+  };
+  const processAll = () => setAskMode('all');
+  const pickMode = (mode) => {
+    const scope = askMode;
+    setAskMode(null);
+    if (mode !== (project.breakdownMode || 'normal')) update({ breakdownMode: mode });
+    if (scope === 'scene') runGenerate(mode);
+    else runAll(mode);
   };
 
   const setShots = (nextShots) =>
@@ -254,6 +315,13 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
           >
             <div className="shot-head">
               <strong>{t('s4.shot', { n: i + 1 })}</strong>
+              {(() => {
+                // an extended shot: its segments share one H3 take
+                const g = takeOf(project, shot.id);
+                if (!g) return null;
+                const n = Object.keys(project.shotGroups || {}).indexOf(g.shotIds[0]) + 1;
+                return <span className="take-badge" title={t('s4.takeTip')}>{t('s4.takeBadge', { n })}{g.shotIds[0] === shot.id ? '' : ` · ${g.shotIds.indexOf(shot.id) + 1}/${g.shotIds.length}`}</span>;
+              })()}
               <span className="timecode">{fmt(start)} – {fmt(cursor)}</span>
               <StyleChip project={project} styles={styles} cat="script" onClick={onProjectSettings} />
               <div className="scene-tools">
@@ -344,6 +412,7 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
       <Lightbox item={lightbox} onClose={() => setLightbox(null)} />
       {showExport && <ScriptExportModal project={project} onClose={() => setShowExport(false)} />}
       {showCheck && <DramaCheckModal project={project} update={update} onClose={() => setShowCheck(false)} />}
+      {askMode && <BreakdownModeModal value={project.breakdownMode || 'normal'} scope={askMode} onPick={pickMode} onClose={() => setAskMode(null)} />}
       {showLayout && scene && <SpatialModal project={project} update={update} scene={scene} settings={settings} onClose={() => setShowLayout(false)} />}
     </section>
   );
