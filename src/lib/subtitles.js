@@ -71,7 +71,48 @@ export function normalizeSubtitles(raw) {
   const style = normalizeSubStyle(raw?.style);
   const items = (Array.isArray(raw?.items) ? raw.items : []).map(normalizeSubItem).filter(Boolean).slice(0, MAX_SUB_ITEMS);
   items.sort((a, b) => a.start - b.start);
-  return { style, items };
+  return { enabled: raw?.enabled !== false, style, items };
+}
+
+// ---- word-by-word timing
+// Words appear one after another across the block, in step with speech:
+// each word gets a share of the block proportional to its length, the last
+// word landing at about 85% of the block so the whole line holds before it
+// goes. (No word-level timestamps come from the video models; this follows
+// the natural pace of the line.) Returns [{ word, at }] with absolute times.
+export function wordTimes(item) {
+  const words = String(item.text || '').split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  if (words.length === 1) return [{ word: words[0], at: item.start }];
+  const weights = words.map((w) => w.replace(/[^\p{L}\p{N}]/gu, '').length + 1.5);
+  const sum = weights.reduce((a, b) => a + b, 0);
+  const span = Math.max(0, item.duration) * 0.85;
+  let acc = 0;
+  return words.map((word, i) => {
+    const at = item.start + (acc / sum) * span;
+    acc += weights[i];
+    return { word, at: Math.round(at * 1000) / 1000 };
+  });
+}
+// The words of a block shown at a moment (at least the first), with the
+// block's own line breaks kept.
+export function visibleText(item, t) {
+  const times = wordTimes(item);
+  const n = Math.max(1, times.filter((w) => w.at <= t + 0.001).length);
+  const words = String(item.text || '').split(/(\s+)/); // keep the separators
+  let shown = 0;
+  let out = '';
+  for (const part of words) {
+    if (/^\s+$/.test(part)) {
+      out += part;
+      continue;
+    }
+    if (!part) continue;
+    if (shown >= n) break;
+    out += part;
+    shown++;
+  }
+  return out.replace(/\s+$/, '');
 }
 export const subtitlesOf = (project) => normalizeSubtitles(project?.subtitles);
 export const subStyleOf = (subs, item) => normalizeSubStyle({ ...subs.style, ...(item?.style || {}) }, subs.style);
@@ -157,12 +198,13 @@ const ALIGN = { 'left:bottom': 1, 'center:bottom': 2, 'right:bottom': 3, 'left:m
 
 export function buildAss(project, width, height, rIn = 0, rOut = Infinity) {
   const subs = subtitlesOf(project);
+  if (!subs.enabled) return '';
   const items = subs.items.filter((it) => it.start + it.duration > rIn + 0.01 && it.start < rOut - 0.01);
   if (!items.length) return '';
   const base = subs.style;
   const px = (size) => Math.max(8, Math.round((size / 100) * height));
   const marginV = Math.round(height * 0.06);
-  const events = items.map((it) => {
+  const events = items.flatMap((it) => {
     const st = subStyleOf(subs, it);
     const pl = subPlacement(subs, it);
     const tags = [`\\an${ALIGN[`${pl.align}:${pl.vertical}`] || 2}`];
@@ -171,9 +213,17 @@ export function buildAss(project, width, height, rIn = 0, rOut = Infinity) {
     if (st.color !== base.color) tags.push(`\\1c${assColor(st.color)}`);
     if (st.outline !== base.outline) tags.push(`\\3c${assColor(st.outline)}`);
     if (pl.custom) tags.push(`\\pos(${Math.round(pl.x * width)},${Math.round(pl.y * height)})`);
-    const a = Math.max(0, it.start - rIn);
-    const b = Math.min(rOut - rIn, it.start + it.duration - rIn);
-    return `Dialogue: 0,${assTime(a)},${assTime(b)},Default,,0,0,0,,{${tags.join('')}}${assText(it.text)}`;
+    const end = Math.min(rOut - rIn, it.start + it.duration - rIn);
+    // one event per word: the line grows word by word, timed with the speech
+    const times = wordTimes(it);
+    return times
+      .map((w, k) => {
+        const a = Math.max(0, w.at - rIn);
+        const b = k + 1 < times.length ? Math.max(0, times[k + 1].at - rIn) : end;
+        if (b <= a + 0.001 || b <= 0) return null;
+        return `Dialogue: 0,${assTime(a)},${assTime(b)},Default,,0,0,0,,{${tags.join('')}}${assText(visibleText(it, w.at))}`;
+      })
+      .filter(Boolean);
   });
   return [
     '[Script Info]',

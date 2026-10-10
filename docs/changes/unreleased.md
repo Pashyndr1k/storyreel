@@ -661,8 +661,10 @@ centre / top); custom text anywhere on the frame; an MCP tool.
   clips; lane buttons ≡ "From dialogue" (`autoSubtitles`: each shot's lines
   share the slot minus its silence pads, in proportion to their length;
   custom text is kept), + "Add text" (a free block at the playhead, placed
-  by X / Y). Each block has its own small ✕ (the lane-wide "Clear" was
-  removed on request). Drag a block to move it; double-click opens
+  by X / Y). Each block has its own small ✕. The lane head is the same as an
+  audio lane's — the ST tag, the on / off dot (hides the layer in the
+  preview and the render, `subtitles.enabled`) and ⋯ with "From dialogue"
+  and "Add text" in a pop-up. Drag a block to move it; double-click opens
   `SubtitleModal` (text, start, length, font, size, colour, outline colour,
   placement bottom / centre / top / anywhere with X / Y, a live sample,
   "Use this look for all subtitles", Delete, Save).
@@ -677,6 +679,18 @@ centre / top); custom text anywhere on the frame; an MCP tool.
   fallback (no ffmpeg bridge) draws the text with the 2D context.
 - Agent: `storyreel_subtitles` and `storyreel_set_subtitles` ({ auto, style,
   add, edit, remove, clear }). Guide step 7. i18n `sub.*` EN/RU/UK.
+
+**Words and width (later in the same cycle).** A block spans 90% of the
+frame width (`.sub-text-band`; ASS margins 5% each side) and its words
+appear one by one in step with the line: `wordTimes` gives each word a
+share of the block proportional to its length, the last word landing at
+~85% of the block (no word timestamps come from the video models; this is
+the natural pace of the line). The preview and the canvas renderer draw
+`visibleText(block, t)`; the ASS file carries one event per word with the
+cumulative text, so the render matches. The editor is compact — two
+columns: the text over the shot's first frame (the block's shot, else the
+shot under its start) at the exact place and size it will have, a click
+on the frame placing custom text there; and the fields in tight rows.
 
 **Verified.** In the dev app: the lane, "From dialogue" on the seeded shots,
 the overlay in the preview, the editor (double-click), moving a block, the

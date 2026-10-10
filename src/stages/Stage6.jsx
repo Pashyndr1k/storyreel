@@ -18,7 +18,7 @@ import { Play, Pause, SkipBack, StopSq, Grip, Download, Upload, Stars, Trash, Tr
 import Lightbox from '../components/Lightbox.jsx';
 import ShotTrimModal from '../components/ShotTrimModal.jsx';
 import SubtitleModal from '../components/SubtitleModal.jsx';
-import { subtitlesOf, autoSubtitles, activeSubtitles, subStyleOf, subPlacement, buildAss, normalizeSubItem } from '../lib/subtitles.js';
+import { subtitlesOf, autoSubtitles, activeSubtitles, subStyleOf, subPlacement, buildAss, normalizeSubItem, visibleText, shotStarts } from '../lib/subtitles.js';
 import { suggestTransition } from '../lib/transitions.js';
 import { logged } from '../lib/actionLog.js';
 
@@ -212,6 +212,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
   const [lightbox, setLightbox] = useState(null); // full-size pop-up of the previewed video
   const [trimModal, setTrimModal] = useState(null); // shot id shown in the isolated trim pop-up (double-click)
   const [subModal, setSubModal] = useState(null); // subtitle block id open in the editor (double-click)
+  const [subMenu, setSubMenu] = useState(null); // the subtitle lane's ⋯ pop-up { x, y }
   const [pvBox, setPvBox] = useState({ w: 0, h: 0 }); // the preview box, for the subtitle overlay
   const pvBoxRef = useRef(null);
   const [stripLeft, setStripLeft] = useState(NLE_GUT); // px from .nle-inner's left edge to where clips start
@@ -1610,7 +1611,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
             drawSeg(cur + 1, 0, (tt - (s.t1 - s.ov)) / s.ov);
           }
           // subtitles over the picture (the ffmpeg engine burns them from the ASS file)
-          for (const it of activeSubtitles(subs, tt + (segs[0]?.t0 ?? 0))) {
+          for (const it of subs.enabled ? activeSubtitles(subs, tt + (segs[0]?.t0 ?? 0)) : []) {
             const st = subStyleOf(subs, it);
             const pl = subPlacement(subs, it);
             const px = Math.max(8, (st.size / 100) * h);
@@ -1620,7 +1621,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
             ctx.lineWidth = Math.max(1, px / 9);
             ctx.strokeStyle = st.outline;
             ctx.fillStyle = st.color;
-            const lines = String(it.text).split(/\r?\n/);
+            const lines = visibleText(it, tt + (segs[0]?.t0 ?? 0)).split(/\r?\n/);
             lines.forEach((line, li) => {
               const y = pl.y * h + (li - (pl.vertical === 'bottom' ? lines.length - 1 : pl.vertical === 'middle' ? (lines.length - 1) / 2 : 0)) * px * 1.2;
               ctx.strokeText(line, pl.x * w, y);
@@ -1921,7 +1922,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
         {(() => {
           const idleSel = !playing && !scrubbing && selected;
           const at = idleSel ? startOf(items.indexOf(selected)) + 0.05 : elapsed;
-          const active = activeSubtitles(subs, at);
+          const active = subs.enabled ? activeSubtitles(subs, at) : [];
           if (!active.length || !pvBox.w || !pvBox.h) return null;
           const [aw, ah] = videoDims(project.aspectRatio || '16:9', project.videoResolution);
           const k = Math.min(pvBox.w / aw, pvBox.h / ah);
@@ -1937,10 +1938,10 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                 return (
                   <div
                     key={it.id}
-                    className="sub-text"
+                    className={`sub-text ${pl.custom ? '' : 'sub-text-band'}`}
                     style={{ left: `${pl.x * 100}%`, top: `${pl.y * 100}%`, transform: `translate(${tx}, ${ty})`, fontFamily: `"${st.font}", Arial, sans-serif`, fontSize: (st.size / 100) * fh, color: st.color, WebkitTextStroke: `${Math.max(0.5, ((st.size / 100) * fh) / 18)}px ${st.outline}`, textShadow: `0 0 ${Math.max(2, ((st.size / 100) * fh) / 10)}px ${st.outline}`, textAlign: pl.align }}
                   >
-                    {it.text}
+                    {visibleText(it, at)}
                   </div>
                 );
               })}
@@ -2201,14 +2202,31 @@ export default function Stage6({ project, update, settings, ...workbench }) {
         </div>
         {/* Subtitle layer: timed text blocks under the video track — made
             from the shots' dialogue or added by hand; double-click to edit. */}
-        <div className="sub-lane" title={t('sub.laneTip')}>
+        <div className={`sub-lane audio-lane ${subs.enabled ? '' : 'lane-off'}`} title={t('sub.laneTip')}>
+          {/* the same head as an audio lane: tag, on / off, everything else in ⋯ */}
           <span className="nle-gut lane-head" title={t('sub.lane')}>
             <i className="trk-tag" title={t('sub.lane')}>ST</i>
-            <button type="button" className="lane-more" title={t('sub.makeTip')} aria-label={t('sub.make')} onClick={makeSubs}>
-              ≡
+            <button
+              type="button"
+              className={`lane-eye ${subs.enabled ? 'on' : ''}`}
+              title={t('sub.toggle')}
+              aria-label={t('sub.toggle')}
+              aria-pressed={subs.enabled}
+              onClick={() => setSubs((s) => ({ ...s, enabled: !s.enabled }), 'subtitles.toggle')}
+            >
+              ●
             </button>
-            <button type="button" className="lane-more" title={t('sub.addTip')} aria-label={t('sub.add')} onClick={addCustomSub}>
-              +
+            <button
+              type="button"
+              className="lane-more"
+              title={t('sub.menu')}
+              aria-label={t('sub.menu')}
+              onClick={(e) => {
+                const r = e.currentTarget.getBoundingClientRect();
+                setSubMenu((m) => (m ? null : { x: Math.min(r.left, window.innerWidth - 218), y: Math.min(r.bottom + 6, window.innerHeight - 200) }));
+              }}
+            >
+              ⋯
             </button>
           </span>
           <div className="lane-strip">
@@ -2352,6 +2370,36 @@ export default function Stage6({ project, update, settings, ...workbench }) {
             </div>
           ))}
         </div>
+        {subMenu && (
+          <>
+            <div className="cut-menu-backdrop" onClick={() => setSubMenu(null)} />
+            <div className="lane-menu" style={{ left: subMenu.x, top: subMenu.y }}>
+              <label className="lane-menu-lbl">{t('sub.lane')} · {subs.items.length}</label>
+              <button
+                type="button"
+                className="btn small lane-sync"
+                title={t('sub.makeTip')}
+                onClick={() => {
+                  setSubMenu(null);
+                  makeSubs();
+                }}
+              >
+                <RestoreIcon size={14} />{t('sub.make')}
+              </button>
+              <button
+                type="button"
+                className="btn small lane-sync"
+                title={t('sub.addTip')}
+                onClick={() => {
+                  setSubMenu(null);
+                  addCustomSub();
+                }}
+              >
+                + {t('sub.add')}
+              </button>
+            </div>
+          </>
+        )}
         {laneMenu && (() => {
           const L = layers.find((x) => x.id === laneMenu.layerId);
           if (!L) return null;
@@ -2498,7 +2546,12 @@ export default function Stage6({ project, update, settings, ...workbench }) {
         (() => {
           const it = subs.items.find((x) => x.id === subModal);
           if (!it) return null;
-          return <SubtitleModal subs={subs} item={it} onSave={saveSub} onDelete={deleteSub} onClose={() => setSubModal(null)} />;
+          // the frame the block sits over: its shot's first frame, else the
+          // shot under the block's start
+          const starts = shotStarts(project);
+          const under = items.find((x) => it.start >= (starts[x.shot.id] || 0) && it.start < (starts[x.shot.id] || 0) + (x.shot.duration || 0)) || items[0];
+          const frame = (it.shotId && (project.shotImages || {})[it.shotId]) || under?.image || null;
+          return <SubtitleModal subs={subs} item={it} frame={frame} aspect={project.aspectRatio || '16:9'} onSave={saveSub} onDelete={deleteSub} onClose={() => setSubModal(null)} />;
         })()}
       <div className="nle-footer">
         <span className="nle-nudge nle-scale" title={zoomed ? t('s6.scrollHint') : ''}>

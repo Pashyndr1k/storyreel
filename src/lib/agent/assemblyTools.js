@@ -61,6 +61,7 @@ export function subtitlesView(project) {
   let n = 0;
   for (const sc of project.outline || []) for (const sh of project.sceneDetails?.[sc.id]?.shots || []) numbers[sh.id] = ++n;
   return {
+    enabled: subs.enabled,
     style: subs.style,
     items: subs.items.map((it) => ({ ...it, ...(it.shotId ? { shot: numbers[it.shotId] || null } : {}) })),
     count: subs.items.length,
@@ -70,7 +71,7 @@ export function subtitlesView(project) {
       for (const sc of project.outline || []) for (const sh of project.sceneDetails?.[sc.id]?.shots || []) if (sh.id === id) return !!(sh.dialogue || '').trim();
       return false;
     }).length,
-    note: 'Times are film seconds (the assembly order). size is percent of the frame height; x / y percent of the frame for custom text; position bottom | center | top | custom.',
+    note: 'Times are film seconds (the assembly order). size is percent of the frame height; x / y percent of the frame for custom text; position bottom | center | top | custom. A block spans 90% of the frame width and its words appear one by one across the block, in step with the line (the last word by ~85% of the block); enabled=false hides the layer in the preview and the render.',
   };
 }
 
@@ -166,13 +167,15 @@ export function assemblyTools(ctx) {
           edit: { type: 'array', items: ITEM_SCHEMA },
           remove: { type: 'array', items: { type: 'string' } },
           clear: { type: 'boolean' },
+          enabled: { type: 'boolean', description: 'Show (true) or hide (false) the whole layer.' },
         },
         ['projectId']
       ),
-      run: async ({ projectId, auto, style, add, edit, remove, clear }) => {
+      run: async ({ projectId, auto, style, add, edit, remove, clear, enabled }) => {
         let p = projectOf(projectId);
         let subs = subtitlesOf(p);
         let made = 0;
+        if (typeof enabled === 'boolean') subs = { ...subs, enabled };
         if (clear) subs = { ...subs, items: [] };
         if (auto) {
           const r = autoSubtitles({ ...p, subtitles: subs }, typeof auto === 'object' ? auto : {});
