@@ -17,6 +17,10 @@ import Stage5, { QUEUE_STOP_EVENT } from './Stage5.jsx';
 import { Play, Pause, SkipBack, StopSq, Grip, Download, Upload, Stars, Trash, TransitionIcon, AudioPlus, Expand, Zap, RestoreIcon } from '../components/icons.jsx';
 import Lightbox from '../components/Lightbox.jsx';
 import ShotTrimModal from '../components/ShotTrimModal.jsx';
+import SubtitleModal from '../components/SubtitleModal.jsx';
+import { subtitlesOf, autoSubtitles, activeSubtitles, subStyleOf, subPlacement, buildAss, normalizeSubItem } from '../lib/subtitles.js';
+import { suggestTransition } from '../lib/transitions.js';
+import { logged } from '../lib/actionLog.js';
 
 const readFileDataURL = (file) =>
   new Promise((resolve, reject) => {
@@ -207,6 +211,9 @@ export default function Stage6({ project, update, settings, ...workbench }) {
   const [pvState, setPvState] = useState({ playing: false, rate: 1 }); // idle preview transport
   const [lightbox, setLightbox] = useState(null); // full-size pop-up of the previewed video
   const [trimModal, setTrimModal] = useState(null); // shot id shown in the isolated trim pop-up (double-click)
+  const [subModal, setSubModal] = useState(null); // subtitle block id open in the editor (double-click)
+  const [pvBox, setPvBox] = useState({ w: 0, h: 0 }); // the preview box, for the subtitle overlay
+  const pvBoxRef = useRef(null);
   const [stripLeft, setStripLeft] = useState(NLE_GUT); // px from .nle-inner's left edge to where clips start
   const [queue, setQueue] = useState(null); // auto queue progress { a, b } | null
   const queueApi = useRef(null); // the embedded workbench's per-scene media queue
@@ -259,6 +266,61 @@ export default function Stage6({ project, update, settings, ...workbench }) {
           : L
       )
     );
+  // ---- subtitles: a layer of timed text under the video track --------------
+  const subs = subtitlesOf(project);
+  const setSubs = (fn, action = 'subtitles') => update(logged((p) => ({ subtitles: fn(subtitlesOf(p), p) }), action));
+  // from the shots' dialogue (custom text stays)
+  const makeSubs = () => {
+    const r = autoSubtitles(project);
+    if (!r.made) return showToast(t('sub.none'), 'error');
+    setSubs(() => r.subtitles, 'subtitles.auto');
+    showToast(t('sub.made', { n: r.made, s: r.shots }));
+  };
+  // a free text block at the playhead
+  const addCustomSub = () => {
+    const item = normalizeSubItem({ id: `sub_${uid()}`, start: Math.round(elapsed * 10) / 10, duration: 3, text: t('sub.customText'), custom: true, x: 50, y: 50 });
+    setSubs((s) => ({ ...s, items: [...s.items, item].sort((a, b) => a.start - b.start) }), 'subtitles.add');
+    setSubModal(item.id);
+  };
+  const saveSub = (item, { forAll } = {}) => {
+    setSubs((s) => {
+      const next = normalizeSubItem(item);
+      const style = forAll && next?.style ? { ...s.style, ...next.style, position: next.style.position === 'custom' ? s.style.position : next.style.position } : s.style;
+      const items = s.items.map((x) => (x.id === next.id ? next : forAll && next?.style ? { ...x, style: undefined } : x)).sort((a, b) => a.start - b.start);
+      return { style, items };
+    });
+    setSubModal(null);
+  };
+  const deleteSub = (id) => {
+    setSubs((s) => ({ ...s, items: s.items.filter((x) => x.id !== id) }), 'subtitles.delete');
+    setSubModal(null);
+  };
+  const clearSubs = () => {
+    if (!subs.items.length || !window.confirm(t('sub.clearConfirm'))) return;
+    setSubs((s) => ({ ...s, items: [] }), 'subtitles.clear');
+  };
+  // drag a block along the timeline (its start); a double-click opens the editor
+  const startSubDrag = (e, item) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const x0 = e.clientX;
+    const s0 = item.start;
+    const pxPerSec = Math.max(1, (xAtSec(item.start + 1) ?? NLE_GUT + (item.start + 1) * scale) - (xAtSec(item.start) ?? NLE_GUT + item.start * scale));
+    let moved = false;
+    const onMove = (ev) => {
+      const d = (ev.clientX - x0) / pxPerSec;
+      if (Math.abs(ev.clientX - x0) < 3 && !moved) return;
+      moved = true;
+      setSubs((s) => ({ ...s, items: s.items.map((x) => (x.id === item.id ? { ...x, start: Math.max(0, Math.round((s0 + d) * 10) / 10) } : x)) }), 'subtitles.move');
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  };
+
   // Background-music lanes ('bgmusic' legacy id or 'bgm_*') form a group
   // pinned to the very bottom of the timeline; ordinary new layers slot in
   // ABOVE that group.
@@ -427,7 +489,22 @@ export default function Stage6({ project, update, settings, ...workbench }) {
     if (override && override !== 'auto' && CUT_ACTIONS[override]) {
       return { ...CUT_ACTIONS[override], overridden: true };
     }
-    const auto = transitionFor(items[idx].block, items[idx + 1].block);
+    // automatic: from what happens in the two shots (action → abrupt, quiet →
+    // soft, a jump in time → fade), the scene rhythm deciding the rest
+    const a = items[idx];
+    const b = items[idx + 1];
+    const sameScene = a.sceneId === b.sceneId;
+    const nextScene = project.outline.find((s) => s.id === b.sceneId);
+    const prevScene = project.outline.find((s) => s.id === a.sceneId);
+    const pick = suggestTransition(a.shot, b.shot, {
+      prevBlock: a.block,
+      nextBlock: b.block,
+      sameScene,
+      sceneChange: !sameScene && (a.shot.location || '') !== (b.shot.location || ''),
+      episodeEnd: !sameScene && !!prevScene?.episode && !!nextScene?.episode && prevScene.episode !== nextScene.episode,
+      nextSummary: sameScene ? '' : nextScene?.summary || '',
+    });
+    const auto = CUT_ACTIONS[pick.type] || transitionFor(a.block, b.block);
     if (disabledCuts.has(auto.transition_type)) {
       return { transition_type: 'match_action_cut', audio_bridge: 'none', overlap_frames: 0, overridden: false };
     }
@@ -1167,6 +1244,18 @@ export default function Stage6({ project, update, settings, ...workbench }) {
     }
   }, [elapsed, zoomed, scale]);
 
+  // the preview box's size: the subtitle overlay is laid over the picture
+  // exactly where the contained frame sits
+  useLayoutEffect(() => {
+    const el = pvBoxRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const measure = () => setPvBox({ w: el.clientWidth, h: el.clientHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   // ---- render to a video file ----------------------------------------------
   const blobToDataURL = (blob) =>
     new Promise((resolve, reject) => {
@@ -1254,7 +1343,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
       setRenderProg((cur) => ({ ...(cur || {}), pct: Math.min(100, Math.round((p.sec / (p.total || 1)) * 100)) }))
     );
     try {
-      return await window.ffmpegBridge.render({ width: w, height: h, fps: 25, segments, transitions, audioClips, outPath });
+      return await window.ffmpegBridge.render({ width: w, height: h, fps: 25, segments, transitions, audioClips, ass: buildAss(project, w, h, rIn, rOut), outPath });
     } finally {
       off?.();
     }
@@ -1523,6 +1612,24 @@ export default function Stage6({ project, update, settings, ...workbench }) {
           if (s.cut && s.ov > 0 && tt >= s.t1 - s.ov && cur < segs.length - 1) {
             drawSeg(cur + 1, 0, (tt - (s.t1 - s.ov)) / s.ov);
           }
+          // subtitles over the picture (the ffmpeg engine burns them from the ASS file)
+          for (const it of activeSubtitles(subs, tt + (segs[0]?.t0 ?? 0))) {
+            const st = subStyleOf(subs, it);
+            const pl = subPlacement(subs, it);
+            const px = Math.max(8, (st.size / 100) * h);
+            ctx.font = `bold ${px}px "${st.font}", Arial, sans-serif`;
+            ctx.textAlign = pl.align;
+            ctx.textBaseline = pl.vertical === 'top' ? 'top' : pl.vertical === 'middle' ? 'middle' : 'bottom';
+            ctx.lineWidth = Math.max(1, px / 9);
+            ctx.strokeStyle = st.outline;
+            ctx.fillStyle = st.color;
+            const lines = String(it.text).split(/\r?\n/);
+            lines.forEach((line, li) => {
+              const y = pl.y * h + (li - (pl.vertical === 'bottom' ? lines.length - 1 : pl.vertical === 'middle' ? (lines.length - 1) / 2 : 0)) * px * 1.2;
+              ctx.strokeText(line, pl.x * w, y);
+              ctx.fillText(line, pl.x * w, y);
+            });
+          }
 
           setTimeout(step, 33);
         };
@@ -1750,7 +1857,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
       </div>
 
       <div className="asm-top">
-      <div className="asm-preview">
+      <div className="asm-preview" ref={pvBoxRef}>
         {/* Idle with a shot selected: mirror the workbench — the Image tab
             shows the current image version, the Video tab the shot's video.
             Playing: follow the playhead through the timeline as before. */}
@@ -1812,6 +1919,36 @@ export default function Stage6({ project, update, settings, ...workbench }) {
           const still = idleSel && benchFrame === 'final' && pv.final ? pv.final : pv?.image;
           if (still) return <img decoding="async" loading="lazy" src={still} alt="" />;
           return <div className="asm-blank">{pv ? t('s4.shot', { n: items.indexOf(pv) + 1 }) : ''}</div>;
+        })()}
+        {/* subtitles over the picture, sized to the frame the preview shows */}
+        {(() => {
+          const idleSel = !playing && !scrubbing && selected;
+          const at = idleSel ? startOf(items.indexOf(selected)) + 0.05 : elapsed;
+          const active = activeSubtitles(subs, at);
+          if (!active.length || !pvBox.w || !pvBox.h) return null;
+          const [aw, ah] = videoDims(project.aspectRatio || '16:9', project.videoResolution);
+          const k = Math.min(pvBox.w / aw, pvBox.h / ah);
+          const fw = aw * k;
+          const fh = ah * k;
+          return (
+            <div className="sub-overlay" style={{ width: fw, height: fh, left: (pvBox.w - fw) / 2, top: (pvBox.h - fh) / 2 }} aria-hidden="true">
+              {active.map((it) => {
+                const st = subStyleOf(subs, it);
+                const pl = subPlacement(subs, it);
+                const tx = pl.align === 'left' ? '0' : pl.align === 'right' ? '-100%' : '-50%';
+                const ty = pl.vertical === 'top' ? '0' : pl.vertical === 'middle' ? '-50%' : '-100%';
+                return (
+                  <div
+                    key={it.id}
+                    className="sub-text"
+                    style={{ left: `${pl.x * 100}%`, top: `${pl.y * 100}%`, transform: `translate(${tx}, ${ty})`, fontFamily: `"${st.font}", Arial, sans-serif`, fontSize: (st.size / 100) * fh, color: st.color, WebkitTextStroke: `${Math.max(0.5, ((st.size / 100) * fh) / 18)}px ${st.outline}`, textShadow: `0 0 ${Math.max(2, ((st.size / 100) * fh) / 10)}px ${st.outline}`, textAlign: pl.align }}
+                  >
+                    {it.text}
+                  </div>
+                );
+              })}
+            </div>
+          );
         })()}
         {/* warm the decoder for the next clip so the boundary switch doesn't stall */}
         {playing && items[curIdx + 1]?.video && (
@@ -2065,6 +2202,47 @@ export default function Stage6({ project, update, settings, ...workbench }) {
           })}
           </div>
         </div>
+        {/* Subtitle layer: timed text blocks under the video track — made
+            from the shots' dialogue or added by hand; double-click to edit. */}
+        <div className="sub-lane" title={t('sub.laneTip')}>
+          <span className="nle-gut lane-head" title={t('sub.lane')}>
+            <i className="trk-tag" title={t('sub.lane')}>ST</i>
+            <button type="button" className="lane-more" title={t('sub.makeTip')} aria-label={t('sub.make')} onClick={makeSubs}>
+              ≡
+            </button>
+            <button type="button" className="lane-more" title={t('sub.addTip')} aria-label={t('sub.add')} onClick={addCustomSub}>
+              +
+            </button>
+            {subs.items.length > 0 && (
+              <button type="button" className="lane-more" title={t('sub.clearTip')} aria-label={t('sub.clear')} onClick={clearSubs}>
+                ✕
+              </button>
+            )}
+          </span>
+          <div className="lane-strip">
+            {subs.items.map((it) => (
+              <div
+                key={it.id}
+                className={`sclip ${it.custom ? 'sclip-custom' : ''} ${subModal === it.id ? 'selected' : ''}`}
+                style={
+                  geom.length
+                    ? { left: xAtSec(it.start) - stripLeft, width: Math.max(8, xAtSec(it.start + it.duration) - xAtSec(it.start)) }
+                    : zoomed
+                      ? { left: it.start * scale, width: Math.max(8, it.duration * scale) }
+                      : { left: `${(it.start / Math.max(0.1, total)) * 100}%`, width: `${Math.max(0.6, (it.duration / Math.max(0.1, total)) * 100)}%` }
+                }
+                title={`${it.text} · ${it.start.toFixed(1)}s – ${(it.start + it.duration).toFixed(1)}s\n${t('sub.blockTip')}`}
+                onPointerDown={(e) => startSubDrag(e, it)}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  setSubModal(it.id);
+                }}
+              >
+                <span className="aclip-name">{it.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
         {/* Audio timeline: layers of clips under the video track. Each layer
             is its own lane — toggle, volume, add clips, drag to move, edge
             trims, fades; clips play in the preview and mix into the render. */}
@@ -2307,6 +2485,13 @@ export default function Stage6({ project, update, settings, ...workbench }) {
               onClose={() => setTrimModal(null)}
             />
           );
+        })()}
+      {/* A subtitle block: text, timing, font, size, colour, placement (double-click it) */}
+      {subModal &&
+        (() => {
+          const it = subs.items.find((x) => x.id === subModal);
+          if (!it) return null;
+          return <SubtitleModal subs={subs} item={it} onSave={saveSub} onDelete={deleteSub} onClose={() => setSubModal(null)} />;
         })()}
       <div className="nle-footer">
         <span className="nle-nudge nle-scale" title={zoomed ? t('s6.scrollHint') : ''}>

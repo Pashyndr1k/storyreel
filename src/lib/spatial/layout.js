@@ -206,3 +206,50 @@ export const forwardOf = (c, withHead = false) => {
   const a = rad(c.rot + (withHead ? c.head : 0));
   return { x: Math.sin(a), z: Math.cos(a) };
 };
+
+// ---- the line of action (the 180° rule)
+// The axis the camera must stay on one side of: between the two present
+// characters nearest the camera's target (in cast order, so the axis points
+// the same way in every shot), or a lone character's facing line. Set pieces
+// never move, so a camera that keeps its side also keeps the window, door and
+// counter on the same side of the screen from shot to shot.
+export function actionAxis(chars, cast, cam) {
+  const present = cast.map((c, i) => ({ i, id: c.id, st: chars[c.id] })).filter((x) => x.st && !x.st.off);
+  if (!present.length) return null;
+  if (present.length === 1) {
+    const s = present[0].st;
+    const f = forwardOf(s);
+    return { key: present[0].id, ax: s.x, az: s.z, dx: f.x, dz: f.z };
+  }
+  const near = [...present].sort((p, q) => Math.hypot(p.st.x - cam.tx, p.st.z - cam.tz) - Math.hypot(q.st.x - cam.tx, q.st.z - cam.tz)).slice(0, 2).sort((p, q) => p.i - q.i);
+  const [a, b] = near;
+  const dx = b.st.x - a.st.x;
+  const dz = b.st.z - a.st.z;
+  const l = Math.hypot(dx, dz) || 1;
+  return { key: `${a.id}|${b.id}`, ax: a.st.x, az: a.st.z, dx: dx / l, dz: dz / l };
+}
+// Which side of the axis the camera stands on: +1 / -1, or 0 when it is on
+// the line (within 0.3 m) — then no side is established.
+export function cameraSide(axis, cam) {
+  if (!axis) return 0;
+  const p = cameraPosition(cam);
+  const s = axis.dx * (p.z - axis.az) - axis.dz * (p.x - axis.ax);
+  return Math.abs(s) < 0.3 ? 0 : Math.sign(s);
+}
+// The camera mirrored across the axis (position and target), same distance,
+// height and lens: the same shot from the other side of the line.
+export function mirrorCamera(axis, cam) {
+  const refl = (x, z) => {
+    const vx = x - axis.ax;
+    const vz = z - axis.az;
+    const k = vx * axis.dx + vz * axis.dz;
+    return { x: axis.ax + 2 * k * axis.dx - vx, z: axis.az + 2 * k * axis.dz - vz };
+  };
+  const p = cameraPosition(cam);
+  const P = refl(p.x, p.z);
+  const T = refl(cam.tx, cam.tz);
+  const yaw = (Math.atan2(P.x - T.x, P.z - T.z) * 180) / Math.PI;
+  return normalizeCamera({ ...cam, tx: T.x, tz: T.z, yaw });
+}
+// Does the shot's text ask for the line to be crossed on purpose?
+export const crossesLineOnPurpose = (shot) => /cross(es|ed|ing)? the line|other side of|opposite side|180[ -]?degree|turn(s|ed)? around/i.test(`${shot?.shotType || ''} ${shot?.action || ''} ${shot?.notes || ''}`);

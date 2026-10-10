@@ -14,7 +14,7 @@ person may be watching — never fight them for control: if a call fails with
 | 2 Storyline | synopsis, characters | `storyreel_run_stage` (2) |
 | 3 Scene outline | scenes with durations, pacing plan | `storyreel_run_stage` (3) |
 | 4 Shot breakdown | shots per scene: type, location, action, dialogue | `storyreel_run_stage` (4) |
-| 5 Generation & assembly | per shot: prompts → first frame → video (→ voice); then the timeline render | `storyreel_create_prompts`, `storyreel_create_media`, `storyreel_render` |
+| 5 Generation & assembly | per shot: prompts → first frame (→ the scene's location reference) → voice when there is dialogue → video; then transitions, subtitles and the timeline render | `storyreel_create_prompts`, `storyreel_create_media`, `storyreel_set_transitions`, `storyreel_set_subtitles`, `storyreel_render` |
 
 Start with `storyreel_status`, then `storyreel_list_projects` or
 `storyreel_create_project`. Read the project with `storyreel_get_project`
@@ -62,10 +62,42 @@ state in your report why you chose them. One image style for the whole film.
 
 1. Prompts exist? If not, `storyreel_create_prompts` for the scene.
 2. `storyreel_create_media` kind `image`, then `storyreel_review_shot`.
-3. If the frame passes, `storyreel_create_media` kind `video`, then
-   `storyreel_review_shot` again.
-4. For a shot voiced by TTS, `storyreel_create_media` kind `voice` and check
-   the audio measurements.
+3. The first frame of a scene that passes, when the scene's location has no
+   reference photo (`expected.environments` is empty / `environmentNote`):
+   `storyreel_create_media` kind `location_ref` — the frame with the people
+   removed and the view widened becomes the location's reference. Every
+   later frame of the scene is made with it and reviewed against it, so the
+   place and the side its landmarks are on stay the same. (A reference from
+   nothing but the text: `storyreel_location_image`.)
+4. A shot with dialogue voiced by TTS: `storyreel_create_media` kind `voice`
+   BEFORE the video. The shot grows to hold the whole line when the voice is
+   longer than its slot (`shotExtendedTo` in the result) — never shorten it
+   below the voice afterwards. On the local engine the video of a spoken
+   shot is refused until the voice exists (the talking-video workflow syncs
+   the lips to it).
+5. If the frame passes, `storyreel_create_media` kind `video`, then
+   `storyreel_review_shot` again. A native-audio engine (H3, Seedance) may
+   speak past the slot: the shot grows to the generated length instead of
+   cutting the last words — read `shotExtendedTo` and keep the slot.
+
+**After the videos of the film exist — the edit.**
+
+6. Transitions: `storyreel_transitions` lists every boundary with the
+   automatic choice and its reason; look at the videos (the contact sheets
+   from `storyreel_review_shot`) and set the cuts with
+   `storyreel_set_transitions`: abrupt (`smash_cut`, `match_action_cut`,
+   `whip_pan`) where the action is fast or something sudden happens, smooth
+   (`soft_cut`, `dissolve`, `directional_crossfade`) for slow, quiet beats,
+   `rest_cut` / `dip_to_black` for a jump in time or an episode end.
+   `auto: true` writes the automatic choice everywhere as a start. A smooth
+   transition needs tail slack in the clip (`tailSlackSec`); without it the
+   render makes a hard cut.
+7. Subtitles: `storyreel_set_subtitles { auto: true }` makes compact text at
+   the bottom from every shot's dialogue, timed inside the shot's slot;
+   `style` sets font, size, colours and placement; `add` places free text
+   anywhere on the frame (x / y in percent). Check the result with
+   `storyreel_subtitles`; the render burns them in.
+8. `storyreel_render`.
 
 `storyreel_review_shot` returns measurements and images: the reference
 photos of the characters named in the shot, the location and asset
@@ -113,13 +145,26 @@ Skip it for single-character scenes, montage and inserts.
    action: is everyone the shot names present and in frame, on the same
    screen side as in the previous shot, facing who they talk to, and does the
    shot size match the shot type? `storyreel_get_layout { image: true }`
-   shows the camera view.
+   shows the camera view. Two things the builder now guarantees, and the
+   warnings watch: the SHOT SIZE comes from the shot type (a close-up is
+   framed as a close-up whatever lens the planner picked — the camera is
+   moved to the distance the type implies, so a subject never fills the
+   frame by accident), and the CAMERA KEEPS ITS SIDE of the line of action
+   from shot to shot (a camera that crossed it is mirrored back unless the
+   shot's text asks for the crossing — "crosses the line", "from the other
+   side"). Because the set boxes never move, keeping the side keeps the
+   window, the door, the counter on the same side of the screen: the
+   `lineCross` and `setFlip` warnings mean the environment would come out
+   mirrored. The description's "Continuity:" line tells the prompt writers
+   which side the background stays on.
 4. Fix: one wrong shot → `storyreel_build_layout { shotId }` (counts as an
    attempt) or, better when you know what is wrong, `storyreel_set_layout`
    with only the fields to change (free). Typical fixes: `present: false`
-   for someone not there yet; `camera.aimAt`; swap the camera side
-   (`yawDeg` + 180) when two characters flipped; a longer lens or shorter
-   distance for a close-up.
+   for someone not there yet; `camera.aimAt`; mirror the camera back
+   (`yawDeg` + 180) on a `lineCross` / `setFlip` warning; a longer lens or
+   shorter distance for a close-up. Set the location's landmarks as set
+   boxes (`setBoxes`: the shop window, the counter, the door) when the
+   planner left them out — only what is on the floor plan can keep its side.
 5. Only then `storyreel_create_prompts`. Prompts written before a layout
    change do not follow it — recreate them.
 6. `storyreel_review_shot` returns the layout's camera view as "INTENDED
@@ -183,6 +228,18 @@ is a flag of kind `asset` or `environment`; a fix is a better description on
 the card (`storyreel_set_asset`), a new reference image, or a prompt that
 names the asset by its exact name.
 
+A scene's location must have a reference before its second frame is made:
+`expected.environments` empty (or `environmentNote` present) means make one
+— `storyreel_create_media` kind `location_ref` from the scene's first good
+frame, or `storyreel_location_image` from the text. Then every review of
+the scene gets "REFERENCE — location" and "PREVIOUS — last frame": the
+landmarks (window, lights, counter, door) must be the same ones, on the
+same side of the screen, in the same light — a frame in which the shop
+window has moved from the right to the left is an `environment` flag even
+when the architecture matches. Fix it through the layout camera
+(`storyreel_set_layout`, see `lineCross` / `setFlip`) or the prompt
+("the shop window stays screen-right behind her"), then recreate the frame.
+
 ## Engines, quality and cost
 
 `storyreel_status.services` tells you what renders: the image service and
@@ -232,8 +289,14 @@ Change one thing per attempt, and say what you changed:
   the letter in her left hand, facing the door").
 - Too static or too wild → `storyreel_set_dynamics` (camera, dynamics), then
   recreate the video prompt.
-- Voice too long for the shot → shorten the line or lengthen the shot with
-  `storyreel_edit_script`, then recreate the voice.
+- Voice too long for the shot (`voiceOverrunsShot`) → lengthen the shot with
+  `storyreel_edit_script` (the length is rounded UP; never shorten a shot
+  below its voice), or shorten the line and recreate the voice. A video made
+  for the old length is now shorter than its slot (`shortBy`): recreate it,
+  or the render freezes its last frame and goes silent at the end.
+- Sound cut off at the end (`endsAbruptly`) → the slot is shorter than the
+  sound: lengthen the shot to the sound's length (`storyreel_edit_script`),
+  then recreate the video so the picture covers the slot.
 - A change that touches many places (a renamed character, another time of
   day) → `storyreel_smart_edit`.
 

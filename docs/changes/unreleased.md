@@ -525,3 +525,214 @@ the rendered references is untested.
 (like character portraits). Attachment matches names, not the script's
 other words for the object (the "mentions" the finder returns are stored
 but not yet used for matching).
+
+---
+
+## 11. Audio is never cut at the end of a shot (agent runs)
+
+**Request.** When the agent drives generation, the sound of a shot sometimes
+loses its last words and ends in silence.
+
+**Cause (found by reading the whole audio path).** The shot's slot
+(`shot.duration`) rules everything and nothing ever grew it for the agent:
+the TTS voice was trimmed to the slot inside the talking-video workflow
+(`TrimAudioDuration` in the LTX si2v graph) and clamped again as a lane
+clip; a native-audio engine (H3, Seedance) that spoke past the slot had its
+mix clip clamped to the slot (`Math.min(slotDur, mix.duration)`) and the
+video trimmed tail-only; `storyreel_edit_script` rounded the requested
+length to the nearest half second (6.2 → 6.0) and never warned that the
+existing video no longer covered the slot — the render then froze the last
+frame and padded silence (`tpad` + `apad`). The guide ordered video before
+voice, so the voice was cut at generation.
+
+**Fix.**
+- `genVoice` measures the clip and grows the shot to hold it (≤ 10 s, as the
+  silence pads already did); the si2v video run grows the slot first when the
+  voice is longer; a native-audio mix longer than the slot of a spoken shot
+  grows the slot to the generated length instead of clamping the clip.
+- Agent: `storyreel_create_media` returns `shotExtendedTo` / `voiceSec`; a
+  spoken shot on the local engine cannot get its video before its voice
+  (NOT_READY); `storyreel_edit_script` rounds a duration UP and returns
+  `warnings` when the video is shorter than the new slot or the voice longer.
+  Guide: voice before video, never shorten below the voice, recreate a
+  video shorter than its slot.
+
+**Files.** `src/stages/Stage5.jsx` (genVoice, genVideo si2v, native mix),
+`src/lib/agent/api.js`, `agent/AGENT_GUIDE.md`.
+
+**Verified.** Build; the agent paths with stubs (see §17). **Not run with a
+real voice or video model.**
+
+---
+
+## 12. Spatial layout: the shot type decides the shot size; the camera keeps its side
+
+**Request.** The planner often put the camera so close that the character
+filled the frame (a telephoto lens with a short distance); and two
+consecutive shots (the pastry shop) came out mirrored — the window and the
+row of lamps on the right in one, on the left in the next — although the
+layout tool exists to prevent it; the agent also never made a location
+reference.
+
+**Fix (`src/lib/spatial/build.js`, `layout.js`, `describe.js`).**
+- `framingOf(shotType)` reads the framing words of the shot type (extreme
+  close-up … extreme wide, OTS, two-shot, insert) → the frame height at the
+  subject and the lens that suits it. `fitCamera` keeps the planner's lens
+  only when it is within one step of that lens, then sets the DISTANCE from
+  the frame height and the lens's vertical field of view (so a close-up is a
+  close-up on 9:16 as on 16:9); for medium shots and wider it moves back
+  until every present character the shot names is inside the frame. Applied
+  to every shot the planner returns (scene build and single-shot rebuild, in
+  the window and through the agent).
+- The line of action: `actionAxis` (the two present characters nearest the
+  target, in cast order, or a lone character's facing line), `cameraSide`,
+  `mirrorCamera` (the same shot from the other side of the line — position
+  and target reflected, yaw recomputed). `keepSide` mirrors a camera that
+  crossed the line back to the previous shot's side unless the shot's text
+  asks for it (`crossesLineOnPurpose`: "crosses the line", "other side of",
+  "opposite side", "180-degree", "turns around"). Since set boxes never
+  move, keeping the side keeps the window / door / counter on the same side
+  of the screen.
+- Planner prompt: always box the landmarks that define the place and its
+  background (window, shop front, door, counter…); the set keeps its side.
+- `continuityWarnings` adds `lineCross` (the camera changed sides) and
+  `setFlip` (a labelled set piece swapped screen sides); the window and the
+  agent show them (i18n `sp.warn_lineCross` / `sp.warn_setFlip` EN/RU/UK).
+- `describeShot` ends with a "Continuity:" sentence for every shot after the
+  first — the background keeps its screen side (naming the set pieces and
+  their sides) or, when the line is crossed, says so; the image and video
+  prompt writers read it.
+- Agent: `storyreel_create_media` kind `location_ref` exposes the workbench's
+  location-reference tool (the approved frame, people removed, widened →
+  the scene's location photos); new `storyreel_location_image` renders a
+  reference from the text alone (`locationImagePrompt`). `storyreel_review_shot`
+  adds `environmentNote` when the location has no reference and extends the
+  environment check: landmarks on the same screen side as in the previous
+  frame unless the layout says the line is crossed. Guide: location
+  reference after the first good frame, the side rule, the new warnings.
+
+**Verified.** In the dev app with a staged scene (see §17): `framingOf`,
+`fitCamera` (85 mm at 1 m planned for a "wide shot" → 24 mm at the wide
+distance; a medium with a named character out of frame → camera moved
+back), `keepSide` (a camera placed at yaw 180 against a yaw-0 previous
+shot is mirrored back; not when the action says "other side"), the
+warnings and the "Continuity:" line. **Not run with the real planner model.**
+
+---
+
+## 13. Transitions chosen from what happens in the shots
+
+**Request.** After the videos exist the agent must set the transitions
+from the events: abrupt for action, smooth for slow scenes.
+
+**Behaviour.** `src/lib/transitions.js`: `suggestTransition(prev, next, …)`
+reads the two shots' type / action / notes (action verbs → `smash_cut`;
+both quiet → `soft_cut`; a time jump inside the scene → `dissolve`; across
+scenes: time jump → `rest_cut`, action → `smash_cut`, a new place → `soft_cut`;
+episode end → `dip_to_black`; continuous dialogue → `match_action_cut`; else
+the scene's rhythm block as before), with Russian / Ukrainian verbs too.
+The assembly's automatic choice (`cutFor` in Stage 6) now uses it; a manual
+pick per boundary still wins. Agent: `storyreel_transitions` (every
+boundary: effective, override, suggested, reason, `tailSlackSec` — a smooth
+transition needs tail slack or the render cuts hard) and
+`storyreel_set_transitions` ({ items: [{ shotId, type }] } or { auto: true }).
+Guide step 6. `shotTransitions` is now copied into split parts.
+
+**Verified.** `suggestTransition` cases and the two tools in the dev app.
+
+---
+
+## 14. Subtitles: a layer under the video track
+
+**Request.** Automatic subtitles at Stage 5 on a separate layer beneath the
+video; compact text at the bottom of the frame with the dialogue;
+double-click a block → editor for font, size, colour, placement (bottom /
+centre / top); custom text anywhere on the frame; an MCP tool.
+
+**Behaviour.**
+- Data: `project.subtitles = { style: { font, size (% of frame height),
+  color, outline, position }, items: [{ id, shotId?, start, duration, text,
+  custom?, x?, y?, style? }] }` (`src/lib/subtitles.js`, normalised in
+  `migrateProject`). Fonts: those present on Windows and macOS with Cyrillic
+  (Arial, Arial Black, Verdana, Tahoma, Georgia, Times New Roman, Trebuchet
+  MS, Courier New, Impact), so the burned-in text matches the preview.
+- Timeline (Stage 6): a lane "ST" between the video track and the audio
+  lanes with the blocks placed on the same measured geometry as the audio
+  clips; lane buttons ≡ "From dialogue" (`autoSubtitles`: each shot's lines
+  share the slot minus its silence pads, in proportion to their length;
+  custom text is kept), + "Add text" (a free block at the playhead, placed
+  by X / Y), ✕ "Clear". Drag a block to move it; double-click opens
+  `SubtitleModal` (text, start, length, font, size, colour, outline colour,
+  placement bottom / centre / top / anywhere with X / Y, a live sample,
+  "Use this look for all subtitles", Delete, Save).
+- Preview: the active blocks are drawn over the picture, sized to the frame
+  the preview shows (a ResizeObserver keeps the overlay on the contained
+  frame), with the same placement maths as the render.
+- Render: `buildAss` writes an ASS subtitle file (a style for the layer's
+  look, per-block override tags for font / size / colours, `\an` alignment
+  for bottom / centre / top, `\pos` for custom text, times shifted into the
+  rendered window); `electron/ffmpegRender.cjs` writes it to the temp dir and
+  appends `subtitles='…'` (libass) after the transition chain. The canvas
+  fallback (no ffmpeg bridge) draws the text with the 2D context.
+- Agent: `storyreel_subtitles` and `storyreel_set_subtitles` ({ auto, style,
+  add, edit, remove, clear }). Guide step 7. i18n `sub.*` EN/RU/UK.
+
+**Verified.** In the dev app: the lane, "From dialogue" on the seeded shots,
+the overlay in the preview, the editor (double-click), moving a block, the
+ASS text, the two tools. **Not rendered through ffmpeg** (no Electron here):
+the `subtitles` filter is present in the bundled Windows ffmpeg (libass,
+fontconfig) — the macOS build must be checked once on a Mac
+(`ffmpeg -filters | grep subtitles`).
+
+---
+
+## 15. Action logs: an app log file and a per-project log
+
+**Request.** Log user actions: app-level actions in an app log file,
+project-specific actions inside the project file.
+
+**Behaviour** (`src/lib/actionLog.js`).
+- App log: `<userData>/logs/app.log` (desktop app; one JSON line per entry
+  with `t`, `iso`, `by` user | agent, `action`, `details`; rotated once to
+  `app.log.1` past 2 MB; IPC `app-log` / `app-log-path`, bridge
+  `window.appLog`; `storyreel_status` returns `appLogFile`). Logged:
+  `project.create` / `delete` / `duplicate` / `import`, `style.create` /
+  `edit` / `delete` / `import`, `settings.save` (the changed fields; a key
+  field is logged as set / cleared, never its value), `undo` / `redo`, and
+  every writing `agent.call` (tool, project, shot, kind).
+- Project log: `project.actionLog` (≤ 400 entries, inside the project and
+  so inside `project.md`): `App.updateProject` appends `{ t, by, action:
+  'edit', keys }` for every content change — the project fields the patch
+  touched (`sceneDetails`, `shotVideos`, `subtitles`…) and whether the user or
+  the agent made it; the same actor touching the same fields within five
+  seconds extends the last entry (`n`) instead of adding one (typing);
+  named actions pass a patch made with `logged(patch, action)` (the subtitle
+  actions do). Undo rolls the log back with the project — the undo itself
+  is in the app log.
+
+**Verified.** The project log entries and coalescing in the dev app; the
+app log falls back to the console outside Electron. **The file itself is
+not written here** (no Electron run).
+
+---
+
+## 16. macOS: the timeline scrollbar vanished
+
+**Cause.** `* { scrollbar-width: thin; scrollbar-color: … }` is set globally;
+in Chromium 121+ the standard properties switch the WebKit pseudo-element
+styling off, and on macOS that leaves the native OVERLAY scrollbar, which
+hides until the next scroll ("Show scroll bars: when scrolling"). Windows
+draws classic bars, so it only showed on the Mac.
+
+**Fix.** `.nle-scroll` reverts the two properties to `auto` and styles its
+WebKit scrollbar (12 px, visible track and thumb) — a classic, permanent
+bar on macOS. **Not verified on a Mac** (no Mac here); the CSS is inert on
+Windows.
+
+---
+
+## 17. Verification of §11–16 in the dev app
+
+See each section's "Verified" line; the dev app has no Electron bridge, so
+the ffmpeg burn-in, the app log file and the real generation paths are
+untested here.

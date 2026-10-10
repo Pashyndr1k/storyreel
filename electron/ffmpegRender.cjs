@@ -181,6 +181,13 @@ function buildArgs(job) {
     aAcc = 'amix';
   }
 
+  // subtitles burned in last, over the finished picture (libass; the ASS file
+  // carries fonts, colours and placement — see lib/subtitles.js)
+  if (job.assFile) {
+    const p = String(job.assFile).replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "\\'");
+    filters.push(`[${vAcc}]subtitles='${p}'[vsub]`);
+    vAcc = 'vsub';
+  }
   args.push('-filter_complex', filters.join(';'));
   args.push('-map', `[${vAcc}]`, '-map', `[${aAcc}]`);
   args.push('-r', String(fps), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p');
@@ -221,7 +228,12 @@ async function renderJob(job, onProgress) {
       .filter(Boolean);
 
     fs.mkdirSync(path.dirname(job.outPath), { recursive: true });
-    const { args, totalSec } = buildArgs({ ...job, segments, audioClips });
+    let assFile = null;
+    if (job.ass && String(job.ass).trim()) {
+      assFile = path.join(tmp, 'subs.ass');
+      fs.writeFileSync(assFile, String(job.ass), 'utf8');
+    }
+    const { args, totalSec } = buildArgs({ ...job, segments, audioClips, assFile });
     // A long timeline's filter graph overflows the Windows command-line limit
     // (spawn ENAMETOOLONG), so ffmpeg reads it from a file instead.
     const fcIdx = args.indexOf('-filter_complex');

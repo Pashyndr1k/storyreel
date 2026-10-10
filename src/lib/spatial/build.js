@@ -1,7 +1,79 @@
 // "Build layout": the text model reads the scene and its shots and places the
 // characters, a few set boxes and the camera for every shot. The result is a
 // starting point the user adjusts in the 3D window.
-import { layoutFor, namedInShot, sceneCast, normalizeChar, normalizeCamera, normalizeProp, LENSES, POSES, MAX_PROPS, POSE_TOP } from './layout.js';
+import { layoutFor, namedInShot, sceneCast, normalizeChar, normalizeCamera, normalizeProp, LENSES, POSES, MAX_PROPS, POSE_TOP, verticalFov, aspectValue, actionAxis, cameraSide, mirrorCamera, crossesLineOnPurpose } from './layout.js';
+import { cameraFrame } from './describe.js';
+
+// ---- framing from the shot type
+// The frame height at the subject (metres) a shot size implies, and the lens
+// that suits it. Read from the words of the shot type ("low-angle medium
+// close-up"); the order matters (extreme close-up before close-up, …).
+const FRAMINGS = [
+  [/extreme[- ]close|\becu\b|macro|detail shot/i, 0.28, 85],
+  [/medium[- ]close|\bmcu\b/i, 0.95, 50],
+  [/close[- ]?up|\bcu\b/i, 0.55, 85],
+  [/medium[- ]full|cowboy|american/i, 2.1, 35],
+  [/over[- ]the[- ]shoulder|\bots\b/i, 1.1, 50],
+  [/two[- ]shot/i, 2.2, 35],
+  [/medium|\bms\b|mid[- ]shot/i, 1.4, 50],
+  [/full[- ]?(shot|body|figure|length)|\bfs\b|head[- ]to[- ]toe/i, 3.0, 35],
+  [/extreme[- ]wide|\bews\b|\bels\b|establishing|aerial|drone|bird/i, 12, 18],
+  [/wide|\bws\b|\bls\b|long shot|master/i, 6, 24],
+  [/insert/i, 0.4, 85],
+];
+export function framingOf(shotType) {
+  const t = String(shotType || '');
+  const hit = FRAMINGS.find(([re]) => re.test(t));
+  return hit ? { height: hit[1], lens: hit[2] } : null;
+}
+const rad = (d) => (d * Math.PI) / 180;
+
+// Fit the camera to the shot type: the distance that gives the shot size at
+// the target with the lens (a lens more than one step off the one the size
+// suits is replaced — a telephoto planned for a wide view puts the camera in
+// the subject's face), then, for medium shots and wider, far enough back
+// that every named present character is inside the frame.
+export function fitCamera(cam, shotType, aspect, heads = []) {
+  const f = framingOf(shotType);
+  const out = { ...cam };
+  if (f) {
+    if (Math.abs(LENSES.indexOf(out.lens) - LENSES.indexOf(f.lens)) > 1) out.lens = f.lens;
+    const tanV = Math.tan(rad(verticalFov(out.lens, aspect)) / 2);
+    out.dist = f.height / (2 * tanV);
+  }
+  if (heads.length && (!f || f.height >= 1.4)) {
+    // at most twice the framing's distance: a medium shot may become a
+    // full shot to hold everyone, never a wide one (the warnings say the rest)
+    const maxDist = f ? out.dist * 2 : 40;
+    for (let k = 0; k < 12 && out.dist * 1.15 <= maxDist; k++) {
+      const frame = cameraFrame(normalizeCamera(out), aspect);
+      const outside = heads.some((h) => {
+        const p = frame.project(h);
+        return p.behind || Math.abs(p.x) > 0.9 || Math.abs(p.y) > 0.95;
+      });
+      if (!outside) break;
+      out.dist *= 1.15;
+    }
+  }
+  return normalizeCamera(out);
+}
+
+// Keep the camera on the side of the line it had in the previous shot (the
+// 180° rule): when it crossed, mirror it back — unless the shot's text asks
+// for the crossing. Returns the camera to use.
+export function keepSide(prev, cur, cast, shot) {
+  if (!prev || crossesLineOnPurpose(shot)) return cur.camera;
+  const axis = actionAxis(cur.chars, cast, cur.camera);
+  const before = actionAxis(prev.chars, cast, prev.camera);
+  if (!axis || !before || axis.key !== before.key) return cur.camera;
+  const was = cameraSide(before, prev.camera);
+  const now = cameraSide(axis, cur.camera);
+  return was && now && was !== now ? mirrorCamera(axis, cur.camera) : cur.camera;
+}
+
+// the heads of the present characters a shot's text names
+const namedHeads = (project, shot, cast, chars) =>
+  cast.filter((c) => chars[c.id] && !chars[c.id].off && namedInShot(project, shot, c.name)).map((c) => ({ x: chars[c.id].x, y: (POSE_TOP[chars[c.id].pose] || 1.8) - 0.16, z: chars[c.id].z }));
 
 export function layoutPrompt(project, scene, shots) {
   const cast = sceneCast(project, scene);
@@ -26,7 +98,8 @@ RULES
 - THE LINE: for two characters in conversation, keep the camera on the same side of the line between them for the whole scene, so the one on screen-left stays on screen-left. Cross the line only when a shot's description demands it.
 - FRAMING: choose distance and lens from the shot type — extreme close-up: 85 mm at about 1 m; close-up: 85 mm at 1.5–2.5 m; medium close-up: 50 mm at 2–2.5 m; medium: 50 mm at 3–4 m; full: 35 mm at 5–6 m; wide: 24 mm at 6–9 m; extreme wide: 18 mm at 10 m or more. Low angle: negative elevation with the camera low; high angle: elevation 25–45; top-down: elevation 80; ground-level: target_height 0.3 and elevation 0 to -10.
 - The camera must see every PRESENT character the shot's action or dialogue names. Aim it ("aim_at") at the character who is the subject of the shot, or give target_x / target_z for a group.
-- Add up to ${MAX_PROPS} set pieces as plain boxes only where the action uses them or they define the place (door, table, bench, bed, car, counter, window, wall). They do not move between shots.`,
+- Add up to ${MAX_PROPS} set pieces as plain boxes: ALWAYS the landmarks that define the place and its background (the window, the shop front, the door, the counter, the bar, the table, the bed, the car, a wall with a sign) and anything the action uses. They do not move between shots.
+- THE SET KEEPS ITS SIDE: because the set pieces never move, a camera that stays on one side of the action keeps the window / door / counter on the same side of the screen in every shot. Placing the camera on the opposite side (yaw about 180° away, so the background swaps sides) is a line crossing: do it only when the shot's description asks for it.`,
     maxTokens: 9000,
     user: `SCENE ${sceneNo}: ${scene.title} — ${scene.summary}
 
@@ -52,10 +125,18 @@ export function layoutFromModel(project, scene, shots, data) {
   };
   const keptCast = (project.sceneLayouts || {})[scene.id]?.cast;
   const out = { ...(Array.isArray(keptCast) ? { cast: keptCast } : {}), props: (Array.isArray(data?.props) ? data.props : []).slice(0, MAX_PROPS).map(normalizeProp), shots: {} };
+  const aspect = aspectValue(project.aspectRatio);
   let prevChars = null;
+  let prevLayout = null; // the shot before, for the line of action
   (Array.isArray(data?.shots) ? data.shots : []).forEach((row, k) => {
-    const shot = shots[(Number(row?.shot) || k + 1) - 1];
+    const index = (Number(row?.shot) || k + 1) - 1;
+    const shot = shots[index];
     if (!shot) return;
+    // a single rebuilt shot (or the first row) continues the stored layout before it
+    if (!prevLayout && index > 0) {
+      const l = layoutFor(project, scene, shots[index - 1].id);
+      if (l.exists) prevLayout = { chars: l.chars, camera: l.camera };
+    }
     const chars = {};
     for (const c of Array.isArray(row.characters) ? row.characters : []) {
       const who = byName(c?.name);
@@ -66,7 +147,7 @@ export function layoutFromModel(project, scene, shots, data) {
     const cam = row.camera || {};
     const aim = byName(cam.aim_at);
     const aimed = aim && chars[aim.id] && !chars[aim.id].off ? chars[aim.id] : null;
-    const camera = normalizeCamera({
+    let camera = normalizeCamera({
       tx: aimed ? aimed.x : cam.target_x,
       tz: aimed ? aimed.z : cam.target_z,
       ty: Number.isFinite(Number(cam.target_height)) ? cam.target_height : aimed ? Math.max(0.3, (POSE_TOP[aimed.pose] || 1.8) - 0.25) : 1.3,
@@ -75,9 +156,14 @@ export function layoutFromModel(project, scene, shots, data) {
       dist: cam.distance_m,
       lens: cam.lens_mm,
     });
+    // the shot type decides the shot size, not the planner's distance; the
+    // camera stays on its side of the line
+    camera = fitCamera(camera, shot.shotType, aspect, namedHeads(project, shot, cast, chars));
+    camera = keepSide(prevLayout, { chars, camera }, cast, shot);
     if (Object.keys(chars).length) {
       out.shots[shot.id] = { chars, camera };
       prevChars = chars;
+      prevLayout = { chars, camera };
     }
   });
   return out;

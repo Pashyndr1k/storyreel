@@ -3,7 +3,7 @@
 // the camera, who looks at whom, distances, the shot size the lens gives and
 // the camera's height and angle. Also the continuity warnings between shots.
 // Everything is computed from the same camera maths the 3D view renders with.
-import { layoutFor, cameraPosition, verticalFov, aspectValue, forwardOf, POSE_TOP, hasLayout, layoutEnabled, namedInShot } from './layout.js';
+import { layoutFor, cameraPosition, verticalFov, aspectValue, forwardOf, POSE_TOP, hasLayout, layoutEnabled, namedInShot, actionAxis, cameraSide, crossesLineOnPurpose } from './layout.js';
 
 const rad = (d) => (d * Math.PI) / 180;
 const deg = (r) => (r * 180) / Math.PI;
@@ -162,12 +162,50 @@ export function describeShot(project, scene, shotId) {
   if (absent.length) lines.push(`Not in this shot at all (do not show them): ${absent.map((c) => c.name).join(', ')}.`);
 
   // set pieces the camera sees
-  const props = layout.props
-    .map((pr) => ({ pr, p: frame.project({ x: pr.x, y: pr.h / 2, z: pr.z }) }))
-    .filter((x) => !x.p.behind && Math.abs(x.p.x) <= 1.1 && x.pr.label);
+  const props = visibleProps(layout, frame);
   if (props.length) lines.push(`Set pieces in frame: ${props.map((x) => `${x.pr.label} (${sideWord(x.p.x)}, ${r1(x.p.depth)} m from camera)`).join('; ')}.`);
+
+  // continuity with the shot before: the same background on the same side
+  const shots = project.sceneDetails?.[scene.id]?.shots || [];
+  const idx = shots.findIndex((s) => s.id === shotId);
+  if (idx > 0) {
+    const prevLayout = layoutFor(project, scene, shots[idx - 1].id);
+    const prevFrame = cameraFrame(prevLayout.camera, aspect);
+    const prevProps = visibleProps(prevLayout, prevFrame);
+    const same = [];
+    const flipped = [];
+    // a set piece "flips" only when the camera really looks the other way
+    // (re-aiming at the other speaker shifts a centred background a little —
+    // that is not a crossing)
+    const turned = turnedAround(prevLayout.camera, layout.camera);
+    for (const x of props) {
+      const q = prevProps.find((y) => y.pr.id === x.pr.id);
+      if (!q) continue;
+      const a = Math.sign(x.p.x);
+      const b = Math.sign(q.p.x);
+      if (!turned || Math.abs(x.p.x) < 0.12 || Math.abs(q.p.x) < 0.12 || a === b) same.push(`${x.pr.label} ${sideWord(x.p.x)}`);
+      else flipped.push(`${x.pr.label} from ${sideWord(q.p.x)} to ${sideWord(x.p.x)}`);
+    }
+    const axis = actionAxis(layout.chars, layout.cast, layout.camera);
+    const before = actionAxis(prevLayout.chars, prevLayout.cast, prevLayout.camera);
+    const sameSide = axis && before && axis.key === before.key ? cameraSide(axis, layout.camera) * cameraSide(before, prevLayout.camera) : 0;
+    if (flipped.length || sameSide < 0) {
+      lines.push(`Continuity: the camera is on the OPPOSITE side of the action from the previous shot (the line is crossed${crossesLineOnPurpose(shots[idx]) ? ', as the shot asks' : ''}); the background swaps sides${flipped.length ? `: ${flipped.join('; ')}` : ''}.`);
+    } else if (same.length || sameSide > 0) {
+      lines.push(`Continuity: the camera stays on the same side of the action as the previous shot — the background keeps its screen side${same.length ? ` (${same.join('; ')})` : ''}.`);
+    }
+  }
   return lines.join('\n');
 }
+
+// did the camera turn to look the other way (more than a quarter turn)?
+const turnedAround = (a, b) => {
+  const d = Math.abs((((b.yaw - a.yaw) % 360) + 540) % 360) - 180;
+  return Math.abs(d) > 90;
+};
+// labelled set pieces inside a camera's frame
+const visibleProps = (layout, frame) =>
+  layout.props.map((pr) => ({ pr, p: frame.project({ x: pr.x, y: pr.h / 2, z: pr.z }) })).filter((x) => !x.p.behind && Math.abs(x.p.x) <= 1.1 && x.pr.label);
 
 // Continuity warnings across a scene's shots: [{ shotIndex, kind, text }].
 export function continuityWarnings(project, scene) {
@@ -176,9 +214,27 @@ export function continuityWarnings(project, scene) {
   const aspect = aspectValue(project.aspectRatio);
   const out = [];
   let prev = null;
+  let prevLayout = null;
+  let prevProps = null;
   shots.forEach((shot, i) => {
     const layout = layoutFor(project, scene, shot.id);
-    const { people } = analyse(layout, aspect);
+    const { frame, people } = analyse(layout, aspect);
+    const props = visibleProps(layout, frame);
+    if (prevLayout && !crossesLineOnPurpose(shot)) {
+      // the camera changed sides of the line of action
+      const axis = actionAxis(layout.chars, layout.cast, layout.camera);
+      const before = actionAxis(prevLayout.chars, prevLayout.cast, prevLayout.camera);
+      if (axis && before && axis.key === before.key && cameraSide(axis, layout.camera) * cameraSide(before, prevLayout.camera) < 0) out.push({ shotIndex: i, kind: 'lineCross', m: i });
+      // a set piece swapped screen sides because the camera looks the other way
+      if (turnedAround(prevLayout.camera, layout.camera)) {
+        for (const x of props) {
+          const q = prevProps.find((y) => y.pr.id === x.pr.id);
+          if (q && Math.abs(x.p.x) > 0.12 && Math.abs(q.p.x) > 0.12 && Math.sign(x.p.x) !== Math.sign(q.p.x)) out.push({ shotIndex: i, kind: 'setFlip', a: x.pr.label, b: sideWord(x.p.x) });
+        }
+      }
+    }
+    prevLayout = layout;
+    prevProps = props;
     for (const p of people) {
       if (namedInShot(project, shot, p.name) && !p.inFrame) out.push({ shotIndex: i, kind: 'outOfFrame', a: p.name });
     }

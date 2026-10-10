@@ -16,6 +16,7 @@ import { loadStyles, saveStyles, absorbLegacyStyles } from './lib/styles.js';
 import { checkForUpdate } from './lib/updateCheck.js';
 import { mirrorProjectToDisk } from './lib/projectFiles.js';
 import { I18nContext, createT } from './lib/i18n.js';
+import { appLog, withLogEntry, patchKeys } from './lib/actionLog.js';
 
 const HISTORY_LIMIT = 50;
 const HISTORY_COALESCE_MS = 800;
@@ -127,6 +128,7 @@ export default function App() {
       const prev = h.past.pop();
       h.future.push(cur);
       h.lastPush = 0;
+      appLog('undo');
       return prev;
     });
 
@@ -137,6 +139,7 @@ export default function App() {
       const next = h.future.pop();
       h.past.push(cur);
       h.lastPush = 0;
+      appLog('redo');
       return next;
     });
 
@@ -233,13 +236,18 @@ export default function App() {
   // Content edits stamp updatedAt (the "last edited" sort reads it). View-only
   // changes — pinning, archiving — pass { touch: false } so they don't pretend
   // the film was worked on.
+  // Every content change is also written to the project's own action log
+  // (which fields, by whom — the user or the agent); explicit actions pass a
+  // patch made with logged() and keep their name.
   const updateProject = (id, patch, { touch = true } = {}) =>
     setProjects((ps) =>
-      ps.map((p) =>
-        p.id === id
-          ? { ...p, ...(typeof patch === 'function' ? patch(p) : patch), ...(touch ? { updatedAt: Date.now() } : {}) }
-          : p
-      )
+      ps.map((p) => {
+        if (p.id !== id) return p;
+        const body = typeof patch === 'function' ? patch(p) : patch;
+        const keys = patchKeys(body);
+        const log = touch && keys.length && !('actionLog' in body) ? { actionLog: withLogEntry(p, { action: 'edit', keys }) } : {};
+        return { ...p, ...body, ...log, ...(touch ? { updatedAt: Date.now() } : {}) };
+      })
     );
 
   // ---- AI agent access: the app-level scope the agent API works through,
@@ -265,6 +273,7 @@ export default function App() {
   }, [settings.agentEnabled, settings.agentPort]);
 
   const removeProject = (id) => {
+    appLog('project.delete', { projectId: id, title: projects.find((p) => p.id === id)?.title || '' });
     setProjects((ps) => ps.filter((p) => p.id !== id));
     if (route.name === 'project' && route.id === id) setRoute({ name: 'home' });
   };

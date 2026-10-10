@@ -13,7 +13,7 @@ const SHOT_MAPS = [
   'shotPrompts', 'shotImages', 'shotImageHistory', 'shotFinalImages', 'shotVideos', 'shotAudios', 'shotAudioSrc',
   'shotAudioPads', 'shotAssets', 'shotLocations', 'videoGenDurations', 'shotVideoModes', 'shotSeeds', 'shotSeedMode',
   'shotVideoEngines', 'shotPromptEngines', 'shotCamera', 'shotAction', 'shotPromptDyn', 'shotVoiceSources',
-  'shotSpeakerNotes', 'shotRefs', 'shotGroups', 'shotKeyframes', 'shotTrims',
+  'shotSpeakerNotes', 'shotRefs', 'shotGroups', 'shotKeyframes', 'shotTrims', 'shotTransitions',
 ];
 
 export const normalizeCuts = (cuts, sceneCount) =>

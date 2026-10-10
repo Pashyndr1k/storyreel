@@ -168,3 +168,22 @@ Units for the layout tools: metres; `facingDeg` 0 = toward +z, 90 = +x;
 | `storyreel_sync_assets` | Attach assets to the shots whose text names them. | no |
 
 `storyreel_create_project` accepts `episodeSeconds` (60 / 90 / 120); `storyreel_get_project` returns `assets`; `storyreel_review_shot` returns `expected.assets` / `expected.environments` and labelled reference images; flag kind `asset` added.
+
+## Added in 2.16: the edit (transitions, subtitles), location references, logs
+
+| Tool | Purpose | Attempt |
+|---|---|---|
+| `storyreel_transitions` | Every boundary: the effective transition, the override, the automatic choice from the shots' text and its reason, the tail slack a fade needs. | no |
+| `storyreel_set_transitions` | Set the transition into the next shot per boundary ({ items: [{ shotId, type }] }), or write the automatic choice everywhere ({ auto: true }). | no |
+| `storyreel_subtitles` | The subtitle layer: default look and every block. | no |
+| `storyreel_set_subtitles` | Make blocks from the dialogue ({ auto }), set the look ({ style }), add / edit / remove blocks (custom text by x / y), clear. | no |
+| `storyreel_location_image` | A location's reference image from the scene text, in the project's image style. | yes |
+| `storyreel_create_media` kind `location_ref` | The location reference cut from a shot's approved first frame (people removed, widened). | yes |
+
+`storyreel_create_media` returns `shotExtendedTo` when the shot grew to hold
+its sound, and `voiceSec` for a voice; a spoken shot on the local engine needs
+its voice before its video. `storyreel_edit_script` rounds a duration up and
+returns `warnings` when the video is shorter than the new slot or the voice
+longer. `storyreel_review_shot` adds `environmentNote` when the location has
+no reference. `storyreel_get_layout` warnings gain `lineCross` and `setFlip`.
+`storyreel_status` returns `appLogFile`; every writing call is logged there.

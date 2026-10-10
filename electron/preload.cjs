@@ -59,6 +59,13 @@ contextBridge.exposeInMainWorld('ffmpegBridge', {
   },
 });
 
+// App-level action log: one JSON line per entry, appended by the main process
+// to <userData>/logs/app.log (project-level actions live in the project).
+contextBridge.exposeInMainWorld('appLog', {
+  append: (entry) => ipcRenderer.invoke('app-log', entry),
+  path: () => ipcRenderer.invoke('app-log-path'),
+});
+
 // AI agent access: the main process runs a local server (agentServer.cjs) and
 // relays each call here; the page answers with the tool's result.
 contextBridge.exposeInMainWorld('agentBridge', {

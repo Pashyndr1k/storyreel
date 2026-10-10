@@ -7,6 +7,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { MODELS } from '../lib/claude.js';
 import { listImageModels } from '../lib/gemini.js';
 import { useI18n } from '../lib/i18n.js';
+import { appLog, settingsDiff } from '../lib/actionLog.js';
 import { saveProjects, migrateProject } from '../lib/storage.js';
 import { loadStyles, saveStyles, mergeStyles, buildStylesExport, parseStylesFile } from '../lib/styles.js';
 import { sanitizeFolder } from '../lib/projectFiles.js';
@@ -164,7 +165,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
   };
 
   const save = () => {
-    setSettings({
+    const next = {
       ...settings,
       apiKey: apiKey.trim(),
       model,
@@ -190,7 +191,10 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
       policyId,
       agentEnabled,
       agentPort: Math.max(1024, Math.min(65535, Math.round(Number(agentPort) || 47821))),
-    });
+    };
+    const changed = settingsDiff(settings, next);
+    if (Object.keys(changed).length) appLog('settings.save', changed);
+    setSettings(next);
     onClose();
   };
 

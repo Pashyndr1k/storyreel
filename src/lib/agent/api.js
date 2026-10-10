@@ -33,6 +33,12 @@ import { dramaFixPrompt } from '../prompts.js';
 import { loadStyles } from '../styles.js';
 import { layoutTools } from './layoutTools.js';
 import { assetTools, assetsView } from './assetTools.js';
+import { assemblyTools } from './assemblyTools.js';
+import { appLog } from '../actionLog.js';
+import { locationImagePrompt } from '../sceneLocations.js';
+import { generateImage } from '../gemini.js';
+import { resolveStyleText } from '../styles.js';
+import { resizeDataURL } from '../images.js';
 import { CAMERA_LEVELS, ACTION_LEVELS, cameraOf, actionOf } from '../shotDynamics.js';
 import { blockForScene } from '../dynamics.js';
 import { transcribeAudio } from '../gemini.js';
@@ -276,7 +282,9 @@ const MEDIA = {
   final_frame: { map: 'shotFinalImages', label: 'The final frame of this shot', run: (b, shot) => b.genFinalFrame(shot) },
   video: { map: 'shotVideos', label: 'The video of this shot', run: (b, shot, i) => b.genVideo(shot, i) },
   voice: { map: 'shotAudios', label: 'The voice of this shot', run: (b, shot, i) => b.genVoice(shot, i) },
+  location_ref: { map: null, label: 'The location reference cut from this shot', run: (b, shot) => b.makeLocationRef(shot) },
 };
+const locPhotoCount = (project, scene, shotId) => shotLocationRefs(project, scene, shotId, 99).reduce((a, g) => a + g.photos.length, 0);
 
 async function createMedia({ projectId, shotId, kind, seed }) {
   const spec = MEDIA[kind] || fail('BAD_INPUT', `kind must be one of: ${Object.keys(MEDIA).join(', ')}.`);
@@ -285,8 +293,16 @@ async function createMedia({ projectId, shotId, kind, seed }) {
   const pr = project.shotPrompts[shotId] || {};
   if (kind === 'image' && !(pr.imagePrompt || '').trim()) fail('NOT_READY', 'This shot has no image prompt yet.');
   if (kind === 'video' && !(pr.videoPrompt || '').trim()) fail('NOT_READY', 'This shot has no video prompt yet.');
-  if ((kind === 'video' || kind === 'final_frame') && !has(project.shotImages, shotId)) fail('NOT_READY', 'Create and approve the first frame before this.');
+  if ((kind === 'video' || kind === 'final_frame' || kind === 'location_ref') && !has(project.shotImages, shotId)) fail('NOT_READY', 'Create and approve the first frame before this.');
   if (kind === 'voice' && !(shot.dialogue || '').trim()) fail('NOT_READY', 'This shot has no dialogue.');
+  // A spoken shot on the local LTX engine is a talking video synced to its
+  // voice: the voice comes first, and the shot has grown to hold all of it.
+  const engine = app().settings.videoEngine || 'ltx';
+  if (kind === 'video' && (shot.dialogue || '').trim() && !has(project.shotAudios, shotId) && (engine === 'ltx' || voiceSourceFor(project, shotId) === 'tts') && engine !== 'minimax' && engine !== 'kling' && engine !== 'krea') {
+    fail('NOT_READY', 'This shot has dialogue: create its voice first (kind "voice"), then the video — the talking-video workflow syncs the lips to it and keeps the whole line.');
+  }
+  const locBefore = kind === 'location_ref' ? locPhotoCount(project, scene, shotId) : 0;
+  const slotBefore = Number(shot.duration) || 0;
   if (kind === 'video' && seed) {
     if (seed === 'same' && !Number.isFinite(Number((project.shotSeeds || {})[shotId]))) fail('NOT_READY', 'This shot has no stored seed yet — render it once first.');
     patchProject(projectId, (q) => ({ shotSeedMode: { ...(q.shotSeedMode || {}), [shotId]: seed } }));
@@ -301,12 +317,25 @@ async function createMedia({ projectId, shotId, kind, seed }) {
   // The result itself is not compared with the previous one: a regeneration
   // may legitimately return an identical file.
   const b = agentScope('bench');
-  const after = (projectOf(projectId)[spec.map] || {})[shotId] || null;
+  const fresh = projectOf(projectId);
+  const after = spec.map ? (fresh[spec.map] || {})[shotId] || null : locPhotoCount(fresh, findShot(fresh, shotId).scene, shotId) > locBefore;
   const alerts = takeAgentAlerts().join(' ');
   if (b?.imgErr?.id === shotId) fail('GENERATION_FAILED', String(b.imgErr.msg));
   if (alerts) fail('GENERATION_FAILED', alerts);
   if (!after) fail('GENERATION_FAILED', 'Nothing was produced.');
-  return { attempt, attemptsLeft: MAX_ATTEMPTS - attempt, created: kind, next: 'Call storyreel_review_shot to verify the result before going on.' };
+  const out = { attempt, attemptsLeft: MAX_ATTEMPTS - attempt, created: kind, next: 'Call storyreel_review_shot to verify the result before going on.' };
+  // the shot grows to hold a voice longer than its slot (never cut)
+  const slotAfter = Number(findShot(fresh, shotId).shot.duration) || 0;
+  if (slotAfter > slotBefore + 0.01) {
+    out.shotExtendedTo = slotAfter;
+    out.note = `The shot's slot grew from ${slotBefore} s to ${slotAfter} s to hold the whole sound; a video made for the old length is shorter than the slot now — recreate it.`;
+  }
+  if (kind === 'voice') {
+    const rep = await audioReport(after).catch(() => null);
+    if (rep?.duration) out.voiceSec = Math.round(rep.duration * 100) / 100;
+  }
+  if (kind === 'location_ref') out.next = 'The reference joins the scene\'s location photos: every later frame of the scene is made and reviewed against it.';
+  return out;
 }
 
 async function reviewShot({ projectId, shotId, frames = 6, transcript = false }) {
@@ -409,7 +438,8 @@ async function reviewShot({ projectId, shotId, frames = 6, transcript = false })
       assets: (project.storyline?.assets || [])
         .filter((a) => ((project.shotAssets || {})[shot.id] || []).includes(a.libId) || new RegExp(String(a.name || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(`${shot.action} ${shot.dialogue}`))
         .map((a) => ({ name: a.name, description: a.description, referenceImage: !!a.photos?.[0], check: 'the rendered object must match the reference image and description: same material, colour, shape and marks; if it differs, flag kind "asset"' })),
-      environments: shotLocationRefs(project, scene, shot.id).map((g) => ({ name: g.name || scene.title, referencePhotos: g.photos.length, check: 'architecture, colours and lighting must match the location reference; if they differ, flag kind "environment"' })),
+      environments: shotLocationRefs(project, scene, shot.id).map((g) => ({ name: g.name || scene.title, referencePhotos: g.photos.length, check: 'architecture, colours and lighting must match the location reference, and the landmarks (window, door, counter, lights, furniture) must stay on the same side of the screen as in the PREVIOUS frame of this scene unless expected.spatialLayout says the line is crossed; a mirrored environment is a flag of kind "environment" — fix the layout camera (storyreel_set_layout) or the prompt, then recreate the frame' })),
+      ...(!shotLocationRefs(project, scene, shot.id).length ? { environmentNote: 'This shot\'s location has no reference image: make one (storyreel_create_media kind "location_ref" from an approved frame, or storyreel_location_image) before the rest of the scene is made, so every frame is checked against the same place.' } : {}),
       ...(isShortDrama(project)
         ? (() => {
             const ep = episodesOf(project).find((e) => e.scenes.some((sc) => sc.id === scene.id));
@@ -454,6 +484,7 @@ export const TOOLS = [
       return {
         version: a.version,
         openProject: ps ? { id: ps.id, stage: ps.view } : null,
+        appLogFile: (await window.appLog?.path?.().catch(() => null)) || null,
         services: {
           text: (s.textService || 'claude') === 'gemini' ? 'gemini' : s.textService === 'claude-cli' ? `claude code CLI, local console (${s.model})` : `claude API (${s.model})`,
           textKeySet: !textKeyError(s),
@@ -599,12 +630,24 @@ export const TOOLS = [
         const { scene } = findShot(p, shotId);
         const patch = {};
         for (const k of ['shotType', 'location', 'action', 'dialogue', 'notes']) if (typeof f[k] === 'string') patch[k] = f[k];
-        if (durationSec != null) patch.duration = Math.max(2, Math.min(10, Math.round(Number(durationSec) * 2) / 2));
+        // rounded UP to the half second: a slot is never made shorter than asked
+        if (durationSec != null) patch.duration = Math.max(2, Math.min(10, Math.ceil(Number(durationSec) * 2 - 1e-9) / 2));
         patchProject(projectId, (q) => ({
           sceneDetails: { ...q.sceneDetails, [scene.id]: { ...q.sceneDetails[scene.id], shots: q.sceneDetails[scene.id].shots.map((s) => (s.id === shotId ? { ...s, ...patch } : s)) } },
         }));
         await settle();
-        return { updated: Object.keys(patch), note: 'Prompts and media already made for this shot are not changed; recreate them if the edit affects them.' };
+        const warnings = [];
+        if (patch.duration != null) {
+          const fresh = projectOf(projectId);
+          const raw = Number((fresh.videoGenDurations || {})[shotId]) || 0;
+          if (has(fresh.shotVideos, shotId) && raw && raw < patch.duration - 0.05) warnings.push(`The shot's video is ${raw} s, shorter than the new ${patch.duration} s slot: the render would freeze its last frame and go silent — recreate the video.`);
+          const voice = (fresh.shotAudios || {})[shotId];
+          if (voice) {
+            const rep = await audioReport(voice).catch(() => null);
+            if (rep?.duration && rep.duration > patch.duration + 0.05) warnings.push(`The voice is ${Math.round(rep.duration * 100) / 100} s, longer than the new slot: its last words would be cut — keep the slot at least that long, or shorten the line and recreate the voice.`);
+          }
+        }
+        return { updated: Object.keys(patch), ...(warnings.length ? { warnings } : {}), note: 'Prompts and media already made for this shot are not changed; recreate them if the edit affects them.' };
       }
       const scene = sceneOf(p, sceneId || fail('BAD_INPUT', 'Give sceneId or shotId.'));
       const patch = {};
@@ -789,10 +832,35 @@ export const TOOLS = [
     },
   },
   ...layoutTools({ app, projectOf, patchProject, sceneOf, findShot, fail, settle, countAttempt, schema, PROJECT }),
+  ...assemblyTools({ app, projectOf, patchProject, sceneOf, findShot, fail, settle, countAttempt, schema, PROJECT }),
+  {
+    name: 'storyreel_location_image',
+    description:
+      'Stage 3/5: give a scene\'s location a reference image when it has none — rendered from the scene and the location\'s name in the project\'s image style and aspect ratio (Gemini). Every frame of the scene is then made and reviewed against it ("REFERENCE — location"), so the place keeps its architecture, light and the side its landmarks are on. Prefer storyreel_create_media kind "location_ref" once a good first frame exists (it is cut from that frame). Counts as an attempt (location:<id>:image).',
+    inputSchema: schema({ ...PROJECT, sceneId: { type: 'string' }, locationId: { type: 'string', description: 'One of the scene\'s locations (storyreel_assets → environments); default: the first.' }, replace: { type: 'boolean' } }, ['projectId', 'sceneId']),
+    run: async ({ projectId, sceneId, locationId, replace }) => {
+      const a0 = app();
+      if (!a0.settings.geminiKey) fail('NO_KEY', 'The Gemini API key (image generation) is not set in StoryReel Settings.');
+      const p = projectOf(projectId);
+      const scene = sceneOf(p, sceneId);
+      const locs = locationsOf(scene);
+      const loc = (locationId ? locs.find((l) => l.id === locationId) : locs[0]) || fail('NOT_FOUND', locs.length ? `No location "${locationId}" in this scene.` : 'This scene has no location yet — add one in Stage 3 (or through the Stage 5 workbench).');
+      const attempt = countAttempt(projectId, { sceneId: loc.id, kind: 'location_image' }, `The reference image of location "${loc.name || scene.title}"`);
+      const style = resolveStyleText(a0.styles, 'image', p.imageStyleId) || '';
+      const raw = await generateImage(a0.settings, { prompt: locationImagePrompt(p, scene, loc, style), aspectRatio: p.aspectRatio || '16:9', imageSize: '1K' });
+      const dataURL = await resizeDataURL(raw, 1280 * 1280, 0.9);
+      patchProject(projectId, (q) => ({
+        outline: q.outline.map((s) => (s.id === scene.id ? { ...s, locations: locationsOf(s).map((l) => (l.id === loc.id ? { ...l, photos: replace ? [dataURL] : [...(l.photos || []), dataURL].slice(-3) } : l)) } : s)),
+      }));
+      await settle();
+      const fresh = locationsOf(sceneOf(projectOf(projectId), scene.id)).find((l) => l.id === loc.id);
+      return { attempt, locationId: loc.id, referencePhotos: (fresh?.photos || []).length, next: 'Create (or recreate) the frames of the scene; storyreel_review_shot compares them with the reference.' };
+    },
+  },
   ...assetTools({ app, projectOf, patchProject, sceneOf, fail, settle, countAttempt, schema, PROJECT }),
   {
     name: 'storyreel_create_media',
-    description: 'Stage 5: generate one piece of media for a shot — "image" (first frame), "final_frame", "video" (needs the first frame; can take many minutes) or "voice" (TTS for the shot\'s dialogue). For video on a local engine, seed "same" replays the seed of the shot\'s previous render (shotView.videoSeed) so only the prompt or quality setting changes; "new" (default) rolls fresh noise. Counts as an attempt; after four the target is flagged and further calls are refused. Verify the result with storyreel_review_shot.',
+    description: 'Stage 5: generate one piece of media for a shot — "image" (first frame), "final_frame", "video" (needs the first frame; can take many minutes), "voice" (TTS for the shot\'s dialogue; a shot with dialogue needs its voice BEFORE its video on the local engine, and the shot grows to hold the whole line) or "location_ref" (a clean environment reference cut from the approved first frame — people removed, frame widened — added to the scene\'s location photos; make one for every scene whose location has no reference, right after its first good frame). For video on a local engine, seed "same" replays the seed of the shot\'s previous render (shotView.videoSeed) so only the prompt or quality setting changes; "new" (default) rolls fresh noise. Counts as an attempt; after four the target is flagged and further calls are refused. Verify the result with storyreel_review_shot.',
     inputSchema: schema({ ...PROJECT, shotId: { type: 'string' }, kind: { type: 'string', enum: Object.keys(MEDIA) }, seed: { type: 'string', enum: ['same', 'new'] } }, ['projectId', 'shotId', 'kind']),
     run: createMedia,
   },
@@ -854,9 +922,10 @@ let running = null;
 export async function callAgent(method, params = {}) {
   const tool = TOOLS.find((t) => t.name === method);
   if (!tool) return { ok: false, error: { code: 'UNKNOWN_TOOL', message: `No tool named "${method}".` } };
-  const readOnly = ['storyreel_guide', 'storyreel_status', 'storyreel_list_projects', 'storyreel_get_project', 'storyreel_list_styles', 'storyreel_list_flags', 'storyreel_get_layout', 'storyreel_drama_rules', 'storyreel_drama_check', 'storyreel_assets'].includes(method);
+  const readOnly = ['storyreel_guide', 'storyreel_status', 'storyreel_list_projects', 'storyreel_get_project', 'storyreel_list_styles', 'storyreel_list_flags', 'storyreel_get_layout', 'storyreel_drama_rules', 'storyreel_drama_check', 'storyreel_assets', 'storyreel_transitions', 'storyreel_subtitles'].includes(method);
   if (running && !readOnly) return { ok: false, error: { code: 'BUSY', message: `StoryReel is still running "${running}". Wait for it to finish.` } };
   if (!readOnly) running = method;
+  if (!readOnly) appLog('agent.call', { tool: method, ...(params?.projectId ? { projectId: params.projectId } : {}), ...(params?.shotId ? { shotId: params.shotId } : {}), ...(params?.kind ? { kind: params.kind } : {}) });
   try {
     const result = await inAgentCall(() => tool.run(params || {}));
     return { ok: true, result };

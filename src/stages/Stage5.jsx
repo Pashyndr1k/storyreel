@@ -194,6 +194,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     genFinalFrame: (shot) => genFinalFrame(shot),
     genVideo: (shot, i) => genVideo(shot, i),
     genVoice: (shot, i) => genVoice(shot, i),
+    makeLocationRef: (shot) => makeLocationRef(shot),
   });
   const hasPrompts = shots.some((s) => project.shotPrompts[s.id]);
 
@@ -1432,7 +1433,17 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     // ramp-up and tail degradation. Voice-synced shots render at the exact
     // duration so assembly never trims into synced speech — and H3 counts as
     // voice-synced, because it generates its own dialogue, effects and score.
-    const slotDur = take && isH3 ? takeDur : Number(shot.duration || 4);
+    let slotDur = take && isH3 ? takeDur : Number(shot.duration || 4);
+    // Talking video: the voice is trimmed to the slot inside the workflow, so
+    // a shot shorter than its voice grows first (the last words stay).
+    if (useMode === 'si2v' && voiceAud) {
+      const vd = await mediaDuration(voiceAud).catch(() => 0);
+      const need = vd > 0 ? Math.min(SHOT_MAX_SEC, Math.ceil(vd * 10) / 10) : 0;
+      if (need > slotDur + 0.05) {
+        slotDur = need;
+        update((p) => ({ sceneDetails: { ...p.sceneDetails, [scene.id]: { shots: (p.sceneDetails[scene.id]?.shots || []).map((s) => (s.id === shot.id ? { ...s, duration: need } : s)) } } }));
+      }
+    }
     // Kling bills per second and anchors on the first frame: render the
     // model's nearest allowed length, no padding.
     const genDuration = isKling
@@ -1534,6 +1545,15 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           shotVideoEngines: { ...(p.shotVideoEngines || {}), [shot.id]: isH3 ? 'minimax' : isKling ? 'kling' : isKrea ? `krea:${krModel.id}` : 'ltx' },
         };
         if (!mixWav) return base;
+        // The model speaks the line at its own pace: when the generated sound
+        // runs past the slot of a shot with dialogue, the slot grows to the
+        // generated length (within the shot maximum) instead of cutting the
+        // last words — the video is that long anyway.
+        const spoken = (shot.dialogue || '').trim() && !take;
+        const mixLen = Math.floor(mixBuf.duration * 10) / 10;
+        const grown = spoken && mixLen > slotDur + 0.1 ? Math.min(SHOT_MAX_SEC, mixLen) : 0;
+        if (grown) base.sceneDetails = { ...p.sceneDetails, [scene.id]: { shots: (p.sceneDetails[scene.id]?.shots || []).map((s) => (s.id === shot.id ? { ...s, duration: grown } : s)) } };
+        const laneSlot = grown || slotDur;
         // timeline start = summed durations of every shot before this one
         let startAt = 0;
         outer: for (const sc of p.outline) {
@@ -1548,7 +1568,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           dataURL: mixWav,
           start: startAt,
           offset: 0, // H3 trims tail-only, so the mix starts at the first frame
-          duration: Math.min(slotDur || mixBuf.duration, mixBuf.duration),
+          duration: Math.min(laneSlot || mixBuf.duration, mixBuf.duration),
           srcDuration: mixBuf.duration,
           fadeIn: 0,
           fadeOut: 0,
@@ -1642,9 +1662,15 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
       }
       const dataURL = await generateGeminiVoice(settings, { prompt: voice.text, speakers });
       saveToLocalOutputs(settings, `${name}.wav`, dataURL); // best-effort local copy
+      // A voice longer than the shot would be cut at the slot (the talking-video
+      // workflow trims it before generation, the assembly at the end): the shot
+      // grows to hold the whole line instead, as the silence pads do.
+      const dur = await mediaDuration(dataURL).catch(() => 0);
+      const needed = dur > 0 ? Math.min(SHOT_MAX_SEC, Math.ceil(dur * 10) / 10) : 0;
       update((p) => ({
         shotAudios: { ...(p.shotAudios || {}), [shot.id]: dataURL },
         shotAudioSrc: { ...(p.shotAudioSrc || {}), [shot.id]: dataURL },
+        ...(needed > (Number(shot.duration) || 0) + 0.05 ? { sceneDetails: { ...p.sceneDetails, [scene.id]: { shots: (p.sceneDetails[scene.id]?.shots || []).map((s) => (s.id === shot.id ? { ...s, duration: needed } : s)) } } } : {}),
       }));
     } catch (e) {
       setImgErr({ id: shot.id, msg: e.message === 'COMFY_UNREACHABLE' ? 'COMFY_UNREACHABLE' : e.message || String(e) });

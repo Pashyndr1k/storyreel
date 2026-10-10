@@ -40,6 +40,16 @@ export function normalizeSceneLocations(scene, projectId) {
   return { ...rest, locations: list };
 }
 
+// The reference image of a location rendered from nothing but the scene text
+// (the agent's storyreel_location_image; the workbench cuts one from a frame
+// instead): the empty place, with its landmarks, in the story's world.
+export function locationImagePrompt(project, scene, loc, imageStyle = '') {
+  const world = (project.genres || []).join(', ');
+  return `Location reference plate for a film: "${loc.name || scene.title}". The scene set there: ${scene.summary || scene.title}.
+The story's world: ${world || 'contemporary drama'}${project.storyline?.synopsis ? ` — ${String(project.storyline.synopsis).slice(0, 400).replace(/[.\s]+$/, '')}` : ''}.
+Show the EMPTY place — no people, no animals — from a natural eye-level wide view that reveals its defining landmarks (windows, doors, counters, furniture, signs) and where they stand relative to each other, with the lighting and time of day the scene implies. Realistic architecture and materials, consistent perspective, no text, no watermark. This image becomes the environment reference for every shot of the scene.${imageStyle ? `\n\nVisual style: ${imageStyle}` : ''}`;
+}
+
 // Every location photo of the scene, taken round-robin (photo 1 of each
 // location first) so a cap never drops a whole location.
 export function scenePhotos(scene, cap = MAX_LOCATION_PHOTOS) {

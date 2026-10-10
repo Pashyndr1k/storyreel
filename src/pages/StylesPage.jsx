@@ -4,6 +4,7 @@ import AutoTextarea from '../components/AutoTextarea.jsx';
 import StyleAssistant from '../components/StyleAssistant.jsx';
 import { Stars, Search } from '../components/icons.jsx';
 import { useI18n } from '../lib/i18n.js';
+import { appLog } from '../lib/actionLog.js';
 import { STYLE_CATEGORIES, newStyle, buildStylesExport, parseStylesFile, mergeStyles } from '../lib/styles.js';
 import { downloadText } from '../lib/exportScript.js';
 
@@ -23,6 +24,7 @@ export default function StylesPage({ styles, setStyles, settings, setSettings, o
     : list;
 
   const upsert = (style) => {
+    appLog(list.some((s) => s.id === style.id) ? 'style.edit' : 'style.create', { category: cat, id: style.id, name: style.name });
     setStyles((prev) => {
       const arr = prev[cat] || [];
       const exists = arr.some((s) => s.id === style.id);
@@ -33,6 +35,7 @@ export default function StylesPage({ styles, setStyles, settings, setSettings, o
 
   const remove = (id) => {
     if (!window.confirm(t('styles.deleteConfirm'))) return;
+    appLog('style.delete', { category: cat, id, name: list.find((s) => s.id === id)?.name || '' });
     setStyles((prev) => ({ ...prev, [cat]: (prev[cat] || []).filter((s) => s.id !== id) }));
   };
 

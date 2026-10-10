@@ -87,7 +87,7 @@ export function assetTools(ctx) {
         const attempt = countAttempt(projectId, { sceneId: a.id, kind: 'asset_image' }, `The reference image of asset "${a.name}"`);
         const style = resolveStyleText(a0.styles, 'image', p.imageStyleId) || '';
         const raw = await generateImage(a0.settings, { prompt: assetImagePrompt(p, a, style), aspectRatio: '1:1', imageSize: '1K' });
-        const dataURL = await resizeDataURL(raw, 1024, 0.9);
+        const dataURL = await resizeDataURL(raw, 1024 * 1024, 0.9);
         setAssets(projectId, (list) => list.map((x) => (x.id === a.id ? { ...x, photos: replace ? [dataURL] : [...(x.photos || []), dataURL].slice(0, MAX_ASSET_PHOTOS), libId: x.libId || storyAssetLibId(p, x) } : x)));
         await settle();
         return { attempt, assetId: a.id, referenceImages: (projectOf(projectId).storyline.assets.find((x) => x.id === a.id)?.photos || []).length, next: 'storyreel_sync_assets, then recreate the frames of the shots that use it.' };

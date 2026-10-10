@@ -1963,6 +1963,19 @@ input.episodes-input { width: 110px; }
 /* Assembly timeline zoom + horizontal scroll. The scale control lives in the
    footer, styled exactly like the shot-length nudge control next to it. */
 .nle-scroll { overflow-x: auto; overflow-y: hidden; }
+/* The timeline's scrollbar must never hide: with the standard scrollbar
+   properties set (above, on *), Chromium keeps macOS overlay scrollbars,
+   which vanish until the next scroll. Reverting them here brings the WebKit
+   pseudo-element styling back, and that draws a classic, permanent bar. */
+.nle-scroll { scrollbar-width: auto; scrollbar-color: auto; }
+.nle-scroll::-webkit-scrollbar { height: 12px; width: 12px; }
+.nle-scroll::-webkit-scrollbar-track { background: var(--tl-panel); }
+.nle-scroll::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb-hover);
+  border-radius: 3px;
+  border: 3px solid var(--tl-panel);
+  background-clip: padding-box;
+}
 .nle-scroll.zoomed { cursor: grab; }
 .nle-inner { position: relative; }
 .nle-nudge .zoom-select {
@@ -3997,3 +4010,62 @@ select.prompt-model:hover:not(:disabled) { border-color: var(--ink); color: var(
 .error-text { color: var(--accent); }
 .new-episodes-row { align-items: center; gap: 10px; flex-wrap: wrap; }
 .new-episodes-row .episodes-input { width: 90px; }
+
+/* ---- Subtitle layer (Stage 5 assembly): a lane of timed text blocks under
+   the video track, and the text drawn over the preview picture. */
+.sub-lane {
+  display: flex;
+  align-items: stretch;
+  height: 30px;
+  padding: 0 6px 0 0;
+  border-top: 1px solid var(--tl-border);
+  background: var(--tl-lanes);
+}
+.sub-lane .lane-head { gap: 4px; }
+.sclip {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  border-radius: 3px;
+  overflow: hidden;
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-size: 10px;
+  color: var(--ac-text);
+  background: #5a5f6b;
+  white-space: nowrap;
+  user-select: none;
+  touch-action: none;
+}
+.sclip-custom { background: #6b5a3c; }
+.sclip.selected { box-shadow: 0 0 0 2px #fff inset; }
+.sub-overlay { position: absolute; pointer-events: none; overflow: hidden; }
+.sub-text {
+  position: absolute;
+  max-width: 92%;
+  padding: 0 1%;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: pre-wrap;
+  word-break: break-word;
+  paint-order: stroke fill;
+}
+.modal.sub-modal { width: min(620px, 94vw); max-width: min(620px, 94vw); }
+.sub-row { gap: 10px; align-items: flex-end; }
+.sub-row > div { display: flex; flex-direction: column; gap: 4px; }
+.sub-row input[type='number'] { width: 84px; }
+.sub-row input[type='color'] { width: 44px; height: 32px; padding: 2px; }
+.sub-sample {
+  margin: 12px 0 4px;
+  padding: 14px 12px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 22px;
+  line-height: 1.2;
+  background: #222;
+  border-radius: 3px;
+  white-space: pre-wrap;
+  paint-order: stroke fill;
+}

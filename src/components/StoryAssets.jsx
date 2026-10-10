@@ -52,7 +52,7 @@ export default function StoryAssets({ project, update, settings, genLang, imageS
     setError('');
     try {
       const raw = await generateImage(settings, { prompt: assetImagePrompt(project, a, imageStyle), aspectRatio: '1:1', imageSize: '1K' });
-      const dataURL = await resizeDataURL(raw, 1024, 0.9);
+      const dataURL = await resizeDataURL(raw, 1024 * 1024, 0.9);
       updateAsset(a.id, (cur) => ({ photos: [...(cur.photos || []), dataURL].slice(0, MAX_ASSET_PHOTOS), ...withLib(cur) }));
     } catch (e) {
       setError(e.message || String(e));

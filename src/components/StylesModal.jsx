@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { STYLE_CATEGORIES, newStyle, buildStylesExport, parseStylesFile, mergeStyles } from '../lib/styles.js';
 import { downloadText } from '../lib/exportScript.js';
 import { useI18n } from '../lib/i18n.js';
+import { appLog } from '../lib/actionLog.js';
 import AutoTextarea from './AutoTextarea.jsx';
 import StyleAssistant from './StyleAssistant.jsx';
 import { Stars } from './icons.jsx';
@@ -16,6 +17,7 @@ export default function StylesModal({ styles, setStyles, settings, onSettings, i
   const list = styles[cat] || [];
 
   const upsert = (style) => {
+    appLog(list.some((s) => s.id === style.id) ? 'style.edit' : 'style.create', { category: cat, id: style.id, name: style.name });
     setStyles((prev) => {
       const arr = prev[cat] || [];
       const exists = arr.some((s) => s.id === style.id);
@@ -27,6 +29,7 @@ export default function StylesModal({ styles, setStyles, settings, onSettings, i
 
   const remove = (id) => {
     if (!window.confirm(t('styles.deleteConfirm'))) return;
+    appLog('style.delete', { category: cat, id, name: list.find((s) => s.id === id)?.name || '' });
     setStyles((prev) => ({ ...prev, [cat]: (prev[cat] || []).filter((s) => s.id !== id) }));
   };
 
@@ -40,6 +43,7 @@ export default function StylesModal({ styles, setStyles, settings, onSettings, i
     reader.onload = () => {
       try {
         const incoming = parseStylesFile(String(reader.result));
+        appLog('style.import', { file: file.name });
         setStyles((prev) => mergeStyles(prev, incoming));
       } catch {
         window.alert(t('styles.importInvalid'));

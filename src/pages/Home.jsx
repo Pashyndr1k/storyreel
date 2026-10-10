@@ -10,6 +10,7 @@ import { newProject, uid, migrateProject } from '../lib/storage.js';
 import { parseProjectFile } from '../lib/exportScript.js';
 import { importProjectZip, exportProjectZip } from '../lib/projectFiles.js';
 import { useI18n } from '../lib/i18n.js';
+import { appLog } from '../lib/actionLog.js';
 
 export default function Home({
   projects,
@@ -66,6 +67,7 @@ export default function Home({
       episodeSeconds,
       scriptStyleId: scriptType === 'series' ? SHORT_DRAMA_STYLE_ID : '',
     });
+    appLog('project.create', { projectId: p.id, title: p.title, scriptType, aspectRatio, episodeCount: p.episodeCount || 0 });
     setProjects((ps) => [p, ...ps]);
     setShowNew(false);
     onOpen(p.id);
@@ -81,6 +83,7 @@ export default function Home({
     copy.createdAt = Date.now();
     copy.archived = false;
     copy.title = `${p.title} ${t('card.copySuffix')}`;
+    appLog('project.duplicate', { projectId: copy.id, from: p.id, title: copy.title });
     setProjects((ps) => [copy, ...ps]);
   };
 
@@ -89,6 +92,7 @@ export default function Home({
     p.id = uid();
     p.createdAt = Date.now();
     p.archived = false;
+    appLog('project.import', { projectId: p.id, title: p.title });
     setProjects((ps) => [p, ...ps]);
   };
 

@@ -62,6 +62,28 @@ ipcMain.handle('clipboard-write', (_e, text) => {
   return true;
 });
 
+// App-level action log: <userData>/logs/app.log, one JSON line per entry,
+// rotated once to app.log.1 past 2 MB. Project-level actions are kept in the
+// project itself (project.actionLog → project.md).
+const appLogPath = () => path.join(app.getPath('userData'), 'logs', 'app.log');
+ipcMain.handle('app-log-path', () => appLogPath());
+ipcMain.handle('app-log', (_e, entry) => {
+  try {
+    const file = appLogPath();
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    try {
+      if (fs.statSync(file).size > 2 * 1024 * 1024) fs.renameSync(file, `${file}.1`);
+    } catch {
+      /* no file yet */
+    }
+    const e = entry && typeof entry === 'object' ? entry : { t: Date.now(), action: String(entry) };
+    fs.appendFileSync(file, `${JSON.stringify({ ...e, iso: new Date(e.t || Date.now()).toISOString() })}\n`, 'utf8');
+    return true;
+  } catch {
+    return false;
+  }
+});
+
 ipcMain.handle('ffmpeg-check', () => ({ version: ffmpegVersion() }));
 ipcMain.handle('ffmpeg-cancel', () => cancelActive());
 ipcMain.handle('ffmpeg-render', (e, job) =>

@@ -11,6 +11,24 @@
 - **Agent: engines and parts.** The agent's status names the image and video
   models in use (including Krea and the H3 step count); the project view
   shows parts; a new tool splits a project into parts.
+- **Subtitles.** A subtitle layer under the video track in the assembly:
+  blocks from every shot's dialogue (compact text at the bottom), free text
+  anywhere on the frame, double-click to edit font, size, colours and
+  placement; shown in the preview and burned into the render.
+- **Transitions from the action.** The automatic transition now follows
+  what happens in the two shots — abrupt cuts for action, soft ones for
+  quiet beats, a fade for a jump in time; the agent sets them per boundary.
+- **Audio is never cut.** A shot grows to hold its voice or its generated
+  sound instead of losing the last words; the agent makes the voice before
+  the video and is warned when a video no longer covers its slot.
+- **Spatial layout.** The shot type decides the shot size (no more
+  accidental close-ups from a telephoto lens); the camera keeps its side
+  of the action, so the window and the counter stay on the same side of the
+  screen from shot to shot; new warnings when the line is crossed; the
+  agent can make a location reference from a frame or from the text.
+- **Action logs.** App-level actions go to an app log file; what was done
+  to a project is kept inside the project.
+- **macOS.** The timeline's scrollbar no longer disappears.
 - **Story assets.** Stage 2 has an Assets tab: cards for the objects the
   characters handle across shots, each with a unique English name, a
   description in the story's world and a reference image (uploaded or

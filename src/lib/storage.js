@@ -3,6 +3,8 @@ import { idbGetAll, idbPutMany, idbDeleteMany } from './idb.js';
 import { isValidAspect } from './aspect.js';
 import { normalizeSceneLocations } from './sceneLocations.js';
 import { sanitizeMethods } from './randomization.js';
+import { normalizeSubtitles, DEFAULT_SUB_STYLE } from './subtitles.js';
+import { MAX_PROJECT_LOG } from './actionLog.js';
 
 const LEGACY_PROJECTS_KEY = 'storyreel.projects.v1'; // pre-1.3.0 localStorage store
 const SETTINGS_KEY = 'storyreel.settings.v1';
@@ -237,6 +239,8 @@ function projectDefaults() {
     shotGroups: {}, // leadShotId -> { shotIds: [lead, ...members] } — H3 multi-shot takes (2-3 consecutive shots, one generation)
     shotKeyframes: {}, // shotId -> [{ kind: 'image'|'audio', src, label, at }] — H3 MULTI mode anchors on the output timeline (seconds)
     shotTrims: {}, // shotId -> { head, tail } seconds — manual overrides of the 15-frame rule
+    subtitles: { style: { ...DEFAULT_SUB_STYLE }, items: [] }, // the subtitle layer of the assembly (lib/subtitles.js)
+    actionLog: [], // what was done to this project, newest last: [{ t, by: 'user'|'agent', action, keys?, note?, n? }] (lib/actionLog.js)
     // Multi-layer audio timeline (Stage 5 assembly). Each layer is its own track lane:
     // { id, name, enabled, volume, clips: [{ id, name, dataURL, start, offset,
     //   duration, srcDuration, fadeIn, fadeOut }] } — times in seconds,
@@ -334,6 +338,8 @@ export function migrateProject(raw) {
   p.shotAudioPads = p.shotAudioPads && typeof p.shotAudioPads === 'object' ? p.shotAudioPads : {};
   p.shotTrims = p.shotTrims && typeof p.shotTrims === 'object' ? p.shotTrims : {};
   p.shotTransitions = p.shotTransitions && typeof p.shotTransitions === 'object' ? p.shotTransitions : {};
+  p.subtitles = normalizeSubtitles(p.subtitles);
+  p.actionLog = Array.isArray(p.actionLog) ? p.actionLog.filter((e) => e && typeof e === 'object' && e.t && e.action).slice(-MAX_PROJECT_LOG) : [];
   p.storyboards = p.storyboards && typeof p.storyboards === 'object' ? p.storyboards : {};
   p.referenceFrames = p.referenceFrames && typeof p.referenceFrames === 'object' ? p.referenceFrames : {};
   p.shotPrompts = p.shotPrompts && typeof p.shotPrompts === 'object' ? p.shotPrompts : {};

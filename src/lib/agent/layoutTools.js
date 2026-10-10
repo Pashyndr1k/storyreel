@@ -18,6 +18,8 @@ const WARN = {
   absentNamed: (w) => `Shot ${w.shotIndex + 1}: ${w.a} is named in the shot but is marked as not present.`,
   flip: (w) => `Shot ${w.shotIndex + 1}: ${w.a} and ${w.b} swapped screen sides against the previous shot (the line was crossed).`,
   jump: (w) => `Shot ${w.shotIndex + 1}: ${w.a} is ${w.m} m from where the previous shot left them.`,
+  lineCross: (w) => `Shot ${w.shotIndex + 1}: the camera is on the other side of the action than in shot ${w.m} — the background and the screen sides flip (the line was crossed). Mirror the camera back (storyreel_set_layout camera.yawDeg) unless the action asks for it.`,
+  setFlip: (w) => `Shot ${w.shotIndex + 1}: the set piece "${w.a}" moves to the ${w.b} against the previous shot — the environment would be mirrored in the generated frame.`,
 };
 const warningsOf = (project, scene) => continuityWarnings(project, scene).map((w) => (WARN[w.kind] ? WARN[w.kind](w) : `Shot ${w.shotIndex + 1}: ${w.kind}`));
 
