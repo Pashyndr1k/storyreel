@@ -4143,3 +4143,50 @@ select.prompt-model:hover:not(:disabled) { border-color: var(--ink); color: var(
 .sub-fields .check-row { margin-top: 2px; }
 /* a subtitle band spans 90% of the frame */
 .sub-text-band { width: 90%; max-width: 90%; }
+
+/* ---- Prompt colour-coding (Stage 5): the mirror layer carries the text
+   with marks for the passages taken from the 3D layout (blue) and from the
+   character cards (green) and gives the box its height; the editable
+   textarea lies over it with the same metrics, text on a transparent
+   background. The two share the prompt font rule below. */
+.s5e-hlwrap { position: relative; background: var(--well-bg); border-radius: 3px; min-height: 220px; }
+.s5e-hlwrap-sm { min-height: 150px; }
+.s5e-compact .s5e-hlwrap { min-height: 0; }
+.s5e-hl,
+.s5e-hlwrap textarea.s5e-prompt-over {
+  padding: 16px 18px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  font-size: 12px;
+  line-height: 1.7;
+  font-family: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  letter-spacing: normal;
+  box-sizing: border-box;
+}
+.s5e-promptbox .s5e-hl,
+.s5e-promptbox textarea.s5e-prompt-over { font-family: var(--ui-font-display); font-size: 12.5px; line-height: 1.65; }
+.s5e-hl { position: relative; color: transparent; pointer-events: none; min-height: inherit; margin: 0; }
+.s5e-hl mark { color: transparent; border-radius: 2px; }
+.s5e-hl mark.hl-layout { background: rgba(47, 111, 221, 0.22); box-shadow: inset 0 -1.5px 0 rgba(47, 111, 221, 0.9); }
+.s5e-hl mark.hl-char { background: rgba(47, 158, 79, 0.22); box-shadow: inset 0 -1.5px 0 rgba(47, 158, 79, 0.9); }
+.s5e-hlwrap textarea.s5e-prompt-over {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  color: var(--text);
+}
+.s5e-hlwrap textarea.s5e-prompt-over:focus { background: transparent; border-color: var(--accent); }
+.prompt-collapsed .s5e-promptbox .s5e-hlwrap { display: none; }
+.hl-legend { display: inline-flex; align-items: center; gap: 10px; margin-left: 4px; }
+.hl-key { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.hl-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.hl-dot.hl-layout { background: rgba(47, 111, 221, 0.9); }
+.hl-dot.hl-char { background: rgba(47, 158, 79, 0.9); }

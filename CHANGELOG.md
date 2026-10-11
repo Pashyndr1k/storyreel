@@ -31,6 +31,9 @@
   shot breakdown, the final frame) no longer reach the Claude Code console
   as garbage; the console gets the text and a note about the photos. The
   JSON reader also copes with prose and code fences around an answer.
+- **Prompt colour-coding (Stage 5).** The passages of an image or video
+  prompt that repeat the 3D layout's description are marked blue, those
+  that repeat a character card green; a legend sits in the prompt head.
 - **Nested projects.** A project split into episode projects or parts is
   one card on the main screen; click it for a pop-up with the projects
   inside as compact rows, each with open, duplicate, archive, delete and

@@ -1030,3 +1030,37 @@ didn't come through").
 **Verified.** Node runs of the bridge (a long outline parses; an image is
 not delivered); the reader on fenced, prose-wrapped and truncated samples
 in the dev app. **Not run again through the packaged app's console path.**
+
+---
+
+## 27. Prompt colour-coding: what came from the 3D layout, what from the cards
+
+**Request.** At Stage 5, colour the parts of the image and video prompts
+that were inserted from the 3D layout and the parts that come from the
+character cards.
+
+**Behaviour.** The prompt writer paraphrases its sources, so the marks are
+found by matching: `src/lib/promptMarks.js` tokenises the prompt and marks
+every run of words that also occurs in a source — the description of each
+character the prompt or the shot names (runs of 4 words, green) and the
+measured description of the shot from the 3D layout (runs of 3 words, blue;
+it is terse and numeric). Adjacent marked words merge into one span; the
+first source to claim a word keeps it. In the prompt box the text now sits
+in a wrapper: a mirror layer carries the text with `<mark>`s and gives the
+box its height, and the editable textarea lies over it with the same font,
+size, line height and padding on a transparent background — so the marks
+sit under the right words and the text stays editable, no auto-grow loop
+(the earlier AutoTextarea over a mirror ran away to 7,700 px). The prompt
+head shows a legend ("3D layout", "character card") only when such
+passages exist. Motion prompts for LTX / Kling forbid character
+descriptions by rule, so they carry layout marks only; H3 prompts can carry
+both.
+
+**Files.** `src/lib/promptMarks.js` (new), `src/stages/Stage5.jsx` (`promptBox`,
+`promptSources`), `src/styles.css`, i18n `hl.layout` / `hl.char` / `hl.tip`.
+
+**Verified.** Dev app, a seeded project with a built layout and card
+descriptions: the legend, three marks (two layout, one card) under the
+right passages, identical metrics of mirror and textarea, growth with a
+longer text and back. **Limit:** a passage the writer rewrote in other
+words is not marked — the marks show literal reuse, not every influence.

@@ -3,6 +3,8 @@ import { generateKlingVideo, klingModelOf, klingSeconds, KLING_VIDEO_MODES, reso
 import { generateKreaImage, generateKreaVideo, kreaImageModelOf, kreaVideoModelOf, kreaSeconds, KREA_VIDEO_MODES, resolveKreaMode } from '../lib/krea.js';
 import { SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC, MAX_IMAGE_VERSIONS, MAX_CHARACTER_REFS, MAX_LOCATION_PHOTOS } from '../lib/config.js';
 import { shotCastRefs } from '../lib/castRefs.js';
+import { markSpans, markPieces } from '../lib/promptMarks.js';
+import { describeShot } from '../lib/spatial/describe.js';
 import { CAMERA_LEVELS, ACTION_LEVELS, cameraOf, actionOf, dynamicsStale } from '../lib/shotDynamics.js';
 import GenProgress from '../components/GenProgress.jsx';
 import { etaKey, expectedSeconds, recordRun } from '../lib/videoEta.js';
@@ -645,9 +647,24 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     );
   };
   // the prompt in its own box: name · workflow · length, the tools, the text, the tweak row
+  // The passages a prompt took from its sources, for colour-coding: the
+  // characters' card descriptions (green) and the 3D layout's measured
+  // description of the shot (blue). Matched by runs of words, since the
+  // writer paraphrases; a mirror layer under the transparent textarea
+  // carries the marks, so the text stays editable.
+  const promptSources = (shot, text) => {
+    const low = `${text}\n${shot.action || ''}\n${shot.dialogue || ''}`.toLowerCase();
+    const chars = (project.storyline?.characters || []).filter((c) => (c.description || '').trim() && (c.name || '').trim() && low.includes(c.name.trim().toLowerCase()));
+    const sources = chars.map((c) => ({ kind: 'char', text: c.description }));
+    const layout = scene ? describeShot(project, scene, shot.id) : '';
+    if (layout) sources.push({ kind: 'layout', text: layout });
+    return sources;
+  };
   const promptBox = (shot, kind, meta) => {
     const field = kind === 'image' ? 'imagePrompt' : 'videoPrompt';
     const text = project.shotPrompts[shot.id]?.[field] || '';
+    const spans = text ? markSpans(text, promptSources(shot, text)) : [];
+    const has = { char: spans.some((s) => s.kind === 'char'), layout: spans.some((s) => s.kind === 'layout') };
     return (
       <div className="s5e-promptbox">
         <div className="s5e-prompthead">
@@ -656,6 +673,12 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
             {meta.filter(Boolean).map((m, k) => (
               <span key={k}>· {m}</span>
             ))}
+            {(has.char || has.layout) && (
+              <span className="hl-legend" title={t('hl.tip')}>
+                {has.layout && <span className="hl-key"><i className="hl-dot hl-layout" aria-hidden="true" />{t('hl.layout')}</span>}
+                {has.char && <span className="hl-key"><i className="hl-dot hl-char" aria-hidden="true" />{t('hl.char')}</span>}
+              </span>
+            )}
           </span>
           <span className="prompt-tools">
             {kind === 'video' && promptEngineBadge(shot)}
@@ -664,14 +687,20 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
             {promptToggle()}
           </span>
         </div>
-        <AutoTextarea
-          minRows={embed ? 4 : 6}
-          className="s5e-prompt"
-          remeasure={promptOpen}
-          value={text}
-          placeholder={t('s5.ph')}
-          onChange={(e) => setPrompt(shot.id, { [field]: e.target.value })}
-        />
+        {/* the mirror sizes the box from the text; the textarea lies over it */}
+        <div className={`s5e-hlwrap ${embed ? 's5e-hlwrap-sm' : ''}`}>
+          <div className="s5e-hl" aria-hidden="true">
+            {markPieces(text, spans).map((p, k) => (p.kind ? <mark key={k} className={`hl-${p.kind}`}>{p.text}</mark> : <span key={k}>{p.text}</span>))}
+            {'\n'}
+          </div>
+          <textarea
+            className="s5e-prompt s5e-prompt-over"
+            value={text}
+            placeholder={t('s5.ph')}
+            spellCheck={false}
+            onChange={(e) => setPrompt(shot.id, { [field]: e.target.value })}
+          />
+        </div>
         {tweakRow(shot, kind)}
       </div>
     );
