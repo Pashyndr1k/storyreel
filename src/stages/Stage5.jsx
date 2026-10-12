@@ -1047,6 +1047,31 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     });
   };
 
+  // The film position of a shot: the summed durations of every shot before it.
+  const shotStartIn = (p, shotId) => {
+    let startAt = 0;
+    for (const sc of p.outline) {
+      for (const sh of p.sceneDetails[sc.id]?.shots || []) {
+        if (sh.id === shotId) return startAt;
+        startAt += Number(sh.duration) || 0;
+      }
+    }
+    return startAt;
+  };
+  // The H3 mix lane with this shot's clip replaced (clip null: removed).
+  const withH3Clip = (Ls, shotId, clip) => {
+    const out = [...Ls];
+    const li = out.findIndex((L) => L.id === 'h3mix');
+    if (li >= 0) out[li] = { ...out[li], clips: [...out[li].clips.filter((c) => c.id !== `h3_${shotId}`), ...(clip ? [clip] : [])] };
+    else if (clip) {
+      const lane = { id: 'h3mix', name: t('s6.h3Lane'), enabled: true, volume: 1, clips: [clip] };
+      const mi = out.findIndex((L) => L.id === 'bgmusic' || String(L.id).startsWith('bgm_'));
+      if (mi >= 0) out.splice(mi, 0, lane);
+      else out.push(lane);
+    }
+    return out;
+  };
+
   const uploadShotVideo = async (shot, file) => {
     try {
       const dataURL = await readFileDataURL(file);
@@ -1057,11 +1082,41 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
         v.onerror = () => res(0);
         v.src = dataURL;
       });
-      update((p) => ({
-        shotVideos: { ...(p.shotVideos || {}), [shot.id]: dataURL },
-        videoGenDurations: { ...(p.videoGenDurations || {}), [shot.id]: Math.round(dur * 10) / 10 },
-        shotVideoEngines: { ...(p.shotVideoEngines || {}), [shot.id]: 'upload' },
-      }));
+      // The upload's own sound replaces whatever the previous generation left
+      // on the H3 lane for this shot — the old clip no longer matches the
+      // picture. With a soundtrack it is detached onto the lane like an H3
+      // mix (video muted); without one the stale clip goes and the shot is
+      // unmuted.
+      let mixBuf = null;
+      try {
+        mixBuf = await decodeMediaAudio(dataURL);
+      } catch {
+        mixBuf = null;
+      }
+      const mixWav = mixBuf ? audioBufferToWavDataURL(mixBuf) : null;
+      update((p) => {
+        const slot = Number(shot.duration) || 0;
+        const clip = mixWav
+          ? {
+              id: `h3_${shot.id}`,
+              name: t('s6.h3Clip', { n: shot.number || '' }).trim(),
+              dataURL: mixWav,
+              start: shotStartIn(p, shot.id),
+              offset: (p.shotTrims || {})[shot.id]?.head || 0,
+              duration: Math.min(slot || mixBuf.duration, mixBuf.duration),
+              srcDuration: mixBuf.duration,
+              fadeIn: 0,
+              fadeOut: 0,
+            }
+          : null;
+        return {
+          shotVideos: { ...(p.shotVideos || {}), [shot.id]: dataURL },
+          videoGenDurations: { ...(p.videoGenDurations || {}), [shot.id]: Math.round(dur * 10) / 10 },
+          shotVideoEngines: { ...(p.shotVideoEngines || {}), [shot.id]: 'upload' },
+          audioLayers: withH3Clip(p.audioLayers || [], shot.id, clip),
+          shotMutes: { ...(p.shotMutes || {}), [shot.id]: !!clip },
+        };
+      });
     } catch (e) {
       setImgErr({ id: shot.id, msg: e.message || String(e) });
     }

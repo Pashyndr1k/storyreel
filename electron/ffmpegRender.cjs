@@ -172,7 +172,11 @@ function buildArgs(job) {
       if (fi >= 0.01) f += `,afade=t=in:st=0:d=${fi.toFixed(3)}`;
       if (fo >= 0.01) f += `,afade=t=out:st=${(D - fo).toFixed(3)}:d=${fo.toFixed(3)}`;
       f += `,volume=${vol},aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo`;
-      f += `,adelay=${delayMs}|${delayMs},apad=whole_dur=${accDur.toFixed(3)},atrim=0:${accDur.toFixed(3)}[tk${k}]`;
+      // asetpts after adelay: a clip cut from inside its source (offset > 0)
+      // reaches amix with timestamps that place it at the film's start
+      // instead of at `start` — regular sample-counted timestamps keep it
+      // where the delay put it (the per-shot chains do the same).
+      f += `,adelay=${delayMs}|${delayMs},asetpts=N/SR/TB,apad=whole_dur=${accDur.toFixed(3)},atrim=0:${accDur.toFixed(3)}[tk${k}]`;
       filters.push(f);
     });
     filters.push(

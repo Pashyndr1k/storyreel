@@ -12,6 +12,12 @@
   instead of the whole project, and the app no longer re-writes every
   project folder on disk at start-up. Existing projects move to the new
   layout on their own, one per save.
+- **Fix: a head-trimmed lane clip rendered at the start of the film.** A
+  shot whose in-point was trimmed had its detached sound mixed in at 0 s
+  instead of under the shot (the timeline was right, the render was not).
+- **Uploaded videos bring their sound.** Uploading a video for a shot now
+  puts its soundtrack on the H3 lane in place of the previous generation's
+  clip, so the old take no longer plays over the new picture.
 
 ## 2.17.0 — 2026-10-12
 
