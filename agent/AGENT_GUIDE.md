@@ -264,6 +264,12 @@ by `storyreel_drama_rules`:
   repeated). Create one with `storyreel_create_project { scriptType:
   "series", dramaEngine: "v2" }`.
 
+Both engines cast the way the genre does (`castLook` in `storyreel_drama_rules`):
+every character attractive and contemporary, striking details modern on purpose
+(a tattoo, coloured hair, a piercing, a signature accessory), never a scar,
+wound or disfigurement as the identifying mark. A card that breaks this is a
+`script` flag; fix it with `storyreel_edit_script` ("replace the scar with a modern detail").
+
 Always read `storyreel_drama_rules` before judging a series: the beats,
 hook types, limits and landmarks you must hold the script to are the
 engine's, not the ones you remember from another project. In a v2 series the

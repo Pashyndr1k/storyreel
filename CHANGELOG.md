@@ -12,6 +12,10 @@
   it on the new-project modal; the project's settings show its template; the
   drama check and the agent's `storyreel_drama_rules` follow the project's
   engine (`storyreel_create_project { dramaEngine: "v2" }`).
+- **Short drama: the cast looks the part.** Both engines now tell the
+  screenwriter to cast attractive, contemporary people with striking modern
+  details (tattoos, coloured hair, piercings, signature accessories) and
+  never a scar or wound as an identifying mark.
 
 ## 2.16.0 — 2026-10-12
 

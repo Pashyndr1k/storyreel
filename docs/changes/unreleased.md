@@ -143,3 +143,27 @@ in EN/RU/UK.
 `src/components/{NewProjectModal,ProjectSettingsModal,DramaCheckModal}.jsx`,
 `src/pages/Home.jsx`, `src/lib/i18n.js`, `agent/AGENT_GUIDE.md`,
 `docs/agent-api.md`, `CHANGELOG.md`.
+
+## 2. Short drama: how the cast looks (no scars)
+
+**Request.** The screenwriter kept giving the protagonist a scar. The genre
+casts attractive people with striking, modern details — tattoos, coloured
+hair, contemporary accessories — with tasteful contemporary styling and
+modern make-up. Instruct the screenwriter accordingly.
+
+**Behaviour.** A shared `CAST_LOOK` rule (`src/lib/shortDrama/rules.js`) is
+appended to the storyline-stage brief of BOTH engines: every character —
+lead, love interest, antagonist, supporting — is attractive and camera-ready
+in a contemporary way (modern styling, make-up, grooming); striking details
+are modern and chosen on purpose (a tattoo with its place and subject,
+coloured or boldly styled hair, a piercing, a signature accessory, a sharp
+haircut, a manicure, a distinctive garment); never a scar, disfigurement,
+burn, missing tooth, limp or wound as an identifying mark, for anyone;
+villains are attractive too, their menace in behaviour and styling. The
+v2 identity block asks for "one modern distinctive detail (… never a scar)"
+instead of "one distinctive feature", and the series storyline JSON field
+names the rule. `dramaRulesSummary` of both engines returns `castLook`;
+the agent guide tells the agent to flag a card that breaks it.
+
+**Files.** `src/lib/shortDrama/{rules,rules2}.js`, `src/lib/prompts.js`,
+`agent/AGENT_GUIDE.md`, `CHANGELOG.md`.
