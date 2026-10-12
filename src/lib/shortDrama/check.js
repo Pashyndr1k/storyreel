@@ -84,11 +84,16 @@ export function checkProject(project) {
     const locs = new Set(ep.shots.map((s) => (s.location || '').split(',')[0].trim().toLowerCase()).filter(Boolean));
     m.locations = locs.size;
     if (locs.size > MAX_LOCATIONS_PER_EPISODE) add('warn', 'locations', `Episode ${ep.number} uses ${locs.size} locations; keep to ${MAX_LOCATIONS_PER_EPISODE} or fewer.`, { episode: ep.number });
+    // every scene opens on a shot without dialogue — the viewer settles into the place first
+    for (const sc of ep.scenes) {
+      const f = (project.sceneDetails?.[sc.id]?.shots || [])[0];
+      if (f && (f.dialogue || '').trim()) add('warn', 'scene-opens-dialogue', `Episode ${ep.number}, scene "${sc.title || ''}": its first shot carries a line — every scene opens with a shot without dialogue (the place, the light, a detail or a face) so the viewer settles into the new location; move the line to the second shot.`, { episode: ep.number, sceneId: sc.id, shotId: f.id });
+    }
     if (ep.shots.length) {
       const s0 = ep.shots[0];
       m.openingSec = Number(s0.duration) || 0;
       if (m.openingSec > OPENING_HOOK_SEC) add('warn', 'opening-long', `Episode ${ep.number}: the opening shot runs ${m.openingSec} s; the conflict must be visible inside ${OPENING_HOOK_SEC} s.`, { episode: ep.number, shotId: s0.id });
-      if (!(s0.dialogue || '').trim() && !/\b(slap|grab|throw|snatch|shout|scream|tear|slam|push|point|accus|scream|bleed|kiss|ring|contract|photo|phone|door|evidence|cry|runs?|stand|stare|sign)/i.test(s0.action || '')) add('info', 'opening-quiet', `Episode ${ep.number}: the opening shot shows no visible disruption or line — check that the conflict is on screen in the first 3 seconds.`, { episode: ep.number, shotId: s0.id });
+      if (!(s0.dialogue || '').trim() && !/\b(slap|grab|throw|snatch|shout|scream|tear|slam|push|point|accus|scream|bleed|kiss|ring|contract|photo|phone|door|evidence|cry|runs?|stand|stare|sign)/i.test(s0.action || '')) add('info', 'opening-quiet', `Episode ${ep.number}: the opening shot shows no visible disruption — check that the conflict is on screen through action, a face or an object in the first 3 seconds (it carries no line by rule).`, { episode: ep.number, shotId: s0.id });
       let sinceShift = 0;
       ep.shots.forEach((sh, i) => {
         const d = Number(sh.duration) || 0;

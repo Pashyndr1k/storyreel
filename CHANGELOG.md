@@ -34,6 +34,9 @@
 - **Prompt colour-coding (Stage 5).** The passages of an image or video
   prompt that repeat the 3D layout's description are marked blue, those
   that repeat a character card green; a legend sits in the prompt head.
+- **Short drama: silent scene openings.** Every scene now opens with a shot
+  without dialogue that sets the place and the atmosphere; the genre check
+  flags a scene whose first shot speaks.
 - **Nested projects.** A project split into episode projects or parts is
   one card on the main screen; click it for a pop-up with the projects
   inside as compact rows, each with open, duplicate, archive, delete and

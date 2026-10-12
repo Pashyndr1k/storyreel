@@ -1064,3 +1064,28 @@ descriptions: the legend, three marks (two layout, one card) under the
 right passages, identical metrics of mirror and textarea, growth with a
 longer text and back. **Limit:** a passage the writer rewrote in other
 words is not marked — the marks show literal reuse, not every influence.
+
+---
+
+## 28. Short drama: every scene opens with a shot without dialogue
+
+**Request.** A rule for the short-drama scripting guidelines: every scene
+begins with a shot without dialogue that establishes the atmosphere and
+gives the viewer time to settle into the new location.
+
+**Behaviour.** The rule is now in the engine's shot-stage brief
+(`DRAMA_STAGE.shots`: an atmosphere shot of 2–4 s — the place, the light, a
+detail or a face — before anyone speaks; the first line in the second
+shot; an episode's first scene keeps that opening shot ≤ 5 s and shows the
+conflict through action, still without a line), in the Stage 4 breakdown
+note of every series scene, in the rules summary the agent reads
+(`sceneOpening`) and in the guide. The genre check adds
+`scene-opens-dialogue` (warn) for a scene whose first shot carries a line,
+pointing at the shot; the episode-opening hint no longer expects a line.
+
+**Files.** `src/lib/shortDrama/rules.js`, `src/lib/shortDrama/check.js`,
+`src/lib/prompts.js` (`stage4Prompt`), `agent/AGENT_GUIDE.md`.
+
+**Verified.** Build; the check on a seeded series (a scene whose first shot
+speaks is flagged, a silent opening passes) in the dev app. **Not run with
+the real breakdown model.**

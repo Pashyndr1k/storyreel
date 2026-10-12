@@ -238,6 +238,15 @@ choice (`breakdownMode`); the user is asked the same question in the app.
 
 ## Short drama (series projects)
 
+Every scene of a series opens with a shot WITHOUT dialogue — an atmosphere
+shot of 2–4 s (the place, the light, a detail or a face) that lets the
+viewer settle into the new location; the first line comes in the second
+shot. An episode's first scene keeps that opening shot at 5 s or less and
+shows the conflict through action. `storyreel_drama_check` reports
+`scene-opens-dialogue` when a scene's first shot carries a line; fix it
+with `storyreel_edit_script` (move the line to shot 2, give shot 1 its
+atmosphere).
+
 A series is written by the app's short-drama engine: vertical 9:16, one
 dramatic unit per 1–2 minute episode, the conflict visible in the first 3–5
 seconds, a turn about every 30 seconds, every episode cut on a labelled hook
