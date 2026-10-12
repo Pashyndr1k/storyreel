@@ -7,6 +7,11 @@
   reason is written to the app log, the page reloads from the last saved
   state and a dialog says what happened. The page also gets a larger memory
   limit.
+- **Lighter saves.** Images, videos and audio clips are stored as their own
+  records; a save writes the project text plus only the media that changed
+  instead of the whole project, and the app no longer re-writes every
+  project folder on disk at start-up. Existing projects move to the new
+  layout on their own, one per save.
 
 ## 2.17.0 — 2026-10-12
 

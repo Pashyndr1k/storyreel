@@ -44,3 +44,41 @@ what the fix needs. Moving videos and image history out of the project
 record into their own store is the real cure.
 
 **Files.** `electron/main.cjs`, `CHANGELOG.md`.
+
+## 2. Media stored as separate records; no mirror storm at start-up
+
+**Report (continued).** With the crash guard in place the window reloaded
+with "Reason: crashed (exit code -36861)" 75 s after start, while the same
+large project was open. Everything points at memory: the open project
+(~445 MB of media as data URLs) was serialised whole for IndexedDB on every
+save, and at every launch the app re-mirrored every project to disk at once
+(36 projects, ~3 GB of base64 through the bridge, all in parallel).
+
+**Behaviour now.**
+- **IndexedDB v3.** The `projects` store holds the media-free project (every
+  media slot reads `file:<name>`, the same split the disk mirror uses:
+  `splitProjectMedia` / `mergeProjectMedia`); a new `media` store holds one
+  record per image, video and audio clip, key `"<projectId>\0<name>"`
+  (`{ key, projectId, name, dataURL }`). A save writes the small record plus
+  only the media whose string changed (identity check against what was
+  loaded or last written) and deletes media no longer referenced — all in
+  one transaction (`idbSaveProjects`). Deleting a project removes its media
+  by key range (`idbDeleteProjects`). The in-memory project is unchanged:
+  `loadProjects` merges the media back, so every consumer keeps reading
+  `project.shotVideos[id]` etc. as before.
+- **Migration.** A project found in the old whole-record form loads as is
+  and is split on its first save; untouched old projects are moved one per
+  save (never all in one transaction). The legacy localStorage path is
+  unchanged.
+- **Mirror.** At start-up the loaded projects are marked as already
+  mirrored; the on-disk folders follow changes from then on. Mirrors run one
+  project at a time app-wide (a single promise chain) instead of one chain
+  per project in parallel.
+
+**Verified** in the dev app: an old-form project with cover, frame, two
+history versions, a video, a character photo and an audio clip was split on
+first save into a 2 KB record plus seven media records; after a reload the
+project had all its media; a rename rewrote the record and no media; a
+delete removed the record and its media.
+
+**Files.** `src/lib/{idb,storage,projectFiles}.js`, `src/App.jsx`.

@@ -1,5 +1,6 @@
 import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIR, DEFAULT_PROJECTS_DIR, DEFAULT_CLAUDE_MODEL, CLAUDE_MODELS, CLAUDE_MODEL_SUCCESSORS, DEFAULT_IMAGE_MODEL, LEGACY_IMAGE_MODELS, DEFAULT_KLING_MODEL, STAGE_COUNT, MAX_IMAGE_VERSIONS } from './config.js';
-import { idbGetAll, idbPutMany, idbDeleteMany } from './idb.js';
+import { idbGetAll, idbMediaGetAll, idbSaveProjects, idbDeleteProjects, idbPutMany, mediaKey } from './idb.js';
+import { splitProjectMedia, mergeProjectMedia } from './projectFiles.js';
 import { isValidAspect } from './aspect.js';
 import { normalizeSceneLocations } from './sceneLocations.js';
 import { sanitizeMethods } from './randomization.js';
@@ -21,6 +22,14 @@ export function uid() {
 // Reference map of what's already persisted, so saveProjects only writes
 // projects whose object identity changed (and deletes removed ones).
 let lastSaved = new Map();
+// What the media store holds per project: projectId -> Map<name, dataURL>.
+// The strings are the very ones inside the loaded project, so "changed" is an
+// identity check — a regenerated image is a new string, an untouched one is
+// not, and only the new ones are written.
+let storedMedia = new Map();
+// projects loaded in the pre-v3 form (media inside the record): their first
+// save moves the media into its own store, even if nothing else changed
+const needsSplit = new Set();
 // When IndexedDB can't be opened (blocked by another window, corrupted, …)
 // fall back to the legacy localStorage store so the app keeps working.
 let idbBroken = false;
@@ -38,12 +47,29 @@ export async function loadProjects() {
   let list;
   try {
     list = await idbGetAll();
+    // v3: the media of each project comes from its own records
+    const byProject = new Map();
+    for (const m of await idbMediaGetAll()) {
+      if (!byProject.has(m.projectId)) byProject.set(m.projectId, new Map());
+      byProject.get(m.projectId).set(m.name, m.dataURL);
+    }
+    storedMedia = byProject;
+    needsSplit.clear();
+    list = list.map((lite) => {
+      const media = byProject.get(lite.id);
+      if (!media) {
+        needsSplit.add(lite.id); // the old whole-record form (or a project without media)
+        return lite;
+      }
+      return mergeProjectMedia(lite, (name) => media.get(name) || '');
+    });
     if (!list.length) {
       // One-time migration from the pre-1.3.0 localStorage store.
       const legacy = readLegacy();
       if (legacy.length) {
         list = legacy.map(migrateProject);
         await idbPutMany(list);
+        for (const p of list) needsSplit.add(p.id); // stored whole; the first save splits them
         localStorage.removeItem(LEGACY_PROJECTS_KEY); // frees the old quota
       }
     }
@@ -70,10 +96,29 @@ export async function saveProjects(projects) {
   }
   try {
     const next = new Map(projects.map((p) => [p.id, p]));
+    // changed projects, plus at most one untouched pre-v3 project per save so
+    // the move into the media store happens one project at a time — never
+    // every project in one transaction (that is the memory spike this
+    // store was made to avoid)
     const changed = projects.filter((p) => lastSaved.get(p.id) !== p);
+    const pending = projects.find((p) => needsSplit.has(p.id) && !changed.includes(p));
+    if (pending) changed.push(pending);
     const removed = [...lastSaved.keys()].filter((id) => !next.has(id));
-    await idbPutMany(changed);
-    await idbDeleteMany(removed);
+    const items = changed.map((p) => {
+      const { lite, files } = splitProjectMedia(p);
+      const prev = storedMedia.get(p.id) || new Map();
+      const now = new Map(files.map((f) => [f.name, f.dataURL]));
+      const mediaPut = files.filter((f) => prev.get(f.name) !== f.dataURL).map((f) => ({ key: mediaKey(p.id, f.name), projectId: p.id, name: f.name, dataURL: f.dataURL }));
+      const mediaDelete = [...prev.keys()].filter((n) => !now.has(n)).map((n) => mediaKey(p.id, n));
+      return { id: p.id, lite, mediaPut, mediaDelete, now };
+    });
+    await idbSaveProjects(items);
+    await idbDeleteProjects(removed);
+    for (const it of items) {
+      storedMedia.set(it.id, it.now);
+      needsSplit.delete(it.id);
+    }
+    for (const id of removed) storedMedia.delete(id);
     lastSaved = next;
   } catch (e) {
     console.error('saveProjects failed', e);

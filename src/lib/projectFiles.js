@@ -146,13 +146,14 @@ export function buildProjectMd(project, lite, lang) {
 // files are written only when their byte length changed since the last write
 // this session (they are immutable blobs in practice).
 const mirrored = new Map(); // projectId -> Map<fileName, dataURL.length>
-const mirrorQueue = new Map(); // projectId -> promise chain (folder renames must not interleave)
+// One mirror at a time, app-wide: every media file crosses the bridge as a
+// base64 copy, and several projects mirroring at once stacked those copies up.
+let mirrorChain = Promise.resolve();
 
 export function mirrorProjectToDisk(settings, project, lang) {
   if (!window.localFiles?.saveOutput || !project?.id) return Promise.resolve(null);
-  const prev = mirrorQueue.get(project.id) || Promise.resolve();
-  const next = prev.then(() => mirrorOnce(settings, project, lang)).catch(() => null);
-  mirrorQueue.set(project.id, next);
+  const next = mirrorChain.then(() => mirrorOnce(settings, project, lang)).catch(() => null);
+  mirrorChain = next;
   return next;
 }
 

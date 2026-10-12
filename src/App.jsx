@@ -43,6 +43,8 @@ export default function App() {
   );
   const { t } = i18n;
 
+  const mirroredRef = useRef(new Map()); // projectId -> last mirrored object
+
   // Load projects from IndexedDB (with one-time localStorage migration), then
   // absorb any pre-1.4.0 per-project prompts into the shared style library.
   useEffect(() => {
@@ -55,6 +57,10 @@ export default function App() {
         saveStyles(res.styles);
         saveProjects(res.projects);
       }
+      // what was just loaded is already on disk: the mirror follows changes
+      // from here on (re-writing every project at start-up read and sent
+      // gigabytes of media through the bridge each launch)
+      for (const p of res.changed ? res.projects : ps) mirroredRef.current.set(p.id, p);
       setProjectsRaw(res.changed ? res.projects : ps);
       setLoaded(true);
     });
@@ -170,7 +176,6 @@ export default function App() {
   // Electron-only; IndexedDB remains the live source of truth.
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
-  const mirroredRef = useRef(new Map()); // projectId -> last mirrored object
   const mirrorChanged = (ps) => {
     for (const p of ps) {
       if (mirroredRef.current.get(p.id) === p) continue;
