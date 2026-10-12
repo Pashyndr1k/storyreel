@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.16.0 — 2026-10-12
 
 - **Render by episode (assembly).** Render now sits at the right end of the
   control row; a series picks what to export — the whole film, one episode,
