@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.17.0 — 2026-10-12
 
 - **"Short Drama 2" template.** A second short-drama engine, derived from the
   AI Short Drama Production Manual and the articles it cites: six rotating

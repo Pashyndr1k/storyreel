@@ -1,7 +1,7 @@
 {
   "name": "storyreel",
   "productName": "StoryReel",
-  "version": "2.16.0",
+  "version": "2.17.0",
   "private": true,
   "description": "AI assistant for writing short videos: from plot idea to an assembled short film.",
   "author": "StoryReel",
