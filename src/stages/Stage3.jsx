@@ -1,5 +1,6 @@
 import { useAgentScope } from '../lib/agent/registry.js';
-import { BEATS, isShortDrama } from '../lib/shortDrama/rules.js';
+import { isShortDrama } from '../lib/shortDrama/rules.js';
+import { rulesFor } from '../lib/shortDrama/engine.js';
 import DramaCheckModal from '../components/DramaCheckModal.jsx';
 import { planParts, cutsEvery, normalizeCuts, buildPartProject } from '../lib/split.js';
 import { useGenerate } from '../lib/useGenerate.js';
@@ -63,7 +64,7 @@ function Stage3Outline({ project, update, settings, goNext, onSettings, onProjec
     ...(project.seriesPart && Number(s.episode) ? { episode: Number(s.episode) } : {}),
     summary: s.summary || '',
     duration: Number(s.duration_sec) || 20,
-    ...(project.seriesPart && BEATS.includes(String(s.beat || '').toLowerCase()) ? { beat: String(s.beat).toLowerCase() } : {}),
+    ...(project.seriesPart && rulesFor(project).BEATS.includes(String(s.beat || '').toLowerCase()) ? { beat: String(s.beat).toLowerCase() } : {}),
   });
 
   // Inline series: the outline of the whole series, written a few episodes

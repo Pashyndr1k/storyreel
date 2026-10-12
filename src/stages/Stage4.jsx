@@ -1,6 +1,7 @@
 import { useAgentScope } from '../lib/agent/registry.js';
 import { syncShotAssets } from '../lib/storyAssets.js';
-import { BEATS, isShortDrama } from '../lib/shortDrama/rules.js';
+import { isShortDrama } from '../lib/shortDrama/rules.js';
+import { rulesFor } from '../lib/shortDrama/engine.js';
 import DramaCheckModal from '../components/DramaCheckModal.jsx';
 import { SHOT_MIN_SEC, SHOT_MAX_SEC, SHOT_STEP_SEC, EXTENDED_SUBSHOTS } from '../lib/config.js';
 import { takeOf, fitTakeDurations, autoTakeRefs } from '../lib/takes.js';
@@ -62,7 +63,7 @@ const flattenShots = (rawShots) => {
   return { shots, groups };
 };
 
-const mapShots = (rawShots, range = { min: SHOT_MIN_SEC, max: SHOT_MAX_SEC }) =>
+const mapShots = (rawShots, range = { min: SHOT_MIN_SEC, max: SHOT_MAX_SEC }, project = null) =>
   (rawShots || []).map((s) => ({
     id: uid(),
     // Dynamics-plan blocks narrow the allowed range; the global 2-10s rule
@@ -73,7 +74,7 @@ const mapShots = (rawShots, range = { min: SHOT_MIN_SEC, max: SHOT_MAX_SEC }) =>
     action: s.action || '',
     dialogue: s.dialogue || '',
     notes: s.notes || '',
-    ...(BEATS.includes(String(s.beat || '').toLowerCase()) ? { beat: String(s.beat).toLowerCase() } : {}),
+    ...(rulesFor(project).BEATS.includes(String(s.beat || '').toLowerCase()) ? { beat: String(s.beat).toLowerCase() } : {}),
   }));
 
 export default function Stage4({ project, update, settings, goNext, onSettings, onProjectSettings, genLang, styles, scriptStyle, imageStyle, library, libUpsert }) {
@@ -99,7 +100,7 @@ export default function Stage4({ project, update, settings, goNext, onSettings, 
       // an extended shot's segments may be shorter than the rhythm block's
       // range asks of a normal shot — they are cuts inside one generation
       const range = mode === 'extended' ? { min: SHOT_MIN_SEC, max: SHOT_MAX_SEC } : block ? densityRange(block) : undefined;
-      const mapped = mapShots(flat, range);
+      const mapped = mapShots(flat, range, project);
       // extended: each group becomes one H3 take (durations fitted to the
       // take ceiling), rendered with the cast / location / asset references
       const oldIds = new Set((p.sceneDetails[targetSceneId]?.shots || []).map((s) => s.id));

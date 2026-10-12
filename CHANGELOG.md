@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- **"Short Drama 2" template.** A second short-drama engine, derived from the
+  AI Short Drama Production Manual and the articles it cites: six rotating
+  cliffhanger types (revelation, reversal, deadline, intrusion, new arrival,
+  withheld decision), the hook / friction / turn / spike / button beat sheet,
+  the paywall as the last free episode with the twist window around it, 135
+  words a minute, one subject per frame with the face in the top third, and
+  prompt rules written for MiniMax H3 video and Nano Banana 2.1 images. Pick
+  it on the new-project modal; the project's settings show its template; the
+  drama check and the agent's `storyreel_drama_rules` follow the project's
+  engine (`storyreel_create_project { dramaEngine: "v2" }`).
+
 ## 2.16.0 — 2026-10-12
 
 - **Render by episode (assembly).** Render now sits at the right end of the

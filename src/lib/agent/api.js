@@ -27,7 +27,8 @@ import { kreaImageModelOf, kreaVideoModelOf } from '../krea.js';
 import { geminiImageLabel } from '../gemini.js';
 import { h3StepsOf } from '../comfy.js';
 import { planParts, cutsEvery, normalizeCuts, buildPartProject } from '../split.js';
-import { isShortDrama, dramaRulesSummary, DRAMA_CORE, DRAMA_STAGE, DRAMA_FRAME_RULE, seasonLandmarks, HOOK_TYPES, BEATS } from '../shortDrama/rules.js';
+import { isShortDrama } from '../shortDrama/rules.js';
+import { rulesFor } from '../shortDrama/engine.js';
 import { checkProject, autoFixProject, episodesOf } from '../shortDrama/check.js';
 import { dramaFixPrompt } from '../prompts.js';
 import { loadStyles } from '../styles.js';
@@ -179,8 +180,9 @@ function projectView(project, { prompts = false } = {}) {
     ...(isShortDrama(project)
       ? {
           shortDrama: {
+            engine: rulesFor(project).label,
             subgenre: (() => { try { return (loadStyles().drama || []).find((s) => s.id === project.dramaStyleId)?.name || null; } catch { return null; } })(),
-            landmarks: seasonLandmarks(project.seriesPart?.total || project.episodeCount),
+            landmarks: rulesFor(project).seasonLandmarks(project.seriesPart?.total || project.episodeCount),
             episodes: (project.seriesPlan?.episodes || project.seriesPart?.episodes || []).map((e) => ({ number: e.number, title: e.title, hookType: e.hookType || null, goal: e.goal || null, powerStart: e.powerStart || null, powerEnd: e.powerEnd || null, turns: e.turns || [], cliffhanger: e.cliffhanger, question: e.cliffhangerQuestion || null, nextOpensOn: e.firstActionNext || null })),
           },
         }
@@ -482,7 +484,7 @@ async function reviewShot({ projectId, shotId, frames = 6, transcript = false })
                 beat: shot.beat || null,
                 episode: ep?.number || null,
                 position: firstOfEp ? 'first shot of the episode' : lastOfEp ? 'last shot of the episode (hook frame)' : 'inside the episode',
-                frame: 'vertical 9:16: the subject fills the frame, faces and hands carry it; tight singles for dialogue; foreground = power, background = threat; the lower fifth free for captions; at most 4 people in frame',
+                frame: rulesFor(project).frameShort,
                 ...(firstOfEp ? { opening: 'the conflict must be visible in the first frame and the first 3 s — a face, an object or a line, not a setting' } : {}),
                 ...(lastOfEp ? { hook: 'the clip must end on a face holding the unresolved action or line (no fade, no settled state)' } : {}),
                 dialogue: 'spoken lines under 20 words, no em dashes, no voice-over; in the voice clip the words must match the shot text',
@@ -565,7 +567,7 @@ export const TOOLS = [
   },
   {
     name: 'storyreel_create_project',
-    description: 'Create a new project from an idea. scriptType: "short" (10–30 s), "medium" (1–4 min), "long" (5–10 min) or "series" (vertical short drama; give episodeCount). Returns the project id.',
+    description: 'Create a new project from an idea. scriptType: "short" (10–30 s), "medium" (1–4 min), "long" (5–10 min) or "series" (vertical short drama; give episodeCount and, optionally, dramaEngine). Returns the project id.',
     inputSchema: schema(
       {
         title: str('Working title.'),
@@ -574,13 +576,14 @@ export const TOOLS = [
         aspectRatio: { type: 'string', enum: ['16:9', '9:16', '1:1', '4:3', '3:4'] },
         episodeCount: { type: 'integer', minimum: 1, maximum: 200 },
         episodeSeconds: { type: 'integer', enum: [60, 90, 120], description: 'Series: the episode length (default 90).' },
+        dramaEngine: { type: 'string', enum: ['v1', 'v2'], description: 'Series: the template — "v1" Short drama (the craft-guide engine, default) or "v2" Short Drama 2 (the production-manual engine: hook / friction / turn / spike / button, six cliffhanger types, the paywall as the last free episode, written for MiniMax H3 and Nano Banana 2.1).' },
       },
       ['logline']
     ),
-    run: async ({ title, logline, scriptType = 'medium', aspectRatio, episodeCount, episodeSeconds }) => {
+    run: async ({ title, logline, scriptType = 'medium', aspectRatio, episodeCount, episodeSeconds, dramaEngine }) => {
       if (!(logline || '').trim()) fail('BAD_INPUT', 'logline is required.');
       const series = scriptType === 'series';
-      const p = newProject({ title, logline: logline.trim(), scriptType, aspectRatio: aspectRatio || (series ? '9:16' : '16:9'), episodeCount, episodeSeconds, scriptStyleId: series ? SHORT_DRAMA_STYLE_ID : '' });
+      const p = newProject({ title, logline: logline.trim(), scriptType, aspectRatio: aspectRatio || (series ? '9:16' : '16:9'), episodeCount, episodeSeconds, scriptStyleId: series ? SHORT_DRAMA_STYLE_ID : '', dramaEngine: series ? dramaEngine : 'v1' });
       app().addProjects([p]);
       await settle();
       return { projectId: p.id, next: 'storyreel_run_stage with stage 1.' };
@@ -724,12 +727,13 @@ export const TOOLS = [
   },
   {
     name: 'storyreel_drama_rules',
-    description: 'The short-drama conventions the app writes series by (vertical 9:16, 1–2 minute episodes): opening inside 3–5 s, turns every ~30 s, the three hook types and their rotation, the first five episodes, the season landmarks for this project (first win, first reversal, paid checkpoint after the first quarter, mid-season betrayal, climax), dialogue limits, the vertical frame — as data plus the full brief. Read it before judging or fixing a series.',
+    description: 'The short-drama conventions the app writes this series by — the project\'s engine decides which: "Short drama" (v1: opening inside 3–5 s, turns every ~30 s, three hook types, first win, paid checkpoint after the first quarter) or "Short Drama 2" (v2, the production manual: hook / friction / turn / spike / button, six cliffhanger types, the paywall as the last free episode, 135 words a minute, one subject per frame, H3 and Nano Banana prompt rules). Returns the engine, its beats and hook types, the timing grids, the dialogue limits, the landmarks of this project and (brief: true) the full text brief. Read it before judging or fixing a series.',
     inputSchema: schema({ ...PROJECT, brief: { type: 'boolean', description: 'true also returns the full text brief the model is given (long).' } }, ['projectId']),
     run: async ({ projectId, brief }) => {
       const p = projectOf(projectId);
       if (!isShortDrama(p)) fail('NOT_READY', 'This is not a series project; the short-drama rules apply to series only.');
-      return { ...dramaRulesSummary({ ...p, episodeCount: p.seriesPart?.total || p.episodeCount }), beats: BEATS, hookTypes: HOOK_TYPES, ...(brief ? { brief: DRAMA_CORE, stages: DRAMA_STAGE, frame: DRAMA_FRAME_RULE } : {}) };
+      const R = rulesFor(p);
+      return { engine: R.engine, engineLabel: R.label, ...R.dramaRulesSummary({ ...p, episodeCount: p.seriesPart?.total || p.episodeCount }), beats: R.BEATS, hookTypes: R.HOOK_TYPES, hookTag: `${R.tagPrefix} · TYPE`, ...(brief ? { brief: R.DRAMA_CORE, stages: R.DRAMA_STAGE, frame: R.DRAMA_FRAME_RULE } : {}) };
     },
   },
   {
@@ -778,7 +782,7 @@ export const TOOLS = [
           const patch = {};
           for (const [k, f] of [['shotType', 'shot_type'], ['location', 'location'], ['action', 'action'], ['dialogue', 'dialogue'], ['notes', 'notes']]) if (typeof r[f] === 'string' && r[f] !== s[k]) patch[k] = r[f];
           if (r.duration_sec != null) { const d = Math.max(2, Math.min(10, Math.round(Number(r.duration_sec) * 2) / 2)); if (d !== s.duration) patch.duration = d; }
-          if (BEATS.includes(String(r.beat || '').toLowerCase()) && r.beat !== s.beat) patch.beat = String(r.beat).toLowerCase();
+          if (rulesFor(p).BEATS.includes(String(r.beat || '').toLowerCase()) && r.beat !== s.beat) patch.beat = String(r.beat).toLowerCase();
           if (Object.keys(patch).length) changed++;
           return { ...s, ...patch };
         });

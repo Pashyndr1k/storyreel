@@ -160,6 +160,7 @@ export function buildSegmentProject(master, seg, label) {
     episodeCount: total,
     episodeSeconds: clampEpisodeSec(master.episodeSeconds),
     scriptStyleId: master.scriptStyleId,
+    dramaEngine: master.dramaEngine,
   });
   return {
     ...p,

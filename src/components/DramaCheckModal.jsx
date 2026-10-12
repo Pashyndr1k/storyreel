@@ -33,7 +33,9 @@ export default function DramaCheckModal({ project, update, onClose }) {
         <p className="hint">{report.summary}</p>
         {report.landmarks && (
           <p className="hint">
-            {t('drama.landmarks', { w: report.landmarks.firstWinBy, r: report.landmarks.firstReversal, p: report.landmarks.paywall, b: report.landmarks.midBetrayal, c: report.landmarks.climax })}
+            {report.engine === 'v2'
+              ? t('drama.landmarks2', { o: report.landmarks.opponentMove, f: report.landmarks.firstFailure, p: report.landmarks.paywall, a: report.landmarks.twistFrom, b: report.landmarks.twistTo, d: report.landmarks.lowPoint, r: report.landmarks.resolveFrom })
+              : t('drama.landmarks', { w: report.landmarks.firstWinBy, r: report.landmarks.firstReversal, p: report.landmarks.paywall, b: report.landmarks.midBetrayal, c: report.landmarks.climax })}
           </p>
         )}
         {report.episodes.length > 0 && (

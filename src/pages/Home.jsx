@@ -61,7 +61,10 @@ export default function Home({
   };
   const sorted = [...filtered].sort((a, b) => (a.pinned === b.pinned ? order(a, b) : a.pinned ? -1 : 1));
 
-  const create = (title, logline, scriptType, aspectRatio, episodeCount, episodeSeconds = 0) => {
+  const create = (title, logline, type, aspectRatio, episodeCount, episodeSeconds = 0) => {
+    // both drama templates are series projects; the template picks the engine
+    const scriptType = type === 'series2' ? 'series' : type;
+    const dramaEngine = type === 'series2' ? 'v2' : 'v1';
     // a series starts with the Short Drama Series rules from the style library
     const p = newProject({
       title,
@@ -71,8 +74,9 @@ export default function Home({
       episodeCount,
       episodeSeconds,
       scriptStyleId: scriptType === 'series' ? SHORT_DRAMA_STYLE_ID : '',
+      dramaEngine,
     });
-    appLog('project.create', { projectId: p.id, title: p.title, scriptType, aspectRatio, episodeCount: p.episodeCount || 0 });
+    appLog('project.create', { projectId: p.id, title: p.title, scriptType, dramaEngine, aspectRatio, episodeCount: p.episodeCount || 0 });
     setProjects((ps) => [p, ...ps]);
     setShowNew(false);
     onOpen(p.id);

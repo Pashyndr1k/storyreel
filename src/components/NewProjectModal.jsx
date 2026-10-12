@@ -5,8 +5,11 @@ import VoiceButton from './VoiceButton.jsx';
 import AspectSelector from './AspectSelector.jsx';
 import { SERIES_MIN_EPISODES, SERIES_MAX_EPISODES, SERIES_DEFAULT_EPISODES, EPISODE_DEFAULT_SEC, EPISODE_SEC_CHOICES, clampEpisodes } from '../lib/series.js';
 
-// 'series' is the short-drama template: a vertical serial planned by episodes — first in the list
-const TYPES = ['series', 'short', 'medium', 'long'];
+// 'series' is the short-drama template (the craft-guide engine) and 'series2'
+// is "Short Drama 2" (the production-manual engine): vertical serials planned
+// by episodes — first in the list
+const TYPES = ['series', 'series2', 'short', 'medium', 'long'];
+const isSeries = (k) => k === 'series' || k === 'series2';
 
 export default function NewProjectModal({ onCreate, onClose, settings }) {
   const { t } = useI18n();
@@ -18,8 +21,8 @@ export default function NewProjectModal({ onCreate, onClose, settings }) {
   const [epSec, setEpSec] = useState(EPISODE_DEFAULT_SEC); // 60 / 90 / 120 s per episode
   // the series template is vertical; leaving it restores the usual default
   const pickType = (k) => {
-    if (k === 'series' && type !== 'series') setAspect('9:16');
-    if (k !== 'series' && type === 'series') setAspect('16:9');
+    if (isSeries(k) && !isSeries(type)) setAspect('9:16');
+    if (!isSeries(k) && isSeries(type)) setAspect('16:9');
     setType(k);
   };
 
@@ -48,7 +51,7 @@ export default function NewProjectModal({ onCreate, onClose, settings }) {
             </button>
           ))}
         </div>
-        {type === 'series' && (
+        {isSeries(type) && (
           <>
             <label htmlFor="new-episodes">{t('new.episodes')}</label>
             <p className="hint">{t('new.episodesHint')}</p>
@@ -84,7 +87,7 @@ export default function NewProjectModal({ onCreate, onClose, settings }) {
             minRows={5}
             value={logline}
             onChange={(e) => setLogline(e.target.value)}
-            placeholder={t(type === 'series' ? 'new.plotPlaceholderSeries' : 'new.plotPlaceholder')}
+            placeholder={t(isSeries(type) ? 'new.plotPlaceholderSeries' : 'new.plotPlaceholder')}
           />
           <VoiceButton
             settings={settings}
@@ -98,7 +101,7 @@ export default function NewProjectModal({ onCreate, onClose, settings }) {
           <button title={t('tip.create')}
             className="btn primary"
             disabled={!logline.trim()}
-            onClick={() => onCreate(title, logline.trim(), type, aspect, type === 'series' ? clampEpisodes(episodes) : 0, type === 'series' ? epSec : 0)}
+            onClick={() => onCreate(title, logline.trim(), type, aspect, isSeries(type) ? clampEpisodes(episodes) : 0, isSeries(type) ? epSec : 0)}
           >
             {t('new.create')}
           </button>

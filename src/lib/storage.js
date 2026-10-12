@@ -201,6 +201,7 @@ function projectDefaults() {
     seriesPart: null, // series segment project: { parentId, seriesTitle, total, from, to, episodes, … }
     splitCuts: [], // Stage 3 split: scene indices after which a new part starts (lib/split.js)
     breakdownMode: 'normal', // Stage 4: 'normal' shots or 'extended' shots (2–3 camera changes in one H3 take)
+    dramaEngine: 'v1', // series: 'v1' Short drama (craft guide) | 'v2' Short Drama 2 (production manual) — lib/shortDrama/engine.js
     parts: [], // Stage 3 split: parts created as projects [{ from, to, projectId, title }]
     partInfo: null, // on a part project: { parentId, parentTitle, index, total, from, to }
     aspectRatio: '16:9', // image/video aspect ratio: 16:9|4:3|1:1|3:4|9:16
@@ -264,9 +265,10 @@ function projectDefaults() {
 
 const SCRIPT_TYPES = ['short', 'medium', 'long', 'series'];
 
-export function newProject({ title, logline, scriptType, aspectRatio, episodeCount = 0, episodeSeconds = 0, scriptStyleId = '' }) {
+export function newProject({ title, logline, scriptType, aspectRatio, episodeCount = 0, episodeSeconds = 0, scriptStyleId = '', dramaEngine = 'v1' }) {
   return {
     ...projectDefaults(),
+    dramaEngine: dramaEngine === 'v2' ? 'v2' : 'v1',
     title: (title || '').trim() || 'Untitled project',
     logline: logline || '',
     scriptType: SCRIPT_TYPES.includes(scriptType) ? scriptType : 'medium',
@@ -325,6 +327,7 @@ export function migrateProject(raw) {
   p.dramaStyleId = typeof p.dramaStyleId === 'string' ? p.dramaStyleId : '';
   p.parts = Array.isArray(p.parts) ? p.parts : [];
   p.breakdownMode = p.breakdownMode === 'extended' ? 'extended' : 'normal';
+  p.dramaEngine = p.dramaEngine === 'v2' ? 'v2' : 'v1';
   p.partInfo = p.partInfo && typeof p.partInfo === 'object' ? p.partInfo : null;
   p.shotSeedMode = p.shotSeedMode && typeof p.shotSeedMode === 'object' ? p.shotSeedMode : {};
   p.shotVideoEngines = p.shotVideoEngines && typeof p.shotVideoEngines === 'object' ? p.shotVideoEngines : {};

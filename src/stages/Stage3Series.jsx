@@ -1,5 +1,5 @@
 import { useAgentScope } from '../lib/agent/registry.js';
-import { HOOK_TYPES, seasonLandmarks } from '../lib/shortDrama/rules.js';
+import { rulesFor } from '../lib/shortDrama/engine.js';
 import DramaCheckModal from '../components/DramaCheckModal.jsx';
 import { useRef, useState } from 'react';
 import { generateJSON, textKeyError } from '../lib/claude.js';
@@ -131,7 +131,8 @@ export default function Stage3Series({ project, update, settings, onSettings, on
 
   // ---- split into production projects
   const segSize = clampSegment(plan?.segmentSize, planTotal);
-  const landmarks = seasonLandmarks(planTotal);
+  const R = rulesFor(project);
+  const landmarks = R.seasonLandmarks(planTotal);
   const [showCheck, setShowCheck] = useState(false);
   const segs = arcs.length ? planSegments(arcs, planTotal, segSize) : [];
   const createdFor = (s) => (plan?.segments || []).find((x) => x.from === s.from && x.to === s.to && projectExists?.(x.projectId));
@@ -290,8 +291,8 @@ export default function Stage3Series({ project, update, settings, onSettings, on
                       />
                       {/* the short-drama engine: the hook type (editable) and the question the cut leaves */}
                       <div className="row ep-hook">
-                        <span className="seg seg-compact" title={t('drama.hookTip')}>
-                          {HOOK_TYPES.map((h) => (
+                        <span className="seg seg-compact" title={t(R.engine === 'v2' ? 'drama.hookTip2' : 'drama.hookTip')}>
+                          {R.HOOK_TYPES.map((h) => (
                             <button
                               key={h}
                               type="button"
@@ -304,8 +305,9 @@ export default function Stage3Series({ project, update, settings, onSettings, on
                           ))}
                         </span>
                         {ep.cliffhangerQuestion && <span className="hint ep-question" title={t('drama.questionTip')}>? {ep.cliffhangerQuestion}</span>}
-                        {ep.number === landmarks.paywall && <span className="total-badge" title={t('drama.paywallTip')}>{t('drama.paywall')}</span>}
-                        {ep.number <= landmarks.firstWinBy && ep.number === landmarks.firstWinBy && <span className="total-badge" title={t('drama.firstWinTip')}>{t('drama.firstWin')}</span>}
+                        {ep.number === landmarks.paywall && <span className="total-badge" title={t(R.engine === 'v2' ? 'drama.paywallTip2' : 'drama.paywallTip')}>{t(R.engine === 'v2' ? 'drama.paywall2' : 'drama.paywall')}</span>}
+                        {landmarks.firstWinBy && ep.number === landmarks.firstWinBy && <span className="total-badge" title={t('drama.firstWinTip')}>{t('drama.firstWin')}</span>}
+                        {landmarks.twistFrom && ep.number === landmarks.twistFrom && <span className="total-badge" title={t('drama.twistTip', { a: landmarks.twistFrom, b: landmarks.twistTo })}>{t('drama.twist')}</span>}
                       </div>
                     </div>
                   </div>

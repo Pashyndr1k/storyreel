@@ -8,7 +8,8 @@ import { scenePhotos } from './sceneLocations.js';
 import { dynamicsFor, DYNAMICS_RULE } from './shotDynamics.js';
 import { describeShot } from './spatial/describe.js';
 import { episodeRange, clampEpisodes, episodeLine, SHORT_DRAMA_STYLE_ID } from './series.js';
-import { isShortDrama, DRAMA_CORE, DRAMA_STAGE, DRAMA_FRAME_RULE, HOOK_TYPES, OPENING_HOOKS, seasonLandmarks, timingText } from './shortDrama/rules.js';
+import { isShortDrama } from './shortDrama/rules.js';
+import { rulesFor } from './shortDrama/engine.js';
 import { loadStyles, resolveStyleText } from './styles.js';
 import { assetBlock, storyAssetsOf } from './storyAssets.js';
 
@@ -80,24 +81,25 @@ const dramaStyleText = (project) => {
 export function dramaSystem(lang, scriptStyle, project, stage, extra = '') {
   const style = project.scriptStyleId === SHORT_DRAMA_STYLE_ID ? '' : scriptStyle;
   const sub = dramaStyleText(project);
-  const lm = seasonLandmarks(seriesTotal(project));
+  const R = rulesFor(project);
+  const lm = R.seasonLandmarks(seriesTotal(project));
   const r = episodeRange(project);
   return `${system(lang, style)}
 
-${DRAMA_CORE}
+${R.DRAMA_CORE}
 
-THIS SERIES: ${lm.total} episodes of ${r.min}–${r.max} seconds. Landmarks: first win by episode ${lm.firstWinBy}; first reversal around episode ${lm.firstReversal}; PAID CHECKPOINT at episode ${lm.paywall} (the strongest hook so far); mid-season betrayal around episode ${lm.midBetrayal}; climax around episode ${lm.climax}; finale in episode ${lm.finale}.${sub ? `
+${R.landmarksText(lm, r)}${sub ? `
 
 SUB-GENRE BRIEF (colours tone, world and plot types; it never overrides the engine):
 ${sub}` : ''}
 
-${DRAMA_STAGE[stage] || ''}${extra}`;
+${R.DRAMA_STAGE[stage] || ''}${extra}`;
 }
 // Randomization directives (oblique constraints, an auteur lens, a micro-tone,
 // forced variance) shape the execution inside the format, never the format.
 const DRAMA_RANDOM_BRIDGE = `
 
-RANDOMIZATION INSIDE THE FORMAT: any constraint, directorial lens or micro-tone given above shapes the EXECUTION — the specific humiliation, secret, world, voice and imagery — and must be expressed through the engine's beats (opening pressure, turns, hooks, the paid checkpoint, the first win). It never removes the trope, the one-unit episode, the cliffhanger rotation or the dialogue rules. Four directions must still differ in trope, antagonist, secret or relationship.`;
+RANDOMIZATION INSIDE THE FORMAT: any constraint, directorial lens or micro-tone given above shapes the EXECUTION — the specific humiliation, secret, world, voice and imagery — and must be expressed through the engine's beats (the opening pressure, the turns, the hooks, the paywall landmark). It never removes the trope, the one-unit episode, the cliffhanger rotation or the dialogue rules. Four directions must still differ in trope, antagonist, secret or relationship.`;
 
 function characterBlock(project) {
   const chars = project.storyline?.characters || [];
@@ -218,7 +220,8 @@ JSON schema:
 // Series master, step 1: the main sections of the series.
 export function seriesArcsPrompt(project, lang, scriptStyle) {
   const n = seriesTotal(project);
-  const lm = seasonLandmarks(n);
+  const R = rulesFor(project);
+  const lm = R.seasonLandmarks(n);
   const sections = n <= 8 ? '1 or 2 sections' : `one section per roughly 8–12 episodes (a section may run 5–15 episodes; about ${Math.max(2, Math.round(n / 10))} sections in total)`;
   return {
     system: dramaSystem(lang, scriptStyle, project, 'arcs'),
@@ -241,7 +244,7 @@ Break the series into its MAIN SECTIONS — the large movements of the story. Us
 - The sections cover episodes 1 to ${n} with no gaps and no overlaps, in order.
 - Each section is a complete movement with its own antagonist or obstacle and its own escalation.
 - Each section ENDS on an INTERMEDIATE FINALE in its last episode: a major twist, reveal or reversal that closes the movement and opens the next one. The last section ends on the series finale, which resolves everything.
-- The first section contains the wrong done to the protagonist, the inciting incident and the first big reveal.${n >= 12 ? `\n- One section ends EXACTLY at episode ${lm.paywall}, the paid checkpoint: its finale is the strongest hook of the first quarter.` : ''}
+- The first section contains the wrong done to the protagonist, the inciting incident and the first big reveal.${R.arcsNotes(lm, n)}
 
 JSON schema:
 {"arcs":[{"title":"short section title","episode_from":1,"episode_to":10,"summary":"3-5 sentences: what happens across this section, who opposes the protagonist, how the power balance changes","finale":"1-2 sentences: the intermediate finale that ends the section's last episode"}]}`,
@@ -251,15 +254,10 @@ JSON schema:
 // Series master, step 2: the episodes of one section (a chunk of it at a time).
 export function seriesEpisodesPrompt(project, lang, scriptStyle, { arcs, arc, from, to, previous }) {
   const n = seriesTotal(project);
-  const lm = seasonLandmarks(n);
+  const R = rulesFor(project);
+  const lm = R.seasonLandmarks(n);
   const prevHook = (previous || []).length ? String(previous[previous.length - 1].hookType || '').toLowerCase() : '';
-  const hookRules = [];
-  for (let k = from; k <= to; k++) if (OPENING_HOOKS[k - 1]) hookRules.push(`episode ${k} ends on ${OPENING_HOOKS[k - 1].toUpperCase()}`);
-  const drama = `
-- Hook types: ${hookRules.length ? hookRules.join(', ') + '; ' : ''}never the same type in two consecutive episodes${prevHook ? ` (episode ${from - 1} ended on ${prevHook.toUpperCase()})` : ''}. Each episode names its "hook_type".
-- "turns": 2–3 moments where leverage changes or an option is removed, in order; "summary" places them on the timing grid of a ${episodeRange(project).min}–${episodeRange(project).max} s episode (0–5 s the conflict visible, a turn about every 30 s, the hook in the last seconds).
-- "power_start" / "power_end": who holds the power when the episode opens and when it cuts.
-- "cliffhanger" is the exact final image or line at the cut (a face, an action, a line — never a summary); "cliffhanger_question" the one question it leaves; "first_action_next" the first action of the next episode, which answers it before anything new.${from <= lm.firstWinBy && to >= 4 ? `\n- The lead's FIRST GENUINE WIN lands by episode ${lm.firstWinBy}, and the bigger problem behind it is revealed right after.` : ''}${lm.paywall >= from && lm.paywall <= to ? `\n- Episode ${lm.paywall} is the PAID CHECKPOINT: the biggest jaw-drop reveal or reversal so far, on an identity or realisation hook; episode ${lm.paywall - 1} carries the biggest payoff so far.` : ''}${lm.midBetrayal >= from && lm.midBetrayal <= to ? `\n- Episode ${lm.midBetrayal} carries the mid-season betrayal.` : ''}`;
+  const drama = R.episodePlanNotes({ lm, from, to, prevHook, range: episodeRange(project) });
   const arcList = arcs.map((a, i) => `${i + 1}. "${a.title}" — episodes ${a.from}–${a.to}. ${a.summary} Finale: ${a.finale}`).join('\n');
   const prev = (previous || []).length
     ? `The episodes written just before these (continue directly from the last cliffhanger):\n${previous.map(episodeLine).join('\n')}`
@@ -437,9 +435,9 @@ export function stage4Prompt(project, scene, lang, scriptStyle, block, mode = 'n
     const last = ep && sib[sib.length - 1]?.id === scene.id;
     const epSec = sib.reduce((a, x) => a + (Number(x.duration) || 0), 0) || scene.duration;
     const planned = (project.seriesPart?.episodes || project.seriesPlan?.episodes || []).find((e) => Number(e.number) === ep);
-    const hook = planned?.hookType && HOOK_TYPES.includes(planned.hookType) ? planned.hookType.toUpperCase() : null;
-    const note = `\n\nSHORT DRAMA — this scene is${first ? ' the FIRST scene' : ''}${first && last ? ' and' : ''}${last ? ' the LAST scene' : ''}${!first && !last ? ' a middle scene' : ''} of episode ${ep || '?'} (${epSec} s in all). Timing grid of the episode:\n${timingText(epSec)}${first ? '\n- Shot 1 runs at most 5 seconds and shows the conflict (a face, an object, an action), answering the previous cliffhanger through action — no dialogue in it, no slow establishing pan, no recap.' : ''}\n- SHOT 1 OF THIS SCENE HAS NO DIALOGUE: an atmosphere shot of 2–4 seconds (the place, the light, a telling detail or a face) that lets the viewer settle into the new location; the scene's first line is spoken in shot 2.${last ? `\n- The final shot is the hook frame: a face holding the unresolved action or line${planned?.cliffhanger ? ` — "${planned.cliffhanger}"` : ''}; its "notes" end with "HOOK · ${hook || 'IDENTITY / EMOTION / REALISATION'}".` : ''}${planned?.turns?.length ? `\n- Turns of this episode: ${planned.turns.join(' · ')}.` : ''}\n- Every shot names its "beat"; something visibly or emotionally shifts at least every 15 seconds; dialogue lines under 20 words, no em dashes, no voice-over.`;
-    return { system: dramaSystem(lang, scriptStyle, project, 'shots'), note, beat: ',"beat":"open | orient | turn | squeeze | reversal | cliff"' };
+    const R = rulesFor(project);
+    const note = R.shotsSceneNote({ first, last, ep, epSec, planned });
+    return { system: dramaSystem(lang, scriptStyle, project, 'shots'), note, beat: `,"beat":"${R.beatEnum}"` };
   })();
   const dynNote = block
     ? `\n\nACTION DYNAMICS (this scene belongs to rhythm block "${block.block_id}" — these constraints are mandatory):
@@ -495,8 +493,9 @@ const SPATIAL_RULE = `SPATIAL LAYOUT — where a shot has a "spatial_layout", it
 // request of a series, and the engine with the smart edit.
 const withDrama = (fn, extra) => (project, ...rest) => {
   const spec = fn(project, ...rest);
-  return isShortDrama(project) && spec?.system ? { ...spec, system: `${spec.system}\n\n${extra}` } : spec;
+  return isShortDrama(project) && spec?.system ? { ...spec, system: `${spec.system}\n\n${extra(rulesFor(project))}` } : spec;
 };
+const FRAME = (R) => R.DRAMA_FRAME_RULE;
 const spatialOf = (project, scene, shot) => {
   const text = scene?.id ? describeShot(project, scene, shot.id) : '';
   return text ? { spatial_layout: text } : {};
@@ -1368,12 +1367,12 @@ Return exactly one entry per shot, in order.`,
 }
 
 // ---- short-drama wrappers
-export const stage5Prompt = withDrama(stage5Prompt__plain, DRAMA_FRAME_RULE);
-export const stage5VideoPrompt = withDrama(stage5VideoPrompt__plain, DRAMA_FRAME_RULE);
-export const stage5H3VideoPrompt = withDrama(stage5H3VideoPrompt__plain, DRAMA_FRAME_RULE);
-export const stage5KlingVideoPrompt = withDrama(stage5KlingVideoPrompt__plain, DRAMA_FRAME_RULE);
-export const finalFramePrompt = withDrama(finalFramePrompt__plain, DRAMA_FRAME_RULE);
-export const smartEditPrompt = withDrama(smartEditPrompt__plain, `${DRAMA_CORE}\n\n${DRAMA_STAGE.shots}`);
+export const stage5Prompt = withDrama(stage5Prompt__plain, FRAME);
+export const stage5VideoPrompt = withDrama(stage5VideoPrompt__plain, FRAME);
+export const stage5H3VideoPrompt = withDrama(stage5H3VideoPrompt__plain, FRAME);
+export const stage5KlingVideoPrompt = withDrama(stage5KlingVideoPrompt__plain, FRAME);
+export const finalFramePrompt = withDrama(finalFramePrompt__plain, FRAME);
+export const smartEditPrompt = withDrama(smartEditPrompt__plain, (R) => `${R.DRAMA_CORE}\n\n${R.DRAMA_STAGE.shots}`);
 
 // The agent's genre fix: the shots of one scene rewritten to the engine's
 // rules with the listed issues resolved; the same number of shots, in order.

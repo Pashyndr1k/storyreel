@@ -238,7 +238,39 @@ choice (`breakdownMode`); the user is asked the same question in the app.
 
 ## Short drama (series projects)
 
-Every scene of a series opens with a shot WITHOUT dialogue — an atmosphere
+A series runs on one of two engines, chosen when the project is created and
+reported as `shortDrama.engine` by `storyreel_get_project` and as `engine`
+by `storyreel_drama_rules`:
+
+- **Short drama** (`dramaEngine: "v1"`, the default) — the craft-guide
+  engine described below: three hook types (identity / emotion /
+  realisation), beats open / orient / turn / squeeze / reversal / cliff, the
+  first win by episode 5, the paid checkpoint after the first quarter, the
+  last shot of an episode noted `HOOK · TYPE`.
+- **Short Drama 2** (`dramaEngine: "v2"`) — the production-manual engine:
+  six cliffhanger types rotated (revelation / reversal / deadline /
+  intrusion / arrival / withheld), beats hook / friction / turn / spike /
+  button, the paywall as the LAST FREE EPISODE (the strongest reveal of the
+  season so far; the next episode pays it off inside ~10 s) with the big
+  twist two episodes before to one after it, 135 spoken words a minute
+  (lines ≤ 16 words), 2 locations per episode and 3 per series, 1–2
+  characters per scene, shots of 3–6 s with one beat each, no speaking mouth
+  on screen for more than 5 s of one line, one subject per frame with the
+  face in the top third and the bottom third quiet for captions, the last
+  shot noted `CLIFF · TYPE`. Its video prompts are written for MiniMax H3
+  (identity block verbatim, one or two exchanges per clip, ambient under
+  dialogue, no music) and its images for Nano Banana 2.1 (vertical zones
+  stated, the location's immutable detail and key-light direction
+  repeated). Create one with `storyreel_create_project { scriptType:
+  "series", dramaEngine: "v2" }`.
+
+Always read `storyreel_drama_rules` before judging a series: the beats,
+hook types, limits and landmarks you must hold the script to are the
+engine's, not the ones you remember from another project. In a v2 series the
+episode's FIRST scene opens on the hook (which may be a line); only its later
+scenes open on a close detail of the new place without dialogue.
+
+Every scene of a v1 series opens with a shot WITHOUT dialogue — an atmosphere
 shot of 2–4 s (the place, the light, a detail or a face) that lets the
 viewer settle into the new location; the first line comes in the second
 shot. An episode's first scene keeps that opening shot at 5 s or less and

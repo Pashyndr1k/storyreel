@@ -15,6 +15,8 @@ export const HOOK_LABEL = { identity: 'IDENTITY', emotion: 'EMOTION', realisatio
 // the first five episodes end on fixed hook types (SceneMixer)
 export const OPENING_HOOKS = ['identity', 'emotion', 'realisation', 'identity', 'emotion'];
 export const BEATS = ['open', 'orient', 'turn', 'squeeze', 'reversal', 'cliff'];
+// the note the last shot of an episode must carry
+export const HOOK_TAG = /HOOK\s*[·:\-]\s*(IDENTITY|EMOTION|REALISATION|REALIZATION)/i;
 
 // Dialogue limits (phone captions hold 6–8 words a line)
 export const MAX_LINE_WORDS = 20;
@@ -136,3 +138,42 @@ export function dramaRulesSummary(project) {
     timing: { 60: timingGrid(60), 90: timingGrid(90), 120: timingGrid(120) },
   };
 }
+
+// ---------------------------------------------------------------- engine hooks
+// The pieces of prompt text and checker configuration that differ between
+// the two engines (lib/shortDrama/engine.js hands them out as rulesFor()).
+export const TAG_PREFIX = 'HOOK'; // the last shot's note: "HOOK · IDENTITY"
+export const FRAME_SHORT = 'vertical 9:16: the subject fills the frame, faces and hands carry it; tight singles for dialogue; foreground = power, background = threat; the lower fifth free for captions; at most 4 people in frame';
+// the "THIS SERIES" landmark sentence of the system prompt
+export const landmarksText = (lm, r) => `THIS SERIES: ${lm.total} episodes of ${r.min}–${r.max} seconds. Landmarks: first win by episode ${lm.firstWinBy}; first reversal around episode ${lm.firstReversal}; PAID CHECKPOINT at episode ${lm.paywall} (the strongest hook so far); mid-season betrayal around episode ${lm.midBetrayal}; climax around episode ${lm.climax}; finale in episode ${lm.finale}.`;
+// the extra rule of the sections prompt
+export const arcsNotes = (lm, n) => (n >= 12 ? `\n- One section ends EXACTLY at episode ${lm.paywall}, the paid checkpoint: its finale is the strongest hook of the first quarter.` : '');
+// the rules of one chunk of the episode plan (hook rotation and landmarks)
+export function episodePlanNotes({ lm, from, to, prevHook, range }) {
+  const hookRules = [];
+  for (let k = from; k <= to; k++) if (OPENING_HOOKS[k - 1]) hookRules.push(`episode ${k} ends on ${OPENING_HOOKS[k - 1].toUpperCase()}`);
+  return `
+- Hook types: ${hookRules.length ? hookRules.join(', ') + '; ' : ''}never the same type in two consecutive episodes${prevHook ? ` (episode ${from - 1} ended on ${prevHook.toUpperCase()})` : ''}. Each episode names its "hook_type".
+- "turns": 2–3 moments where leverage changes or an option is removed, in order; "summary" places them on the timing grid of a ${range.min}–${range.max} s episode (0–5 s the conflict visible, a turn about every 30 s, the hook in the last seconds).
+- "power_start" / "power_end": who holds the power when the episode opens and when it cuts.
+- "cliffhanger" is the exact final image or line at the cut (a face, an action, a line — never a summary); "cliffhanger_question" the one question it leaves; "first_action_next" the first action of the next episode, which answers it before anything new.${from <= lm.firstWinBy && to >= 4 ? `\n- The lead's FIRST GENUINE WIN lands by episode ${lm.firstWinBy}, and the bigger problem behind it is revealed right after.` : ''}${lm.paywall >= from && lm.paywall <= to ? `\n- Episode ${lm.paywall} is the PAID CHECKPOINT: the biggest jaw-drop reveal or reversal so far, on an identity or realisation hook; episode ${lm.paywall - 1} carries the biggest payoff so far.` : ''}${lm.midBetrayal >= from && lm.midBetrayal <= to ? `\n- Episode ${lm.midBetrayal} carries the mid-season betrayal.` : ''}`;
+}
+// the note of the shot-breakdown prompt: where this scene sits in its episode
+export function shotsSceneNote({ first, last, ep, epSec, planned }) {
+  const hook = planned?.hookType && HOOK_TYPES.includes(planned.hookType) ? HOOK_LABEL[planned.hookType] : null;
+  return `\n\nSHORT DRAMA — this scene is${first ? ' the FIRST scene' : ''}${first && last ? ' and' : ''}${last ? ' the LAST scene' : ''}${!first && !last ? ' a middle scene' : ''} of episode ${ep || '?'} (${epSec} s in all). Timing grid of the episode:\n${timingText(epSec)}${first ? '\n- Shot 1 runs at most 5 seconds and shows the conflict (a face, an object, an action), answering the previous cliffhanger through action — no dialogue in it, no slow establishing pan, no recap.' : ''}\n- SHOT 1 OF THIS SCENE HAS NO DIALOGUE: an atmosphere shot of 2–4 seconds (the place, the light, a telling detail or a face) that lets the viewer settle into the new location; the scene's first line is spoken in shot 2.${last ? `\n- The final shot is the hook frame: a face holding the unresolved action or line${planned?.cliffhanger ? ` — "${planned.cliffhanger}"` : ''}; its "notes" end with "HOOK · ${hook || 'IDENTITY / EMOTION / REALISATION'}".` : ''}${planned?.turns?.length ? `\n- Turns of this episode: ${planned.turns.join(' · ')}.` : ''}\n- Every shot names its "beat"; something visibly or emotionally shifts at least every ${SHOCK_EVERY_SEC} seconds; dialogue lines under ${MAX_LINE_WORDS} words, no em dashes, no voice-over.`;
+}
+// what the deterministic check (check.js) looks for in this engine
+export const CHECK = {
+  hookTypesText: 'identity / emotion / realisation',
+  openBeat: 'open', // the first scene of an episode
+  cliffBeat: 'cliff', // the last scene of an episode
+  turnBeats: ['turn', 'reversal', 'cliff'], // counted as turns
+  quietBeats: ['orient'], // not a shift
+  weakPaywallHooks: ['emotion'],
+  paywallHint: 'an identity or realisation jaw-drop rather than a held emotion',
+  firstWin: true, // the lead wins something by firstWinBy
+  sceneOpensQuiet: true, // every scene's first shot has no dialogue
+  maxLocationsPerSeries: 0, // no series-wide cap
+  maxMouthSec: 0, // no cap on a speaking mouth
+};

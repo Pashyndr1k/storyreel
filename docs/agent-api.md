@@ -195,3 +195,23 @@ grouped in a take, `breakdownMode` on the project). On MiniMax H3
 prompt and the model speaks them.
 
 | `storyreel_h3_rules` | The MiniMax H3 prompt brief (three fields, <d>[English] …</d> direct speech, internal cuts, keyframe format, take / reference conventions). | no |
+
+## Added after 2.16: the "Short Drama 2" engine
+
+A series project carries `dramaEngine`: `"v1"` (Short drama, the craft-guide
+engine, default) or `"v2"` (Short Drama 2, the production-manual engine:
+hook / friction / turn / spike / button beats, six rotating cliffhanger types,
+the paywall as the last free episode, 135 words a minute, one subject per
+frame, prompts written for MiniMax H3 and Nano Banana 2.1).
+
+- `storyreel_create_project` accepts `dramaEngine` (series only).
+- `storyreel_drama_rules` returns `engine`, `engineLabel`, `hookTag`
+  (`HOOK · TYPE` / `CLIFF · TYPE`) and the engine's own beats, hook types,
+  limits, timing grids, landmarks and (`brief: true`) briefs.
+- `storyreel_drama_check` reports with the engine's beat names and limits
+  (`engine` in the report); v2 adds `long-speech` (a speaking mouth on
+  screen for more than 5 s of one line) and `locations-series` (more than
+  three locations across the series); `scene-opens-dialogue` applies to
+  every scene in v1 and to the later scenes of an episode in v2.
+- `storyreel_get_project` → `shortDrama.engine`; `storyreel_review_shot` →
+  `expected.shortDrama.frame` is the engine's frame summary.
