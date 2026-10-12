@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **A crashed window reloads itself.** When the page dies (out of memory on a
+  very large project, a GPU fault) the window no longer stays black: the
+  reason is written to the app log, the page reloads from the last saved
+  state and a dialog says what happened. The page also gets a larger memory
+  limit.
+
 ## 2.17.0 — 2026-10-12
 
 - **"Short Drama 2" template.** A second short-drama engine, derived from the

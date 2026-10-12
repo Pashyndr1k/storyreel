@@ -67,17 +67,28 @@ ipcMain.handle('clipboard-write', (_e, text) => {
 // project itself (project.actionLog → project.md).
 const appLogPath = () => path.join(app.getPath('userData'), 'logs', 'app.log');
 ipcMain.handle('app-log-path', () => appLogPath());
+// The main process writes its own entries (crashes, process exits) the same way.
+function appendAppLog(entry) {
+  const file = appLogPath();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  try {
+    if (fs.statSync(file).size > 2 * 1024 * 1024) fs.renameSync(file, `${file}.1`);
+  } catch {
+    /* no file yet */
+  }
+  const e = entry && typeof entry === 'object' ? entry : { t: Date.now(), action: String(entry) };
+  fs.appendFileSync(file, `${JSON.stringify({ ...e, iso: new Date(e.t || Date.now()).toISOString() })}\n`, 'utf8');
+}
+const mainLog = (action, details = {}) => {
+  try {
+    appendAppLog({ t: Date.now(), by: 'app', action, details });
+  } catch {
+    /* logging never breaks the app */
+  }
+};
 ipcMain.handle('app-log', (_e, entry) => {
   try {
-    const file = appLogPath();
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    try {
-      if (fs.statSync(file).size > 2 * 1024 * 1024) fs.renameSync(file, `${file}.1`);
-    } catch {
-      /* no file yet */
-    }
-    const e = entry && typeof entry === 'object' ? entry : { t: Date.now(), action: String(entry) };
-    fs.appendFileSync(file, `${JSON.stringify({ ...e, iso: new Date(e.t || Date.now()).toISOString() })}\n`, 'utf8');
+    appendAppLog(entry);
     return true;
   } catch {
     return false;
@@ -259,14 +270,49 @@ function createWindow() {
     shell.openExternal(url);
     return { action: 'deny' };
   });
+
+  // A crashed page (out of memory, a GPU fault, a killed renderer) used to
+  // leave the window black until the app was restarted. Log the reason, reload
+  // the page — IndexedDB has the last saved state — and say what happened.
+  win.webContents.on('render-process-gone', (_e, details) => {
+    mainLog('renderer.gone', { reason: details.reason, exitCode: details.exitCode });
+    if (details.reason === 'clean-exit' || win.isDestroyed()) return;
+    setTimeout(() => {
+      if (win.isDestroyed()) return;
+      win.webContents.reload();
+      dialog.showMessageBox(win, {
+        type: 'warning',
+        message: 'The app window crashed and was reloaded.',
+        detail: `Reason: ${details.reason} (exit code ${details.exitCode}). The last saved state is restored; a change made in the final seconds before the crash may be missing. Details are in the app log (Settings → logs).${details.reason === 'oom' ? '\n\nOut of memory: this project carries a lot of media. Removing old image versions (shot history) or splitting the project into parts lowers the load.' : ''}`,
+        buttons: ['OK'],
+        noLink: true,
+      }).catch(() => {});
+    }, 300);
+  });
+  win.webContents.on('unresponsive', () => mainLog('renderer.unresponsive'));
+  win.webContents.on('responsive', () => mainLog('renderer.responsive'));
 }
+
+// Other Chromium processes (the GPU process above all: a crash there also
+// blacks out the window) — log them; a GPU loss repaints after a reload.
+app.on('child-process-gone', (_e, details) => {
+  mainLog('process.gone', { type: details.type, reason: details.reason, exitCode: details.exitCode, name: details.name || '' });
+  if (details.type === 'GPU' && details.reason !== 'clean-exit') {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win && !win.isDestroyed()) setTimeout(() => !win.isDestroyed() && win.webContents.reload(), 500);
+  }
+});
 
 // The local ComfyUI server rejects requests carrying a foreign Origin and
 // sends no CORS headers. For loopback requests only: strip the Origin on the
 // way out and inject permissive CORS headers on the way back, so the renderer
 // can talk to ComfyUI directly. Remote APIs (Anthropic/Gemini) are untouched.
 const LOOPBACK = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//i;
+// The page keeps every project with its media (data URLs) in memory and
+// serialises the open one whole on each save; give V8 room for that.
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=8192');
 app.whenReady().then(() => {
+  mainLog('app.start', { version: app.getVersion(), electron: process.versions.electron });
   // Microphone (voice input): grant media once at the session level so each
   // recording doesn't re-trigger an OS permission prompt. macOS still shows
   // its own one-time system prompt, gated by NSMicrophoneUsageDescription.
