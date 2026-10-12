@@ -341,19 +341,55 @@ export async function exportProjectZip(project, lang) {
 }
 
 // Reassemble a project from an exported ZIP (project.md + media files).
+// The media-free project embedded in a project.md (null when absent).
+export function parseProjectMd(md) {
+  const m = String(md || '').match(/<!--\s*storyreel-project:([A-Za-z0-9+/=]+)\s*-->/);
+  if (!m) return null;
+  const bin = atob(m[1]);
+  const jb = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) jb[i] = bin.charCodeAt(i);
+  return JSON.parse(new TextDecoder().decode(jb));
+}
+// The media file names a lite project refers to ("file:<name>" slots).
+export const mediaRefsOf = (lite) => [...new Set((JSON.stringify(lite).match(/"file:([^"]+)"/g) || []).map((s) => s.slice(6, -1)))];
+
 export async function importProjectZip(bytes) {
   const entries = await readZip(bytes);
   const mdBytes = entries.get('project.md');
   if (!mdBytes) throw new Error('project.md not found in the archive.');
-  const md = new TextDecoder().decode(mdBytes);
-  const m = md.match(/<!--\s*storyreel-project:([A-Za-z0-9+/=]+)\s*-->/);
-  if (!m) throw new Error('The archive does not contain StoryReel project data.');
-  const bin = atob(m[1]);
-  const jb = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) jb[i] = bin.charCodeAt(i);
-  const lite = JSON.parse(new TextDecoder().decode(jb));
+  const lite = parseProjectMd(new TextDecoder().decode(mdBytes));
+  if (!lite) throw new Error('The archive does not contain StoryReel project data.');
   return mergeProjectMedia(lite, (name) => {
     const b = entries.get(name);
     return b ? bytesToDataURL(name, b) : '';
   });
+}
+
+// ---- restore from the mirrored folders (Electron only) ----------------------
+// The folders under the projects directory, as the main process lists them.
+export async function listRestorableFolders(root) {
+  const res = await window.localFiles?.listProjectDirs?.(root);
+  return res?.ok ? res.dirs : [];
+}
+
+// One mirrored folder → a full project (media read file by file, so a large
+// project never has to pass through memory twice). The folder is not changed.
+export async function restoreProjectFromFolder(root, folder, onProgress) {
+  const info = await window.localFiles.readProjectDir(root, folder);
+  if (!info?.ok) throw new Error(info?.error || 'The folder cannot be read.');
+  const lite = parseProjectMd(info.md);
+  if (!lite) throw new Error('project.md carries no project data.');
+  const names = new Set(info.files);
+  const cache = new Map();
+  const refs = mediaRefsOf(lite).filter((n) => names.has(n));
+  for (let i = 0; i < refs.length; i++) {
+    const name = refs[i];
+    const res = await window.localFiles.readProjectFile(root, folder, name);
+    if (res?.ok && res.base64) {
+      const ext = name.slice(name.lastIndexOf('.') + 1).toLowerCase();
+      cache.set(name, `data:${MIME_BY_EXT[ext] || 'application/octet-stream'};base64,${res.base64}`);
+    }
+    onProgress?.(i + 1, refs.length);
+  }
+  return mergeProjectMedia(lite, (name) => cache.get(name) || '');
 }

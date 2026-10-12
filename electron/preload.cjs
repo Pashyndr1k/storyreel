@@ -20,6 +20,9 @@ contextBridge.exposeInMainWorld('localFiles', {
     ipcRenderer.invoke('resolve-project-dir', { root, projectId, folderName }),
   listStrayProjectDirs: (root, projects) => ipcRenderer.invoke('list-stray-project-dirs', { root, projects }),
   deleteProjectDirs: (root, names) => ipcRenderer.invoke('delete-project-dirs', { root, names }),
+  listProjectDirs: (root) => ipcRenderer.invoke('list-project-dirs', { root }),
+  readProjectDir: (root, folder) => ipcRenderer.invoke('read-project-dir', { root, folder }),
+  readProjectFile: (root, folder, name) => ipcRenderer.invoke('read-project-file', { root, folder, name }),
   pickDirectory: (current, title) => ipcRenderer.invoke('pick-directory', { current, title }),
   openDirectory: (dir) => ipcRenderer.invoke('open-directory', dir),
 });

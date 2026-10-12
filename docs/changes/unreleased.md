@@ -167,3 +167,54 @@ the agent guide tells the agent to flag a card that breaks it.
 
 **Files.** `src/lib/shortDrama/{rules,rules2}.js`, `src/lib/prompts.js`,
 `agent/AGENT_GUIDE.md`, `CHANGELOG.md`.
+
+## 3. Home: an inline series was hidden by the nested cards
+
+**Bug.** An inline series (a series written inside one project, never split
+into episode projects) carries `seriesPart` with `parentId` equal to the
+project's own id (`inline: true`). The nested-cards grouping of 2.16.0
+(`src/lib/projectGroups.js`) treated that as "a child whose parent is on the
+page" and hid the card — the project existed in the database but never showed
+on Home, so it looked lost.
+
+**Fix.** `parentIdOf(p)` ignores a parent id equal to the project's own id.
+
+## 4. Restore projects from the project folders
+
+**Why.** The app mirrors every project into
+`<projectsDir>/<title>/` (project.md with the full media-free project
+payload, plus every image, video and audio as a file). That mirror is the
+recovery source when the IndexedDB store loses records (it happened on
+2026-10-11: an external read of the database rebuilt it from the write-ahead
+logs and discarded the compacted tables; see the memory note on never
+opening the app's IndexedDB from another Electron process).
+
+**What the user sees.** Home has a **Restore** button (Electron only, before
+"New project") that opens "Restore projects": every folder under the
+projects directory that holds a project payload, newest first, with the
+title, scene count, size and save time. Folders whose project is already in
+the app are unticked and marked "in the app"; an older folder of a project
+listed above (a pre-rename copy) is marked "older copy" and unticked; a
+folder without an id comes back as a new project. "Select all" / "Select
+none"; "Restore selected" brings the ticked projects back one by one (a
+progress line names the current one, then a log lists the results). A
+restored project keeps its id, dates, stage, parts and media; the folders are
+not changed.
+
+**How.** `electron/projectDirs.cjs`: `listProjectDirs(root)` (skips folders
+starting with "_"), `readProjectDir(root, folder)` (project.md text + media
+file names), `readProjectFile(root, folder, name)` (one file, base64); all
+three refuse paths outside the root. IPC `list-project-dirs`,
+`read-project-dir`, `read-project-file` in `main.cjs`; the preload exposes
+them on `window.localFiles`. `src/lib/projectFiles.js`: `parseProjectMd`
+(shared with the ZIP import), `mediaRefsOf`, `listRestorableFolders`,
+`restoreProjectFromFolder` (reads only the media files the project refers
+to, one at a time, then `mergeProjectMedia`). `RestoreProjectsModal.jsx`;
+Home `restoreProjects` (migrate, keep the id, skip ids already present, log
+`project.restore`). i18n `home.restore`, `tip.restoreProjects`, `rst.*`,
+`tip.rst*` in EN/RU/UK; styles `.rst-*`.
+
+**Files.** `electron/{projectDirs,main,preload}.cjs`,
+`src/lib/{projectFiles,projectGroups}.js`,
+`src/components/RestoreProjectsModal.jsx`, `src/pages/Home.jsx`,
+`src/lib/i18n.js`, `src/styles.css`.

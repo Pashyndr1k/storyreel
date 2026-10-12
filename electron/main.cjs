@@ -5,7 +5,7 @@ const { comfyRequest } = require('./comfyRequest.cjs');
 const { netRequest } = require('./netRequest.cjs');
 const { claudeCliCheck, claudeCliRun } = require('./claudeCli.cjs');
 const { ffmpegVersion, renderJob, cancelActive } = require('./ffmpegRender.cjs');
-const { resolveProjectDir, listStrayDirs, deleteDirs } = require('./projectDirs.cjs');
+const { resolveProjectDir, listStrayDirs, deleteDirs, listProjectDirs, readProjectDir, readProjectFile } = require('./projectDirs.cjs');
 const { createAgentServer } = require('./agentServer.cjs');
 
 // All ComfyUI traffic goes through the main process — renderer fetches carry
@@ -124,6 +124,29 @@ ipcMain.handle('resolve-project-dir', async (_e, { root, projectId, folderName }
 ipcMain.handle('list-stray-project-dirs', async (_e, { root, projects }) => {
   try {
     return { ok: true, dirs: listStrayDirs(root, projects) };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+
+// Restore from the mirrored folders: list them, read one, read one of its files.
+ipcMain.handle('list-project-dirs', async (_e, { root }) => {
+  try {
+    return { ok: true, dirs: listProjectDirs(root) };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+ipcMain.handle('read-project-dir', async (_e, { root, folder }) => {
+  try {
+    return { ok: true, ...readProjectDir(root, folder) };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+ipcMain.handle('read-project-file', async (_e, { root, folder, name }) => {
+  try {
+    return { ok: true, base64: readProjectFile(root, folder, name) };
   } catch (err) {
     return { ok: false, error: String(err) };
   }

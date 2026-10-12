@@ -16,6 +16,13 @@
   screenwriter to cast attractive, contemporary people with striking modern
   details (tattoos, coloured hair, piercings, signature accessories) and
   never a scar or wound as an identifying mark.
+- **Fix: an inline series vanished from Home.** A series written inside one
+  project (never split) was hidden by the nested-cards grouping; it shows
+  again.
+- **Restore projects from their folders.** Home gains a Restore button: the
+  app's own per-project folders (project file plus media) are listed and any
+  project missing from the app can be brought back with its id, parts and
+  media.
 
 ## 2.16.0 — 2026-10-12
 

@@ -132,4 +132,66 @@ function deleteDirs(root, names) {
   return removed;
 }
 
-module.exports = { ID_MARKER, resolveProjectDir, listStrayDirs, deleteDirs, findDirById };
+// Every mirrored project folder under root, with the facts a restore needs.
+// Folders starting with "_" (backups) are skipped; a folder without the
+// project payload in its project.md is reported with hasPayload false.
+function listProjectDirs(root) {
+  const out = [];
+  for (const name of subdirs(root)) {
+    if (name.startsWith('_')) continue;
+    const dir = path.join(root, name);
+    const mdPath = path.join(dir, 'project.md');
+    if (!fs.existsSync(mdPath)) continue;
+    try {
+      const st = fs.statSync(mdPath);
+      const m = fs.readFileSync(mdPath, 'utf8').match(/<!--\s*storyreel-project:([A-Za-z0-9+/=]+)\s*-->/);
+      const lite = m ? JSON.parse(Buffer.from(m[1], 'base64').toString('utf8')) : null;
+      const files = fs.readdirSync(dir).filter((f) => f !== 'project.md' && f !== ID_MARKER);
+      let bytes = st.size;
+      for (const f of files) {
+        try { bytes += fs.statSync(path.join(dir, f)).size; } catch { /* unreadable file: not counted */ }
+      }
+      out.push({
+        folder: name,
+        id: idOf(dir) || (lite && lite.id) || '',
+        hasPayload: !!lite,
+        title: (lite && lite.title) || name,
+        stage: lite ? lite.stage || 0 : 0,
+        scriptType: lite ? lite.scriptType || '' : '',
+        scenes: lite ? (lite.outline || []).length : 0,
+        createdAt: lite ? lite.createdAt || 0 : 0,
+        updatedAt: (lite && lite.updatedAt) || st.mtimeMs,
+        savedAt: st.mtimeMs,
+        files: files.length,
+        bytes,
+      });
+    } catch { /* unreadable folder: skipped */ }
+  }
+  return out;
+}
+
+// A folder name or file name given by the renderer must stay inside root.
+const inside = (root, ...parts) => {
+  const p = path.resolve(root, ...parts);
+  const r = path.resolve(root);
+  if (!p.startsWith(r + path.sep)) throw new Error('Path outside the projects folder.');
+  return p;
+};
+
+// The project file of a mirrored folder plus the names of its media files.
+function readProjectDir(root, folder) {
+  const dir = inside(root, folder);
+  const md = fs.readFileSync(path.join(dir, 'project.md'), 'utf8');
+  const files = fs.readdirSync(dir).filter((f) => f !== 'project.md' && f !== ID_MARKER && fs.statSync(path.join(dir, f)).isFile());
+  return { md, files };
+}
+
+// One media file of a mirrored folder, base64.
+function readProjectFile(root, folder, name) {
+  return fs.readFileSync(inside(root, folder, name)).toString('base64');
+}
+
+module.exports = {
+  listProjectDirs,
+  readProjectDir,
+  readProjectFile, ID_MARKER, resolveProjectDir, listStrayDirs, deleteDirs, findDirById };

@@ -2,7 +2,12 @@
 // into episode projects (project.seriesPart on the children) or a project
 // split into parts at Stage 3 (project.partInfo) — show on the Home page as
 // one card that opens to reveal the projects inside it.
-export const parentIdOf = (p) => p?.seriesPart?.parentId || p?.partInfo?.parentId || null;
+// An inline series (written inside one project, never split) carries a
+// seriesPart that points at the project itself: that is not a parent.
+export const parentIdOf = (p) => {
+  const id = p?.seriesPart?.parentId || p?.partInfo?.parentId || null;
+  return id && id !== p?.id ? id : null;
+};
 
 // Where a child sits in its parent: { kind: 'episodes' | 'scenes', from, to, index?, total }
 export function childSpan(p) {
