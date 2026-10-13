@@ -4,7 +4,7 @@ import Archive from './pages/Archive.jsx';
 import Project from './pages/Project.jsx';
 import LibraryPage from './pages/LibraryPage.jsx';
 import StylesPage from './pages/StylesPage.jsx';
-import { loadLibrary, persistLibraryEntry, deleteLibraryEntry } from './lib/library.js';
+import { loadLibrary, persistLibraryEntry, deleteLibraryEntry, rebuildLibraryFromProjects } from './lib/library.js';
 import SettingsModal from './components/SettingsModal.jsx';
 import PolicyNotice from './components/PolicyNotice.jsx';
 import { POLICY_EVENT } from './lib/policy.js';
@@ -28,6 +28,7 @@ export default function App() {
   const [settings, setSettings] = useState(loadSettings);
   const [styles, setStyles] = useState(loadStyles);
   const [library, setLibrary] = useState([]);
+  const [libLoaded, setLibLoaded] = useState(false);
   const [route, setRoute] = useState({ name: 'home' });
   const [showSettings, setShowSettings] = useState(false);
   const [updateInfo, setUpdateInfo] = useState(null);
@@ -88,11 +89,29 @@ export default function App() {
   // Character/location library (IndexedDB, write-through).
   useEffect(() => {
     let alive = true;
-    loadLibrary().then((rows) => alive && setLibrary(rows));
+    loadLibrary().then((rows) => {
+      if (!alive) return;
+      setLibrary(rows);
+      setLibLoaded(true);
+    });
     return () => {
       alive = false;
     };
   }, []);
+
+  // A project the library holds nothing for (its entries lost, or made before
+  // the library existed) gets the entries its cards imply — characters,
+  // locations and story assets with photos — so shots that reference them by
+  // id and the asset picker work again.
+  useEffect(() => {
+    if (!loaded || !libLoaded) return;
+    const add = rebuildLibraryFromProjects(projects, library);
+    if (!add.length) return;
+    appLog('library.rebuild', { entries: add.length, projects: [...new Set(add.map((e) => e.projectId))].length });
+    setLibrary((prev) => [...prev, ...add.filter((e) => !prev.some((x) => x.id === e.id))]);
+    for (const e of add) persistLibraryEntry(e);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, libLoaded]);
 
   const libUpsert = (entry) => {
     setLibrary((prev) => {

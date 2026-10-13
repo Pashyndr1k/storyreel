@@ -119,3 +119,38 @@ Already-uploaded shots keep their stale clip until the video is uploaded
 again (or the clip is deleted on the timeline and the shot unmuted).
 
 **Files.** `electron/ffmpegRender.cjs`, `src/stages/Stage5.jsx`.
+
+## 4. The library rebuilds itself from the projects
+
+**Report.** The Assets Library (and the character / location libraries)
+showed only the entries of "Ninety Seconds at Harlan's"; the assets of
+every other project could not be picked for a shot.
+
+**Cause.** The global library lives in the IndexedDB `library` store, which
+was lost with the tables on 2026-10-11 (see the memory note); the restore
+from the project folders brought back each project's own cards (characters,
+story assets, scene locations with their photos) but not the library
+entries that mirror them — those are written only when a card changes
+(`useLibrarySync`). Only entries written after the loss existed.
+
+**Behaviour now.** Once projects and library are loaded, the app adds back,
+for every project the library holds nothing for, the entries its cards
+imply: characters and scene locations that carry a `libId` and photos,
+and every story asset with photos (`liba_<projectId>_<assetId>`), with the
+project as owner and the project's creation date. Entries keep their
+original ids, so shots that reference assets by id (`shotAssets`) work
+again. A project that still owns at least one entry is left alone, so an
+entry the user removed on purpose does not come back. The rebuild is
+logged (`library.rebuild` with the counts).
+
+**How.** `src/lib/library.js`: `impliedLibraryEntries(project)` and
+`rebuildLibraryFromProjects(projects, library)`; `src/App.jsx` runs the
+rebuild in an effect gated on both loads (`libLoaded`), persisting each
+new entry.
+
+**Verified** in the dev app: a project with a character, a story asset and
+a scene location (all with photos) and no library entries got three
+entries after a reload; a second project that already owned one entry was
+left unchanged.
+
+**Files.** `src/lib/library.js`, `src/App.jsx`.

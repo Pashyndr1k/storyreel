@@ -18,6 +18,10 @@
 - **Uploaded videos bring their sound.** Uploading a video for a shot now
   puts its soundtrack on the H3 lane in place of the previous generation's
   clip, so the old take no longer plays over the new picture.
+- **The library rebuilds itself.** A project the global library holds no
+  entries for gets them back from its own cards (characters, story assets
+  and locations with photos), so the asset picker and the libraries show
+  every project again after a lost library store.
 
 ## 2.17.0 — 2026-10-12
 

@@ -4,6 +4,8 @@
 import { idbLibGetAll, idbLibPut, idbLibDelete } from './idb.js';
 import { uid } from './storage.js';
 import { MAX_LOCATION_PHOTOS, MAX_LIBRARY_PHOTOS } from './config.js';
+import { locationsOf } from './sceneLocations.js';
+import { storyAssetLibId } from './storyAssets.js';
 
 export const libraryPhotoCap = (kind) => (kind === 'location' ? MAX_LOCATION_PHOTOS : MAX_LIBRARY_PHOTOS);
 
@@ -80,4 +82,54 @@ export function sortLibrary(entries, mode) {
     list.sort((a, b) => b.createdAt - a.createdAt);
   }
   return list;
+}
+
+// ---- rebuild from the projects -------------------------------------------
+// The library mirrors the projects' cards (useLibrarySync): a character or
+// location with a libId and photos, and every story asset with photos, has
+// an entry. These are the entries a project implies — what a lost library
+// store can be rebuilt from.
+export function impliedLibraryEntries(project) {
+  const out = [];
+  const base = (id, kind, name, description, photos) => ({
+    ...newLibraryEntry(kind),
+    id,
+    name: name || '',
+    description: description || '',
+    photos: (photos || []).slice(0, libraryPhotoCap(kind)),
+    projectId: project.id,
+    projectTitle: project.title || '',
+    createdAt: project.createdAt || Date.now(),
+  });
+  for (const c of project.storyline?.characters || []) {
+    if (c.libId && (c.photos || []).length) out.push(base(c.libId, 'character', c.name, c.description, c.photos));
+  }
+  for (const a of project.storyline?.assets || []) {
+    if ((a.photos || []).length) out.push(base(storyAssetLibId(project, a), 'asset', a.name, a.description, a.photos));
+  }
+  for (const s of project.outline || []) {
+    for (const l of locationsOf(s)) {
+      if (l.libId && (l.photos || []).length) out.push(base(l.libId, 'location', l.name, s.summary, l.photos));
+    }
+  }
+  return out;
+}
+
+// The entries to add back for projects the library knows nothing about — a
+// project with at least one entry keeps its state (an entry the user removed
+// on purpose stays removed); a project with none gets every entry its cards
+// imply. Returns the new entries, none already present.
+export function rebuildLibraryFromProjects(projects, library) {
+  const have = new Set((library || []).map((e) => e.id));
+  const owners = new Set((library || []).map((e) => e.projectId).filter(Boolean));
+  const out = [];
+  for (const p of projects || []) {
+    if (!p || owners.has(p.id)) continue;
+    for (const e of impliedLibraryEntries(p)) {
+      if (have.has(e.id)) continue;
+      have.add(e.id);
+      out.push(e);
+    }
+  }
+  return out;
 }
