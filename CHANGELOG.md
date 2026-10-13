@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.18.0 — 2026-10-13
 
 - **A crashed window reloads itself.** When the page dies (out of memory on a
   very large project, a GPU fault) the window no longer stays black: the
