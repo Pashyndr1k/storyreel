@@ -3,7 +3,7 @@ import { sortLibrary } from '../lib/library.js';
 
 // Modal for picking a character/location from the global library
 // (used by the Stage 2 / Stage 4 photo-upload flows).
-export default function LibraryPicker({ kind, library, onPick, onClose }) {
+export default function LibraryPicker({ kind, library, onPick, onClose, emptyText = '' }) {
   const { t } = useI18n();
   const entries = sortLibrary(
     (library || []).filter((e) => e.kind === kind && e.photos.length),
@@ -15,7 +15,7 @@ export default function LibraryPicker({ kind, library, onPick, onClose }) {
       <div className="modal wide" onClick={(e) => e.stopPropagation()}>
         <h2 title={t('tip.pickTitle')}>{t(`pick.title_${kind}`)}</h2>
         {entries.length === 0 ? (
-          <p className="hint">{t('lib.empty')}</p>
+          <p className="hint">{emptyText || t('lib.empty')}</p>
         ) : (
           <div className="lib-pick-grid">
             {entries.map((e) => (

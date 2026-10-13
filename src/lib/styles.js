@@ -287,6 +287,15 @@ function persist(styles) {
   localStorage.setItem(STYLES_KEY, JSON.stringify({ version: STYLES_VERSION, styles: normalize(styles) }));
 }
 
+// Whether the browser store holds styles at all (a fresh profile does not).
+export const hasStoredStyles = () => {
+  try {
+    return localStorage.getItem(STYLES_KEY) != null;
+  } catch {
+    return false;
+  }
+};
+
 export function loadStyles() {
   let raw;
   try {

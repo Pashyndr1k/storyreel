@@ -3106,13 +3106,15 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
           library={library}
           libUpsert={libUpsert}
           libDelete={libDelete}
+          project={project}
           onClose={() => setShowAssets(false)}
         />
       )}
       {assetPickFor && (
         <LibraryPicker
           kind="asset"
-          library={library}
+          library={(library || []).filter((e) => e.projectId === project.id)}
+          emptyText={t('pick.assetEmpty')}
           onPick={(entry) => attachAsset(assetPickFor, entry.id)}
           onClose={() => setAssetPickFor(null)}
         />

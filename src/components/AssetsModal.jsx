@@ -1,21 +1,27 @@
 import { useState } from 'react';
 import { useI18n } from '../lib/i18n.js';
 import { newLibraryEntry, sortLibrary } from '../lib/library.js';
+import { uid } from '../lib/storage.js';
 import { fileToResizedDataURL } from '../lib/images.js';
 import AutoTextarea from './AutoTextarea.jsx';
 import { Upload } from './icons.jsx';
 import Lightbox from './Lightbox.jsx';
 
-// Pop-up manager for the global ASSET library (logos, props, wardrobe, UI
+// Pop-up manager for the ASSET library (logos, props, wardrobe, UI
 // screenshots…). Same shape as the character/location library entries, but
-// asset-focused: name, description and up to three reference images. Assets are
-// shared across projects and attached to individual shots on Stage 5.
-export default function AssetsModal({ library, libUpsert, libDelete, onClose }) {
+// asset-focused: name, description and up to three reference images. Every
+// asset belongs to a project: a shot can attach only its own project's assets
+// (Stage 5); an asset of another project is copied into this one here.
+export default function AssetsModal({ library, libUpsert, libDelete, onClose, project = null }) {
   const { t } = useI18n();
   const [editing, setEditing] = useState(null);
   const [lightbox, setLightbox] = useState(null); // full-size image pop-up
+  const [scope, setScope] = useState(project ? 'project' : 'all'); // 'project' | 'all'
 
-  const assets = sortLibrary((library || []).filter((e) => e.kind === 'asset'), 'date');
+  const all = sortLibrary((library || []).filter((e) => e.kind === 'asset'), 'date');
+  const mine = (e) => !!project && e.projectId === project.id;
+  const assets = scope === 'project' ? all.filter(mine) : all;
+  const copyHere = (a) => libUpsert({ ...a, id: 'lib_' + uid(), projectId: project.id, projectTitle: project.title, createdAt: Date.now() });
 
   const addPhoto = async (file) => {
     try {
@@ -36,11 +42,20 @@ export default function AssetsModal({ library, libUpsert, libDelete, onClose }) 
       <div className="modal wide" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head-row">
           <h2 title={t('tip.assetLib')}>{t('asset.libTitle')}</h2>
-          <button title={t('tip.assetAdd')} className="btn small primary" onClick={() => setEditing(newLibraryEntry('asset'))}>
+          <button title={t('tip.assetAdd')} className="btn small primary" onClick={() => setEditing({ ...newLibraryEntry('asset'), projectId: project?.id || '', projectTitle: project?.title || '' })}>
             {t('asset.add')}
           </button>
         </div>
         <p className="hint">{t('asset.libDesc')}</p>
+        {project && (
+          <span className="seg seg-compact" role="radiogroup" aria-label={t('tip.assetScope')} title={t('tip.assetScope')}>
+            {['project', 'all'].map((s) => (
+              <button key={s} type="button" role="radio" aria-checked={scope === s} className={`seg-btn ${scope === s ? 'on' : ''}`} title={t(`tip.assetScope_${s}`)} onClick={() => setScope(s)}>
+                {t(`asset.scope_${s}`)}
+              </button>
+            ))}
+          </span>
+        )}
 
         {assets.length === 0 ? (
           <p className="hint">{t('asset.empty')}</p>
@@ -57,7 +72,11 @@ export default function AssetsModal({ library, libUpsert, libDelete, onClose }) 
                 </div>
                 <strong className="asset-name">{a.name || t('asset.untitled')}</strong>
                 {a.description && <p className="asset-desc">{a.description}</p>}
+                {project && !mine(a) && <span className="sr-tag muted" title={t('ind.libProject')}>{a.projectTitle || t('asset.noProject')}</span>}
                 <div className="row">
+                  {project && !mine(a) && (
+                    <button title={t('tip.assetCopyHere')} className="btn tiny primary" onClick={() => copyHere(a)}>{t('asset.copyHere')}</button>
+                  )}
                   <button title={t('tip.edit')} className="btn tiny" onClick={() => setEditing({ ...a })}>{t('styles.edit')}</button>
                   <button title={t('tip.delete')}
                     className="btn tiny danger"

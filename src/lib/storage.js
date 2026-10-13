@@ -165,6 +165,15 @@ function revealKey(value) {
   }
 }
 
+// Whether the browser store holds settings at all (a fresh profile does not).
+export const hasStoredSettings = () => {
+  try {
+    return localStorage.getItem(SETTINGS_KEY) != null;
+  } catch {
+    return false;
+  }
+};
+
 export function loadSettings() {
   const defaults = {
     apiKey: '',

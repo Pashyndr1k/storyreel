@@ -22,6 +22,15 @@
   entries for gets them back from its own cards (characters, story assets
   and locations with photos), so the asset picker and the libraries show
   every project again after a lost library store.
+- **The vault.** The library (characters, locations, assets with their
+  photos), the styles and the settings (without the API keys) are kept as
+  files under the projects folder and come back from there when the
+  browser stores are lost — the same protection the project folders already
+  gave the projects.
+- **Assets belong to a project.** The asset picker on Stage 5 offers only
+  this project's assets; the Assets library shows this project by default,
+  can show every project, and copies an asset of another project into this
+  one.
 
 ## 2.17.0 — 2026-10-12
 

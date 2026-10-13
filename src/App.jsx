@@ -11,8 +11,9 @@ import { POLICY_EVENT } from './lib/policy.js';
 import { useAgentScope } from './lib/agent/registry.js';
 import { callAgent, toolList } from './lib/agent/api.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
-import { loadProjects, saveProjects, loadSettings, saveSettings } from './lib/storage.js';
-import { loadStyles, saveStyles, absorbLegacyStyles } from './lib/styles.js';
+import { loadProjects, saveProjects, loadSettings, saveSettings, hasStoredSettings } from './lib/storage.js';
+import { vaultAvailable, vaultRoot, vaultReadLibrary, vaultWriteLibrary, vaultReadJson, vaultWriteJson, settingsForVault } from './lib/vault.js';
+import { loadStyles, saveStyles, absorbLegacyStyles, hasStoredStyles } from './lib/styles.js';
 import { checkForUpdate } from './lib/updateCheck.js';
 import { mirrorProjectToDisk } from './lib/projectFiles.js';
 import { I18nContext, createT } from './lib/i18n.js';
@@ -29,6 +30,7 @@ export default function App() {
   const [styles, setStyles] = useState(loadStyles);
   const [library, setLibrary] = useState([]);
   const [libLoaded, setLibLoaded] = useState(false);
+  const [vaultChecked, setVaultChecked] = useState(false); // the vault's start-up pass ran (lib/vault.js)
   const [route, setRoute] = useState({ name: 'home' });
   const [showSettings, setShowSettings] = useState(false);
   const [updateInfo, setUpdateInfo] = useState(null);
@@ -104,14 +106,14 @@ export default function App() {
   // locations and story assets with photos — so shots that reference them by
   // id and the asset picker work again.
   useEffect(() => {
-    if (!loaded || !libLoaded) return;
+    if (!loaded || !libLoaded || !vaultChecked) return;
     const add = rebuildLibraryFromProjects(projects, library);
     if (!add.length) return;
     appLog('library.rebuild', { entries: add.length, projects: [...new Set(add.map((e) => e.projectId))].length });
     setLibrary((prev) => [...prev, ...add.filter((e) => !prev.some((x) => x.id === e.id))]);
     for (const e of add) persistLibraryEntry(e);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, libLoaded]);
+  }, [loaded, libLoaded, vaultChecked]);
 
   const libUpsert = (entry) => {
     setLibrary((prev) => {
@@ -238,6 +240,76 @@ export default function App() {
       document.removeEventListener('visibilitychange', onVis);
     };
   }, []);
+
+  // ---- the vault (lib/vault.js): the library, the styles and the settings as
+  // files under the projects directory — what the browser stores come back
+  // from when they are lost. Start-up: restore what is missing (an empty
+  // library store with a vault → the vault's entries; no stored styles or
+  // settings → the vault's copies) or create the vault; then every change
+  // goes to the vault once it settles.
+  const libraryRef = useRef(library);
+  libraryRef.current = library;
+  const vaultTimer = useRef(null);
+  const vaultArmed = useRef(false);
+  useEffect(() => {
+    if (!libLoaded) return;
+    if (!vaultAvailable()) {
+      setVaultChecked(true);
+      return;
+    }
+    (async () => {
+      const root = vaultRoot(settingsRef.current);
+      try {
+        const stored = await vaultReadLibrary(root, { withPhotos: false });
+        if (stored === null) {
+          await vaultWriteLibrary(root, libraryRef.current);
+        } else if (!libraryRef.current.length && stored.length) {
+          const full = await vaultReadLibrary(root);
+          appLog('library.restoreVault', { entries: full.length });
+          setLibrary(full);
+          for (const e of full) persistLibraryEntry(e);
+        }
+        if (!hasStoredStyles()) {
+          const s = await vaultReadJson(root, 'styles.json');
+          if (s) {
+            appLog('styles.restoreVault');
+            setStyles(s);
+          }
+        }
+        if (!hasStoredSettings()) {
+          const s = await vaultReadJson(root, 'settings.json');
+          if (s) {
+            appLog('settings.restoreVault');
+            setSettings((cur) => ({ ...cur, ...s }));
+          }
+        }
+      } catch (e) {
+        console.error('vault start-up failed', e);
+      }
+      setVaultChecked(true);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [libLoaded]);
+  useEffect(() => {
+    if (!vaultChecked || !vaultAvailable()) return;
+    // the state at the end of the start-up pass is already in the vault
+    if (!vaultArmed.current) {
+      vaultArmed.current = true;
+      return;
+    }
+    clearTimeout(vaultTimer.current);
+    vaultTimer.current = setTimeout(() => vaultWriteLibrary(vaultRoot(settingsRef.current), libraryRef.current).catch(() => {}), 1500);
+    return () => clearTimeout(vaultTimer.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [library, vaultChecked]);
+  useEffect(() => {
+    if (!vaultChecked || !vaultAvailable()) return;
+    vaultWriteJson(vaultRoot(settings), 'styles.json', styles).catch(() => {});
+  }, [styles, vaultChecked]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!vaultChecked || !vaultAvailable()) return;
+    vaultWriteJson(vaultRoot(settings), 'settings.json', settingsForVault(settings)).catch(() => {});
+  }, [settings, vaultChecked]);
 
   useEffect(() => saveSettings(settings), [settings]);
   // A generation refused by the active content policy reports here.

@@ -154,3 +154,74 @@ entries after a reload; a second project that already owned one entry was
 left unchanged.
 
 **Files.** `src/lib/library.js`, `src/App.jsx`.
+
+## 5. The vault: library, styles and settings as files; per-project assets
+
+**Request.** Find out what else the 2026-10-11 database loss affected, build
+a system that prevents such losses, and make assets per project: the asset
+picker for image generation must not offer other projects' assets.
+
+**What the loss touched (inventory).** The app keeps: IndexedDB
+`projects` (lost; restored from the per-project folders), `media` (new in
+this version), `library` (lost; rebuilt from the projects' cards — see §4 —
+except what no project implies: entries created directly in the Library
+pages or the Assets library with no project, entries whose project had been
+deleted, and library-side edits such as a type or extra photos added in the
+library rather than on the card); localStorage `storyreel.settings.v1`,
+`storyreel.styles.v1`, `storyreel.homeSort.v1` (untouched); on disk
+`agent.json`, `logs/app.log`, the project folders and the outputs
+(untouched). The rebuilt database also carries the July record of "I've
+Been Everywhere" that came back from an old write-ahead log — a second,
+older copy of that project.
+
+**The vault (`src/lib/vault.js`).** Electron only. Under the projects
+directory, next to the project folders:
+- `_library/library.json` + `_library/<entryId>_<i>.<ext>`: every library
+  entry (characters, locations, assets) with its photos as files. Written
+  1.5 s after the library settles following any change; created at the
+  first start that finds none. Photo files are written once per session
+  (same name and byte length = same photo).
+- `_settings/styles.json`, `_settings/settings.json`: the styles library
+  and the settings, written on every change. The API keys are left out of
+  the settings copy (they stay in the OS-encrypted store only).
+- **Start-up restore.** After the library store is read: a vault with
+  entries and an empty store → the vault's entries are loaded and persisted
+  (`library.restoreVault`); no stored styles or settings (a fresh profile)
+  → the vault's copies are used (`styles.restoreVault`,
+  `settings.restoreVault`). The card rebuild of §4 runs after this pass
+  (`vaultChecked`), so vault entries win and the rebuild fills only what
+  is still missing. `hasStoredStyles` / `hasStoredSettings` tell a fresh
+  profile from a stored one.
+- The folder scanner of the Restore window skips `_`-prefixed folders, so
+  the vault never shows up as a project.
+
+**Per-project assets.**
+- Stage 5's asset picker ("Add from assets library") lists only entries
+  whose `projectId` is this project; the empty state explains where
+  assets come from. Uploads from a shot and story assets synced from
+  Stage 2 already carry the project id.
+- The Assets library window takes the project: a scope selector "This
+  project" (default) / "All projects"; in "All projects" an asset of
+  another project shows its owner and a **Copy here** button that makes a
+  copy owned by this project (new id); "+ Add asset" inside a project
+  creates the asset for that project. The description text says each
+  project has its own assets.
+- `LibraryPicker` takes `emptyText`.
+
+**i18n.** `asset.libDesc` reworded; `asset.scope_project`,
+`asset.scope_all`, `asset.copyHere`, `asset.noProject`,
+`tip.assetScope`, `tip.assetScope_project`, `tip.assetScope_all`,
+`tip.assetCopyHere`, `pick.assetEmpty` in EN/RU/UK.
+
+**Verified.** `vault.js` against an in-memory bridge: write → files
+(`library.json` + one file per photo), read back identical, photo-free
+read for the start-up check, settings copy without the keys, missing
+files → null. In the dev app: the Assets library opens on "This project"
+with the project's own asset, "All projects" lists the others with their
+owner (or "no project") and a Copy here button, and the copy is a new entry
+owned by this project that then shows under "This project". The picker
+filters with the same predicate (`projectId === project.id`).
+
+**Files.** `src/lib/{vault,storage,styles}.js`, `src/App.jsx`,
+`src/components/{AssetsModal,LibraryPicker}.jsx`, `src/stages/Stage5.jsx`,
+`src/lib/i18n.js`.
