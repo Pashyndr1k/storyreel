@@ -204,3 +204,26 @@ the returned frame became a new version and the strokes were cleared.
 **Files.** `src/components/MarkupCanvas.jsx`, `src/components/icons.jsx`,
 `src/lib/{images,storage,projectFiles}.js`,
 `src/stages/{Stage5,Stage6}.jsx`, `src/lib/i18n.js`, `src/styles.css`.
+
+## 5. Stage 1: the plot tools as one row of chips
+
+**Request.** Make all randomization tools compact, on one line under the
+brief plot description.
+
+**Behaviour.** The two card grids (Randomize, Unconventional plot) are one
+row of toggle chips under the brief: "Randomize 0/2 · Oblique · Auteur ·
+Mashup · Variance" and "Unconventional 0/6 · Sample space · Subversion ·
+Writing rules · Story dice · Structure die · Interview". A chip's hover hint
+carries the full name and the explanation the cards used to show; the group
+labels carry the old titles. The randomization limit (two, the oldest
+dropped) is unchanged. The story dice, structure die and interview panels
+appear under the row only while their chip is on; the row wraps on a narrow
+window.
+
+**How.** `RandomizationSelector` and `OriginalitySelector` render chips
+(`.tool-group`, `.tool-chip`); `OriginalityPanels` (same file) renders the
+three panels; Stage 1 lays them out in `.plot-tools`. i18n `rand.short`,
+`rand.short_*`, `orig.short`, `orig.short_*` in EN/RU/UK.
+
+**Files.** `src/components/{RandomizationSelector,OriginalitySelector}.jsx`,
+`src/stages/Stage1.jsx`, `src/styles.css`, `src/lib/i18n.js`.

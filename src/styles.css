@@ -4235,3 +4235,27 @@ select.prompt-model:hover:not(:disabled) { border-color: var(--ink); color: var(
 .pv-ctrl.mark-ctrl button.mark-erase-btn { width: auto; padding: 0 8px; gap: 4px; }
 .pv-ctrl.mark-ctrl button.mark-erase-btn span { font-size: 11.5px; }
 .asm-preview .mark-hint { bottom: 48px; }
+
+/* ---- Stage 1: the plot tools as one row of chips ---- */
+.plot-tools { display: flex; flex-wrap: nowrap; align-items: center; gap: 14px; margin: 6px 0 14px; overflow-x: auto; scrollbar-width: thin; padding-bottom: 2px; }
+.tool-group { display: inline-flex; flex-wrap: nowrap; align-items: center; gap: 3px; flex: none; }
+.tool-group-label { display: inline-flex; align-items: center; gap: 4px; margin-right: 3px; color: var(--muted); font-size: 11.5px; font-weight: 600; white-space: nowrap; cursor: help; }
+.tool-group-label svg { color: var(--accent); }
+.tool-count { font-variant-numeric: tabular-nums; color: var(--muted-2); font-weight: 500; }
+.tool-chip {
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 11.5px;
+  line-height: 1.3;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: 0.15s;
+}
+.tool-chip:hover { background: var(--hover-bg); }
+.tool-chip.on { background: rgba(var(--accent-rgb), 0.18); border-color: rgba(var(--accent-rgb), 0.6); color: var(--text); }
+.orig-panels { margin: -6px 0 14px; display: flex; flex-direction: column; gap: 8px; }
+.orig-panels .orig-panel { margin-top: 0; }

@@ -1,47 +1,51 @@
 import { useI18n } from '../lib/i18n.js';
 import { ORIGINALITY_KEYS, normalizeOriginality, DICE_SLOTS, DICE_MAX, rollDiceWord, normalizeDice, PLOT_WHERE, plotBlockOf, rollPlotBlock, normalizeStructureDie, normalizeInterview } from '../lib/originality.js';
-import { Dice } from './icons.jsx';
+import { Stars } from './icons.jsx';
 
-// Stage-1 "unconventional plot" options: six toggle cards (all off by
-// default) and, under them, the panels of the three that carry data — the
-// story dice, the structure die and the story interview.
-export default function OriginalitySelector({ project, update, onInterview, busy = false }) {
+// Stage-1 "unconventional plot" options: a row of toggle chips (all off by
+// default) — OriginalitySelector — and, below the row, the panels of the
+// three that carry data (the story dice, the structure die, the story
+// interview) — OriginalityPanels. The full name and explanation live in each
+// chip's hover hint.
+export default function OriginalitySelector({ project, update }) {
   const { t } = useI18n();
   const flags = normalizeOriginality(project.originality);
-  const dice = normalizeDice(project.storyDice);
-  const die = normalizeStructureDie(project.structureDie);
-  const block = die ? plotBlockOf(die.id) : null;
-  const interview = normalizeInterview(project.interview);
-  const on = ORIGINALITY_KEYS.filter((k) => flags[k]).length;
-
   // functional: two quick toggles must not overwrite each other
   const toggle = (k) =>
     update((p) => {
       const cur = normalizeOriginality(p.originality);
       return { originality: { ...cur, [k]: !cur[k] } };
     });
+  return (
+    <div className="tool-group" role="group" aria-label={t('orig.title')}>
+      <span className="tool-group-label" title={t('orig.hint')}>
+        <Stars size={13} />
+        {t('orig.short')}
+      </span>
+      {ORIGINALITY_KEYS.map((k) => (
+        <button key={k} type="button" className={`tool-chip ${flags[k] ? 'on' : ''}`} aria-pressed={flags[k]} title={`${t(`orig.name_${k}`)} — ${t(`orig.tip_${k}`)}`} onClick={() => toggle(k)}>
+          {t(`orig.short_${k}`)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function OriginalityPanels({ project, update, onInterview, busy = false }) {
+  const { t } = useI18n();
+  const flags = normalizeOriginality(project.originality);
+  const dice = normalizeDice(project.storyDice);
+  const die = normalizeStructureDie(project.structureDie);
+  const block = die ? plotBlockOf(die.id) : null;
+  const interview = normalizeInterview(project.interview);
+  if (!flags.dice && !flags.structure && !flags.interview) return null;
+
   const setDice = (list) => update({ storyDice: normalizeDice(list) });
   const setDie = (next) => update({ structureDie: normalizeStructureDie(next) });
   const setAnswer = (i, answer) => update({ interview: { questions: interview.questions.map((q, j) => (j === i ? { ...q, answer } : q)) } });
 
   return (
-    <div className="rand-block orig-block">
-      <div className="rand-head">
-        <Dice size={15} />
-        <span>{t('orig.title')}</span>
-        <span className="rand-count">{on}/{ORIGINALITY_KEYS.length}</span>
-      </div>
-      <p className="hint">{t('orig.hint')}</p>
-      <div className="rand-grid orig-grid">
-        {ORIGINALITY_KEYS.map((k) => (
-          <button key={k} type="button" className={`rand-card ${flags[k] ? 'on' : ''}`} aria-pressed={flags[k]} title={t(`orig.tip_${k}`)} onClick={() => toggle(k)}>
-            <span className="rand-check">{flags[k] ? '✓' : ''}</span>
-            <strong>{t(`orig.name_${k}`)}</strong>
-            <span className="rand-tip">{t(`orig.tip_${k}`)}</span>
-          </button>
-        ))}
-      </div>
-
+    <div className="orig-panels">
       {flags.dice && (
         <div className="orig-panel" title={t('orig.diceTip')}>
           <div className="orig-panel-head">

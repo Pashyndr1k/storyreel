@@ -18,6 +18,8 @@
   bright marker over the areas to change; Tweak sends the frame with your
   strokes and edits those areas; Erase clears them. The stored frame, the
   video and the final frame never carry the strokes.
+- **Compact plot tools.** The randomization and unconventional-plot options
+  sit in one row of chips under the brief; the hints carry the explanations.
 
 ## 2.18.0 — 2026-10-13
 

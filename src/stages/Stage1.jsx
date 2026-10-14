@@ -7,7 +7,7 @@ import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import VoiceButton from '../components/VoiceButton.jsx';
 import RandomizationSelector from '../components/RandomizationSelector.jsx';
-import OriginalitySelector from '../components/OriginalitySelector.jsx';
+import OriginalitySelector, { OriginalityPanels } from '../components/OriginalitySelector.jsx';
 import { Stars, Star, Trash, Chevron } from '../components/icons.jsx';
 import { useState } from 'react';
 
@@ -136,11 +136,14 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
         />
       </div>
 
-      <RandomizationSelector
-        value={project.randomization}
-        onChange={(next) => update({ randomization: next })}
-      />
-      <OriginalitySelector project={project} update={update} onInterview={askInterview} busy={busy} />
+      {/* the plot tools, one compact row: randomization (up to 2) and the
+          unconventional-plot options (any number); the options that carry
+          data unfold their panel below the row */}
+      <div className="plot-tools">
+        <RandomizationSelector value={project.randomization} onChange={(next) => update({ randomization: next })} />
+        <OriginalitySelector project={project} update={update} />
+      </div>
+      <OriginalityPanels project={project} update={update} onInterview={askInterview} busy={busy} />
 
       <div className="row">
         <button title={t('tip.s1Generate')} className="btn primary" disabled={busy || !project.logline.trim()} onClick={generate}>
