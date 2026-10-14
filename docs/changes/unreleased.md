@@ -373,3 +373,19 @@ measured onsets. The toast reports how many blocks were timed from speech.
 
 **Files.** `src/lib/{subtitleAlign,subtitles}.js`, `src/stages/Stage6.jsx`,
 `src/lib/agent/assemblyTools.js`, `src/styles.css`, `src/lib/i18n.js`.
+
+## 10. Fix: the first word lit up before it was spoken
+
+**Bug.** The word-state logic treated at least one word as spoken at every
+moment, so a block's first word was active from the shot change even when
+the character said it seconds later; the first word of a following line
+lit up ahead of its onset the same way.
+
+**Fix.** Before the first word's onset no word is spoken: the whole line
+is faint (`wordStates`, `visibleText`). The ffmpeg render gets an extra
+event from the block's start to the first word's onset carrying the line
+faint, so it is on screen from the shot change and lights its first word
+only when the voice reaches it. Preview and canvas renderer follow
+`wordStates`.
+
+**Files.** `src/lib/subtitles.js`.

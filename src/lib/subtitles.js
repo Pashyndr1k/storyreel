@@ -108,7 +108,7 @@ export function wordTimes(item) {
 // block's own line breaks kept.
 export function visibleText(item, t) {
   const times = wordTimes(item);
-  const n = Math.max(1, times.filter((w) => w.at <= t + 0.001).length);
+  const n = times.filter((w) => w.at <= t + 0.001).length; // 0 before the first word is spoken
   const words = String(item.text || '').split(/(\s+)/); // keep the separators
   let shown = 0;
   let out = '';
@@ -131,7 +131,7 @@ export function visibleText(item, t) {
 export const FAINT_ALPHA = 0.28;
 export function wordStates(item, t) {
   const times = wordTimes(item);
-  const n = Math.max(1, times.filter((w) => w.at <= t + 0.001).length);
+  const n = times.filter((w) => w.at <= t + 0.001).length; // 0 before the first word is spoken
   const parts = String(item.text || '').split(/(\s+)/).filter((p) => p !== '');
   const out = [];
   let i = 0;
@@ -266,7 +266,7 @@ export function buildAss(project, width, height, rIn = 0, rOut = Infinity) {
       spoken: `{\\1a&H00&\\3a&H00&\\4a&H00&\\1c${colour}}`,
       current: `{\\1a&H00&\\3a&H00&\\4a&H00&\\1c${tint}}`,
     };
-    return times
+    const evs = times
       .map((w, k) => {
         const a = Math.max(0, w.at - rIn);
         const b = k + 1 < times.length ? Math.max(0, times[k + 1].at - rIn) : end;
@@ -283,6 +283,14 @@ export function buildAss(project, width, height, rIn = 0, rOut = Infinity) {
         return `Dialogue: 0,${assTime(a)},${assTime(b)},Default,,0,0,0,,{${tags.join('')}}${text}`;
       })
       .filter(Boolean);
+    // from the block's start to its first word: the whole line, faint
+    const a0 = Math.max(0, it.start - rIn);
+    const b0 = times.length ? Math.max(0, times[0].at - rIn) : end;
+    if (b0 > a0 + 0.001 && b0 > 0) {
+      const faintLine = wordStates(it, -Infinity).map((p) => assText(p.text)).join('');
+      evs.unshift(`Dialogue: 0,${assTime(a0)},${assTime(Math.min(b0, end))},Default,,0,0,0,,{${tags.join('')}}${KIND.faint}${faintLine}`);
+    }
+    return evs;
   });
   return [
     '[Script Info]',
