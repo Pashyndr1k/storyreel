@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.19.0 — 2026-10-14
 
 - **Unconventional plot, on request.** Six options on Stage 1, all off by
   default, for a plot that leaves the expected path: sample the space
