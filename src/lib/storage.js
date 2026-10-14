@@ -4,6 +4,7 @@ import { splitProjectMedia, mergeProjectMedia } from './projectFiles.js';
 import { isValidAspect } from './aspect.js';
 import { normalizeSceneLocations } from './sceneLocations.js';
 import { sanitizeMethods } from './randomization.js';
+import { normalizeOriginality, normalizeDice, normalizeStructureDie, normalizeInterview } from './originality.js';
 import { normalizeSubtitles, DEFAULT_SUB_STYLE } from './subtitles.js';
 import { MAX_PROJECT_LOG } from './actionLog.js';
 
@@ -264,6 +265,10 @@ function projectDefaults() {
     videoStyleId: '',
     dramaStyleId: '', // short-drama sub-genre brief from the style library (series only; '' = none)
     randomization: [], // Stage-1 plot randomization method ids (max 2, ordered)
+    originality: normalizeOriginality(null), // Stage-1 "unconventional plot" options, all off (lib/originality.js)
+    storyDice: [], // [{ word, at }] — words pinned to points of the timeline
+    structureDie: null, // { id, where } — a dramatic situation / form for one act
+    interview: { questions: [] }, // [{ question, why, options, answer }]
     stage: 1,
     cover: '', // generated project cover image (data URL)
     shotImages: {}, // shotId -> current generated image (data URL)
@@ -362,6 +367,10 @@ export function migrateProject(raw) {
   p.imageStyleId = typeof p.imageStyleId === 'string' ? p.imageStyleId : '';
   p.videoStyleId = typeof p.videoStyleId === 'string' ? p.videoStyleId : '';
   p.randomization = sanitizeMethods(p.randomization);
+  p.originality = normalizeOriginality(p.originality);
+  p.storyDice = normalizeDice(p.storyDice);
+  p.structureDie = normalizeStructureDie(p.structureDie);
+  p.interview = normalizeInterview(p.interview);
   // Legacy per-project prompt fields (systemPrompt/imageTemplate/videoTemplate) are
   // intentionally preserved here so absorbLegacyStyles() can convert them to library
   // styles once, then strip them.

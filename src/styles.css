@@ -4200,3 +4200,21 @@ select.prompt-model:hover:not(:disabled) { border-color: var(--ink); color: var(
 .rst-row .rst-meta { margin-left: auto; opacity: 0.65; white-space: nowrap; font-size: 11.5px; }
 .rst-row.rst-inapp .rst-title { opacity: 0.55; }
 .rst-log { margin: 8px 0 0; padding-left: 18px; font-size: 12px; max-height: 20vh; overflow: auto; }
+
+/* ---- Stage 1: unconventional plot options ---- */
+.orig-block .hint { margin: 0 0 8px; }
+.orig-grid { grid-template-columns: repeat(3, 1fr); }
+.orig-panel { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }
+.orig-panel-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.orig-panel-head .hint { margin: 0; }
+.dice-row { gap: 8px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+.dice-word { flex: 1; min-width: 180px; }
+.plot-block { margin-bottom: 8px; }
+.plot-block strong { display: block; margin: 4px 0 2px; }
+.plot-block p { margin: 0 0 4px; }
+.interview-q { margin-bottom: 10px; }
+.interview-question { margin: 0 0 6px; }
+.interview-options { gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.interview-options .btn { white-space: normal; text-align: left; }
+.interview-answer { width: 100%; }
+@media (max-width: 900px) { .orig-grid { grid-template-columns: repeat(2, 1fr); } }

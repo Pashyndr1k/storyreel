@@ -2,13 +2,14 @@
 
 ## Unreleased
 
-- **Less formulaic plots.** Stage 1 asks for its four directions as samples
-  from the whole space of possible directions, each with the model's own
-  probability and none allowed to be the obvious one (verbalized sampling);
-  the card shows the "typicality". Stage 2 names the turns a reader would
-  predict and replaces most of them. Scenes, shots and the smart edit follow
-  writing rules against stock images, stock lines, parallel structures and
-  generic sentences.
+- **Unconventional plot, on request.** Six options on Stage 1, all off by
+  default, for a plot that leaves the expected path: sample the space
+  (verbalized sampling, with the typicality of each direction shown), the
+  subversion pass at Stage 2, writing rules for scenes and shots, story dice
+  (words pinned to points of the timeline), a structure die (one of Polti's
+  dramatic situations or a narrative form for one act) and a story interview
+  (three questions drawn from your brief whose answers become facts of the
+  story).
 
 ## 2.18.0 — 2026-10-13
 

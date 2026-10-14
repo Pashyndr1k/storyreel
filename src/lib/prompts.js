@@ -10,6 +10,7 @@ import { describeShot } from './spatial/describe.js';
 import { episodeRange, clampEpisodes, episodeLine, SHORT_DRAMA_STYLE_ID } from './series.js';
 import { isShortDrama } from './shortDrama/rules.js';
 import { rulesFor } from './shortDrama/engine.js';
+import { originalityOf, plotConstraintsText } from './originality.js';
 import { loadStyles, resolveStyleText } from './styles.js';
 import { assetBlock, storyAssetsOf } from './storyAssets.js';
 
@@ -142,13 +143,18 @@ const STAGE1_DEFAULT_PERSONA =
 
 export function stage1Prompt(project, lang, scriptStyle, randomizationMethods) {
   const d = durationOf(project);
+  // the "unconventional plot" options (lib/originality.js) — all off by default
+  const flags = originalityOf(project);
+  const vs = flags.sampling ? `\n\n${VS_RULE}` : '';
+  const probField = flags.sampling ? '"probability":0.0,' : '';
+  const constraints = plotConstraintsText(project);
   // Plot Randomization Engine: composes extra system directives from the selection.
   const { systemAppend, overridesPersona, applied } = buildRandomization(randomizationMethods);
   const persona = overridesPersona ? '' : `\n\n${project.scriptType === 'series' ? SERIES_PERSONA : STAGE1_DEFAULT_PERSONA}`;
   if (project.scriptType === 'series') {
     return {
       applied,
-      system: dramaSystem(lang, scriptStyle, project, 'ideas') + `\n\n${STAGE1_PRODUCTION_CONSTRAINTS}\n\n${VS_RULE} In a series the space is bounded by the engine: the four stay inside its beats and differ in trope, antagonist, secret or relationship.` + persona + systemAppend + (systemAppend ? DRAMA_RANDOM_BRIDGE : ''),
+      system: dramaSystem(lang, scriptStyle, project, 'ideas') + `\n\n${STAGE1_PRODUCTION_CONSTRAINTS}${vs ? `${vs} In a series the space is bounded by the engine: the four stay inside its beats and differ in trope, antagonist, secret or relationship.` : ''}` + persona + systemAppend + (systemAppend ? DRAMA_RANDOM_BRIDGE : ''),
       maxTokens: 4500,
       user: `Brief concept for a series:
 
@@ -156,29 +162,29 @@ export function stage1Prompt(project, lang, scriptStyle, randomizationMethods) {
 ${project.logline}
 """
 
-${seriesFormat(project)}
+${seriesFormat(project)}${constraints}
 
 Generate exactly 4 distinct directions for developing this concept into the series. Make them genuinely different from each other (a different central trope, antagonist, secret or relationship) — not four variations of one idea. Each must stay faithful to the core of the original and be big enough to fill all ${seriesTotal(project)} episodes: name the protagonist and the wrong done to them, the secret or reversal that drives the story, the chain of escalating antagonists or obstacles, and the final payoff.
 
 JSON schema:
-{"ideas":[{"probability":0.0,"title":"catchy series title","pitch":"the series in 5-8 sentences (premise, protagonist and the wrong, the engine of reversals, the central secret, how it escalates, the ending), then these labelled lines: Trope: … / Opening (0–3 s): … / Episode 1 trap: … / First win (ep N): … / Quarter hook (ep N): … / Season promise: …","why_it_works":"1-2 sentences on why viewers keep watching episode after episode"}]}`,
+{"ideas":[{${probField}"title":"catchy series title","pitch":"the series in 5-8 sentences (premise, protagonist and the wrong, the engine of reversals, the central secret, how it escalates, the ending), then these labelled lines: Trope: … / Opening (0–3 s): … / Episode 1 trap: … / First win (ep N): … / Quarter hook (ep N): … / Season promise: …","why_it_works":"1-2 sentences on why viewers keep watching episode after episode"}]}`,
     };
   }
   return {
     // The concrete random picks, so the UI can annotate the generated ideas.
     applied,
-    system: system(lang, scriptStyle) + `\n\n${STAGE1_PRODUCTION_CONSTRAINTS}\n\n${VS_RULE}` + persona + systemAppend,
+    system: system(lang, scriptStyle) + `\n\n${STAGE1_PRODUCTION_CONSTRAINTS}${vs}` + persona + systemAppend,
     maxTokens: 2500,
     user: `Brief plot description for a short video (target length: ${d.min}–${d.max} seconds):
 
 """
 ${project.logline}
-"""
+"""${constraints}
 
 Generate exactly 4 distinct directions for improving and developing this plot. Make them genuinely different from each other (different angle, tone, structure or twist) — not four variations of one idea. Each must stay faithful to the core of the original but make it stronger: clearer conflict, a more distinctive hook, a more satisfying ending.
 
 JSON schema:
-{"ideas":[{"probability":0.0,"title":"catchy working title","pitch":"the improved plot in 3-6 sentences","why_it_works":"1-2 sentences on why this version is stronger than the original"}]}`,
+{"ideas":[{${probField}"title":"catchy working title","pitch":"the improved plot in 3-6 sentences","why_it_works":"1-2 sentences on why this version is stronger than the original"}]}`,
   };
 }
 
@@ -188,6 +194,10 @@ JSON schema:
 const SUBVERSION_PASS = `SUBVERSION PASS, before the synopsis is written: list the three turns a reader would predict from this direction — the expected betrayal, the expected rescue, the expected ending, the expected reveal. Keep at most ONE of them, as a feint the story sets up and then abandons; replace the others with turns that follow from what these specific characters want and from the specific rules of this world, never from genre habit. The replacement must be as strong as the cliché it displaces (a surprise that costs nothing is worse than the cliché). Report what you replaced in "subversions".`;
 
 export function stage2Prompt(project, lang, scriptStyle) {
+  const flags = originalityOf(project);
+  const pass = flags.subversion ? `${SUBVERSION_PASS}\n\n` : '';
+  const subField = flags.subversion ? '"subversions":["the turn a reader would predict → what happens instead (2-3 entries; the kept feint, if any, marked \'kept as a feint\')"],' : '';
+  const constraints = plotConstraintsText(project);
   if (project.scriptType === 'series') {
     return {
       system: dramaSystem(lang, scriptStyle, project, 'storyline'),
@@ -202,14 +212,12 @@ Approved direction:
 ${project.approvedPlot}
 """
 
-${seriesFormat(project)}
+${seriesFormat(project)}${constraints}
 
 Create the final storyline of the whole series. The synopsis must tell the complete story from the first episode to the last, sized for ${seriesTotal(project)} episodes: the wrong and the inciting incident, the early big reveal, each escalating cycle of the middle with its antagonist and its reversal, the main turning points, the full truth coming out, the villain's comeuppance and the final payoff. Keep the cast small.
 
-${SUBVERSION_PASS}
-
-JSON schema:
-{"title":"a strong final series title","genres":["2-3 short genre tags, e.g. revenge, romance, drama"],"subversions":["the turn a reader would predict → what happens instead (2-3 entries; the kept feint, if any, marked 'kept as a feint')"],"synopsis":"the complete series story, 350-600 words, in chronological order","characters":[{"name":"character name","role":"protagonist / love interest / antagonist / supporting","description":"the production profile: age and physical appearance following the CAST LOOK rule — attractive, contemporary, a modern striking detail, never a scar (specific enough to keep the character visually consistent across AI image generation); then active want, visible method, hidden leverage, shame trigger, speech rhythm, physical strategy under pressure, recurring physical motif — one or two sentences each; the secret if they have one"}],"assets":[{"name":"a UNIQUE English label of 2-3 words for a key object the characters handle across the story (e.g. Halvard Signet Ring — never a bare generic word)","description":"1-3 sentences: the object's exact look in this story's world and period, for an image model"}]}`,
+${pass}JSON schema:
+{"title":"a strong final series title","genres":["2-3 short genre tags, e.g. revenge, romance, drama"],${subField}"synopsis":"the complete series story, 350-600 words, in chronological order","characters":[{"name":"character name","role":"protagonist / love interest / antagonist / supporting","description":"the production profile: age and physical appearance following the CAST LOOK rule — attractive, contemporary, a modern striking detail, never a scar (specific enough to keep the character visually consistent across AI image generation); then active want, visible method, hidden leverage, shame trigger, speech rhythm, physical strategy under pressure, recurring physical motif — one or two sentences each; the secret if they have one"}],"assets":[{"name":"a UNIQUE English label of 2-3 words for a key object the characters handle across the story (e.g. Halvard Signet Ring — never a bare generic word)","description":"1-3 sentences: the object's exact look in this story's world and period, for an image model"}]}`,
     };
   }
   return {
@@ -223,14 +231,12 @@ ${project.logline}
 Approved plot direction:
 """
 ${project.approvedPlot}
-"""
+"""${constraints}
 
 Create the final storyline for this short video (target length: ${durationOf(project).min}–${durationOf(project).max} seconds).
 
-${SUBVERSION_PASS}
-
-JSON schema:
-{"title":"a strong final title","genres":["2-3 short genre tags, e.g. drama, comedy, thriller"],"subversions":["the turn a reader would predict → what happens instead (2-3 entries; the kept feint, if any, marked 'kept as a feint')"],"synopsis":"a complete story summary of 150-300 words with a clear beginning, middle and end","characters":[{"name":"character name","role":"protagonist / antagonist / supporting","description":"2-4 sentences: age, physical appearance (specific enough to keep the character visually consistent across AI image generation), personality, motivation"}],"assets":[{"name":"a UNIQUE English label of 2-3 words for a key object the characters handle across the story (e.g. Halvard Signet Ring — never a bare generic word)","description":"1-3 sentences: the object's exact look in this story's world and period, for an image model"}]}`,
+${pass}JSON schema:
+{"title":"a strong final title","genres":["2-3 short genre tags, e.g. drama, comedy, thriller"],${subField}"synopsis":"a complete story summary of 150-300 words with a clear beginning, middle and end","characters":[{"name":"character name","role":"protagonist / antagonist / supporting","description":"2-4 sentences: age, physical appearance (specific enough to keep the character visually consistent across AI image generation), personality, motivation"}],"assets":[{"name":"a UNIQUE English label of 2-3 words for a key object the characters handle across the story (e.g. Halvard Signet Ring — never a bare generic word)","description":"1-3 sentences: the object's exact look in this story's world and period, for an image model"}]}`,
   };
 }
 
@@ -255,7 +261,7 @@ ${project.storyline?.synopsis || ''}
 Characters:
 ${characterBlock(project)}
 
-${seriesFormat(project)}
+${seriesFormat(project)}${plotConstraintsText(project)}
 
 Break the series into its MAIN SECTIONS — the large movements of the story. Use ${sections}. Rules:
 - The sections cover episodes 1 to ${n} with no gaps and no overlaps, in order.
@@ -293,7 +299,7 @@ ${project.storyline?.synopsis || ''}
 Characters:
 ${characterBlock(project)}
 
-${seriesFormat(project)}
+${seriesFormat(project)}${plotConstraintsText(project)}
 
 Main sections of the series:
 ${arcList}
@@ -322,13 +328,14 @@ const WRITING_RULES = `WRITING RULES for scene summaries, action and dialogue:
 - IMPERFECTION: each scene holds one odd, observed detail no outline would predict, and at least one line a person would actually say out loud. An uneven beat that says something real beats a balanced one that says nothing.
 - THE LOOP: draft the line, cut a fifth of its words, say it aloud; a line nobody would say in a room is rewritten from scratch, not polished.`;
 const withWriting = (sys) => `${sys}\n\n${WRITING_RULES}`;
+const writingFor = (project, sys) => (originalityOf(project).writing ? withWriting(sys) : sys);
 
 export function stage3Prompt(project, lang, scriptStyle) {
   if (project.scriptType === 'series' && project.seriesPart) {
     const sp = project.seriesPart;
     const n = sp.to - sp.from + 1;
     return {
-      system: withWriting(dramaSystem(lang, scriptStyle, project, 'outline')),
+      system: writingFor(project, dramaSystem(lang, scriptStyle, project, 'outline')),
       names: cardNames(project),
       maxTokens: 9000,
       user: `Series: ${sp.seriesTitle} — a vertical short-drama series of ${sp.total} episodes, each ${episodeRange(project).min}–${episodeRange(project).max} seconds. This project produces episodes ${sp.from}–${sp.to}${sp.arcTitle ? ` (section "${sp.arcTitle}")` : ''}.
@@ -343,7 +350,7 @@ Characters:
 ${characterBlock(project)}
 
 ${sp.prevCliffhanger ? `The previous episode (${sp.from - 1}) ended on this cliffhanger: ${sp.prevCliffhanger}\n\n` : ''}Episodes to produce:
-${(sp.episodes || []).map(episodeLine).join('\n')}
+${(sp.episodes || []).map(episodeLine).join('\n')}${plotConstraintsText(project)}
 
 Create the scene-by-scene outline for these ${n} episodes. Rules:
 - Go episode by episode, in order. Each episode gets 1–3 scenes whose durations total ${episodeRange(project).min}–${episodeRange(project).max} seconds; put the episode's number in "episode".
@@ -365,7 +372,7 @@ JSON schema:
     };
   }
   return {
-    system: withWriting(system(lang, scriptStyle)),
+    system: writingFor(project, system(lang, scriptStyle)),
     names: cardNames(project),
     maxTokens: 4500,
     user: `Title: ${project.title}
@@ -377,7 +384,7 @@ ${project.storyline?.synopsis || ''}
 """
 
 Characters:
-${characterBlock(project)}
+${characterBlock(project)}${plotConstraintsText(project)}
 
 Create a scene-by-scene outline for this short video. The full video must run between ${durationOf(project).min} and ${durationOf(project).max} seconds in total — choose a number of scenes appropriate for that length (a 10–30 second ad may need only 2–4 scenes; a 5–10 minute film may need 6–14). Each scene must be a single continuous location and moment.
 
@@ -457,7 +464,7 @@ export function stage4Prompt(project, scene, lang, scriptStyle, block, mode = 'n
   const compNote = compositionRules(block || null, prevShots.slice(-2).map((x) => x.shotType));
   // short drama: where this scene sits inside its episode, the episode's hook
   const drama = (() => {
-    if (!isShortDrama(project)) return { system: withWriting(system(lang, scriptStyle)), note: '', beat: '' };
+    if (!isShortDrama(project)) return { system: writingFor(project, system(lang, scriptStyle)), note: '', beat: '' };
     const ep = Number(scene.episode) || 0;
     const sib = project.outline.filter((x) => Number(x.episode) === ep);
     const first = ep && sib[0]?.id === scene.id;
@@ -466,7 +473,7 @@ export function stage4Prompt(project, scene, lang, scriptStyle, block, mode = 'n
     const planned = (project.seriesPart?.episodes || project.seriesPlan?.episodes || []).find((e) => Number(e.number) === ep);
     const R = rulesFor(project);
     const note = R.shotsSceneNote({ first, last, ep, epSec, planned });
-    return { system: withWriting(dramaSystem(lang, scriptStyle, project, 'shots')), note, beat: `,"beat":"${R.beatEnum}"` };
+    return { system: writingFor(project, dramaSystem(lang, scriptStyle, project, 'shots')), note, beat: `,"beat":"${R.beatEnum}"` };
   })();
   const dynNote = block
     ? `\n\nACTION DYNAMICS (this scene belongs to rhythm block "${block.block_id}" — these constraints are mandatory):
@@ -949,7 +956,7 @@ function smartEditPrompt__plain(project, instruction, lang) {
   // The smart-edit agent is intentionally NOT governed by project styles — it
   // uses the base system prompt (and the caller forces the standard Sonnet 5 model).
   return {
-    system: withWriting(system(lang)),
+    system: writingFor(project, system(lang)),
     maxTokens: 8000,
     user: `You are performing a TARGETED find-and-adapt edit on an existing short-video script. Do NOT rewrite, improve or regenerate anything beyond what the requested change strictly requires.
 
@@ -1428,5 +1435,33 @@ ${issues.map((x) => `- ${x}`).join('\n')}
 
 Return the corrected shots. JSON schema:
 {"shots":[{"shot":1,"duration_sec":4,"shot_type":"framing + angle","location":"place, time","action":"what the camera sees","dialogue":"NAME (tone): line — or empty string","notes":"notes; the last shot of an episode ends with HOOK · TYPE","beat":"open | orient | turn | squeeze | reversal | cliff"}]}`,
+  };
+}
+
+// The story interview (Stage 1 option): three questions drawn from this
+// brief, each with three possible answers; the author's answers become
+// binding facts (lib/originality.js plotConstraintsText).
+export function interviewPrompt(project, lang, scriptStyle) {
+  const series = project.scriptType === 'series';
+  const approved = (project.approvedPlot || '').trim();
+  return {
+    system: system(lang, scriptStyle),
+    maxTokens: 1800,
+    user: `Brief:
+"""
+${project.logline}
+"""${approved ? `
+
+Approved direction:
+"""
+${approved}
+"""` : ''}
+
+${series ? `${seriesFormat(project)}
+
+` : ''}Ask the author the THREE questions whose answers would change this story the most. Not a questionnaire: each question must be impossible to ask about any other story — it names a person, an object, a place or an event of this brief and opens a door the brief has not opened (what someone refuses to admit; what happened the night before the first scene; the thing a character would never do, and does; who is lying, and to whom; what the object really is; who else knows). Never ask about genre, tone, length, audience or style. For each question give three possible answers that would take the story to three different places — each one short line, concrete, inside the world of the story; the author may also write their own.
+
+JSON schema:
+{"questions":[{"question":"the question, addressed to the author","why":"one line: what the answer changes in the story","options":["answer 1","answer 2","answer 3"]}]}`,
   };
 }

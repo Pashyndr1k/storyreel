@@ -1,12 +1,13 @@
 import { useAgentScope } from '../lib/agent/registry.js';
 import { useGenerate } from '../lib/useGenerate.js';
-import { stage1Prompt } from '../lib/prompts.js';
+import { stage1Prompt, interviewPrompt } from '../lib/prompts.js';
 import { uid } from '../lib/storage.js';
 import { useI18n } from '../lib/i18n.js';
 import ErrorNote from '../components/ErrorNote.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import VoiceButton from '../components/VoiceButton.jsx';
 import RandomizationSelector from '../components/RandomizationSelector.jsx';
+import OriginalitySelector from '../components/OriginalitySelector.jsx';
 import { Stars, Star, Trash, Chevron } from '../components/icons.jsx';
 import { useState } from 'react';
 
@@ -25,6 +26,12 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
       })
     );
   };
+
+  // the story interview: three questions from the brief; answers are kept on the project
+  const askInterview = () =>
+    run(interviewPrompt(project, genLang, scriptStyle), (data) =>
+      update({ interview: { questions: (data.questions || []).slice(0, 3).map((q) => ({ question: String(q.question || ''), why: String(q.why || ''), options: Array.isArray(q.options) ? q.options.map(String) : [], answer: '' })) } })
+    );
 
   useAgentScope('stage1', { projectId: project.id, generate: () => generate(), error });
 
@@ -133,6 +140,7 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
         value={project.randomization}
         onChange={(next) => update({ randomization: next })}
       />
+      <OriginalitySelector project={project} update={update} onInterview={askInterview} busy={busy} />
 
       <div className="row">
         <button title={t('tip.s1Generate')} className="btn primary" disabled={busy || !project.logline.trim()} onClick={generate}>
