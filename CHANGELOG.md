@@ -29,8 +29,9 @@
   in Settings are gone.
 - **Subtitles fill in as they are spoken.** The whole line is there from the
   shot's first frame, barely visible; each word turns white as it is spoken,
-  and the word just spoken is bold with a warm tint — in the preview and in
-  both renders.
+  and the word just spoken carries a warm tint, with the layout fixed — in
+  the preview and in both renders. Word timing is measured from the shot's
+  own speech when subtitles are made from the dialogue.
 
 ## 2.18.0 — 2026-10-13
 

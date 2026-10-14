@@ -4,6 +4,7 @@
 // result at once. The handlers get the api's helpers through `ctx`.
 import { boundariesOf, TRANSITION_TYPES, ABRUPT, SMOOTH } from '../transitions.js';
 import { subtitlesOf, autoSubtitles, normalizeSubItem, normalizeSubStyle, normalizeOverride, SUB_FONTS, SUB_POSITIONS, MAX_SUB_ITEMS, shotStarts } from '../subtitles.js';
+import { alignSubtitlesToSpeech } from '../subtitleAlign.js';
 import { blockForScene, defaultTrim } from '../dynamics.js';
 import { kreaNativeAudio } from '../krea.js';
 import { uid } from '../storage.js';
@@ -179,7 +180,13 @@ export function assemblyTools(ctx) {
         if (clear) subs = { ...subs, items: [] };
         if (auto) {
           const r = autoSubtitles({ ...p, subtitles: subs }, typeof auto === 'object' ? auto : {});
-          subs = r.subtitles;
+          let items = r.subtitles.items;
+          try {
+            items = await alignSubtitlesToSpeech(p, items); // words timed from the shots' speech
+          } catch {
+            /* the estimate applies */
+          }
+          subs = { ...r.subtitles, items };
           made = r.made;
         }
         if (style) subs = { ...subs, style: normalizeSubStyle({ ...subs.style, ...style }, subs.style) };

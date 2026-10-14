@@ -4268,4 +4268,3 @@ select.prompt-model:hover:not(:disabled) { border-color: var(--ink); color: var(
 
 /* subtitles: the line is there from the start; words fill in as they are spoken */
 .sub-text .sub-w.faint { opacity: 0.28; }
-.sub-text .sub-w.current { font-weight: 900; }

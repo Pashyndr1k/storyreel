@@ -65,6 +65,11 @@ export function normalizeSubItem(it) {
   if (Number.isFinite(Number(it.y))) o.y = clamp(Number(it.y), 0, 100);
   const st = normalizeOverride(it.style);
   if (st) o.style = st;
+  // measured word onsets (seconds from the block's start), from the speech
+  if (Array.isArray(it.wordAt)) {
+    const w = it.wordAt.map(Number).filter((v) => Number.isFinite(v) && v >= 0);
+    if (w.length) o.wordAt = w;
+  }
   return o;
 }
 export function normalizeSubtitles(raw) {
@@ -83,6 +88,11 @@ export function normalizeSubtitles(raw) {
 export function wordTimes(item) {
   const words = String(item.text || '').split(/\s+/).filter(Boolean);
   if (!words.length) return [];
+  // measured from the speech (lib/subtitleAlign.js): one onset per word
+  if (Array.isArray(item.wordAt) && item.wordAt.length === words.length) {
+    const end = item.start + Math.max(0, item.duration);
+    return words.map((word, i) => ({ word, at: Math.round(Math.min(end, item.start + item.wordAt[i]) * 1000) / 1000 }));
+  }
   if (words.length === 1) return [{ word: words[0], at: item.start }];
   const weights = words.map((w) => w.replace(/[^\p{L}\p{N}]/gu, '').length + 1.5);
   const sum = weights.reduce((a, b) => a + b, 0);
@@ -245,16 +255,16 @@ export function buildAss(project, width, height, rIn = 0, rOut = Infinity) {
     if (pl.custom) tags.push(`\\pos(${Math.round(pl.x * width)},${Math.round(pl.y * height)})`);
     const end = Math.min(rOut - rIn, it.start + it.duration - rIn);
     // one event per word: the whole line from the start — the unspoken words
-    // faint, the spoken ones in the text colour, the word just spoken tinted
-    // and bold — re-emitted at every word time
+    // faint, the spoken ones in the text colour, the word just spoken tinted —
+    // re-emitted at every word time; nothing changes the text's dimensions
     const times = wordTimes(it);
     const faintA = Math.round(255 * (1 - FAINT_ALPHA)).toString(16).toUpperCase().padStart(2, '0');
     const colour = assColor(st.color);
     const tint = assColor(tintYellow(st.color));
     const KIND = {
-      faint: `{\\1a&H${faintA}&\\3a&H${faintA}&\\4a&H${faintA}&\\1c${colour}\\b0}`,
-      spoken: `{\\1a&H00&\\3a&H00&\\4a&H00&\\1c${colour}\\b0}`,
-      current: `{\\1a&H00&\\3a&H00&\\4a&H00&\\1c${tint}\\b1}`,
+      faint: `{\\1a&H${faintA}&\\3a&H${faintA}&\\4a&H${faintA}&\\1c${colour}}`,
+      spoken: `{\\1a&H00&\\3a&H00&\\4a&H00&\\1c${colour}}`,
+      current: `{\\1a&H00&\\3a&H00&\\4a&H00&\\1c${tint}}`,
     };
     return times
       .map((w, k) => {
@@ -284,7 +294,7 @@ export function buildAss(project, width, height, rIn = 0, rOut = Infinity) {
     '',
     '[V4+ Styles]',
     'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
-    `Style: Default,${base.font},${px(base.size)},${assColor(base.color)},${assColor(base.color)},${assColor(base.outline)},&H80000000&,0,0,0,0,100,100,0,0,1,${Math.max(1, Math.round(px(base.size) / 18))},${Math.max(0, Math.round(px(base.size) / 24))},2,${Math.round(width * 0.05)},${Math.round(width * 0.05)},${marginV},1`,
+    `Style: Default,${base.font},${px(base.size)},${assColor(base.color)},${assColor(base.color)},${assColor(base.outline)},&H80000000&,-1,0,0,0,100,100,0,0,1,${Math.max(1, Math.round(px(base.size) / 18))},${Math.max(0, Math.round(px(base.size) / 24))},2,${Math.round(width * 0.05)},${Math.round(width * 0.05)},${marginV},1`,
     '',
     '[Events]',
     'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',

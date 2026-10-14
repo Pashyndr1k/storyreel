@@ -19,6 +19,7 @@ import { Play, Pause, SkipBack, StopSq, Grip, Download, Upload, Stars, Trash, Tr
 import Lightbox from '../components/Lightbox.jsx';
 import ShotTrimModal from '../components/ShotTrimModal.jsx';
 import SubtitleModal from '../components/SubtitleModal.jsx';
+import { alignSubtitlesToSpeech } from '../lib/subtitleAlign.js';
 import { subtitlesOf, autoSubtitles, activeSubtitles, subStyleOf, subPlacement, buildAss, normalizeSubItem, wordStates, tintYellow, FAINT_ALPHA, shotStarts } from '../lib/subtitles.js';
 import { suggestTransition } from '../lib/transitions.js';
 import { logged } from '../lib/actionLog.js';
@@ -282,11 +283,20 @@ export default function Stage6({ project, update, settings, ...workbench }) {
   const subs = subtitlesOf(project);
   const setSubs = (fn, action = 'subtitles') => update(logged((p) => ({ subtitles: fn(subtitlesOf(p), p) }), action));
   // from the shots' dialogue (custom text stays)
-  const makeSubs = () => {
+  const makeSubs = async () => {
     const r = autoSubtitles(project);
     if (!r.made) return showToast(t('sub.none'), 'error');
-    setSubs(() => r.subtitles, 'subtitles.auto');
-    showToast(t('sub.made', { n: r.made, s: r.shots }));
+    // the words timed from the shots' speech (lib/subtitleAlign.js); the
+    // letter-count estimate stays for shots without sound
+    let items = r.subtitles.items;
+    try {
+      items = await alignSubtitlesToSpeech(project, items);
+    } catch {
+      /* the estimate applies */
+    }
+    const timed = items.filter((it) => it.wordAt).length;
+    setSubs(() => ({ ...r.subtitles, items }), 'subtitles.auto');
+    showToast(timed ? t('sub.madeTimed', { n: r.made, s: r.shots, k: timed }) : t('sub.made', { n: r.made, s: r.shots }));
   };
   // a free text block at the playhead
   const addCustomSub = () => {
@@ -297,6 +307,9 @@ export default function Stage6({ project, update, settings, ...workbench }) {
   const saveSub = (item, { forAll } = {}) => {
     setSubs((s) => {
       const next = normalizeSubItem(item);
+      // edited text: the measured word times no longer match it
+      const before = s.items.find((x) => x.id === next?.id);
+      if (next && before && before.text !== next.text) delete next.wordAt;
       const style = forAll && next?.style ? { ...s.style, ...next.style, position: next.style.position === 'custom' ? s.style.position : next.style.position } : s.style;
       const items = s.items.map((x) => (x.id === next.id ? next : forAll && next?.style ? { ...x, style: undefined } : x)).sort((a, b) => a.start - b.start);
       return { style, items };
@@ -1635,7 +1648,7 @@ export default function Stage6({ project, update, settings, ...workbench }) {
             ctx.lineWidth = Math.max(1, px / 9);
             ctx.strokeStyle = st.outline;
             // the line word by word: faint until spoken, the word just spoken tinted and bold
-            const fontOf = (kind) => `${kind === 'current' ? '900' : '600'} ${px}px "${st.font}", Arial, sans-serif`;
+            const fontOf = () => `bold ${px}px "${st.font}", Arial, sans-serif`; // one weight: the layout never moves
             const lines = [[]];
             for (const p of wordStates(it, tt + (segs[0]?.t0 ?? 0))) {
               const bits = p.text.split(/\r?\n/);

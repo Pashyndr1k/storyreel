@@ -338,3 +338,38 @@ and the canvas renderer use `wordStates`. Styles `.sub-w.faint`,
 `.sub-w.current`.
 
 **Files.** `src/lib/subtitles.js`, `src/stages/Stage6.jsx`, `src/styles.css`.
+
+## 9. Subtitles: static layout, words timed to the speech
+
+**Request.** No bold on the word just spoken and nothing that changes the
+text's dimensions — the layout stays static and only the opacity (and the
+tint) changes; the word activation must match the spoken words precisely in
+the finished video.
+
+**Static layout.** The current word keeps the line's weight everywhere: the
+preview span has no weight rule, the canvas renderer draws every word with
+the same font, the ASS events carry no \b tags and the base style is bold
+again as before. Only alpha (28% → 100%) and the colour (the slight tint)
+change per word, so the line never reflows.
+
+**Timing from the speech (`src/lib/subtitleAlign.js`).** When subtitles
+are made from the dialogue (Stage 6 "from the dialogue" and the agent's
+`storyreel_set_subtitles { auto }`), every shot-linked block gets `wordAt`:
+one onset per word measured from the shot's own audio — the H3 / split lane
+clip (from its trimmed head), else the shot's video when unmuted, else its
+voice track. The audio is cut into 20 ms frames (RMS); frames above a
+noise-relative threshold (floor + 15% of the span to the 95th percentile)
+are speech; a word's onset is where the cumulative speech energy reaches
+the share of the words before it (by letter weight), so pauses do not
+advance the words, and it snaps to the start of a speech burst within −80
+to +180 ms. The blocks of a shot are re-cut on those onsets (the first
+stays at the shot's start so the line is on screen from the first frame;
+later lines begin 50 ms before their first word). `wordTimes` uses
+`wordAt` when it matches the words, else the letter-count estimate (shots
+without sound, custom blocks). Editing a block's text drops its timings.
+`normalizeSubItem` keeps `wordAt`. The preview, the browser renderer and
+the ffmpeg render all read `wordTimes`, so the finished video follows the
+measured onsets. The toast reports how many blocks were timed from speech.
+
+**Files.** `src/lib/{subtitleAlign,subtitles}.js`, `src/stages/Stage6.jsx`,
+`src/lib/agent/assemblyTools.js`, `src/styles.css`, `src/lib/i18n.js`.
