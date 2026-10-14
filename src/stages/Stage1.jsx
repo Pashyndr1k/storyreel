@@ -9,11 +9,22 @@ import VoiceButton from '../components/VoiceButton.jsx';
 import RandomizationSelector from '../components/RandomizationSelector.jsx';
 import OriginalitySelector, { OriginalityPanels } from '../components/OriginalitySelector.jsx';
 import { Stars, Star, Trash, Chevron } from '../components/icons.jsx';
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 
 export default function Stage1({ project, update, settings, goNext, onSettings, genLang, scriptStyle }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { busy, error, run } = useGenerate(settings);
+
+  // every plot-tool chip takes the width of the widest label (measured, so
+  // it holds in every language)
+  const toolsRef = useRef(null);
+  useLayoutEffect(() => {
+    const el = toolsRef.current;
+    if (!el) return;
+    el.style.setProperty('--chip-w', 'auto');
+    const w = Math.max(0, ...[...el.querySelectorAll('.tool-chip')].map((c) => Math.ceil(c.getBoundingClientRect().width)));
+    if (w) el.style.setProperty('--chip-w', `${w}px`);
+  }, [lang]);
 
   const generate = () => {
     const spec = stage1Prompt(project, genLang, scriptStyle, project.randomization);
@@ -139,7 +150,7 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
       {/* the plot tools, one compact row: randomization (up to 2) and the
           unconventional-plot options (any number); the options that carry
           data unfold their panel below the row */}
-      <div className="plot-tools">
+      <div className="plot-tools" ref={toolsRef}>
         <RandomizationSelector value={project.randomization} onChange={(next) => update({ randomization: next })} />
         <OriginalitySelector project={project} update={update} />
       </div>

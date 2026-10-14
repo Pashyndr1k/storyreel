@@ -4258,6 +4258,8 @@ select.prompt-model:hover:not(:disabled) { border-color: var(--ink); color: var(
   white-space: nowrap;
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
+  min-width: var(--chip-w, auto); /* the widest label, measured on Stage 1 */
+  text-align: center;
 }
 .tool-chip:hover:not(.on) { color: var(--text); background: var(--hover-bg); }
 .tool-chip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }

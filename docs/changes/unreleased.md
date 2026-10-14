@@ -220,8 +220,10 @@ dropped) is unchanged. The story dice, structure die and interview panels
 appear under the row only while their chip is on; the row wraps on a narrow
 window.
 
-The chips are rectangular StoryReel buttons (uppercase, the button radius,
-the segmented control's inked "on" state), not pills.
+The chips are rectangular StoryReel buttons (uppercase, sharp, the
+segmented control's inked "on" state), not pills, and all ten share the
+width of the widest label, measured at render time so it holds in every
+language (`--chip-w` on `.plot-tools`).
 
 **How.** `RandomizationSelector` and `OriginalitySelector` render chips
 (`.tool-group`, `.tool-chip`); `OriginalityPanels` (same file) renders the
