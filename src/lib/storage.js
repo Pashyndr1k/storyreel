@@ -272,6 +272,7 @@ function projectDefaults() {
     stage: 1,
     cover: '', // generated project cover image (data URL)
     shotImages: {}, // shotId -> current generated image (data URL)
+    shotMarkups: {}, // shotId -> the user's marker strokes over the first frame (transparent PNG data URL), merged into the Tweak reference only
     shotImageHistory: {}, // shotId -> every first-frame version in creation order (max MAX_IMAGE_VERSIONS)
     shotFinalImages: {}, // shotId -> generated FINAL frame (data URL), paired with shotImages
     shotVideos: {}, // shotId -> generated shot video (data URL, ComfyUI LTX-2)
@@ -375,6 +376,7 @@ export function migrateProject(raw) {
   // intentionally preserved here so absorbLegacyStyles() can convert them to library
   // styles once, then strip them.
   p.shotImages = p.shotImages && typeof p.shotImages === 'object' ? p.shotImages : {};
+  p.shotMarkups = p.shotMarkups && typeof p.shotMarkups === 'object' ? p.shotMarkups : {};
   p.shotImageHistory = p.shotImageHistory && typeof p.shotImageHistory === 'object' ? p.shotImageHistory : {};
   p.shotFinalImages = p.shotFinalImages && typeof p.shotFinalImages === 'object' ? p.shotFinalImages : {};
   p.shotVideos = p.shotVideos && typeof p.shotVideos === 'object' ? p.shotVideos : {};

@@ -14,7 +14,8 @@ import { stage6SmartCutPrompt } from '../lib/prompts.js';
 import { decodeMediaAudio, audioBufferToWavDataURL } from '../lib/audio.js';
 import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
 import Stage5, { QUEUE_STOP_EVENT } from './Stage5.jsx';
-import { Play, Pause, SkipBack, StopSq, Grip, Download, Upload, Stars, Trash, TransitionIcon, AudioPlus, Expand, Zap, RestoreIcon } from '../components/icons.jsx';
+import MarkupCanvas from '../components/MarkupCanvas.jsx';
+import { Play, Pause, SkipBack, StopSq, Grip, Download, Upload, Stars, Trash, TransitionIcon, AudioPlus, Expand, Zap, RestoreIcon, Pencil, Eraser } from '../components/icons.jsx';
 import Lightbox from '../components/Lightbox.jsx';
 import ShotTrimModal from '../components/ShotTrimModal.jsx';
 import SubtitleModal from '../components/SubtitleModal.jsx';
@@ -208,6 +209,16 @@ export default function Stage6({ project, update, settings, ...workbench }) {
   const [overIns, setOverIns] = useState(null);
   const [geom, setGeom] = useState([]); // measured clip rects — see the layout effect below
   const [scrubbing, setScrubbing] = useState(false); // playhead being dragged
+  // marker strokes over the selected shot's first frame (project.shotMarkups):
+  // drawn here in the preview, merged into the Tweak reference only
+  const [markMode, setMarkMode] = useState(false);
+  const setMarkup = (shotId, png) =>
+    update((p) => {
+      const next = { ...(p.shotMarkups || {}) };
+      if (png) next[shotId] = png;
+      else delete next[shotId];
+      return { shotMarkups: next };
+    });
   const [pvState, setPvState] = useState({ playing: false, rate: 1 }); // idle preview transport
   const [lightbox, setLightbox] = useState(null); // full-size pop-up of the previewed video
   const [trimModal, setTrimModal] = useState(null); // shot id shown in the isolated trim pop-up (double-click)
@@ -1685,6 +1696,8 @@ export default function Stage6({ project, update, settings, ...workbench }) {
     : seconds > 120 ? 10 : seconds > 40 ? 5 : 1;
   const showPlayhead = total > 0; // always grabbable (scrubbing), even at zero
   const selected = items.find((x) => x.shot.id === selectedId);
+  // leaving the shot, the tab or the picture ends the marking mode
+  useEffect(() => setMarkMode(false), [selected?.shot?.id, benchTab, benchFrame]); // eslint-disable-line react-hooks/exhaustive-deps
   const workSceneId = selected ? selected.sceneId : selectedSceneId || items[0]?.sceneId || project.outline[0]?.id || null;
   const innerWidth = zoomed ? NLE_GUT + seconds * scale : undefined; // px in zoom mode
 
@@ -1919,7 +1932,51 @@ export default function Stage6({ project, update, settings, ...workbench }) {
           }
           // Image tab: the first frame, or the final frame when its thumb was clicked
           const still = idleSel && benchFrame === 'final' && pv.final ? pv.final : pv?.image;
-          if (still) return <img decoding="async" loading="lazy" src={still} alt="" />;
+          if (still) {
+            // the marker tools: only the selected shot's FIRST frame can be
+            // marked (Tweak edits that frame); the layer covers exactly the
+            // picture, like the subtitle overlay
+            const firstShown = !(idleSel && benchFrame === 'final' && pv.final);
+            const canMark = !!idleSel && firstShown && pvBox.w > 0 && pvBox.h > 0;
+            const mk = canMark ? (project.shotMarkups || {})[pv.shot.id] || '' : '';
+            let box = null;
+            if (canMark) {
+              const [aw, ah] = videoDims(project.aspectRatio || '16:9', project.videoResolution);
+              const k = Math.min(pvBox.w / aw, pvBox.h / ah);
+              box = { width: aw * k, height: ah * k, left: (pvBox.w - aw * k) / 2, top: (pvBox.h - ah * k) / 2 };
+            }
+            return (
+              <>
+                <img decoding="async" loading="lazy" src={still} alt="" />
+                {canMark && (
+                  <div className="mark-layer" style={box}>
+                    <MarkupCanvas src={still} value={mk} active={markMode} onChange={(png) => setMarkup(pv.shot.id, png)} />
+                  </div>
+                )}
+                {canMark && (
+                  <div className="pv-ctrl mark-ctrl" onPointerDown={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      className={markMode ? 'on' : ''}
+                      aria-pressed={markMode}
+                      title={t(markMode ? 'mark.pencilOn' : 'mark.pencil')}
+                      aria-label={t(markMode ? 'mark.pencilOn' : 'mark.pencil')}
+                      onClick={() => setMarkMode((m) => !m)}
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    {(markMode || mk) && (
+                      <button type="button" className="mark-erase-btn" title={t('tip.markErase')} aria-label={t('mark.erase')} disabled={!mk} onClick={() => setMarkup(pv.shot.id, '')}>
+                        <Eraser size={14} />
+                        <span>{t('mark.erase')}</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+                {canMark && markMode && <div className="mark-hint">{t('mark.hint')}</div>}
+              </>
+            );
+          }
           return <div className="asm-blank">{pv ? t('s4.shot', { n: items.indexOf(pv) + 1 }) : ''}</div>;
         })()}
         {/* subtitles over the picture, sized to the frame the preview shows */}

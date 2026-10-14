@@ -28,6 +28,8 @@ import DynamicsVisualizer from '../components/DynamicsVisualizer.jsx';
 import SceneNav from '../components/SceneNav.jsx';
 import { blockForScene, DYNAMICS_CONFIG } from '../lib/dynamics.js';
 import AssetsModal from '../components/AssetsModal.jsx';
+import MarkupCanvas, { MARK_COLOR_NAME } from '../components/MarkupCanvas.jsx';
+import { mergeMarkup } from '../lib/images.js';
 import SpatialModal from '../components/SpatialModal.jsx';
 import { hasLayout, layoutEnabled } from '../lib/spatial/layout.js';
 import Lightbox from '../components/Lightbox.jsx';
@@ -40,7 +42,7 @@ import LibraryPicker from '../components/LibraryPicker.jsx';
 import { newLibraryEntry } from '../lib/library.js';
 import { fileToResizedDataURL, resizeDataURL } from '../lib/images.js';
 import { extractPalette } from '../lib/palette.js';
-import { Download, RestoreIcon, MapPin, Upload, Layers, Grid, Trash, Stars, Zap, Expand, Mic, StopSq, Chevron, Copy, Check, Box } from '../components/icons.jsx';
+import { Pencil, Eraser, Download, RestoreIcon, MapPin, Upload, Layers, Grid, Trash, Stars, Zap, Expand, Mic, StopSq, Chevron, Copy, Check, Box } from '../components/icons.jsx';
 
 const readFileDataURL = (file) =>
   new Promise((resolve, reject) => {
@@ -163,6 +165,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   const [keyPickFor, setKeyPickFor] = useState(null); // shot whose keyframes are being edited // shot whose references are being edited // { kind: 'img' | 'vid', src } shown in the large pop-up
   const [tweakText, setTweakText] = useState({}); // `${shotId}:${kind}` -> adjustment draft
   const [tweakBusy, setTweakBusy] = useState(null); // `${shotId}:${kind}` in flight
+  const [markMode, setMarkMode] = useState(null); // shotId whose first frame is being marked up
   const [regenBusy, setRegenBusy] = useState(null); // `${shotId}:${kind}` single-prompt regen in flight
   const [shotTab, setShotTab] = useState({}); // shotId -> 'image' | 'video' | 'audio'
   // The host preview mirrors the focused shot's tab (image vs video).
@@ -1148,11 +1151,54 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
   // A newly generated image appends to the right and becomes selected (max 6
   // versions kept — the oldest drops off). An image that is already a version
   // (e.g. the same file uploaded again) is selected instead of duplicated.
+  // Marker strokes over the first frame (project.shotMarkups): drawn with the
+  // pencil, kept until the frame changes, merged into the Tweak reference only
+  // — the stored image, the video and the final frame never carry them.
+  const markupOf = (shotId) => (project.shotMarkups || {})[shotId] || '';
+  const dropMark = (p, shotId) => {
+    const m = { ...(p.shotMarkups || {}) };
+    delete m[shotId];
+    return m;
+  };
+  const setMarkup = (shotId, png) =>
+    update((p) => {
+      const next = { ...(p.shotMarkups || {}) };
+      if (png) next[shotId] = png;
+      else delete next[shotId];
+      return { shotMarkups: next };
+    });
+  const markTools = (shot, img) => (
+    <>
+      <MarkupCanvas src={img} value={markupOf(shot.id)} active={markMode === shot.id} onChange={(png) => setMarkup(shot.id, png)} />
+      <div className="mark-actions">
+        <button
+          type="button"
+          className={`img-icon-btn ${markMode === shot.id ? 'on' : ''}`}
+          title={markMode === shot.id ? t('mark.pencilOn') : t('mark.pencil')}
+          aria-label={markMode === shot.id ? t('mark.pencilOn') : t('mark.pencil')}
+          aria-pressed={markMode === shot.id}
+          disabled={!!imgBusy}
+          onClick={() => setMarkMode((m) => (m === shot.id ? null : shot.id))}
+        >
+          <Pencil size={14} />
+        </button>
+        {(markMode === shot.id || markupOf(shot.id)) && (
+          <button type="button" className="btn tiny mark-erase" title={t('tip.markErase')} disabled={!markupOf(shot.id)} onClick={() => setMarkup(shot.id, '')}>
+            <Eraser size={12} /> {t('mark.erase')}
+          </button>
+        )}
+      </div>
+      {markMode === shot.id && <div className="mark-hint">{t('mark.hint')}</div>}
+    </>
+  );
+
   const pushVersion = (shotId, img) =>
     update((p) => {
       const list = versionList(p, shotId);
       return {
         shotImages: { ...p.shotImages, [shotId]: img },
+      shotMarkups: dropMark(p, shotId),
+        shotMarkups: dropMark(p, shotId),
         shotImageHistory: {
           ...(p.shotImageHistory || {}),
           [shotId]: list.includes(img) ? list : [...list, img].slice(-MAX_IMAGE_VERSIONS),
@@ -1255,13 +1301,17 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
     const keyMiss = imageKeyError();
     if (keyMiss) return setImgErr({ id: shot.id, msg: keyMiss });
     const ratio = project.aspectRatio || '16:9';
-    const prompt = `Edit the attached image according to this instruction: ${instruction}. Keep the subject, composition and style unchanged except for the requested change. Maintain ${ratio} aspect ratio.\n\n${FULL_FRAME_RULE}`;
+    // with marker strokes on the frame, the model sees the picture WITH the
+    // strokes and is told what they mean; the stored frame stays clean
+    const markup = markupOf(shot.id);
+    const prompt = `Edit the attached image according to this instruction: ${instruction}. Keep the subject, composition and style unchanged except for the requested change. Maintain ${ratio} aspect ratio.${markup ? ` The attached image carries bright ${MARK_COLOR_NAME} marker strokes drawn by the user over the areas to change: apply the instruction to the marked areas (and only there, unless the instruction says otherwise). The strokes are annotations, not part of the picture — the result must contain no ${MARK_COLOR_NAME} marks.` : ''}\n\n${FULL_FRAME_RULE}`;
     setImgBusy(shot.id);
     setImgErr(null);
     try {
+      const reference = markup ? await mergeMarkup(cur, markup) : cur;
       const img = await runImageGen({
         prompt,
-        images: [cur],
+        images: [reference],
         ratio,
         name: `${(project.title || 'project').slice(0, 24)}_shot${shots.indexOf(shot) + 1}_refine`,
       });
@@ -2407,6 +2457,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                         <figure>
                           <div className="s5e-imgwrap">
                             <img decoding="async" loading="lazy" src={genImg} alt="" className="zoomable" onClick={() => setLightbox({ kind: 'img', src: genImg })} />
+                            {markTools(shot, genImg)}
                           </div>
                           <figcaption>{t('img.first')}</figcaption>
                         </figure>
@@ -2445,6 +2496,7 @@ export default function Stage5({ project, update, settings, onSettings, onProjec
                     ) : (
                       <div className="s5e-imgwrap">
                         <img decoding="async" loading="lazy" src={genImg} alt="" className="zoomable" onClick={() => setLightbox({ kind: 'img', src: genImg })} />
+                            {markTools(shot, genImg)}
                         {/* Version stack hovers over the preview: every version
                             incl. the current one (highlighted); ✕ removes a variant. */}
                         {renderVersions(shot, genImg, 's5e-vers-overlay')}

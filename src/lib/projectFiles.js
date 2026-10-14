@@ -38,6 +38,7 @@ export function splitProjectMedia(project) {
   const lite = { ...project };
   if (isDataURL(lite.cover)) lite.cover = put(lite.cover, `cover.${extFor(lite.cover, 'jpg')}`);
   lite.shotImages = mapOf(project.shotImages, 'img', 'jpg');
+  lite.shotMarkups = mapOf(project.shotMarkups, 'mark', 'png');
   lite.shotFinalImages = mapOf(project.shotFinalImages, 'final', 'jpg');
   lite.shotVideos = mapOf(project.shotVideos, 'vid', 'mp4');
   lite.shotAudios = mapOf(project.shotAudios, 'aud', 'mp3');
@@ -99,6 +100,7 @@ export function mergeProjectMedia(lite, getDataURL) {
   const p = { ...lite };
   p.cover = get(p.cover);
   p.shotImages = mapOf(p.shotImages);
+  p.shotMarkups = mapOf(p.shotMarkups);
   p.shotFinalImages = mapOf(p.shotFinalImages);
   p.shotVideos = mapOf(p.shotVideos);
   p.shotAudios = mapOf(p.shotAudios);

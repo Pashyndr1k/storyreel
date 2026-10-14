@@ -53,3 +53,27 @@ export function resizeDataURL(dataURL, maxPixels = 2_000_000, quality = 0.85) {
     img.src = dataURL;
   });
 }
+
+// The picture with the marker strokes burned in (JPEG), for an edit model
+// that must see what the user circled. The stored image stays clean.
+export function mergeMarkup(imageDataURL, markupDataURL, quality = 0.92) {
+  return new Promise((resolve, reject) => {
+    const base = new Image();
+    base.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = base.naturalWidth;
+      c.height = base.naturalHeight;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(base, 0, 0);
+      const over = new Image();
+      over.onload = () => {
+        ctx.drawImage(over, 0, 0, c.width, c.height);
+        resolve(c.toDataURL('image/jpeg', quality));
+      };
+      over.onerror = () => resolve(imageDataURL);
+      over.src = markupDataURL;
+    };
+    base.onerror = () => reject(new Error('The image could not be read.'));
+    base.src = imageDataURL;
+  });
+}

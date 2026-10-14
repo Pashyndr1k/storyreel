@@ -150,3 +150,57 @@ A comparison of the two short-drama engines (Short drama / Short Drama 2):
 what they share, a side-by-side table of every difference (beats, hook
 types, openings, cadence, landmarks, dialogue budget, locations, shots, the
 frame rule, the checks) and which to choose.
+
+## 4. Stage 5: mark areas on the first frame for Tweak
+
+**Request.** A pencil icon next to the preview frame; clicking it lets the
+user draw over the image with a bright marker to highlight what to change
+with Tweak; an "Erase" button clears the drawing; the drawing is merged into
+the image only when Tweak is pressed; a video generated instead uses the
+clean image as its first-frame reference.
+
+**Behaviour.**
+- With a shot selected and its first frame in the preview (Image tab,
+  first frame), a small toolbar at the bottom of the preview shows the
+  **pencil**. Clicking it turns the marker on: the cursor is a crosshair, a
+  hint says what the strokes do, and dragging over the picture draws a
+  bright magenta stroke (round, about 3% of the frame's width). Clicking the
+  pencil again turns the marker off; the strokes stay. **Erase** (shown while
+  marking or while strokes exist) removes every stroke.
+- The strokes live beside the frame (`project.shotMarkups[shotId]`, a
+  transparent PNG at the frame's natural size); the frame itself is never
+  changed. They are dropped when the frame changes: a new version from
+  generation or Tweak, or another version selected.
+- **Tweak** (the refine row of the shot card) with strokes present merges
+  them into a copy of the frame and sends that copy as the edit reference,
+  with the instruction extended: the magenta strokes mark the areas to
+  change, they are annotations and the result must carry none. The
+  resulting new version replaces the frame; the strokes are cleared.
+- **Video**, the final frame, references, exports and the mirror all read
+  `shotImages`, which stays clean; the strokes never reach them.
+- The standalone (non-embedded) Stage 5 card carries the same tools over
+  its frame image; in the embedded workbench the picture lives in the
+  preview, so the tools live there.
+
+**How.** `src/components/MarkupCanvas.jsx`: the layer (canvas at the
+image's natural size, pointer-captured strokes, `toDataURL` on pointer-up,
+repaint from the stored PNG, inert when inactive). `src/lib/images.js`
+`mergeMarkup` (picture + strokes → JPEG). `Stage6.jsx`: the layer sized
+like the subtitle overlay (`videoDims` + `pvBox`), the pencil / Erase
+toolbar (`.pv-ctrl.mark-ctrl`), `markMode` reset on shot / tab / frame
+change. `Stage5.jsx`: `markupOf`, `setMarkup`, `dropMark` (in
+`pushVersion` and `selectVersion`), `markTools` for the standalone card,
+`refineImage` merging and the extended instruction. `storage.js` default
+and migration; `projectFiles.js` split / merge (`mark_<shotId>.png`).
+Icons `Pencil`, `Eraser`. i18n `mark.*`, `tip.markErase` in EN/RU/UK.
+
+**Verified** in the dev app with a stubbed image model: a stroke drawn in
+the preview shows as magenta pixels on the layer and is stored as
+`mark_sh1.png` while the frame record stays the clean image; Erase clears
+it; after a new stroke, Tweak sent a reference that differs from the clean
+frame and contains magenta pixels, with the instruction naming the marks;
+the returned frame became a new version and the strokes were cleared.
+
+**Files.** `src/components/MarkupCanvas.jsx`, `src/components/icons.jsx`,
+`src/lib/{images,storage,projectFiles}.js`,
+`src/stages/{Stage5,Stage6}.jsx`, `src/lib/i18n.js`, `src/styles.css`.

@@ -4218,3 +4218,20 @@ select.prompt-model:hover:not(:disabled) { border-color: var(--ink); color: var(
 .interview-options .btn { white-space: normal; text-align: left; }
 .interview-answer { width: 100%; }
 @media (max-width: 900px) { .orig-grid { grid-template-columns: repeat(2, 1fr); } }
+
+/* ---- Stage 5: marker strokes over the first frame ---- */
+.markup-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; touch-action: none; display: block; }
+.markup-canvas.active { pointer-events: auto; cursor: crosshair; }
+.mark-actions { position: absolute; top: 6px; left: 6px; display: flex; gap: 4px; align-items: center; z-index: 3; }
+.mark-actions .img-icon-btn.on { background: rgba(255, 45, 215, 0.85); color: #fff; }
+.mark-erase { background: rgba(0, 0, 0, 0.45); color: #fff; border: none; display: inline-flex; align-items: center; gap: 4px; }
+.mark-hint { position: absolute; left: 6px; right: 6px; bottom: 6px; padding: 4px 8px; border-radius: 3px; background: rgba(0, 0, 0, 0.55); color: #f0efec; font-size: 11.5px; pointer-events: none; z-index: 3; }
+.s5e-compact .s5e-imgwrap > .markup-canvas,
+.s5e-compact .s5e-imgwrap > .mark-actions,
+.s5e-compact .s5e-imgwrap > .mark-hint { display: none; }
+
+.asm-preview .mark-layer { position: absolute; z-index: 2; }
+.pv-ctrl.mark-ctrl { pointer-events: auto; }
+.pv-ctrl.mark-ctrl button.mark-erase-btn { width: auto; padding: 0 8px; gap: 4px; }
+.pv-ctrl.mark-ctrl button.mark-erase-btn span { font-size: 11.5px; }
+.asm-preview .mark-hint { bottom: 48px; }

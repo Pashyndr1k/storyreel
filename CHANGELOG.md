@@ -14,6 +14,10 @@
   project folders moved from the Home page into the Backups tab, next to
   the backup file and the vault: the vault's status is shown there, with
   Back up now and Restore library / styles / settings.
+- **Mark what to tweak.** A pencil under the preview frame lets you draw a
+  bright marker over the areas to change; Tweak sends the frame with your
+  strokes and edits those areas; Erase clears them. The stored frame, the
+  video and the final frame never carry the strokes.
 
 ## 2.18.0 — 2026-10-13
 
