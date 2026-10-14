@@ -48,6 +48,7 @@ export default function Stage2({ project, update, rawUpdate, settings, goNext, o
       update((p) => ({
         storyline: {
           synopsis: data.synopsis || '',
+          subversions: Array.isArray(data.subversions) ? data.subversions.map(String).filter(Boolean).slice(0, 4) : [],
           characters: (data.characters || []).map((c) => ({
             id: uid(),
             name: c.name || '',
@@ -360,6 +361,11 @@ One single person, chest-up portrait, face fully visible and evenly lit, looking
               onReplace={setSynopsis}
             />
           </div>
+          {(storyline.subversions || []).length > 0 && (
+            <p className="hint s2-subversions" title={t('s2.subversionsTip')}>
+              <strong>{t('s2.subversions')}</strong> {storyline.subversions.join(' · ')}
+            </p>
+          )}
 
           {/* Characters (with groups) and the story's assets, as two tabs */}
           <div className="s5e-tabs s2-tabs" role="tablist">

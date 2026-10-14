@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **Less formulaic plots.** Stage 1 asks for its four directions as samples
+  from the whole space of possible directions, each with the model's own
+  probability and none allowed to be the obvious one (verbalized sampling);
+  the card shows the "typicality". Stage 2 names the turns a reader would
+  predict and replaces most of them. Scenes, shots and the smart edit follow
+  writing rules against stock images, stock lines, parallel structures and
+  generic sentences.
+
 ## 2.18.0 — 2026-10-13
 
 - **A crashed window reloads itself.** When the page dies (out of memory on a

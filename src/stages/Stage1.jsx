@@ -54,7 +54,7 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
       return {
         pinnedIdeas: list.some((x) => x.id === idea.id)
           ? list.filter((x) => x.id !== idea.id)
-          : [...list, { id: idea.id, title: idea.title || '', pitch: idea.pitch || '', why_it_works: idea.why_it_works || '', modifiers: idea.modifiers || [], pinnedAt: Date.now() }],
+          : [...list, { id: idea.id, title: idea.title || '', pitch: idea.pitch || '', why_it_works: idea.why_it_works || '', modifiers: idea.modifiers || [], probability: idea.probability, pinnedAt: Date.now() }],
       };
     });
   const approved = (project.approvedPlot || '').trim();
@@ -67,13 +67,21 @@ export default function Stage1({ project, update, settings, goNext, onSettings, 
       ],
     }));
 
+  // the model's own estimate of how expected the direction is (verbalized
+  // sampling: every pitch is asked to sit below 10%)
+  const typicality = (idea) => (Number.isFinite(Number(idea.probability)) && idea.probability > 0 ? Math.round(Number(idea.probability) * 100) : null);
   const ideaMods = (idea) =>
-    (idea.modifiers || []).length > 0 && (
+    ((idea.modifiers || []).length > 0 || typicality(idea) !== null) && (
       <p className="idea-mods">
-        🎲{' '}
-        {idea.modifiers
-          .map((m) => (m.name ? `${t(`rand.name_${m.method}`)}: ${m.name}` : t(`rand.name_${m.method}`)))
-          .join(' · ')}
+        {typicality(idea) !== null && <span title={t('s1.typicalityTip')}>{t('s1.typicality', { p: typicality(idea) })}</span>}
+        {(idea.modifiers || []).length > 0 && (
+          <>
+            {typicality(idea) !== null ? ' · ' : ''}🎲{' '}
+            {idea.modifiers
+              .map((m) => (m.name ? `${t(`rand.name_${m.method}`)}: ${m.name}` : t(`rand.name_${m.method}`)))
+              .join(' · ')}
+          </>
+        )}
       </p>
     );
 
