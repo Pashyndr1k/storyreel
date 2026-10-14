@@ -230,3 +230,24 @@ three panels; Stage 1 lays them out in `.plot-tools`. i18n `rand.short`,
 
 **Files.** `src/components/{RandomizationSelector,OriginalitySelector}.jsx`,
 `src/stages/Stage1.jsx`, `src/styles.css`, `src/lib/i18n.js`.
+
+## 6. Sharp corners everywhere
+
+**Request.** Do any UI elements have a 3 px corner radius? Replace all of
+them with sharp rectangular shapes.
+
+**What was found.** `src/styles.css` carried 123 rules with
+`border-radius: 3px`, the tokens `--r-panel`, `--r-btn` and `--r-btn-sm` at
+3 px, and smaller radii on 32 more rules (1, 2, 4, 6, 7, 8 and 13 px:
+badges, swatches, dots, the counter bubble, the Stage 1 option panels).
+
+**Behaviour.** Every one of them is now 0: buttons, inputs, cards, modals,
+panels, chips, badges, thumbnails, swatches and overlays are sharp
+rectangles. The only radii left are the eleven true circles
+(`border-radius: 50%`: dots, the tile dot, round indicators). The three
+tokens are 0, so new rules that use them stay sharp.
+
+**Verified** in the dev app by walking every element's computed
+`border-radius` on the Home page and on Stage 1: nothing but 0 and 50%.
+
+**Files.** `src/styles.css`.

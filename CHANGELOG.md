@@ -20,6 +20,8 @@
   video and the final frame never carry the strokes.
 - **Compact plot tools.** The randomization and unconventional-plot options
   sit in one row of chips under the brief; the hints carry the explanations.
+- **Sharp corners.** Every rounded corner in the interface (buttons, inputs,
+  cards, panels, badges, chips) is now a right angle; only true circles stay.
 
 ## 2.18.0 — 2026-10-13
 
