@@ -311,3 +311,30 @@ and restoring the ticked library and styles writes two log lines.
 **Files.** `src/components/{SettingsModal,RestoreModal}.jsx`
 (`RestoreProjectsModal.jsx` removed), `src/App.jsx`,
 `src/lib/exportScript.js`, `src/lib/i18n.js`.
+
+## 8. Subtitles fill in word by word
+
+**Request.** Subtitles appear immediately when the shot changes, barely
+visible, and fill in with white as the words are spoken; the word that has
+just appeared gets a slight yellow tint and a bolder weight; when the next
+word appears, the previous one switches to the plain white of the spoken
+text.
+
+**Behaviour.** A subtitle block (one per shot, from the shot's first frame)
+shows its whole line from its first frame: the unspoken words at 28%
+opacity, the spoken ones in the subtitle colour, the word just spoken in a
+slight yellow tint (the subtitle colour blended 38% toward a warm yellow)
+and bold. At the next word time the previous word drops to the plain
+spoken look. The same reading in all three places that draw subtitles: the
+Stage 6 preview (spans per word), the browser renderer (canvas, word by
+word with measured widths) and the ffmpeg render (ASS: one event per word
+time carrying the whole line with per-word alpha, colour and bold
+overrides; the base style is regular so only the current word is bold).
+
+**How.** `src/lib/subtitles.js`: `wordStates(item, t)` (parts with kind
+space / faint / spoken / current, separators kept), `tintYellow(hex)`,
+`FAINT_ALPHA`; `buildAss` rewritten on them. `Stage6.jsx`: the preview
+and the canvas renderer use `wordStates`. Styles `.sub-w.faint`,
+`.sub-w.current`.
+
+**Files.** `src/lib/subtitles.js`, `src/stages/Stage6.jsx`, `src/styles.css`.

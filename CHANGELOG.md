@@ -27,6 +27,10 @@
   every change; Back up now rewrites it all, Restore… brings any part back.
   The JSON export / import of all projects and the duplicate styles export
   in Settings are gone.
+- **Subtitles fill in as they are spoken.** The whole line is there from the
+  shot's first frame, barely visible; each word turns white as it is spoken,
+  and the word just spoken is bold with a warm tint — in the preview and in
+  both renders.
 
 ## 2.18.0 — 2026-10-13
 

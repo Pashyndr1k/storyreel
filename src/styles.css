@@ -4265,3 +4265,7 @@ select.prompt-model:hover:not(:disabled) { border-color: var(--ink); color: var(
 .tool-chip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .orig-panels { margin: -6px 0 14px; display: flex; flex-direction: column; gap: 8px; }
 .orig-panels .orig-panel { margin-top: 0; }
+
+/* subtitles: the line is there from the start; words fill in as they are spoken */
+.sub-text .sub-w.faint { opacity: 0.28; }
+.sub-text .sub-w.current { font-weight: 900; }

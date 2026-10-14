@@ -19,7 +19,7 @@ import { Play, Pause, SkipBack, StopSq, Grip, Download, Upload, Stars, Trash, Tr
 import Lightbox from '../components/Lightbox.jsx';
 import ShotTrimModal from '../components/ShotTrimModal.jsx';
 import SubtitleModal from '../components/SubtitleModal.jsx';
-import { subtitlesOf, autoSubtitles, activeSubtitles, subStyleOf, subPlacement, buildAss, normalizeSubItem, visibleText, shotStarts } from '../lib/subtitles.js';
+import { subtitlesOf, autoSubtitles, activeSubtitles, subStyleOf, subPlacement, buildAss, normalizeSubItem, wordStates, tintYellow, FAINT_ALPHA, shotStarts } from '../lib/subtitles.js';
 import { suggestTransition } from '../lib/transitions.js';
 import { logged } from '../lib/actionLog.js';
 
@@ -1630,17 +1630,37 @@ export default function Stage6({ project, update, settings, ...workbench }) {
             const st = subStyleOf(subs, it);
             const pl = subPlacement(subs, it);
             const px = Math.max(8, (st.size / 100) * h);
-            ctx.font = `bold ${px}px "${st.font}", Arial, sans-serif`;
-            ctx.textAlign = pl.align;
+            ctx.textAlign = 'left';
             ctx.textBaseline = pl.vertical === 'top' ? 'top' : pl.vertical === 'middle' ? 'middle' : 'bottom';
             ctx.lineWidth = Math.max(1, px / 9);
             ctx.strokeStyle = st.outline;
-            ctx.fillStyle = st.color;
-            const lines = visibleText(it, tt + (segs[0]?.t0 ?? 0)).split(/\r?\n/);
-            lines.forEach((line, li) => {
+            // the line word by word: faint until spoken, the word just spoken tinted and bold
+            const fontOf = (kind) => `${kind === 'current' ? '900' : '600'} ${px}px "${st.font}", Arial, sans-serif`;
+            const lines = [[]];
+            for (const p of wordStates(it, tt + (segs[0]?.t0 ?? 0))) {
+              const bits = p.text.split(/\r?\n/);
+              bits.forEach((b, bi) => {
+                if (bi > 0) lines.push([]);
+                if (b) lines[lines.length - 1].push({ text: b, kind: p.kind });
+              });
+            }
+            lines.forEach((parts, li) => {
+              const widths = parts.map((p) => {
+                ctx.font = fontOf(p.kind);
+                return ctx.measureText(p.text).width;
+              });
+              const total = widths.reduce((a, b) => a + b, 0);
+              let x = pl.x * w - (pl.align === 'center' ? total / 2 : pl.align === 'right' ? total : 0);
               const y = pl.y * h + (li - (pl.vertical === 'bottom' ? lines.length - 1 : pl.vertical === 'middle' ? (lines.length - 1) / 2 : 0)) * px * 1.2;
-              ctx.strokeText(line, pl.x * w, y);
-              ctx.fillText(line, pl.x * w, y);
+              parts.forEach((p, k) => {
+                ctx.font = fontOf(p.kind);
+                ctx.globalAlpha = p.kind === 'faint' ? FAINT_ALPHA : 1;
+                ctx.fillStyle = p.kind === 'current' ? tintYellow(st.color) : st.color;
+                if (p.kind !== 'space') ctx.strokeText(p.text, x, y);
+                ctx.fillText(p.text, x, y);
+                x += widths[k];
+              });
+              ctx.globalAlpha = 1;
             });
           }
 
@@ -2002,7 +2022,9 @@ export default function Stage6({ project, update, settings, ...workbench }) {
                     className={`sub-text ${pl.custom ? '' : 'sub-text-band'}`}
                     style={{ left: `${pl.x * 100}%`, top: `${pl.y * 100}%`, transform: `translate(${tx}, ${ty})`, fontFamily: `"${st.font}", Arial, sans-serif`, fontSize: (st.size / 100) * fh, color: st.color, WebkitTextStroke: `${Math.max(0.5, ((st.size / 100) * fh) / 18)}px ${st.outline}`, textShadow: `0 0 ${Math.max(2, ((st.size / 100) * fh) / 10)}px ${st.outline}`, textAlign: pl.align }}
                   >
-                    {visibleText(it, at)}
+                    {wordStates(it, at).map((p, k) =>
+                      p.kind === 'space' ? p.text : <span key={k} className={`sub-w ${p.kind}`} style={p.kind === 'current' ? { color: tintYellow(st.color) } : undefined}>{p.text}</span>
+                    )}
                   </div>
                 );
               })}
