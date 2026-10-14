@@ -85,7 +85,30 @@ export async function vaultReadLibrary(root, { withPhotos = true } = {}) {
   return out;
 }
 
+// What the vault's library holds, without the photos: { count, savedAt } or null.
+export async function vaultLibraryInfo(root) {
+  const b64 = await readFile(root, LIB_DIR, 'library.json');
+  if (!b64) return null;
+  try {
+    const data = JSON.parse(utf8FromB64(b64));
+    return { count: (data?.entries || []).length, savedAt: data?.savedAt || 0 };
+  } catch {
+    return null;
+  }
+}
+
 // ---- styles and settings -----------------------------------------------------
+// When a settings-folder file was written: { savedAt } or null.
+export async function vaultJsonInfo(root, name) {
+  const b64 = await readFile(root, SET_DIR, name);
+  if (!b64) return null;
+  try {
+    const parsed = JSON.parse(utf8FromB64(b64));
+    return { savedAt: parsed?.savedAt || 0 };
+  } catch {
+    return null;
+  }
+}
 export async function vaultWriteJson(root, name, obj) {
   const res = await writeFile(root, SET_DIR, name, b64Utf8(JSON.stringify({ version: 1, savedAt: Date.now(), data: obj })));
   return !!res?.ok;

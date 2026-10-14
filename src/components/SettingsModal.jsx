@@ -9,6 +9,10 @@ import { listImageModels } from '../lib/gemini.js';
 import { useI18n } from '../lib/i18n.js';
 import { appLog, settingsDiff } from '../lib/actionLog.js';
 import { saveProjects, migrateProject } from '../lib/storage.js';
+import { DEFAULT_PROJECTS_DIR as PROJECTS_DIR_DEFAULT } from '../lib/projectFiles.js';
+import RestoreProjectsModal from './RestoreProjectsModal.jsx';
+import { vaultAvailable, vaultRoot, vaultLibraryInfo, vaultJsonInfo, vaultReadLibrary, vaultReadJson, vaultWriteLibrary, vaultWriteJson, settingsForVault } from '../lib/vault.js';
+import { persistLibraryEntry, rebuildLibraryFromProjects } from '../lib/library.js';
 import { loadStyles, saveStyles, mergeStyles, buildStylesExport, parseStylesFile } from '../lib/styles.js';
 import { sanitizeFolder } from '../lib/projectFiles.js';
 import { downloadText } from '../lib/exportScript.js';
@@ -29,7 +33,7 @@ const FONT_SCHEMES = [
   { id: 'bahnschrift', label: 'Bahnschrift (sans)', stack: "Bahnschrift, 'Avenir Next Condensed', 'Segoe UI', sans-serif" },
 ];
 
-export default function SettingsModal({ settings, setSettings, projects = [], styles, setStyles, onClose }) {
+export default function SettingsModal({ settings, setSettings, projects = [], styles, setStyles, library = [], setLibrary = null, onRestoreProjects = null, onClose }) {
   const { t } = useI18n();
   const [tab, setTab] = useState('backups');
   const [apiKey, setApiKey] = useState(settings.apiKey);
@@ -198,6 +202,87 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
     onClose();
   };
 
+  // ---- Restore from the project folders (Electron) and the vault ------------
+  const [showRestore, setShowRestore] = useState(false);
+  const canRestoreFolders = !!window.localFiles?.listProjectDirs && !!onRestoreProjects;
+  const vaultOn = vaultAvailable();
+  const root = vaultRoot(settings.projectsDir ? settings : { projectsDir: PROJECTS_DIR_DEFAULT });
+  const [vault, setVault] = useState(null); // { library: {count, savedAt} | null, styles, settings }
+  const [vaultMsg, setVaultMsg] = useState('');
+  const [vaultBusy, setVaultBusy] = useState(false);
+  const refreshVault = async () => {
+    if (!vaultOn) return;
+    try {
+      const [lib, sty, set] = await Promise.all([vaultLibraryInfo(root), vaultJsonInfo(root, 'styles.json'), vaultJsonInfo(root, 'settings.json')]);
+      setVault({ library: lib, styles: sty, settings: set });
+    } catch {
+      setVault({ library: null, styles: null, settings: null });
+    }
+  };
+  useEffect(() => {
+    refreshVault();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [root]);
+  const fmtDate = (ms) => (ms ? new Date(ms).toLocaleString() : '');
+  const vaultAct = async (fn) => {
+    setVaultBusy(true);
+    setVaultMsg('');
+    try {
+      const msg = await fn();
+      if (msg) setVaultMsg(msg);
+      await refreshVault();
+    } catch (e) {
+      setVaultMsg(e?.message || String(e));
+    } finally {
+      setVaultBusy(false);
+    }
+  };
+  const backupNow = () =>
+    vaultAct(async () => {
+      await vaultWriteLibrary(root, library);
+      await vaultWriteJson(root, 'styles.json', styles || loadStyles());
+      await vaultWriteJson(root, 'settings.json', settingsForVault(settings));
+      appLog('vault.backup', { entries: library.length });
+      return t('set.vaultBackedUp');
+    });
+  // the vault's entries that the library lacks, then what the projects' cards imply
+  const restoreLibrary = () =>
+    vaultAct(async () => {
+      const stored = (await vaultReadLibrary(root)) || [];
+      const have = new Set(library.map((e) => e.id));
+      const fromVault = stored.filter((e) => !have.has(e.id));
+      const merged = [...library, ...fromVault];
+      const fromCards = rebuildLibraryFromProjects(projects, merged);
+      const add = [...fromVault, ...fromCards];
+      if (!add.length) return t('set.vaultLibrarySame');
+      for (const e of add) persistLibraryEntry(e);
+      if (setLibrary) setLibrary((prev) => [...prev, ...add.filter((e) => !prev.some((x) => x.id === e.id))]);
+      appLog('library.restoreVault', { entries: fromVault.length, fromCards: fromCards.length, manual: true });
+      return t('set.vaultLibraryDone', { n: add.length });
+    });
+  const restoreStyles = () =>
+    vaultAct(async () => {
+      const s = await vaultReadJson(root, 'styles.json');
+      if (!s) return t('set.vaultNone');
+      if (!window.confirm(t('set.vaultStylesConfirm'))) return '';
+      if (setStyles) setStyles(s);
+      else saveStyles(s);
+      appLog('styles.restoreVault', { manual: true });
+      return t('set.vaultStylesDone');
+    });
+  const restoreSettings = () =>
+    vaultAct(async () => {
+      const s = await vaultReadJson(root, 'settings.json');
+      if (!s) return t('set.vaultNone');
+      if (!window.confirm(t('set.vaultSettingsConfirm'))) return '';
+      // applied to the app's settings directly (this window's fields are per
+      // setting); the keys stay what they are; the window closes
+      setSettings((cur) => ({ ...cur, ...s, apiKey: cur.apiKey, geminiKey: cur.geminiKey, klingKey: cur.klingKey, kreaKey: cur.kreaKey }));
+      appLog('settings.restoreVault', { manual: true });
+      onClose();
+      return '';
+    });
+
   // ---- Backups: projects (full backup) + styles (all three types) ----------
   const exportProjects = () => {
     const payload = { version: 1, exportedAt: new Date().toISOString(), projects, styles: styles || loadStyles() };
@@ -283,6 +368,39 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
           </label>
         </div>
       </div>
+      {canRestoreFolders && (
+        <div className="settings-io">
+          <label>{t('set.restoreFolders')}</label>
+          <p className="hint">{t('set.restoreFoldersHint', { dir: root })}</p>
+          <div className="row">
+            <button title={t('tip.restoreProjects')} className="btn small" onClick={() => setShowRestore(true)}>{t('set.restoreFoldersBtn')}</button>
+          </div>
+        </div>
+      )}
+      {vaultOn && (
+        <div className="settings-io">
+          <label>{t('set.vault')}</label>
+          <p className="hint">{t('set.vaultHint', { dir: root })}</p>
+          <p className="hint vault-status" title={t('tip.vaultStatus')}>
+            {vault === null
+              ? '…'
+              : vault.library || vault.styles || vault.settings
+                ? [
+                    vault.library ? t('set.vaultLibraryStatus', { n: vault.library.count, d: fmtDate(vault.library.savedAt) }) : t('set.vaultLibraryMissing'),
+                    vault.styles ? t('set.vaultStylesStatus', { d: fmtDate(vault.styles.savedAt) }) : t('set.vaultStylesMissing'),
+                    vault.settings ? t('set.vaultSettingsStatus', { d: fmtDate(vault.settings.savedAt) }) : t('set.vaultSettingsMissing'),
+                  ].join(' · ')
+                : t('set.vaultNone')}
+          </p>
+          <div className="row">
+            <button title={t('tip.vaultBackup')} className="btn small primary" disabled={vaultBusy} onClick={backupNow}>{t('set.backupNow')}</button>
+            <button title={t('tip.vaultLibrary')} className="btn small" disabled={vaultBusy} onClick={restoreLibrary}>{t('set.restoreLibrary')}</button>
+            <button title={t('tip.vaultStyles')} className="btn small" disabled={vaultBusy || !vault?.styles} onClick={restoreStyles}>{t('set.restoreStyles')}</button>
+            <button title={t('tip.vaultSettings')} className="btn small" disabled={vaultBusy || !vault?.settings} onClick={restoreSettings}>{t('set.restoreSettings')}</button>
+          </div>
+          {vaultMsg && <p className="hint">{vaultMsg}</p>}
+        </div>
+      )}
       <div className="settings-io">
         <label>{t('set.backupStyles')}</label>
         <p className="hint">{t('set.backupStylesHint')}</p>
@@ -637,6 +755,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
           <button title={t('tip.saveSettings')} className="btn primary" onClick={save}>{t('set.save')}</button>
         </div>
       </div>
+      {showRestore && <RestoreProjectsModal root={root} projects={projects} onRestore={onRestoreProjects} onClose={() => setShowRestore(false)} />}
     </div>
   );
 }

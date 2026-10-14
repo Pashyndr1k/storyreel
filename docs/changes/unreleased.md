@@ -94,3 +94,59 @@ interview panel shows questions and keeps answers.
 `src/data/{story_dice,plot_blocks}.json`,
 `src/components/OriginalitySelector.jsx`, `src/stages/Stage1.jsx`,
 `src/lib/i18n.js`, `src/styles.css`, `CHANGELOG.md`.
+
+## 2. Settings → Backups: one place for every restore
+
+**Request.** Move the project "Restore" function from the Home page into
+Settings → Backups and merge it with the backup restoration process.
+
+**Behaviour.** The Home page no longer has a Restore button. The Backups tab
+of Settings (the first tab) now holds, in order:
+- **Projects** — the backup file, as before: export all projects and styles
+  as one JSON file, import a backup.
+- **Project folders** (desktop only) — "Restore projects…" opens the
+  restore window that used to live on Home: the per-project folders under
+  the projects directory, newest first, projects already in the app and
+  older copies unticked; the ticked ones come back with their ids, parts
+  and media.
+- **The vault** (desktop only) — the status line says what the vault holds
+  (library entries and when they were saved, styles saved when, settings
+  saved when, or "No vault yet"), with four buttons: **Back up now**
+  (writes the library, the styles and the settings without the API keys),
+  **Restore library** (adds the vault's entries the library lacks, then
+  whatever the projects' cards imply for projects with no entries; nothing
+  is removed), **Restore styles** (replaces the styles with the vault's copy
+  after a confirm), **Restore settings** (applies the vault's settings, keys
+  untouched, after a confirm; the window closes). A message under the
+  buttons reports the outcome. The automatic start-up restore of the
+  vault (§5 of 2.18.0) is unchanged.
+- **Styles** and the **projects directory**, as before.
+
+**How.** `App.jsx` owns `restoreProjects` (moved from Home) and passes
+`library`, `setLibrary` and `onRestoreProjects` to `SettingsModal`; the
+modal mounts `RestoreProjectsModal` and runs the vault actions through
+`lib/vault.js` (`vaultLibraryInfo`, `vaultJsonInfo` added for the status
+line; `vaultReadLibrary`, `vaultReadJson`, `vaultWriteLibrary`,
+`vaultWriteJson`) and `lib/library.js` (`persistLibraryEntry`,
+`rebuildLibraryFromProjects`). Manual actions are logged as
+`vault.backup`, `library.restoreVault`, `styles.restoreVault`,
+`settings.restoreVault` with `manual: true`. i18n `set.restoreFolders*`,
+`set.vault*`, `set.backupNow`, `set.restore{Library,Styles,Settings}`,
+`tip.vault*` in EN/RU/UK (`home.restore` and `tip.restoreProjects` stay for
+the button in Settings).
+
+**Verified** in the dev app with a stubbed file bridge: the Backups tab shows
+the three sections; "No vault yet" turns into the three saved-at entries
+after Back up now; "Restore projects…" opens the restore window listing the
+folders. Node: the two info readers return null without files and the
+counts and dates with them.
+
+**Files.** `src/components/SettingsModal.jsx`, `src/pages/Home.jsx`,
+`src/App.jsx`, `src/lib/vault.js`, `src/lib/i18n.js`.
+
+## 3. docs/short-drama-engines.md
+
+A comparison of the two short-drama engines (Short drama / Short Drama 2):
+what they share, a side-by-side table of every difference (beats, hook
+types, openings, cadence, landmarks, dialogue budget, locations, shots, the
+frame rule, the checks) and which to choose.

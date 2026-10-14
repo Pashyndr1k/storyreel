@@ -11,7 +11,7 @@ import { POLICY_EVENT } from './lib/policy.js';
 import { useAgentScope } from './lib/agent/registry.js';
 import { callAgent, toolList } from './lib/agent/api.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
-import { loadProjects, saveProjects, loadSettings, saveSettings, hasStoredSettings } from './lib/storage.js';
+import { loadProjects, saveProjects, loadSettings, saveSettings, hasStoredSettings, migrateProject } from './lib/storage.js';
 import { vaultAvailable, vaultRoot, vaultReadLibrary, vaultWriteLibrary, vaultReadJson, vaultWriteJson, settingsForVault } from './lib/vault.js';
 import { loadStyles, saveStyles, absorbLegacyStyles, hasStoredStyles } from './lib/styles.js';
 import { checkForUpdate } from './lib/updateCheck.js';
@@ -114,6 +114,14 @@ export default function App() {
     for (const e of add) persistLibraryEntry(e);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, libLoaded, vaultChecked]);
+
+  // A project brought back from its folder (Settings → Backups) keeps its
+  // id, dates and parts; one already present is left alone.
+  const restoreProjects = (list, from) => {
+    const restored = list.map((p) => ({ ...migrateProject(p), archived: !!p.archived }));
+    for (const p of restored) appLog('project.restore', { projectId: p.id, title: p.title, folder: from?.folder || '' });
+    setProjects((ps) => [...restored.filter((p) => !ps.some((x) => x.id === p.id)), ...ps]);
+  };
 
   const libUpsert = (entry) => {
     setLibrary((prev) => {
@@ -455,6 +463,9 @@ export default function App() {
           projects={projects}
           styles={styles}
           setStyles={setStyles}
+          library={library}
+          setLibrary={setLibrary}
+          onRestoreProjects={restoreProjects}
           onClose={() => setShowSettings(false)}
         />
       )}

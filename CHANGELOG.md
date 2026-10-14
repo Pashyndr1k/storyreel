@@ -10,6 +10,10 @@
   dramatic situations or a narrative form for one act) and a story interview
   (three questions drawn from your brief whose answers become facts of the
   story).
+- **All restores in Settings → Backups.** The project restore from the
+  project folders moved from the Home page into the Backups tab, next to
+  the backup file and the vault: the vault's status is shown there, with
+  Back up now and Restore library / styles / settings.
 
 ## 2.18.0 — 2026-10-13
 

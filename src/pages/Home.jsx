@@ -9,8 +9,7 @@ import { Upload, Plus, Search } from '../components/icons.jsx';
 import Logo from '../components/Logo.jsx';
 import { newProject, uid, migrateProject } from '../lib/storage.js';
 import { parseProjectFile } from '../lib/exportScript.js';
-import { importProjectZip, exportProjectZip, DEFAULT_PROJECTS_DIR } from '../lib/projectFiles.js';
-import RestoreProjectsModal from '../components/RestoreProjectsModal.jsx';
+import { importProjectZip, exportProjectZip } from '../lib/projectFiles.js';
 import { useI18n } from '../lib/i18n.js';
 import { appLog } from '../lib/actionLog.js';
 import { groupProjects, childrenOf, childSpan } from '../lib/projectGroups.js';
@@ -37,10 +36,6 @@ export default function Home({
     localStorage.setItem('storyreel.homeSort.v1', v);
   };
   const [showNew, setShowNew] = useState(false);
-  // restore from the mirrored project folders (Electron only)
-  const [showRestore, setShowRestore] = useState(false);
-  const canRestore = !!window.localFiles?.listProjectDirs;
-  const projectsRoot = (settings.projectsDir || DEFAULT_PROJECTS_DIR).replace(/[\\/]+$/, '');
   // the split project (a series master with its episode projects, a project
   // with its parts) whose inner projects are shown in the pop-up
   const [openGroup, setOpenGroup] = useState(null);
@@ -110,13 +105,6 @@ export default function Home({
     setProjects((ps) => [p, ...ps]);
   };
 
-  // A project brought back from its folder keeps its id, dates and parts.
-  const restoreProjects = (list, from) => {
-    const restored = list.map((p) => ({ ...migrateProject(p), archived: !!p.archived }));
-    for (const p of restored) appLog('project.restore', { projectId: p.id, title: p.title, folder: from?.folder || '' });
-    setProjects((ps) => [...restored.filter((p) => !ps.some((x) => x.id === p.id)), ...ps]);
-  };
-
   const importProject = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = '';
@@ -179,11 +167,6 @@ export default function Home({
             {t('home.import')}
             <input type="file" accept=".zip,.md,.json,application/zip,text/markdown,application/json" className="sr-only" onChange={importProject} />
           </label>
-          {canRestore && (
-            <button title={t('tip.restoreProjects')} className="btn" onClick={() => setShowRestore(true)}>
-              {t('home.restore')}
-            </button>
-          )}
           <button title={t('tip.newProject')} className="btn primary" onClick={() => setShowNew(true)}>
             <Plus size={14} />
             {t('home.newProject')}
@@ -235,7 +218,6 @@ export default function Home({
       )}
 
       {showNew && <NewProjectModal onCreate={create} onClose={() => setShowNew(false)} settings={settings} />}
-      {showRestore && <RestoreProjectsModal root={projectsRoot} projects={projects} onRestore={restoreProjects} onClose={() => setShowRestore(false)} />}
       {openGroup && (
         <ProjectGroupModal
           rootId={openGroup}
