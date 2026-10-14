@@ -8,14 +8,12 @@ import { MODELS } from '../lib/claude.js';
 import { listImageModels } from '../lib/gemini.js';
 import { useI18n } from '../lib/i18n.js';
 import { appLog, settingsDiff } from '../lib/actionLog.js';
-import { saveProjects, migrateProject } from '../lib/storage.js';
 import { DEFAULT_PROJECTS_DIR as PROJECTS_DIR_DEFAULT } from '../lib/projectFiles.js';
-import RestoreProjectsModal from './RestoreProjectsModal.jsx';
+import RestoreModal from './RestoreModal.jsx';
 import { vaultAvailable, vaultRoot, vaultLibraryInfo, vaultJsonInfo, vaultReadLibrary, vaultReadJson, vaultWriteLibrary, vaultWriteJson, settingsForVault } from '../lib/vault.js';
 import { persistLibraryEntry, rebuildLibraryFromProjects } from '../lib/library.js';
-import { loadStyles, saveStyles, mergeStyles, buildStylesExport, parseStylesFile } from '../lib/styles.js';
+import { loadStyles, saveStyles } from '../lib/styles.js';
 import { sanitizeFolder } from '../lib/projectFiles.js';
-import { downloadText } from '../lib/exportScript.js';
 import { Archive, Key, Cpu, Sliders, Clapperboard } from './icons.jsx';
 
 // UI font schemes (Interface tab). Every option keeps similar proportions so
@@ -33,7 +31,7 @@ const FONT_SCHEMES = [
   { id: 'bahnschrift', label: 'Bahnschrift (sans)', stack: "Bahnschrift, 'Avenir Next Condensed', 'Segoe UI', sans-serif" },
 ];
 
-export default function SettingsModal({ settings, setSettings, projects = [], styles, setStyles, library = [], setLibrary = null, onRestoreProjects = null, onClose }) {
+export default function SettingsModal({ settings, setSettings, projects = [], styles, setStyles, library = [], setLibrary = null, onRestoreProjects = null, onBackupProjects = null, onClose }) {
   const { t } = useI18n();
   const [tab, setTab] = useState('backups');
   const [apiKey, setApiKey] = useState(settings.apiKey);
@@ -202,21 +200,21 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
     onClose();
   };
 
-  // ---- Restore from the project folders (Electron) and the vault ------------
+  // ---- The backup: the project folders + the vault under the projects
+  // directory (Electron). One status, one "Back up now", one Restore window.
   const [showRestore, setShowRestore] = useState(false);
-  const canRestoreFolders = !!window.localFiles?.listProjectDirs && !!onRestoreProjects;
-  const vaultOn = vaultAvailable();
+  const backupOn = vaultAvailable() && !!window.localFiles?.listProjectDirs;
   const root = vaultRoot(settings.projectsDir ? settings : { projectsDir: PROJECTS_DIR_DEFAULT });
-  const [vault, setVault] = useState(null); // { library: {count, savedAt} | null, styles, settings }
+  const [vault, setVault] = useState(null); // { library: {count, savedAt} | null, styles, settings, folders }
   const [vaultMsg, setVaultMsg] = useState('');
   const [vaultBusy, setVaultBusy] = useState(false);
   const refreshVault = async () => {
-    if (!vaultOn) return;
+    if (!backupOn) return;
     try {
-      const [lib, sty, set] = await Promise.all([vaultLibraryInfo(root), vaultJsonInfo(root, 'styles.json'), vaultJsonInfo(root, 'settings.json')]);
-      setVault({ library: lib, styles: sty, settings: set });
+      const [lib, sty, set, dirs] = await Promise.all([vaultLibraryInfo(root), vaultJsonInfo(root, 'styles.json'), vaultJsonInfo(root, 'settings.json'), window.localFiles.listProjectDirs(root)]);
+      setVault({ library: lib, styles: sty, settings: set, folders: (dirs?.dirs || []).filter((d) => d.hasPayload).length });
     } catch {
-      setVault({ library: null, styles: null, settings: null });
+      setVault({ library: null, styles: null, settings: null, folders: 0 });
     }
   };
   useEffect(() => {
@@ -224,12 +222,17 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [root]);
   const fmtDate = (ms) => (ms ? new Date(ms).toLocaleString() : '');
-  const vaultAct = async (fn) => {
+  const lastWritten = vault ? Math.max(vault.library?.savedAt || 0, vault.styles?.savedAt || 0, vault.settings?.savedAt || 0) : 0;
+  const backupNow = async () => {
     setVaultBusy(true);
     setVaultMsg('');
     try {
-      const msg = await fn();
-      if (msg) setVaultMsg(msg);
+      if (onBackupProjects) await onBackupProjects();
+      await vaultWriteLibrary(root, library);
+      await vaultWriteJson(root, 'styles.json', styles || loadStyles());
+      await vaultWriteJson(root, 'settings.json', settingsForVault(settings));
+      appLog('vault.backup', { entries: library.length, projects: projects.length });
+      setVaultMsg(t('set.backupDone', { p: projects.length }));
       await refreshVault();
     } catch (e) {
       setVaultMsg(e?.message || String(e));
@@ -237,99 +240,42 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
       setVaultBusy(false);
     }
   };
-  const backupNow = () =>
-    vaultAct(async () => {
-      await vaultWriteLibrary(root, library);
-      await vaultWriteJson(root, 'styles.json', styles || loadStyles());
-      await vaultWriteJson(root, 'settings.json', settingsForVault(settings));
-      appLog('vault.backup', { entries: library.length });
-      return t('set.vaultBackedUp');
-    });
-  // the vault's entries that the library lacks, then what the projects' cards imply
-  const restoreLibrary = () =>
-    vaultAct(async () => {
+  // the Restore window's vault part: the library's missing entries (then
+  // what the projects' cards imply), the styles copy, the settings copy
+  const restoreVault = async (sel) => {
+    const msgs = [];
+    if (sel.library) {
       const stored = (await vaultReadLibrary(root)) || [];
       const have = new Set(library.map((e) => e.id));
       const fromVault = stored.filter((e) => !have.has(e.id));
-      const merged = [...library, ...fromVault];
-      const fromCards = rebuildLibraryFromProjects(projects, merged);
+      const fromCards = rebuildLibraryFromProjects(projects, [...library, ...fromVault]);
       const add = [...fromVault, ...fromCards];
-      if (!add.length) return t('set.vaultLibrarySame');
       for (const e of add) persistLibraryEntry(e);
-      if (setLibrary) setLibrary((prev) => [...prev, ...add.filter((e) => !prev.some((x) => x.id === e.id))]);
+      if (add.length && setLibrary) setLibrary((prev) => [...prev, ...add.filter((e) => !prev.some((x) => x.id === e.id))]);
       appLog('library.restoreVault', { entries: fromVault.length, fromCards: fromCards.length, manual: true });
-      return t('set.vaultLibraryDone', { n: add.length });
-    });
-  const restoreStyles = () =>
-    vaultAct(async () => {
+      msgs.push(add.length ? t('set.vaultLibraryDone', { n: add.length }) : t('set.vaultLibrarySame'));
+    }
+    if (sel.styles) {
       const s = await vaultReadJson(root, 'styles.json');
-      if (!s) return t('set.vaultNone');
-      if (!window.confirm(t('set.vaultStylesConfirm'))) return '';
-      if (setStyles) setStyles(s);
-      else saveStyles(s);
-      appLog('styles.restoreVault', { manual: true });
-      return t('set.vaultStylesDone');
-    });
-  const restoreSettings = () =>
-    vaultAct(async () => {
+      if (s) {
+        if (setStyles) setStyles(s);
+        else saveStyles(s);
+        appLog('styles.restoreVault', { manual: true });
+        msgs.push(t('set.vaultStylesDone'));
+      }
+    }
+    if (sel.settings) {
       const s = await vaultReadJson(root, 'settings.json');
-      if (!s) return t('set.vaultNone');
-      if (!window.confirm(t('set.vaultSettingsConfirm'))) return '';
-      // applied to the app's settings directly (this window's fields are per
-      // setting); the keys stay what they are; the window closes
-      setSettings((cur) => ({ ...cur, ...s, apiKey: cur.apiKey, geminiKey: cur.geminiKey, klingKey: cur.klingKey, kreaKey: cur.kreaKey }));
-      appLog('settings.restoreVault', { manual: true });
-      onClose();
-      return '';
-    });
-
-  // ---- Backups: projects (full backup) + styles (all three types) ----------
-  const exportProjects = () => {
-    const payload = { version: 1, exportedAt: new Date().toISOString(), projects, styles: styles || loadStyles() };
-    downloadText('storyreel-backup.json', JSON.stringify(payload, null, 2));
-  };
-  const importProjects = (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const data = JSON.parse(reader.result);
-        const projs = Array.isArray(data) ? data : data.projects;
-        const incomingStyles = Array.isArray(data) ? null : data.styles;
-        if (!Array.isArray(projs)) throw new Error('bad format');
-        if (window.confirm(t('set.importConfirm', { n: projs.length }))) {
-          if (incomingStyles) saveStyles(mergeStyles(styles || loadStyles(), incomingStyles));
-          await saveProjects(projs.map(migrateProject));
-          window.location.reload();
-        }
-      } catch {
-        window.alert(t('set.importInvalid'));
+      if (s) {
+        // applied to the app's settings directly; the keys stay what they are
+        setSettings((cur) => ({ ...cur, ...s, apiKey: cur.apiKey, geminiKey: cur.geminiKey, klingKey: cur.klingKey, kreaKey: cur.kreaKey }));
+        appLog('settings.restoreVault', { manual: true });
+        msgs.push(t('set.vaultSettingsDone'));
       }
-    };
-    reader.readAsText(file);
+    }
+    return msgs;
   };
 
-  const exportStyles = () =>
-    downloadText('storyreel-styles.json', JSON.stringify(buildStylesExport(styles || loadStyles()), null, 2));
-  const importStyles = (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const incoming = parseStylesFile(String(reader.result));
-        const merged = mergeStyles(styles || loadStyles(), incoming);
-        if (setStyles) setStyles(merged);
-        else saveStyles(merged);
-      } catch {
-        window.alert(t('styles.importInvalid'));
-      }
-    };
-    reader.readAsText(file);
-  };
 
   const TABS = [
     ['backups', t('set.tabBackups'), Archive],
@@ -357,61 +303,24 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
 
   const backupsBody = (
     <>
-      <div className="settings-io">
-        <label>{t('set.backupProjects')}</label>
-        <p className="hint">{t('set.backupProjectsHint')}</p>
-        <div className="row">
-          <button title={t('tip.exportProjects')} className="btn small" onClick={exportProjects}>{t('set.export')}</button>
-          <label className="btn small file-btn" title={t('tip.importProjects')}>
-            {t('set.import')}
-            <input type="file" accept=".json,application/json" onChange={importProjects} className="sr-only" />
-          </label>
-        </div>
-      </div>
-      {canRestoreFolders && (
+      {backupOn && (
         <div className="settings-io">
-          <label>{t('set.restoreFolders')}</label>
-          <p className="hint">{t('set.restoreFoldersHint', { dir: root })}</p>
-          <div className="row">
-            <button title={t('tip.restoreProjects')} className="btn small" onClick={() => setShowRestore(true)}>{t('set.restoreFoldersBtn')}</button>
-          </div>
-        </div>
-      )}
-      {vaultOn && (
-        <div className="settings-io">
-          <label>{t('set.vault')}</label>
-          <p className="hint">{t('set.vaultHint', { dir: root })}</p>
+          <label>{t('set.backupTitle')}</label>
+          <p className="hint">{t('set.backupHint', { dir: root })}</p>
           <p className="hint vault-status" title={t('tip.vaultStatus')}>
             {vault === null
               ? '…'
-              : vault.library || vault.styles || vault.settings
-                ? [
-                    vault.library ? t('set.vaultLibraryStatus', { n: vault.library.count, d: fmtDate(vault.library.savedAt) }) : t('set.vaultLibraryMissing'),
-                    vault.styles ? t('set.vaultStylesStatus', { d: fmtDate(vault.styles.savedAt) }) : t('set.vaultStylesMissing'),
-                    vault.settings ? t('set.vaultSettingsStatus', { d: fmtDate(vault.settings.savedAt) }) : t('set.vaultSettingsMissing'),
-                  ].join(' · ')
-                : t('set.vaultNone')}
+              : lastWritten || vault.folders
+                ? t('set.backupStatus', { p: vault.folders, n: vault.library?.count || 0, d: lastWritten ? fmtDate(lastWritten) : '—' })
+                : t('set.backupStatusNone')}
           </p>
           <div className="row">
-            <button title={t('tip.vaultBackup')} className="btn small primary" disabled={vaultBusy} onClick={backupNow}>{t('set.backupNow')}</button>
-            <button title={t('tip.vaultLibrary')} className="btn small" disabled={vaultBusy} onClick={restoreLibrary}>{t('set.restoreLibrary')}</button>
-            <button title={t('tip.vaultStyles')} className="btn small" disabled={vaultBusy || !vault?.styles} onClick={restoreStyles}>{t('set.restoreStyles')}</button>
-            <button title={t('tip.vaultSettings')} className="btn small" disabled={vaultBusy || !vault?.settings} onClick={restoreSettings}>{t('set.restoreSettings')}</button>
+            <button title={t('tip.backupNow')} className="btn small primary" disabled={vaultBusy} onClick={backupNow}>{vaultBusy ? t('set.backupBusy') : t('set.backupNow')}</button>
+            <button title={t('tip.restoreOpen')} className="btn small" disabled={vaultBusy} onClick={() => setShowRestore(true)}>{t('set.restoreBtn')}</button>
           </div>
           {vaultMsg && <p className="hint">{vaultMsg}</p>}
         </div>
       )}
-      <div className="settings-io">
-        <label>{t('set.backupStyles')}</label>
-        <p className="hint">{t('set.backupStylesHint')}</p>
-        <div className="row">
-          <button title={t('tip.exportStyles')} className="btn small" onClick={exportStyles}>{t('set.export')}</button>
-          <label className="btn small file-btn" title={t('tip.importStyles')}>
-            {t('set.import')}
-            <input type="file" accept=".json,application/json" onChange={importStyles} className="sr-only" />
-          </label>
-        </div>
-      </div>
       <div className="settings-io">
         <label>{t('set.projectsDir')}</label>
         <p className="hint">{t('set.projectsDirHint')}</p>
@@ -755,7 +664,7 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
           <button title={t('tip.saveSettings')} className="btn primary" onClick={save}>{t('set.save')}</button>
         </div>
       </div>
-      {showRestore && <RestoreProjectsModal root={root} projects={projects} onRestore={onRestoreProjects} onClose={() => setShowRestore(false)} />}
+      {showRestore && <RestoreModal root={root} projects={projects} vault={vault} onRestore={onRestoreProjects} onRestoreVault={restoreVault} onClose={() => { setShowRestore(false); refreshVault(); }} />}
     </div>
   );
 }

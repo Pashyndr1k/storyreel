@@ -117,6 +117,15 @@ export default function App() {
 
   // A project brought back from its folder (Settings → Backups) keeps its
   // id, dates and parts; one already present is left alone.
+  // "Back up now" (Settings → Backups): every project's folder rewritten,
+  // one project at a time (the mirror normally follows changes only)
+  const backupAllProjects = async () => {
+    for (const p of projects) {
+      mirroredRef.current.set(p.id, p);
+      await mirrorProjectToDisk(settingsRef.current, p, p.lang || settingsRef.current.lang);
+    }
+  };
+
   const restoreProjects = (list, from) => {
     const restored = list.map((p) => ({ ...migrateProject(p), archived: !!p.archived }));
     for (const p of restored) appLog('project.restore', { projectId: p.id, title: p.title, folder: from?.folder || '' });
@@ -466,6 +475,7 @@ export default function App() {
           library={library}
           setLibrary={setLibrary}
           onRestoreProjects={restoreProjects}
+          onBackupProjects={backupAllProjects}
           onClose={() => setShowSettings(false)}
         />
       )}

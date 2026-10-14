@@ -22,6 +22,11 @@
   sit in one row of chips under the brief; the hints carry the explanations.
 - **Sharp corners.** Every rounded corner in the interface (buttons, inputs,
   cards, panels, badges, chips) is now a right angle; only true circles stay.
+- **One backup.** Settings → Backups is one system: the projects folder
+  holds every project, the library, the styles and the settings, written on
+  every change; Back up now rewrites it all, Restore… brings any part back.
+  The JSON export / import of all projects and the duplicate styles export
+  in Settings are gone.
 
 ## 2.18.0 — 2026-10-13
 

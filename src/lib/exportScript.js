@@ -83,15 +83,6 @@ function b64DecodeUtf8(b64) {
   return new TextDecoder().decode(bytes);
 }
 
-// The exported .md is human-readable AND re-importable: the full project JSON
-// travels inside an invisible HTML comment at the end of the file.
-export function buildProjectExport(project, lang = 'en') {
-  return (
-    buildScriptMarkdown(project, lang) +
-    `\n\n<!-- storyreel-project:${b64EncodeUtf8(JSON.stringify(project))} -->\n`
-  );
-}
-
 export function parseProjectFile(text) {
   const m = text.match(/<!--\s*storyreel-project:([A-Za-z0-9+/=]+)\s*-->/);
   if (m) {

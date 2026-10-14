@@ -253,3 +253,61 @@ tokens are 0, so new rules that use them stay sharp.
 `border-radius` on the Home page and on Stage 1: nothing but 0 and 50%.
 
 **Files.** `src/styles.css`.
+
+## 7. One backup system
+
+**Request.** Unify the backup system: one way of saving projects, styles and
+settings backups, the most reliable and best-designed one; drop what is
+outdated and the redundant copies.
+
+**What was redundant.** Projects were backed up twice (the JSON "Export all
+projects" with every media file base64-encoded into one file, and the
+per-project folders written on every change); styles three times (inside
+that JSON, the Settings "Styles" export / import which duplicated the Styles
+page's own, and the vault); settings once (the vault). The Settings tab also
+showed the Styles section with the projects' button labels (a shared i18n
+key). Restoring was spread over "Import backup…", "Restore projects…" and
+three vault buttons.
+
+**The one system.** The backup is the projects directory: every project in
+its own folder (project file + media), and the library, the styles and the
+settings (without the API keys) in the vault — all written on every change.
+Copying that folder is a full backup. The Backups tab shows one section:
+- a status line — "projects: N folders · library: N entries · styles ·
+  settings · last written …" (or "Nothing written yet");
+- **Back up now** — rewrites every project folder (one at a time, through
+  the mirror) and the vault;
+- **Restore…** — one window with two parts: the project folders (as
+  before: newest first, those in the app and older copies unticked) and the
+  vault's copies (Library — adds what the app lacks, then what the
+  projects' cards imply; Styles — replaces; Settings — applies, keys
+  untouched), each a checkbox, one "Restore selected", one log;
+- the projects directory row, unchanged.
+
+**Removed.** The JSON export / import of all projects (and its
+replace-everything import), the Settings copy of the styles export / import
+(the Styles page keeps its own, which is the sharing format), the three
+separate vault restore buttons and their confirms, the dead
+`buildProjectExport` in `exportScript.js`, `RestoreProjectsModal` (replaced
+by `RestoreModal`), and 34 i18n keys they used. The per-project ZIP export
+and import on Home stay: that is how one project travels.
+
+**How.** `SettingsModal`: `backupNow` (calls App's `backupAllProjects`, then
+writes the vault), `restoreVault(sel)` for the modal, one status from the
+vault infos plus the folder count. `App.jsx` `backupAllProjects` (every
+project through `mirrorProjectToDisk`). `RestoreModal.jsx`. i18n
+`set.backupTitle`, `set.backupHint`, `set.backupStatus`,
+`set.backupStatusNone`, `set.backupBusy`, `set.backupDone`,
+`set.restoreBtn`, `tip.backupNow`, `tip.restoreOpen`, `rst.projectsTitle`,
+`rst.vault*`, `tip.rstVault_*` in EN/RU/UK; `rst.title` / `rst.hint`
+reworded.
+
+**Verified** in the dev app with a stubbed bridge: the tab shows the one
+Backup section and the directory row; "Nothing written yet" becomes the
+status line after Back up now, which wrote the project folder files and
+the three vault files; Restore… lists the folder and the three vault rows,
+and restoring the ticked library and styles writes two log lines.
+
+**Files.** `src/components/{SettingsModal,RestoreModal}.jsx`
+(`RestoreProjectsModal.jsx` removed), `src/App.jsx`,
+`src/lib/exportScript.js`, `src/lib/i18n.js`.
