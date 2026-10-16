@@ -1088,6 +1088,10 @@ const H3_CAMERA = `Camera vocabulary (motion type, then OPTIONAL amplitude and s
 - speed (only when it matters): "at slow speed" | "at fast speed"
 Example: "The camera pushes in with small amplitude at slow speed toward the folded letter in her hands."`;
 
+// MiniMax H3 renders noisy textures (hiss, rustle, gurgle, wind, sea) as a
+// harsh high-pitched squeal, so its sound is kept to a few visible sources.
+export const H3_SOUND_RULE = `SOUND RULE — MiniMax H3 turns noisy ambience into an unpleasant high-pitched squeal, so: NO hissing, rustling, gurgling, squeaking, whistling, crackling or any other noisy ambient sound anywhere in the prompt — no running, dripping or gurgling water, no rain, no rustling tyres or traffic, no hissing steam, no sea, surf or waves, no wind or breeze, no rustling sand, leaves or fabric, no hum or room tone. At most 2–3 sound sources in the whole video, and every one comes from a character or object VISIBLE in the frame at that moment (her heels on the floor, the cup set down on the table, the door he closes). Nothing off-screen, no background bed. Speech is exempt: the characters' lines may be spoken on camera or as voiceover.`;
+
 export const H3_SYSTEM = `You write prompts for MiniMax H3, an omni-modal video model that generates picture AND stereo audio in a single pass.
 
 Respond with VALID JSON ONLY. No markdown, no commentary.
@@ -1107,9 +1111,9 @@ Produce exactly three fields, in MiniMax's training format:
    - DETAIL STANDARD — write this field long and exact, typically 150–350 words. For the CAMERA say what it does for the whole shot and how (type of move, direction, amplitude, speed, where it starts and ends) and, for a static shot, state that there is no pan, tilt, zoom, dolly or shake and that the framing is identical in the first and last frame. For EVERY moving element — each person, animal, vehicle, cloth, light, natural element — say what moves, in which direction, how fast, how many times, and what state it starts and ends in ("sways back and forth twice and comes to rest where it began", "walks left to right in an even unhurried pace, head level, tail swaying", "turns her head toward the door, blinks once, then lowers her eyes"). Say what does NOT move or change (architecture, props, signage, on-screen text) so the model leaves it alone. Order everything as it plays; put speech and synchronized sound where they happen.
    - Voiceover uses the exact phrase "says in an off-screen voiceover", and immediately after the </d> states that the character's lips remain closed.
    - On-screen text goes in double quotes, verbatim, untranslated.
-   - Describe diegetic sound (sounds the characters can hear) here, synchronized to the action.
+   - Describe here, synchronized to the action, only the few diegetic sounds the SOUND RULE allows: sounds made by characters or objects visible in the frame.
 
-2. "overall_soundscape" — 1–4 sentences, one paragraph: ambience, physical action sounds, non-verbal human sounds across the whole video (wind, traffic, footsteps, fabric, impacts, breathing). Never repeat dialogue here. No music of any kind here. "N/A" only for deliberate total silence.
+2. "overall_soundscape" — 1–2 sentences, one paragraph: the 2–3 sound sources of the whole video, each a physical action sound or non-verbal sound of a character or object visible in the frame (footsteps of the walking woman, the glass set on the counter, a sharp breath), timed to the action. No ambience bed. Never repeat dialogue here. No music of any kind here. "N/A" only for deliberate total silence.
 
 3. "non_diegetic_music" — always exactly "N/A". StoryReel scores its films in the edit with a separate music generator, so the video model must produce NO music of its own: no score, no soundtrack, no musical stingers, no humming or singing ambience — only character speech and sound effects, and those belong to the fields above.
 
@@ -1118,7 +1122,8 @@ Hard rules:
 - Structured long, not verbose long: spend length on action, timeline, camera and audio, never on stacked adjectives.
 - If a shot has a spoken line, the line itself MUST appear in the prompt inside <d>[English] …</d>; a prompt that only says "she speaks" is wrong. There is never a separate voice track: every line of the script is spoken in the video.
 - Do not invent dialogue that the shot does not have. If the shot is silent, say so through the soundscape instead.
-- Describe only what is seeable or hearable.`;
+- Describe only what is seeable or hearable.
+- ${H3_SOUND_RULE}`;
 
 // ---- MULTI-FRAME REFERENCE (keyframe completion) prompt template ------------
 // Learned from MiniMax's own multiframe reference workflow. One ref2va
@@ -1148,7 +1153,7 @@ detailed_description:
    (one [Shot N] per timeline picture; the timestamp is the picture's ANCHOR TIME from the table, to the millisecond — never invent, round or shift it; a picture marked "first frame of [Shot N]" is where that shot STARTS, a picture marked "keyframe of [Shot N]" is a composition the shot must reach)
 
 overall_soundscape:
-<one paragraph: ambience, physical action sounds, non-verbal human sounds, synchronised to the cuts — no music, no dialogue text>
+<one paragraph: at most 2–3 sounds made by characters or objects visible in the frame, synchronised to the cuts — no noisy ambience (no wind, sea, water, steam, rustling, hissing), no music, no dialogue text>
 
 non_diegetic_music:
 N/A

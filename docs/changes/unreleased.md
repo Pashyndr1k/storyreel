@@ -1,0 +1,36 @@
+# Unreleased (after 2.19.0)
+
+Base: tag `v2.19.0` (commit `7276d9a`). All work below is on `main`, local.
+
+Conventions that apply to every change: UI strings exist in EN/RU/UA in
+`src/lib/i18n.js`; every button, header and indicator carries a hover hint
+(`title`); buttons are three words at most; sharp corners only.
+
+## 1. MiniMax H3 sound rule: no noisy ambience, 2–3 visible sources
+
+**Why.** H3 renders noisy textures (hissing steam, gurgling water, rustling
+tyres or sand, sea, wind) as an unpleasant high-pitched squeal in the final
+video.
+
+**Rule.** `H3_SOUND_RULE` in `src/lib/prompts.js`: no hissing, rustling,
+gurgling, squeaking, whistling, crackling or other noisy ambient sound
+anywhere in an H3 prompt; at most two or three sound sources per video, each
+made by a character or object visible in the frame; nothing off-screen and no
+ambience bed. Speech is exempt and may be spoken as voiceover.
+
+**Where it applies.**
+- `H3_SYSTEM` (the app's H3 prompt writer): the diegetic-sound line, the
+  `overall_soundscape` field (now 1–2 sentences naming the 2–3 sources,
+  examples no longer cite wind or traffic) and the hard rules carry it.
+- `H3_MULTI_FORMAT` (keyframe mode) soundscape placeholder.
+- Agent API (`src/lib/agent/api.js`): `h3PromptProblems` refuses a video
+  prompt with noise verbs (hiss, rustle, gurgle, squeak, squeal, whistle,
+  crackle, sizzle, babble, whoosh, howl) outside the `<d>` speech tags, or
+  ambient sources (wind, breeze, sea, surf, waves, rain, water, steam, sand,
+  leaves, tyres, traffic, hum, buzz, room tone, ambience) in the soundscape
+  field. `storyreel_h3_rules` lists the rule.
+- Short Drama 2 (`src/lib/shortDrama/rules2.js`): "ambient sound always
+  under dialogue" replaced by the rule; the models summary too.
+- `agent/AGENT_GUIDE.md`.
+
+The generic (non-H3) video prompt writers are unchanged.

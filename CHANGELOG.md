@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **Cleaner sound on MiniMax H3.** H3 video prompts no longer ask for
+  hissing, rustling, gurgling, whistling or other noisy ambience (water,
+  steam, tyres, sea, wind, sand), which H3 renders as a high-pitched squeal.
+  Each video keeps two or three sounds made by characters or objects in the
+  frame; speech is unaffected and may be a voiceover. Agent-written H3
+  prompts that break the rule are refused.
+
 ## 2.19.0 — 2026-10-14
 
 - **Unconventional plot, on request.** Six options on Stage 1, all off by

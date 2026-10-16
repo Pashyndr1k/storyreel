@@ -186,9 +186,15 @@ review, read `storyreel_h3_rules` first — it is the exact brief the app's
 writer works from. The parts that break a render if you get them wrong:
 
 - Three fields, as one text block: `integrated_multimodal_description:`
-  (the body, along the timeline), `overall_soundscape:` (ambience and
-  effects, 1–4 sentences, NEVER dialogue, no music), `non_diegetic_music:
+  (the body, along the timeline), `overall_soundscape:` (2–3 sounds
+  made by characters or objects visible in the frame, NEVER dialogue, no
+  music, no noisy ambience), `non_diegetic_music:
   N/A` (always — the film is scored in the edit).
+- Sound: no hissing, rustling, gurgling, squeaking, whistling or other
+  noisy ambience anywhere (no water, rain, tyres, steam, sea, wind, sand) —
+  H3 renders it as a high-pitched squeal. At most 2–3 sound sources, each a
+  character or object visible in the frame. Speech is exempt and may be a
+  voiceover. `storyreel_set_prompt` refuses a prompt that breaks this.
 - Direct speech: every line of the script is spoken in the video. Give the
   speaker a stable ID on first appearance with their voice identity — "The
   woman (S1), mid-thirties, low warm voice, says:" — and put the words, and
@@ -258,8 +264,8 @@ by `storyreel_drama_rules`:
   on screen for more than 5 s of one line, one subject per frame with the
   face in the top third and the bottom third quiet for captions, the last
   shot noted `CLIFF · TYPE`. Its video prompts are written for MiniMax H3
-  (identity block verbatim, one or two exchanges per clip, ambient under
-  dialogue, no music) and its images for Nano Banana 2.1 (vertical zones
+  (identity block verbatim, one or two exchanges per clip, two or three
+  on-screen sound sources, no noisy ambience, no music) and its images for Nano Banana 2.1 (vertical zones
   stated, the location's immutable detail and key-light direction
   repeated). Create one with `storyreel_create_project { scriptType:
   "series", dramaEngine: "v2" }`.
