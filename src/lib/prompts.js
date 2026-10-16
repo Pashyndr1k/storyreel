@@ -13,6 +13,9 @@ import { rulesFor } from './shortDrama/engine.js';
 import { originalityOf, plotConstraintsText } from './originality.js';
 import { loadStyles, resolveStyleText } from './styles.js';
 import { assetBlock, storyAssetsOf } from './storyAssets.js';
+import { H3_SOUND_RULE, H3_SOUND_FORMAT, enforceH3Answer, enforceH3Tweak } from './h3Sound.js';
+
+export { H3_SOUND_RULE };
 
 const LANG_NAMES = { en: 'English', ru: 'Russian', uk: 'Ukrainian' };
 
@@ -760,6 +763,8 @@ export function tweakPromptSpec(kind, currentPrompt, instruction) {
     kind === 'video'
       ? 'video MOTION prompt for an image-to-video model'
       : 'image generation prompt (Nano Banana / Flux)';
+  // a MiniMax H3 prompt keeps its sound rule through any tweak
+  const h3 = kind === 'video' && /overall_soundscape\s*:/i.test(currentPrompt || '');
   return {
     system: `You are a senior prompt engineer for AI ${kind === 'video' ? 'video' : 'image'} generation. You revise existing production prompts surgically.
 
@@ -768,8 +773,12 @@ Rules:
 - The rewritten prompt stays entirely in English; character names stay in Latin letters.
 - Apply the user's adjustment CONSISTENTLY across the whole prompt (lighting, mood, color, lens language — wherever it logically reaches), translating their plain words into proper technical prompt vocabulary.
 - Preserve everything the adjustment does not touch: subjects, composition, aspect-ratio statements, verbatim directives, camera/momentum contracts, timing beats and structure.
-- Keep roughly the same length and format as the original.`,
+- Keep roughly the same length and format as the original.${h3 ? `
+- This is a MiniMax H3 prompt: keep its three fields.
+- ${H3_SOUND_RULE}
+- ${H3_SOUND_FORMAT} If the adjustment asks for a sound the SOUND RULE forbids, or for more than three sounds, leave it out.` : ''}`,
     maxTokens: 3000,
+    ...(h3 ? { enforce: enforceH3Tweak } : {}),
     user: `Current ${what}:
 """
 ${currentPrompt}
@@ -1088,10 +1097,6 @@ const H3_CAMERA = `Camera vocabulary (motion type, then OPTIONAL amplitude and s
 - speed (only when it matters): "at slow speed" | "at fast speed"
 Example: "The camera pushes in with small amplitude at slow speed toward the folded letter in her hands."`;
 
-// MiniMax H3 renders noisy textures (hiss, rustle, gurgle, wind, sea) as a
-// harsh high-pitched squeal, so its sound is kept to a few visible sources.
-export const H3_SOUND_RULE = `SOUND RULE — MiniMax H3 turns noisy ambience into an unpleasant high-pitched squeal, so: NO hissing, rustling, gurgling, squeaking, whistling, crackling or any other noisy ambient sound anywhere in the prompt — no running, dripping or gurgling water, no rain, no rustling tyres or traffic, no hissing steam, no sea, surf or waves, no wind or breeze, no rustling sand, leaves or fabric, no hum or room tone. At most 2–3 sound sources in the whole video, and every one comes from a character or object VISIBLE in the frame at that moment (her heels on the floor, the cup set down on the table, the door he closes). Nothing off-screen, no background bed. Speech is exempt: the characters' lines may be spoken on camera or as voiceover.`;
-
 export const H3_SYSTEM = `You write prompts for MiniMax H3, an omni-modal video model that generates picture AND stereo audio in a single pass.
 
 Respond with VALID JSON ONLY. No markdown, no commentary.
@@ -1111,9 +1116,9 @@ Produce exactly three fields, in MiniMax's training format:
    - DETAIL STANDARD — write this field long and exact, typically 150–350 words. For the CAMERA say what it does for the whole shot and how (type of move, direction, amplitude, speed, where it starts and ends) and, for a static shot, state that there is no pan, tilt, zoom, dolly or shake and that the framing is identical in the first and last frame. For EVERY moving element — each person, animal, vehicle, cloth, light, natural element — say what moves, in which direction, how fast, how many times, and what state it starts and ends in ("sways back and forth twice and comes to rest where it began", "walks left to right in an even unhurried pace, head level, tail swaying", "turns her head toward the door, blinks once, then lowers her eyes"). Say what does NOT move or change (architecture, props, signage, on-screen text) so the model leaves it alone. Order everything as it plays; put speech and synchronized sound where they happen.
    - Voiceover uses the exact phrase "says in an off-screen voiceover", and immediately after the </d> states that the character's lips remain closed.
    - On-screen text goes in double quotes, verbatim, untranslated.
-   - Describe here, synchronized to the action, only the few diegetic sounds the SOUND RULE allows: sounds made by characters or objects visible in the frame.
+   - Name NO sound in this field: no sound verbs, no "the sound of …", nothing anyone hears. Every sound belongs in overall_soundscape.
 
-2. "overall_soundscape" — 1–2 sentences, one paragraph: the 2–3 sound sources of the whole video, each a physical action sound or non-verbal sound of a character or object visible in the frame (footsteps of the walking woman, the glass set on the counter, a sharp breath), timed to the action. No ambience bed. Never repeat dialogue here. No music of any kind here. "N/A" only for deliberate total silence.
+2. "overall_soundscape" — ${H3_SOUND_FORMAT} Never repeat dialogue here. No music of any kind here. "N/A" only for deliberate total silence.
 
 3. "non_diegetic_music" — always exactly "N/A". StoryReel scores its films in the edit with a separate music generator, so the video model must produce NO music of its own: no score, no soundtrack, no musical stingers, no humming or singing ambience — only character speech and sound effects, and those belong to the fields above.
 
@@ -1153,7 +1158,7 @@ detailed_description:
    (one [Shot N] per timeline picture; the timestamp is the picture's ANCHOR TIME from the table, to the millisecond — never invent, round or shift it; a picture marked "first frame of [Shot N]" is where that shot STARTS, a picture marked "keyframe of [Shot N]" is a composition the shot must reach)
 
 overall_soundscape:
-<one paragraph: at most 2–3 sounds made by characters or objects visible in the frame, synchronised to the cuts — no noisy ambience (no wind, sea, water, steam, rustling, hissing), no music, no dialogue text>
+<one short sentence per sound, at most THREE, each made by a character or object visible in the frame and timed to the cuts, then "Nothing else is heard." — the SOUND RULE applies; no music, no dialogue text>
 
 non_diegetic_music:
 N/A
@@ -1308,10 +1313,11 @@ ${inner}
   return {
     system: H3_SYSTEM,
     maxTokens: 14000, // long, exact prompts: up to ~350 words per shot
+    enforce: enforceH3Answer, // the sound rule is applied to the answer, whatever the scene says
     user: `FILM: ${project.title}
 SCENE ${project.outline.indexOf(scene) + 1}: ${scene.title} — ${scene.summary}
 ${chars ? `CHARACTERS:\n${chars}\n` : ''}
-DIRECTORIAL STYLE to express as concrete motion and sound: "${styleNote}"${dyn}${compositionRules(block || null, [], 'motion')}
+DIRECTORIAL STYLE to express as concrete motion (sound only as the SOUND RULE allows): "${styleNote}"${dyn}${compositionRules(block || null, [], 'motion')}
 
 Each shot below already has a generated FIRST FRAME that will be attached to the model, so the frame carries the appearance, wardrobe, lighting and set — do NOT re-describe them. Refer to people by neutral visual handles ("the woman", "the taller man"), never by name.
 
@@ -1320,6 +1326,10 @@ ${list}
 ${anySpatial(project, scene, shots) ? `${SPATIAL_RULE} It describes [Shot 1]'s opening composition; when a shot has internal cuts, every later [Shot N] must keep the same people on the same sides of the line between them.\n\n` : ''}${DYNAMICS_RULE} Each shot's CAMERA and ACTION lines hold them; write the camera in H3's own vocabulary (motion type, amplitude, speed).
 
 For EACH shot write the three H3 fields describing only that shot's own duration. Write them to the DETAIL STANDARD, and use shot changes inside a shot wherever the rule for them applies (longer than 4 seconds, more than one beat); the internal [Shot N] cut times must lie inside that shot's own duration. Shots marked REFERENCE MODE are rendered by H3's reference checkpoint: open their integrated_multimodal_description with subject definitions binding each reference to a role (“<Subject 1> is the woman from <Picture 1>”), state retention explicitly (“Use <Picture 1> exactly as it is” / “retain the voice of <Audio 1>”), then describe the shot; every attached reference must be mentioned by its label. References tagged [STORYBOARD FRAME] use MiniMax's official storyboard declaration — “<Picture N> is a storyboard reference for [Shot K], defining its viewpoint, subject placement, and shot order” — bound to the shot the frame belongs to (its scene/shot number is in the label). Shots marked MULTI-FRAME MODE are rendered by the reference checkpoint with stills pinned to exact timestamps: for those shots IGNORE the three-field layout and write "video_prompt" in the ${'SIX-SECTION KEYFRAME FORMAT'} defined at the end of this brief — the anchor table lists every picture with its role and its exact time, and [Shot N] markers inside the take must land on those times. GROUP TAKE entries are ONE multi-shot generation: write ONE video_prompt for the whole take — open with [Shot 1] (no timestamp), start every later segment with [Shot N] At MM:SS.mmm exactly matching the listed times, put <scenetrans> at each internal cut, keep continuity across the cuts — and return it under the take's shot number only; folded shots get NO entry of their own. Dialogue handling: every line is marked [NATIVE VOICE] — H3 speaks it; there is no separate voice track. Describe the dialogue or monologue it belongs to (who speaks to whom, delivery, pauses, the listener's reactions) and give each spoken line inside <d>[English] …</d> with a speaker ID and an established voice identity (honor the speaker notes). The spoken words must be in English — translate the script's line faithfully if it is in another language; split a long line across the speakers and beats exactly as the script has it; never drop or add lines.
+
+${H3_SOUND_RULE}
+${H3_SOUND_FORMAT}
+For EACH shot also return "sounds": its sound sources, at most THREE entries {"source", "sound"} — "source" the visible character or object that makes the sound, "sound" its soundscape sentence. Count them before you answer. The scene, location and style above may describe rain, wind, sea, traffic, steam or humming lights: they get NO sound. The app writes overall_soundscape from this list and drops every entry the SOUND RULE forbids.
 
 Return one entry per shot, in order, numbered from 1. "video_prompt" holds the three fields as ONE text block written exactly like this, blank line between fields:
 
@@ -1332,7 +1342,7 @@ non_diegetic_music: …
 Do NOT add an alignment header — the app prepends it (multi-frame shots need none: their anchor table is the alignment).
 
 JSON schema:
-{"prompts":[{"shot":1,"video_prompt":"integrated_multimodal_description: …\n\noverall_soundscape: …\n\nnon_diegetic_music: …"}]}${shots.some((s) => multiOf(s.id)) ? `\n\n${H3_MULTI_FORMAT}` : ''}`,
+{"prompts":[{"shot":1,"sounds":[{"source":"the woman's heels","sound":"Her heels click twice on the pavement as she steps off the curb."}],"video_prompt":"integrated_multimodal_description: …\n\noverall_soundscape: …\n\nnon_diegetic_music: N/A"}]}${shots.some((s) => multiOf(s.id)) ? `\n\n${H3_MULTI_FORMAT}` : ''}`,
   };
 }
 

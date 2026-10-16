@@ -186,6 +186,9 @@ export async function generateJSON(settings, spec, { signal, noPolicy } = {}) {
   });
   // A request that lists the character cards' names gets them enforced on the
   // answer: Cyrillic forms of a name are put back exactly as on the card.
-  if (!spec.names?.length) return answer;
-  return enforceNames(answer, spec.names, (repair) => generateJSON(settings, repair, { signal, noPolicy: true }));
+  const again = (repair) => generateJSON(settings, repair, { signal, noPolicy: true });
+  const named = spec.names?.length ? await enforceNames(answer, spec.names, again) : answer;
+  // A request that carries its own rules for the answer (the H3 sound rule)
+  // gets them applied here, on every path that runs it.
+  return typeof spec.enforce === 'function' ? spec.enforce(named, again) : named;
 }

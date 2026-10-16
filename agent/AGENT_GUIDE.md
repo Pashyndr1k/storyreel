@@ -190,11 +190,16 @@ writer works from. The parts that break a render if you get them wrong:
   made by characters or objects visible in the frame, NEVER dialogue, no
   music, no noisy ambience), `non_diegetic_music:
   N/A` (always — the film is scored in the edit).
-- Sound: no hissing, rustling, gurgling, squeaking, whistling or other
-  noisy ambience anywhere (no water, rain, tyres, steam, sea, wind, sand) —
-  H3 renders it as a high-pitched squeal. At most 2–3 sound sources, each a
-  character or object visible in the frame. Speech is exempt and may be a
-  voiceover. `storyreel_set_prompt` refuses a prompt that breaks this.
+- Sound (binding, whatever the scene says): no hissing, rustling,
+  gurgling, squeaking, creaking, whistling, crackling, humming or buzzing,
+  no water, rain, tyres, steam, sea, wind, sand, engines, traffic, crowds,
+  breathing or any ambience or off-screen sound — H3 renders it as a
+  high-pitched squeal. Sound goes only in `overall_soundscape`: one short
+  sentence per source, at most THREE, each a character or object visible in
+  the frame, no commas or lists, then "Nothing else is heard." The
+  description body names no sound. Speech is exempt and may be a voiceover.
+  `storyreel_set_prompt` refuses a prompt that breaks this; the app's own
+  writer has its answer cut to the rule.
 - Direct speech: every line of the script is spoken in the video. Give the
   speaker a stable ID on first appearance with their voice identity — "The
   woman (S1), mid-thirties, low warm voice, says:" — and put the words, and

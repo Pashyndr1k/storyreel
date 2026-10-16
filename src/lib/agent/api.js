@@ -18,6 +18,7 @@ import { still, contactSheet, videoFrame, audioReport } from './evidence.js';
 import { newProject, uid } from '../storage.js';
 import { generateJSON, textKeyError } from '../claude.js';
 import { smartEditPrompt, voiceSourceFor, H3_SYSTEM, H3_MULTI_FORMAT, H3_SOUND_RULE } from '../prompts.js';
+import { H3_SOUND_FORMAT, h3SoundProblems } from '../h3Sound.js';
 import { computeSmartPatch } from '../../components/SmartEditModal.jsx';
 import { shotCastRefs } from '../castRefs.js';
 import { locationsOf, shotLocationRefs } from '../sceneLocations.js';
@@ -300,11 +301,6 @@ const nativeVoiceEngine = () => {
 };
 const voiceSourceOf = (project, shotId) => (nativeVoiceEngine() ? 'native' : voiceSourceFor(project, shotId));
 
-// Words that bring noisy ambience into an H3 render: the noise verbs anywhere
-// outside speech, the ambient sources inside the soundscape field.
-const H3_NOISY_SOUND = /\b(hiss\w*|rustl\w*|gurgl\w*|squeak\w*|squeal\w*|whistl\w*|crackl\w*|sizzl\w*|babbl\w*|whoosh\w*|howl\w*|sound of (?:the )?(?:sea|wind|waves|rain|water|surf|ocean))\b/gi;
-const H3_AMBIENT_SOURCE = /\b(wind|winds|breeze|gusts?|sea|ocean|surf|waves?|tide|rain|drizzle|water|stream|river|steam|sand|leaves|tyres?|tires|traffic|hum|buzz\w*|room tone|ambien\w*)\b/gi;
-
 // What a hand-written H3 video prompt must have (the app's own writer obeys
 // H3_SYSTEM; an agent's text is checked for the parts that break a render).
 export function h3PromptProblems(text, shot) {
@@ -320,10 +316,8 @@ export function h3PromptProblems(text, shot) {
   if (dTags.length && !/\(S\d(,\s*S\d)*\)/.test(t)) problems.push('Give each speaker a stable ID — (S1), (S2) — before the <d> tag.');
   const sound = t.split(/overall_soundscape\s*:/i)[1]?.split(/non_diegetic_music/i)[0] || '';
   if (/<d>/.test(sound)) problems.push('No dialogue in overall_soundscape: speech belongs in the main body only.');
-  // H3 renders noisy ambience as a high squeal (H3_SOUND_RULE). Spoken words are exempt.
-  const noSpeech = t.replace(/<d>[\s\S]*?<\/d>/g, ' ');
-  const noisy = [...new Set([...noSpeech.matchAll(H3_NOISY_SOUND), ...sound.matchAll(H3_AMBIENT_SOURCE)].map((m) => m[0].toLowerCase()))];
-  if (noisy.length) problems.push(`Noisy ambient sound (${noisy.join(', ')}): H3 renders hissing, rustling, gurgling, squeaking, whistling, wind, sea, water, steam and sand as a high squeal. Keep 2–3 sounds made by characters or objects visible in the frame.`);
+  // H3 renders noisy sound as a high squeal: the SOUND RULE (h3Sound.js). Speech is exempt.
+  problems.push(...h3SoundProblems(t));
   if (!hasLine && dTags.length) problems.push('The shot has no dialogue, yet the prompt makes someone speak: do not invent lines.');
   return problems;
 }
@@ -527,7 +521,7 @@ export const TOOLS = [
         'A GROUP TAKE (several shots in one generation, project.shotGroups) is ONE video_prompt under the lead shot: [Shot 1] with no timestamp, every later segment "[Shot N] At MM:SS.mmm" at the take\'s cut times, <scenetrans> at each cut, continuity across the cuts; the members get no prompt of their own.',
         'REFERENCE MODE (shotRefs / an extended take): open with subject bindings — "<Subject 1> is the woman from <Picture 1>" — state retention ("Use <Picture 1> exactly as it is"), and mention every attached reference by its label; MULTI-FRAME mode uses the six-section keyframe format instead of the three fields.',
         'Dialogue: every line of the script is spoken in the video (there is no separate voice track on H3). Describe the exchange — who speaks to whom, delivery, pauses, the listener\'s reactions — and put the words, and only the words, inside <d>[English] …</d> after the speaker\'s ID. Never drop, add or reorder lines; split a long line exactly as the script does.',
-        `SOUND: ${H3_SOUND_RULE} storyreel_set_prompt refuses a video prompt with noisy ambience.`,
+        `SOUND: ${H3_SOUND_RULE} ${H3_SOUND_FORMAT} storyreel_set_prompt refuses a video prompt that breaks this.`,
         'The app\'s own writer (storyreel_create_prompts) already obeys all of this; rewrite by hand only when you must, and keep the format.',
       ],
     }),

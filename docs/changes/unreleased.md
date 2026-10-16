@@ -1,0 +1,52 @@
+# Unreleased (after 2.19.1)
+
+Base: tag `v2.19.0` (commit `7276d9a`) + local 2.19.1. All work below is on
+`main`, local.
+
+Conventions that apply to every change: UI strings exist in EN/RU/UA in
+`src/lib/i18n.js`; every button, header and indicator carries a hover hint
+(`title`); buttons are three words at most; sharp corners only.
+
+## 1. H3 sound rule enforced on the writer's answer
+
+**Why.** With 2.19.0 a recreated H3 prompt came back with five background
+sounds, "hiss" and "buzz", and an off-screen streetlight. The scene (rain,
+car, streetlight) pulled the writer past its instructions. The rule must
+hold whatever the scene says, with never more than three sound sources and
+no hissing.
+
+**Module.** `src/lib/h3Sound.js` now owns the rule.
+- `H3_SOUND_RULE` is binding and overrides script, scene, location, action
+  lines and style. It gives an ALLOWED list (≤ 3 short, clean sounds of
+  visible characters or objects) and a FORBIDDEN list (hissing, rustling,
+  water and rain, wind, whistling, squeaking or creaking, crackling,
+  humming or buzzing lights, engines, traffic, crowds, breathing, any
+  ambience or off-screen sound). Noisy scene elements stay silent picture.
+- `H3_SOUND_FORMAT`: sound only in `overall_soundscape`, one short sentence
+  per source, at most three, then "Nothing else is heard." ("Apart from the
+  dialogue, …" when someone speaks); the description body names no sound.
+- `enforceH3Sound` applies the rule to the answer. The app writes
+  `overall_soundscape` itself from the writer's new `sounds` list
+  (`{source, sound}` per entry). Without a list it uses the soundscape's
+  comma segments. Forbidden, off-screen and speech entries are dropped and
+  three at most are kept. A body that names sound goes back for one
+  surgical repair call. The repair is accepted only when every `<d>` speech
+  tag survives exactly. What still names sound is cut clause by clause,
+  keeping `<d>` tags and `[Shot N] At …` lead-ins.
+- `h3SoundProblems` drives the agent's `storyreel_set_prompt` refusal: sound
+  in the body, a forbidden sound, or more than three soundscape sentences.
+
+**Plumbing.** `generateJSON` (`src/lib/claude.js`) runs an optional
+`spec.enforce(answer, repair)` after name enforcement, so every path that
+runs the H3 writer (scene prompts, Process all, single-prompt recreate,
+engine-change rewrite, the agent's create_prompts) is covered. The H3 writer
+spec sets `enforce: enforceH3Answer`. Its user message repeats the rule
+after the shot list and asks for `sounds`. "Tweak" of a video prompt that
+has an `overall_soundscape` field carries the rule and
+`enforce: enforceH3Tweak`.
+
+**Not changed.** Prompts already stored in projects are not rewritten.
+Recreate them to apply the rule. Other video engines are unchanged.
+
+**Files.** `src/lib/h3Sound.js` (new), `src/lib/prompts.js`,
+`src/lib/claude.js`, `src/lib/agent/api.js`, `agent/AGENT_GUIDE.md`.

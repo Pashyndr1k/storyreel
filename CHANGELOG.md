@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **H3 sound rule is enforced.** The H3 prompt writer now follows a binding
+  list of allowed and forbidden sounds, whatever the scene describes. The
+  app itself writes the sound field from the writer's list: never more
+  than three sounds, each from a character or object in the frame, and no
+  hissing, rain, wind, engines, buzzing lights or other noise. A
+  description that still names a sound is repaired. Tweaks of H3 prompts
+  keep the rule. Recreate older prompts to apply it.
+
 ## 2.19.1 — 2026-10-16
 
 - **Cleaner sound on MiniMax H3.** H3 video prompts no longer ask for
