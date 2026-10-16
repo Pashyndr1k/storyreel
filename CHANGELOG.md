@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.19.2 — 2026-10-16
 
 - **H3 sound rule is enforced.** The H3 prompt writer now follows a binding
   list of allowed and forbidden sounds, whatever the scene describes. The
