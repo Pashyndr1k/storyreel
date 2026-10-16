@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.19.1 — 2026-10-16
 
 - **Cleaner sound on MiniMax H3.** H3 video prompts no longer ask for
   hissing, rustling, gurgling, whistling or other noisy ambience (water,
