@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.19.3 — 2026-10-19
 
 - **Much faster start-up.** The app no longer reads every image, video and
   audio file of every project when it starts. Projects open with their
