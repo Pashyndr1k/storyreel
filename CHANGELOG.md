@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.19.5 — 2026-10-19
 
 - **The AI agent can edit everything, comics included.** New agent tools
   edit character cards and portraits, groups, scenes, shots, locations,
