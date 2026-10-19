@@ -68,16 +68,26 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
     };
   }, []);
   const agentCommand = agentInfo?.mcpScript ? `claude mcp add storyreel -- node "${agentInfo.mcpScript}"` : '';
-  const copyAgentCommand = async () => {
+  // the agent skills ship next to the MCP server (agent/skills): one command
+  // copies them into Claude Code's skills folder (PowerShell on Windows)
+  const skillsDir = agentInfo?.mcpScript ? agentInfo.mcpScript.replace(/[\\/][^\\/]+$/, '') + (/^[A-Za-z]:\\/.test(agentInfo.mcpScript) ? '\\skills' : '/skills') : '';
+  const skillsCommand = !skillsDir
+    ? ''
+    : /^[A-Za-z]:\\/.test(skillsDir)
+      ? `New-Item -ItemType Directory -Force "$env:USERPROFILE\\.claude\\skills" | Out-Null; Copy-Item -Recurse -Force "${skillsDir}\\*" "$env:USERPROFILE\\.claude\\skills"`
+      : `mkdir -p ~/.claude/skills && cp -R "${skillsDir}/." ~/.claude/skills/`;
+  const [skillsCopied, setSkillsCopied] = useState(false);
+  const copyText = async (text, done) => {
     try {
-      if (window.localFiles?.clipboardWrite) await window.localFiles.clipboardWrite(agentCommand);
-      else await navigator.clipboard.writeText(agentCommand);
-      setAgentCopied(true);
-      setTimeout(() => setAgentCopied(false), 1500);
+      if (window.localFiles?.clipboardWrite) await window.localFiles.clipboardWrite(text);
+      else await navigator.clipboard.writeText(text);
+      done(true);
+      setTimeout(() => done(false), 1500);
     } catch {
       /* the command is selectable in the field */
     }
   };
+  const copyAgentCommand = () => copyText(agentCommand, setAgentCopied);
   const [policies, setPolicies] = useState(loadPolicies);
   const [policyId, setPolicyId] = useState(() => (loadPolicies().some((p) => p.id === settings.policyId) ? settings.policyId : ''));
 
@@ -615,6 +625,13 @@ export default function SettingsModal({ settings, setSettings, projects = [], st
                 <input className="grow agent-command" readOnly value={agentCommand} title={t('tip.agentCommand')} onFocus={(e) => e.target.select()} />
                 <button title={t('tip.agentCopy')} className="btn small fixedw" disabled={!agentCommand} onClick={copyAgentCommand}>
                   {agentCopied ? t('set.agentCopied') : t('set.agentCopy')}
+                </button>
+              </div>
+              <p className="hint">{t('set.agentSkillsHint')}</p>
+              <div className="row">
+                <input className="grow agent-command" readOnly value={skillsCommand} title={t('tip.agentSkills')} onFocus={(e) => e.target.select()} />
+                <button title={t('tip.agentSkillsCopy')} className="btn small fixedw" disabled={!skillsCommand} onClick={() => copyText(skillsCommand, setSkillsCopied)}>
+                  {skillsCopied ? t('set.agentCopied') : t('set.agentCopy')}
                 </button>
               </div>
             </div>

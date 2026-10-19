@@ -15,6 +15,12 @@ person may be watching — never fight them for control: if a call fails with
 | 3 Scene outline | scenes with durations, pacing plan | `storyreel_run_stage` (3) |
 | 4 Shot breakdown | shots per scene: type, location, action, dialogue | `storyreel_run_stage` (4) |
 | 5 Generation & assembly | per shot: prompts → first frame (→ the scene's location reference) → voice when there is dialogue → video; then transitions, subtitles and the timeline render | `storyreel_create_prompts`, `storyreel_create_media`, `storyreel_set_transitions`, `storyreel_set_subtitles`, `storyreel_render` |
+| 5 Comic (graphic novel projects) | per shot one 9:16 comic screen of 2–3 panels: layout, panel prompts, captions, balloons → panel images → review → PNG export | `storyreel_novel_plan`, `storyreel_novel_set_screen`, `storyreel_novel_draw`, `storyreel_novel_review`, `storyreel_novel_export` |
+
+A project's `format` (in `storyreel_get_project` / `storyreel_list_projects`)
+is `video` or `novel`. A graphic novel develops its story exactly like a
+Short Drama 2 series (stages 1–4) and has no video: the video tools refuse
+it and point to the `storyreel_novel_*` tools (see "Graphic novel").
 
 Start with `storyreel_status`, then `storyreel_list_projects` or
 `storyreel_create_project`. Read the project with `storyreel_get_project`
@@ -36,10 +42,17 @@ work that already passes.
   before the shot's first frame has passed review. Never regenerate something
   that passed. Do not start `storyreel_render` until every shot has a video or
   a flag.
-- **Character photos.** Reference photos are added by the person at Stage 2;
-  you cannot add them. Re-running Stage 2 replaces the cast and **loses their
-  photos** — if a storyline exists and has photos, change it with
-  `storyreel_smart_edit` instead of re-running the stage.
+- **Character photos.** Reference photos come from the person (Stage 2
+  uploads or the library), from `storyreel_character_portrait` (rendered from
+  the description — counts as an attempt) or from `storyreel_set_character`
+  `addPhoto` (a data:image URL you were given). Prefer the person's own
+  photos; never replace one they added. Re-running Stage 2 replaces the cast
+  and **loses their photos** — if a storyline exists and has photos, change
+  it with `storyreel_smart_edit` or `storyreel_set_character` instead of
+  re-running the stage.
+- **Deleting.** `storyreel_manage_project` `delete` and the `delete` ops of
+  the edit tools remove things for good. Only when the person asked for it;
+  a project delete needs `confirmTitle` with the exact title.
 
 ## Verifying each stage
 
@@ -392,6 +405,79 @@ Character names are written exactly as on the character cards (English,
 Latin letters) in every stage's text, whatever the script language. The app
 corrects other spellings in generated text itself; keep to the card names in
 anything you write with `storyreel_edit_script` or `storyreel_set_prompt`.
+
+## Editing a project by hand
+
+Every edit a person makes in the app has a tool. Pick the narrowest one —
+it changes only what it names and is free:
+
+| Change | Tool |
+|---|---|
+| title, genres, logline, approved plot, aspect, styles of the project, 3D layout on/off | `storyreel_update_project` |
+| pin, archive, duplicate, delete a project | `storyreel_manage_project` |
+| Stage 1 options: unconventional-plot tools, randomization methods | `storyreel_set_plot_options` |
+| the synopsis | `storyreel_edit_storyline` |
+| a character card (create, rename, role, description, photos, delete) | `storyreel_set_character`, `storyreel_character_portrait` |
+| an actor group | `storyreel_set_group` |
+| a scene's text | `storyreel_edit_script` (sceneId) |
+| add / delete / move scenes | `storyreel_edit_outline` |
+| a scene's locations (add, rename, photos, delete) | `storyreel_set_location`, `storyreel_location_image` |
+| a shot's text | `storyreel_edit_script` (shotId) |
+| add / delete / move / copy shots | `storyreel_edit_shots`, `storyreel_duplicate_shot` |
+| story assets | `storyreel_set_asset`, `storyreel_asset_image`, `storyreel_sync_assets` |
+| the style library (create, edit, delete a style) | `storyreel_set_style` |
+| app preferences (language, theme, services) | `storyreel_app_settings` |
+| one instruction applied consistently everywhere ("rename Anna to Maria", "move the story to winter") | `storyreel_smart_edit` |
+
+What a direct edit does NOT do: renaming a character card leaves the old
+name in scenes, shots and prompts (use `storyreel_smart_edit` for that);
+changing a shot's text leaves its prompts, images and video as they were
+(recreate them if the change shows); deleting a scene or shot removes its
+prompts, media and comic screen with it. Report every edit you made.
+
+## Graphic novel (format "novel")
+
+A graphic novel is a series project (Short Drama 2 rules, 9:16) whose Stage
+5 is a vertical comic feed. Create one with `storyreel_create_project`
+`{ format: "novel", logline, episodeCount }`; stages 1–4 run as for any
+series (`storyreel_run_stage`). Stage 4 is told that every shot becomes one
+comic screen of two or three beats.
+
+Every shot is one SCREEN (1080×1920) divided into 2–3 panels by one of four
+layout templates — `stack2` (two tiers: action / reaction), `stack3` (three
+tiers: a fast sequence), `heroTop` (a big establishing or impact panel, two
+tall reactions below), `heroBottom` (two tall build-up panels, a big
+reveal or cliffhanger below). Under every panel is a caption line (≤ 2
+lines: narration, place / time, sound — never dialogue). Balloons hold the
+script's lines verbatim in the project language, Comic Sans at one size on
+every screen; each balloon is sized to its text.
+
+1. `storyreel_novel_rules` once — the templates, the composition rules, the
+   lettering limits.
+2. Per scene: `storyreel_novel_plan { sceneId }` (attempt). Then
+   `storyreel_novel_get { sceneId }` and read every screen's `issues`.
+3. Fix by hand with `storyreel_novel_set_screen` (free): change the layout
+   when the beats do not fit it; vary framing between adjacent panels; put
+   the first speaker of a panel on the left; keep ≤ 2 balloons and ≤ 25
+   words per balloon (split lines across panels); shorten long captions;
+   restore any script line missing from the balloons. One screen badly
+   planned: `storyreel_novel_plan { shotId }`.
+4. `storyreel_novel_draw { sceneId }` (one attempt per panel), then
+   `storyreel_novel_review { shotId }` for every screen. Judge the rendered
+   screen and each panel against the references: likeness, the same people
+   on the same sides, framing that matches the panel's `framing`, the upper
+   third clear where there are balloons, balloons not covering faces, no
+   lettering, logos or artifacts drawn into the image, and the last panel of
+   the screen working as the hook that makes the reader scroll on.
+5. A failed panel: improve its `prompt` (`storyreel_novel_set_screen`) and
+   redraw it (`storyreel_novel_draw { shotId, panelIndex }`). A balloon in
+   the wrong place: `bubbleMoves` with x / y as fractions of the panel
+   image. After four attempts, flag the screen (`storyreel_flag`, shotId).
+6. When every panel is drawn or flagged: `storyreel_novel_export` — PNGs in
+   reading order in the project's `comic` folder.
+
+The video tools (`storyreel_create_prompts`, `storyreel_create_media`,
+`storyreel_render`, transitions, subtitles) do not apply to a graphic novel.
 
 ## Fixing a failed check
 

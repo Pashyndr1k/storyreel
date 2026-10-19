@@ -9,7 +9,7 @@
 import { uid } from './storage.js';
 
 // Maps keyed by shot id, copied for the shots a part keeps.
-const SHOT_MAPS = [
+export const SHOT_MAPS = [
   'shotPrompts', 'shotImages', 'shotImageHistory', 'shotFinalImages', 'shotVideos', 'shotAudios', 'shotAudioSrc',
   'shotAudioPads', 'shotAssets', 'shotLocations', 'videoGenDurations', 'shotVideoModes', 'shotSeeds', 'shotSeedMode',
   'shotVideoEngines', 'shotPromptEngines', 'shotCamera', 'shotAction', 'shotPromptDyn', 'shotVoiceSources',

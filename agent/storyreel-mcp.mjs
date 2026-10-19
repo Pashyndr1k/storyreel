@@ -11,10 +11,19 @@
 //   the app's default agent.json for this OS
 //
 // Claude Code:  claude mcp add storyreel -- node "<path to this file>"
+//
+// Skills: the folder skills/ next to this file holds Claude Code skills for
+// operating the app (SKILL.md each). They are served as MCP prompts (any MCP
+// client can load them) and the local tool storyreel_install_skills copies
+// them into ~/.claude/skills (or a project's .claude/skills) — that tool works
+// even while the app is closed.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
+import { fileURLToPath } from 'node:url';
+
+const SKILLS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'skills');
 
 const PROTOCOL = '2024-11-05';
 
@@ -55,6 +64,49 @@ async function http(method, route, body) {
   }
 }
 
+// ---- skills (local: read from the folder next to this script) ----------------
+function readSkills() {
+  let dirs = [];
+  try {
+    dirs = fs.readdirSync(SKILLS_DIR, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
+  } catch {
+    return [];
+  }
+  return dirs
+    .map((dir) => {
+      try {
+        const text = fs.readFileSync(path.join(SKILLS_DIR, dir, 'SKILL.md'), 'utf8');
+        const fm = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text);
+        const field = (k) => (fm ? (new RegExp(`^${k}:\\s*(.*)$`, 'm').exec(fm[1]) || [])[1] : '') || '';
+        return { dir, name: field('name').trim() || dir, description: field('description').trim(), body: fm ? text.slice(fm[0].length) : text, text };
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+}
+
+const INSTALL_TOOL = {
+  name: 'storyreel_install_skills',
+  description: 'Install the StoryReel agent skills (operator, editing, short drama, video, graphic novel) into Claude Code: target "user" copies them to ~/.claude/skills (every project), "project" to <projectDir>/.claude/skills. Claude Code loads skills when a session starts — start a new session afterwards. Works without the app running.',
+  inputSchema: { type: 'object', properties: { target: { type: 'string', enum: ['user', 'project'] }, projectDir: { type: 'string', description: 'For target "project": the project folder.' } }, additionalProperties: false },
+};
+
+function installSkills({ target = 'user', projectDir } = {}) {
+  const skills = readSkills();
+  if (!skills.length) return { isError: true, content: [{ type: 'text', text: `No skills found next to the MCP server (${SKILLS_DIR}).` }] };
+  if (target === 'project' && !projectDir) return { isError: true, content: [{ type: 'text', text: 'projectDir is required for target "project".' }] };
+  const root = target === 'project' ? path.join(projectDir, '.claude', 'skills') : path.join(os.homedir(), '.claude', 'skills');
+  const done = [];
+  for (const sk of skills) {
+    const dir = path.join(root, sk.dir);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'SKILL.md'), sk.text);
+    done.push(sk.name);
+  }
+  return { content: [{ type: 'text', text: JSON.stringify({ installed: done, folder: root, next: 'Start a new Claude Code session to load them.' }, null, 2) }] };
+}
+
 const OFFLINE_TOOL = {
   name: 'storyreel_status',
   description: 'StoryReel is not connected yet. Call this to see what is needed (the desktop app must be open with Agent access enabled), then ask for the tool list again.',
@@ -63,7 +115,7 @@ const OFFLINE_TOOL = {
 
 async function listTools() {
   const res = await http('GET', '/tools');
-  return res.ok && Array.isArray(res.result) ? res.result : [OFFLINE_TOOL];
+  return [...(res.ok && Array.isArray(res.result) ? res.result : [OFFLINE_TOOL]), INSTALL_TOOL];
 }
 
 // Images inside a result ({ label, dataURL }) become MCP image blocks, each
@@ -82,6 +134,7 @@ function toContent(result) {
 }
 
 async function callTool(name, args) {
+  if (name === INSTALL_TOOL.name) return installSkills(args || {});
   const res = await http('POST', '/call', { method: name, params: args || {} });
   if (res.ok) return { content: toContent(res.result) };
   return { isError: true, content: [{ type: 'text', text: `${res.error?.code || 'ERROR'}: ${res.error?.message || 'The call failed.'}` }] };
@@ -97,14 +150,20 @@ async function onMessage(msg) {
     if (method === 'initialize') {
       return reply({
         protocolVersion: params?.protocolVersion || PROTOCOL,
-        capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: 'storyreel', version: '1.0.0' },
-        instructions: 'Operates the StoryReel desktop app. Call storyreel_guide first; it explains the pipeline, the checks to run and the four-attempt rule.',
+        capabilities: { tools: { listChanged: false }, prompts: { listChanged: false } },
+        serverInfo: { name: 'storyreel', version: '1.1.0' },
+        instructions: 'Operates the StoryReel desktop app (films, short-drama series, graphic novels). Call storyreel_guide first; it explains the pipeline, the checks to run and the four-attempt rule. The prompts of this server are the StoryReel skills (operator, editing, short drama, video, graphic novel); storyreel_install_skills installs them into Claude Code.',
       });
     }
     if (method === 'ping') return reply({});
     if (method === 'tools/list') return reply({ tools: await listTools() });
     if (method === 'tools/call') return reply(await callTool(params?.name, params?.arguments));
+    if (method === 'prompts/list') return reply({ prompts: readSkills().map((sk) => ({ name: sk.name, description: sk.description })) });
+    if (method === 'prompts/get') {
+      const sk = readSkills().find((x) => x.name === params?.name);
+      if (!sk) return error(-32602, `Unknown prompt: ${params?.name}`);
+      return reply({ description: sk.description, messages: [{ role: 'user', content: { type: 'text', text: sk.body } }] });
+    }
     if (typeof method === 'string' && method.startsWith('notifications/')) return undefined;
     return error(-32601, `Method not found: ${method}`);
   } catch (e) {

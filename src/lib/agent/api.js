@@ -36,6 +36,9 @@ import { loadStyles } from '../styles.js';
 import { layoutTools } from './layoutTools.js';
 import { assetTools, assetsView } from './assetTools.js';
 import { assemblyTools } from './assemblyTools.js';
+import { editTools } from './editTools.js';
+import { novelTools } from './novelTools.js';
+import { isNovel, feedOf, visiblePanels } from '../novel/model.js';
 import { appLog } from '../actionLog.js';
 import { locationImagePrompt } from '../sceneLocations.js';
 import { generateImage } from '../gemini.js';
@@ -174,6 +177,14 @@ function projectView(project, { prompts = false } = {}) {
     genres: project.genres,
     stage: project.stage,
     scriptType: project.scriptType,
+    format: isNovel(project) ? 'novel' : 'video',
+    ...(isNovel(project)
+      ? (() => {
+          const feed = feedOf(project);
+          const panels = feed.flatMap((x) => visiblePanels(x.screen));
+          return { comic: { screens: feed.length, planned: feed.filter((x) => x.screen.planned).length, panels: panels.length, drawn: panels.filter((pn) => (project.panelImages || {})[pn.id]).length, tools: 'storyreel_novel_get for the screens' } };
+        })()
+      : {}),
     ...(project.scriptType === 'series' ? { episodeCount: project.episodeCount, episodeSeconds: project.episodeSeconds, seriesMaster: isSeriesMaster(project) } : {}),
     aspectRatio: project.aspectRatio,
     useLayout: layoutEnabled(project),
@@ -257,7 +268,13 @@ async function runStage({ projectId, stage, sceneId, mode }) {
   return { attempt, project: projectView(projectOf(projectId)) };
 }
 
+// a graphic novel has no video at Stage 5: its tools are storyreel_novel_*
+const notForNovel = (project, what) => {
+  if (isNovel(project)) fail('NOT_READY', `This project is a graphic novel: ${what} does not apply. Stage 5 builds comic screens — use storyreel_novel_plan, storyreel_novel_set_screen, storyreel_novel_draw, storyreel_novel_review and storyreel_novel_export.`);
+};
+
 async function createPrompts({ projectId, sceneId, shotId, kind }) {
+  notForNovel(projectOf(projectId), 'shot prompts');
   const keyErr = textKeyError(app().settings);
   if (keyErr) fail('NO_KEY', 'The text model API key is not set in StoryReel Settings.');
   const project = projectOf(projectId);
@@ -325,6 +342,7 @@ export function h3PromptProblems(text, shot) {
 async function createMedia({ projectId, shotId, kind, seed }) {
   const spec = MEDIA[kind] || fail('BAD_INPUT', `kind must be one of: ${Object.keys(MEDIA).join(', ')}.`);
   const project = projectOf(projectId);
+  notForNovel(project, 'shot media');
   const { scene, shot, index } = findShot(project, shotId);
   const pr = project.shotPrompts[shotId] || {};
   if (kind === 'image' && !(pr.imagePrompt || '').trim()) fail('NOT_READY', 'This shot has no image prompt yet.');
@@ -561,17 +579,17 @@ export const TOOLS = [
   },
   {
     name: 'storyreel_list_projects',
-    description: 'List the projects (not archived) with their stage and number of open flags.',
-    inputSchema: schema({}),
-    run: async () => ({
+    description: 'List the projects with their format (video / novel), stage and number of open flags. Archived projects only with includeArchived.',
+    inputSchema: schema({ includeArchived: { type: 'boolean' } }),
+    run: async ({ includeArchived } = {}) => ({
       projects: app()
-        .projects.filter((p) => !p.archived)
-        .map((p) => ({ id: p.id, title: p.title, stage: p.stage, scriptType: p.scriptType, scenes: p.outline.length, openFlags: (p.agentFlags || []).filter((f) => !f.resolved).length, updatedAt: p.updatedAt })),
+        .projects.filter((p) => includeArchived || !p.archived)
+        .map((p) => ({ id: p.id, title: p.title, format: isNovel(p) ? 'novel' : 'video', ...(p.archived ? { archived: true } : {}), ...(p.pinned ? { pinned: true } : {}), stage: p.stage, scriptType: p.scriptType, scenes: p.outline.length, openFlags: (p.agentFlags || []).filter((f) => !f.resolved).length, updatedAt: p.updatedAt })),
     }),
   },
   {
     name: 'storyreel_create_project',
-    description: 'Create a new project from an idea. scriptType: "short" (10–30 s), "medium" (1–4 min), "long" (5–10 min) or "series" (vertical short drama; give episodeCount and, optionally, dramaEngine). Returns the project id.',
+    description: 'Create a new project from an idea. scriptType: "short" (10–30 s), "medium" (1–4 min), "long" (5–10 min) or "series" (vertical short drama; give episodeCount and, optionally, dramaEngine). format "novel" makes a GRAPHIC NOVEL: the story is developed like Short Drama 2 (series, 9:16) and Stage 5 builds a vertical comic feed instead of a video (storyreel_novel_* tools). Returns the project id.',
     inputSchema: schema(
       {
         title: str('Working title.'),
@@ -580,14 +598,16 @@ export const TOOLS = [
         aspectRatio: { type: 'string', enum: ['16:9', '9:16', '1:1', '4:3', '3:4'] },
         episodeCount: { type: 'integer', minimum: 1, maximum: 200 },
         episodeSeconds: { type: 'integer', enum: [60, 90, 120], description: 'Series: the episode length (default 90).' },
+        format: { type: 'string', enum: ['video', 'novel'], description: '"novel" = graphic novel (implies series, Short Drama 2, 9:16). Default "video".' },
         dramaEngine: { type: 'string', enum: ['v1', 'v2'], description: 'Series: the template — "v1" Short drama (the craft-guide engine, default) or "v2" Short Drama 2 (the production-manual engine: hook / friction / turn / spike / button, six cliffhanger types, the paywall as the last free episode, written for MiniMax H3 and Nano Banana 2.1).' },
       },
       ['logline']
     ),
-    run: async ({ title, logline, scriptType = 'medium', aspectRatio, episodeCount, episodeSeconds, dramaEngine }) => {
+    run: async ({ title, logline, scriptType = 'medium', aspectRatio, episodeCount, episodeSeconds, dramaEngine, format }) => {
       if (!(logline || '').trim()) fail('BAD_INPUT', 'logline is required.');
-      const series = scriptType === 'series';
-      const p = newProject({ title, logline: logline.trim(), scriptType, aspectRatio: aspectRatio || (series ? '9:16' : '16:9'), episodeCount, episodeSeconds, scriptStyleId: series ? SHORT_DRAMA_STYLE_ID : '', dramaEngine: series ? dramaEngine : 'v1' });
+      const novel = format === 'novel';
+      const series = novel || scriptType === 'series';
+      const p = newProject({ title, logline: logline.trim(), scriptType: series ? 'series' : scriptType, aspectRatio: novel ? '9:16' : aspectRatio || (series ? '9:16' : '16:9'), episodeCount, episodeSeconds, scriptStyleId: series ? SHORT_DRAMA_STYLE_ID : '', dramaEngine: novel ? 'v2' : series ? dramaEngine : 'v1', format: novel ? 'novel' : 'video' });
       app().addProjects([p]);
       await settle();
       return { projectId: p.id, next: 'storyreel_run_stage with stage 1.' };
@@ -918,6 +938,8 @@ export const TOOLS = [
     },
   },
   ...assetTools({ app, projectOf, patchProject, sceneOf, fail, settle, countAttempt, schema, PROJECT }),
+  ...editTools({ app, projectOf, patchProject, sceneOf, findShot, fail, settle, countAttempt, schema, PROJECT }),
+  ...novelTools({ app, projectOf, patchProject, sceneOf, findShot, fail, settle, countAttempt, schema, PROJECT }),
   {
     name: 'storyreel_create_media',
     description: 'Stage 5: generate one piece of media for a shot — "image" (first frame), "final_frame", "video" (needs the first frame; can take many minutes), "voice" (TTS for the shot\'s dialogue; a shot with dialogue needs its voice BEFORE its video on the local engine, and the shot grows to hold the whole line) or "location_ref" (a clean environment reference cut from the approved first frame — people removed, frame widened — added to the scene\'s location photos; make one for every scene whose location has no reference, right after its first good frame). For video on a local engine, seed "same" replays the seed of the shot\'s previous render (shotView.videoSeed) so only the prompt or quality setting changes; "new" (default) rolls fresh noise. Counts as an attempt; after four the target is flagged and further calls are refused. Verify the result with storyreel_review_shot.',
@@ -965,6 +987,7 @@ export const TOOLS = [
     inputSchema: schema({ ...PROJECT, force: { type: 'boolean', description: 'Render even though some shots have neither a video nor a flag.' } }, ['projectId']),
     run: async ({ projectId, force }) => {
       const p = projectOf(projectId);
+      notForNovel(p, 'rendering a video');
       const missing = p.outline.flatMap((sc) => (p.sceneDetails[sc.id]?.shots || []).filter((s) => !has(p.shotVideos, s.id) && !(p.agentFlags || []).some((f) => !f.resolved && f.target?.shotId === s.id)).map((s) => s.id));
       if (missing.length && !force) fail('NOT_READY', `${missing.length} shot(s) have neither a video nor a flag: ${missing.slice(0, 8).join(', ')}.`);
       const assembly = await openStage(projectId, 5);
@@ -982,7 +1005,7 @@ let running = null;
 export async function callAgent(method, params = {}) {
   const tool = TOOLS.find((t) => t.name === method);
   if (!tool) return { ok: false, error: { code: 'UNKNOWN_TOOL', message: `No tool named "${method}".` } };
-  const readOnly = ['storyreel_guide', 'storyreel_status', 'storyreel_list_projects', 'storyreel_get_project', 'storyreel_list_styles', 'storyreel_list_flags', 'storyreel_get_layout', 'storyreel_drama_rules', 'storyreel_drama_check', 'storyreel_assets', 'storyreel_transitions', 'storyreel_subtitles', 'storyreel_h3_rules'].includes(method);
+  const readOnly = ['storyreel_guide', 'storyreel_status', 'storyreel_list_projects', 'storyreel_get_project', 'storyreel_list_styles', 'storyreel_list_flags', 'storyreel_get_layout', 'storyreel_drama_rules', 'storyreel_drama_check', 'storyreel_assets', 'storyreel_transitions', 'storyreel_subtitles', 'storyreel_h3_rules', 'storyreel_novel_rules', 'storyreel_novel_get', 'storyreel_novel_review'].includes(method);
   if (running && !readOnly) return { ok: false, error: { code: 'BUSY', message: `StoryReel is still running "${running}". Wait for it to finish.` } };
   if (!readOnly) running = method;
   if (!readOnly) appLog('agent.call', { tool: method, ...(params?.projectId ? { projectId: params.projectId } : {}), ...(params?.shotId ? { shotId: params.shotId } : {}), ...(params?.kind ? { kind: params.kind } : {}) });

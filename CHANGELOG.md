@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- **The AI agent can edit everything, comics included.** New agent tools
+  edit character cards and portraits, groups, scenes, shots, locations,
+  styles, preferences and projects (pin, archive, duplicate, delete). A
+  full tool set handles graphic novels: plan, edit screens and balloons,
+  draw and review panels with automatic layout checks, and export.
+- **Agent skills.** Five Claude Code skills teach the agent to run
+  StoryReel: operator, editing, short drama, video and graphic novel.
+  Install them from Settings → Interface → Agent access, or let the agent
+  install them itself.
+
 ## 2.19.4 — 2026-10-19
 
 - **Graphic novel.** A new project template that turns a short-drama story

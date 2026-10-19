@@ -408,10 +408,14 @@ export default function App() {
     styles,
     library,
     lang: settings.lang || 'en',
-    updateProject: (id, patch) => updateProject(id, patch),
+    updateProject: (id, patch, opts) => updateProject(id, patch, opts),
     addProjects: (list) => setProjects((ps) => [...list, ...ps]),
     openProject: (id) => setRoute((r) => (r.name === 'project' && r.id === id ? r : { name: 'project', id })),
     ensureHydrated: hydrateInState,
+    // the agent's edit tools (lib/agent/editTools.js)
+    setStyles: (fn) => setStyles(fn),
+    patchSettings: (patch) => setSettings((cur) => ({ ...cur, ...patch })),
+    removeProject: (id) => removeProject(id),
   });
   useEffect(() => {
     // dev and tests reach the same entry point without the server
