@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.19.4 — 2026-10-19
 
 - **Graphic novel.** A new project template that turns a short-drama story
   into a vertical 9:16 comic. Stages 1–4 work as in Short Drama 2. Stage 5
