@@ -74,6 +74,10 @@ export function buildPartProject(master, { from, to }, index, total, label) {
   p.sceneDetails = pick(master.sceneDetails, sceneIds);
   p.sceneLayouts = pick(master.sceneLayouts, sceneIds);
   for (const key of SHOT_MAPS) p[key] = pick(master[key], shotIds);
+  // graphic novel: the screens of the kept shots and their panels' images
+  p.novel = { screens: pick(master.novel?.screens, shotIds) };
+  const panelIds = new Set(Object.values(p.novel.screens).flatMap((s) => (s.panels || []).map((x) => x.id)));
+  p.panelImages = pick(master.panelImages, panelIds);
   p.dynamicsPlan = partPlan(master.dynamicsPlan, master.outline, from, to);
   // flags and attempts that point at kept shots / scenes
   p.agentFlags = (master.agentFlags || []).filter((f) => (f.target?.shotId ? shotIds.has(f.target.shotId) : f.target?.sceneId ? sceneIds.has(f.target.sceneId) : false));

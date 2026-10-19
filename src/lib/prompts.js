@@ -14,6 +14,7 @@ import { originalityOf, plotConstraintsText } from './originality.js';
 import { loadStyles, resolveStyleText } from './styles.js';
 import { assetBlock, storyAssetsOf } from './storyAssets.js';
 import { H3_SOUND_RULE, H3_SOUND_FORMAT, enforceH3Answer, enforceH3Tweak } from './h3Sound.js';
+import { NOVEL_SHOT_NOTE } from './novel/rules.js';
 
 export { H3_SOUND_RULE };
 
@@ -486,7 +487,8 @@ export function stage4Prompt(project, scene, lang, scriptStyle, block, mode = 'n
 - Camera momentum contract: "${block.required_camera_momentum.replace(/_/g, ' ')}" — reflect it in shot types and notes.`
     : '';
   return {
-    system: drama.system,
+    // a graphic novel: every shot becomes one comic screen of 2–3 panels
+    system: project.format === 'novel' ? `${drama.system}\n\n${NOVEL_SHOT_NOTE}` : drama.system,
     names: cardNames(project),
     maxTokens: 6000,
     user: withPhotos(scenePhotos(scene), `Title: ${project.title}

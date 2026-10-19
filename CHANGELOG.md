@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- **Graphic novel.** A new project template that turns a short-drama story
+  into a vertical 9:16 comic. Stages 1–4 work as in Short Drama 2. Stage 5
+  shows the comic as a vertical feed with the screen's options on the
+  right. Each shot becomes a screen of two or three panels, laid out with a
+  composition tool of four templates. Balloons use Comic Sans at one size
+  and grow with their text, and every panel has a caption line. The AI
+  plans layouts and panels, draws the panels with your cast and places, and
+  Export comic saves every screen as a 1080×1920 PNG.
+
 ## 2.19.3 — 2026-10-19
 
 - **Much faster start-up.** The app no longer reads every image, video and

@@ -161,6 +161,7 @@ export function buildSegmentProject(master, seg, label) {
     episodeSeconds: clampEpisodeSec(master.episodeSeconds),
     scriptStyleId: master.scriptStyleId,
     dramaEngine: master.dramaEngine,
+    format: master.format,
   });
   return {
     ...p,

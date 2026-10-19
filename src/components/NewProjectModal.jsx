@@ -8,8 +8,10 @@ import { SERIES_MIN_EPISODES, SERIES_MAX_EPISODES, SERIES_DEFAULT_EPISODES, EPIS
 // 'series' is the short-drama template (the craft-guide engine) and 'series2'
 // is "Short Drama 2" (the production-manual engine): vertical serials planned
 // by episodes — first in the list
-const TYPES = ['series', 'series2', 'short', 'medium', 'long'];
-const isSeries = (k) => k === 'series' || k === 'series2';
+// 'novel' is the graphic novel: the Short Drama 2 story pipeline, a 9:16
+// comic feed instead of a video
+const TYPES = ['series', 'series2', 'novel', 'short', 'medium', 'long'];
+const isSeries = (k) => k === 'series' || k === 'series2' || k === 'novel';
 
 export default function NewProjectModal({ onCreate, onClose, settings }) {
   const { t } = useI18n();
@@ -78,8 +80,12 @@ export default function NewProjectModal({ onCreate, onClose, settings }) {
             </div>
           </>
         )}
-        <label>{t('new.aspect')}</label>
-        <AspectSelector value={aspect} onChange={setAspect} />
+        {type !== 'novel' && (
+          <>
+            <label>{t('new.aspect')}</label>
+            <AspectSelector value={aspect} onChange={setAspect} />
+          </>
+        )}
 
         <label>{t('new.plotLabel')}</label>
         <div className="voice-row">
@@ -101,7 +107,7 @@ export default function NewProjectModal({ onCreate, onClose, settings }) {
           <button title={t('tip.create')}
             className="btn primary"
             disabled={!logline.trim()}
-            onClick={() => onCreate(title, logline.trim(), type, aspect, isSeries(type) ? clampEpisodes(episodes) : 0, isSeries(type) ? epSec : 0)}
+            onClick={() => onCreate(title, logline.trim(), type, type === 'novel' ? '9:16' : aspect, isSeries(type) ? clampEpisodes(episodes) : 0, isSeries(type) ? epSec : 0)}
           >
             {t('new.create')}
           </button>

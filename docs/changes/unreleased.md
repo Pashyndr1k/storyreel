@@ -1,0 +1,93 @@
+# Unreleased (after 2.19.3)
+
+Base: tag `v2.19.3` (commit `86133ba`). All work below is on `main`, local.
+
+Conventions that apply to every change: UI strings exist in EN/RU/UA in
+`src/lib/i18n.js`; every button, header and indicator carries a hover hint
+(`title`); buttons are three words at most; sharp corners only.
+
+## 1. Graphic novel: a vertical 9:16 comic feed instead of a video
+
+**What.** A new project template, "Graphic novel", in the New project
+dialog. Its story, cast, places and assets go through the same stages 1–4 as
+Short Drama 2. Stage 5, labelled "Comic", builds a vertical feed of 9:16
+comic screens instead of a video. Each shot becomes one screen of 2–3 panels
+with images, speech balloons and a caption line under every panel.
+
+**Data.** `project.format = 'novel'` on a series project (`scriptType
+'series'`, `dramaEngine 'v2'`, aspect 9:16).
+- `project.novel.screens[shotId]` holds `{ layout, planned, panels }`. A
+  panel is `{ id, framing, characters, prompt, caption, bubbles }`, and a
+  bubble is `{ id, speaker, text, tail, x?, y? }`.
+- `project.panelImages[panelId]` holds the panel images. They are media,
+  split into the media store as `panel_<id>.*`.
+- Kept through `migrateProject`, series episode projects (`buildSegmentProject`
+  copies `format`) and part splits (`buildPartProject` keeps the kept shots'
+  screens and panel images).
+
+**Modules (`src/lib/novel/`).**
+- `layout.js`: the 1080×1920 screen geometry and the four layout templates
+  (Two tiers, Three tiers, Hero + pair, Pair + hero) with their use. It also
+  places balloons. Dialogue is Comic Sans at one size (34 px in screen units)
+  everywhere, and the balloon is measured and wrapped to its text. The
+  caption line holds up to two lines and is cut with an ellipsis beyond.
+  Panels are drawn at the nearest model ratio and cover-cropped.
+- `model.js`: screens, panels, balloons, normalisation and the feed order.
+  A shot never planned shows two tiers with its dialogue.
+- `rules.js`: the Stage 4 note (one shot = one comic screen of 2–3 beats),
+  the panel composition rules (Z reading order, first speaker on the left,
+  framing variety, establishing panel, 180° rule, the hero panel for the big
+  beat, the last panel as the scroll hook, composition fitted to wide or tall
+  boxes, clear upper third for balloons), the default comic image style and
+  the no-lettering rule.
+- `plan.js`: the composition planner. One text-model call per scene or per
+  screen picks a template per screen and writes each panel's framing,
+  characters, English image prompt, caption and balloons. Balloons hold the
+  script's lines verbatim, in the project language. Panel ids are kept, so
+  images stay with their panels. `lostLines` warns when a script line is
+  missing from the balloons.
+- `images.js`: the panel image prompt. It carries the style (the project's
+  image style, or the default comic style), framing and composition, a clear
+  upper third when the panel has balloons, the photos of the characters it
+  names and of the scene's place, the panel ratio and the no-lettering rule.
+  It is routed to Gemini, ComfyUI or Krea like the rest of the app.
+- `render.js`: draws a screen on canvas from the same geometry as the
+  preview. Export comic writes 1080×1920 PNGs in reading order to
+  `<projects folder>/<project>/comic/` in the desktop app, or downloads a
+  ZIP in a browser.
+
+**Stage 5 layout (`src/stages/NovelStage.jsx`).** A vertical timeline on the
+left scrolls through every screen as the reader will see it, grouped by
+scene with sticky headers. The selected screen's options sit to the right:
+- the shot's script;
+- the composition tool, with the four templates as diagrams and their use;
+- the editable preview, where you click a panel to edit it and drag a
+  balloon to move it ("Auto place" puts it back);
+- panel tabs with Draw / Redraw, Upload, remove image, framing, characters,
+  image prompt, caption and balloons (speaker, line, tail direction).
+
+The toolbar has Plan scene, Draw scene (queued, with Stop), Export comic and
+a drawn-panels counter. The screen header has Plan screen and Draw screen.
+`components/NovelScreen.jsx` is the SVG renderer shared by the feed and the
+editor.
+
+**Elsewhere.** Stage 4 tells the shot writer each shot is one comic screen
+(`stage4Prompt`, novel only). The project settings show the template name.
+
+**Verified** in the dev app with stubbed text and image models. Planning a
+scene gave its layouts, panels, captions and balloons. Draw scene made all 6
+panels at the right ratios (1:1 and 2:3), stored as media records. The
+exported PNG matched the preview. Layout switching kept the hidden panel and
+its image. Balloon drag stored its position. A new Graphic novel project was
+created as series, v2, 9:16 with "Comic" as Stage 5. Episode and part
+projects keep the format.
+
+**Not included.** The agent API has no comic tools yet, and
+`storyreel_create_project` cannot make a graphic novel.
+
+**Files.** `src/lib/novel/*` (new), `src/components/NovelScreen.jsx` (new),
+`src/stages/NovelStage.jsx` (new), `src/pages/Project.jsx`,
+`src/pages/Home.jsx`, `src/components/NewProjectModal.jsx`,
+`src/components/ProjectSettingsModal.jsx`, `src/lib/storage.js`,
+`src/lib/projectFiles.js`, `src/lib/series.js`, `src/lib/split.js`,
+`src/lib/prompts.js`, `src/lib/i18n.js`, `src/styles.css`.

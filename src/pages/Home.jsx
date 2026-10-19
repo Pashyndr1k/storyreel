@@ -63,8 +63,10 @@ export default function Home({
 
   const create = (title, logline, type, aspectRatio, episodeCount, episodeSeconds = 0) => {
     // both drama templates are series projects; the template picks the engine
-    const scriptType = type === 'series2' ? 'series' : type;
-    const dramaEngine = type === 'series2' ? 'v2' : 'v1';
+    const scriptType = type === 'series2' || type === 'novel' ? 'series' : type;
+    // the graphic novel develops its story like Short Drama 2
+    const dramaEngine = type === 'series2' || type === 'novel' ? 'v2' : 'v1';
+    const format = type === 'novel' ? 'novel' : 'video';
     // a series starts with the Short Drama Series rules from the style library
     const p = newProject({
       title,
@@ -75,8 +77,9 @@ export default function Home({
       episodeSeconds,
       scriptStyleId: scriptType === 'series' ? SHORT_DRAMA_STYLE_ID : '',
       dramaEngine,
+      format,
     });
-    appLog('project.create', { projectId: p.id, title: p.title, scriptType, dramaEngine, aspectRatio, episodeCount: p.episodeCount || 0 });
+    appLog('project.create', { projectId: p.id, title: p.title, scriptType, dramaEngine, format, aspectRatio, episodeCount: p.episodeCount || 0 });
     setProjects((ps) => [p, ...ps]);
     setShowNew(false);
     onOpen(p.id);

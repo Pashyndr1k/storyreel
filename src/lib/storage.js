@@ -7,6 +7,7 @@ import { sanitizeMethods } from './randomization.js';
 import { normalizeOriginality, normalizeDice, normalizeStructureDie, normalizeInterview } from './originality.js';
 import { normalizeSubtitles, DEFAULT_SUB_STYLE } from './subtitles.js';
 import { MAX_PROJECT_LOG } from './actionLog.js';
+import { normalizeNovel } from './novel/model.js';
 
 const LEGACY_PROJECTS_KEY = 'storyreel.projects.v1'; // pre-1.3.0 localStorage store
 const SETTINGS_KEY = 'storyreel.settings.v1';
@@ -305,6 +306,9 @@ function projectDefaults() {
     id: uid(),
     schemaVersion: SCHEMA_VERSION,
     title: 'Untitled project',
+    format: 'video', // 'video' | 'novel' — a graphic novel builds comic screens at Stage 5 (lib/novel)
+    novel: { screens: {} }, // graphic novel: shotId -> comic screen (layout, panels, balloons, captions)
+    panelImages: {}, // graphic novel: panelId -> panel image (data URL)
     genres: [],
     createdAt: Date.now(),
     updatedAt: Date.now(), // last content edit — drives the "last edited" sort
@@ -387,9 +391,10 @@ function projectDefaults() {
 
 const SCRIPT_TYPES = ['short', 'medium', 'long', 'series'];
 
-export function newProject({ title, logline, scriptType, aspectRatio, episodeCount = 0, episodeSeconds = 0, scriptStyleId = '', dramaEngine = 'v1' }) {
+export function newProject({ title, logline, scriptType, aspectRatio, episodeCount = 0, episodeSeconds = 0, scriptStyleId = '', dramaEngine = 'v1', format = 'video' }) {
   return {
     ...projectDefaults(),
+    format: format === 'novel' ? 'novel' : 'video',
     dramaEngine: dramaEngine === 'v2' ? 'v2' : 'v1',
     title: (title || '').trim() || 'Untitled project',
     logline: logline || '',
@@ -455,6 +460,9 @@ export function migrateProject(raw) {
   p.parts = Array.isArray(p.parts) ? p.parts : [];
   p.breakdownMode = p.breakdownMode === 'extended' ? 'extended' : 'normal';
   p.dramaEngine = p.dramaEngine === 'v2' ? 'v2' : 'v1';
+  p.format = p.format === 'novel' ? 'novel' : 'video';
+  p.novel = normalizeNovel(p.novel);
+  p.panelImages = p.panelImages && typeof p.panelImages === 'object' ? p.panelImages : {};
   p.partInfo = p.partInfo && typeof p.partInfo === 'object' ? p.partInfo : null;
   p.shotSeedMode = p.shotSeedMode && typeof p.shotSeedMode === 'object' ? p.shotSeedMode : {};
   p.shotVideoEngines = p.shotVideoEngines && typeof p.shotVideoEngines === 'object' ? p.shotVideoEngines : {};

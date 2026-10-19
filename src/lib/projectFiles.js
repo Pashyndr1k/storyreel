@@ -44,6 +44,7 @@ export function splitProjectMedia(project) {
   lite.shotAudios = mapOf(project.shotAudios, 'aud', 'mp3');
   lite.shotAudioSrc = mapOf(project.shotAudioSrc, 'audsrc', 'mp3');
   lite.storyboards = mapOf(project.storyboards, 'sb', 'jpg');
+  lite.panelImages = mapOf(project.panelImages, 'panel', 'png');
   lite.shotImageHistory = {};
   for (const [k, arr] of Object.entries(project.shotImageHistory || {})) {
     lite.shotImageHistory[k] = (arr || []).map((v, i) =>
@@ -106,6 +107,7 @@ export function mergeProjectMedia(lite, getDataURL) {
   p.shotAudios = mapOf(p.shotAudios);
   p.shotAudioSrc = mapOf(p.shotAudioSrc);
   p.storyboards = mapOf(p.storyboards);
+  p.panelImages = mapOf(p.panelImages);
   p.shotImageHistory = {};
   for (const [k, arr] of Object.entries(lite.shotImageHistory || {})) {
     p.shotImageHistory[k] = (arr || []).map(get).filter(Boolean);

@@ -6,6 +6,8 @@ import Stage2 from '../stages/Stage2.jsx';
 import Stage3 from '../stages/Stage3.jsx';
 import Stage4 from '../stages/Stage4.jsx';
 import Stage6 from '../stages/Stage6.jsx';
+import NovelStage from '../stages/NovelStage.jsx';
+import { isNovel } from '../lib/novel/model.js';
 import { exportProjectZip } from '../lib/projectFiles.js';
 import { useI18n } from '../lib/i18n.js';
 import { useLibrarySync } from '../lib/useLibrarySync.js';
@@ -41,7 +43,7 @@ export default function Project({ project, updateProject, settings, setSettings,
   };
   const [staleFrom, setStaleFrom] = useState(null);
 
-  const STAGES = Array.from({ length: STAGE_COUNT }, (_, i) => i + 1).map((n) => ({ n, label: t(`stages.${n}`) }));
+  const STAGES = Array.from({ length: STAGE_COUNT }, (_, i) => i + 1).map((n) => ({ n, label: n === STAGE_COUNT && isNovel(project) ? t('nv.stage') : t(`stages.${n}`) }));
 
   // One global language drives both the UI and script generation (prompts for
   // image/video generation stay English). Already-generated text is untouched.
@@ -219,7 +221,7 @@ export default function Project({ project, updateProject, settings, setSettings,
       {view === 3 && <Stage3 {...stageProps} />}
       {view === 4 && <Stage4 {...stageProps} />}
       {/* 2.5: generation and assembly share one workspace */}
-      {view === 5 && <Stage6 {...stageProps} />}
+      {view === 5 && (isNovel(project) ? <NovelStage {...stageProps} /> : <Stage6 {...stageProps} />)}
 
       {staleFrom !== null && staleFrom < project.stage && !settings.hideStaleToast && (
         <div className="stale-toast">

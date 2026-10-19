@@ -82,7 +82,7 @@ export default function ProjectSettingsModal({ project, update, styles, setStyle
         {project.scriptType === 'series' && (
           <>
             <label className="section-label">{t('pset.template')}</label>
-            <p className="hint" title={t('pset.templateTip')}>{t(project.dramaEngine === 'v2' ? 'new.type_series2' : 'new.type_series')} · {t(project.dramaEngine === 'v2' ? 'new.typeHint_series2' : 'new.typeHint_series')}</p>
+            <p className="hint" title={t('pset.templateTip')}>{t(project.format === 'novel' ? 'new.type_novel' : project.dramaEngine === 'v2' ? 'new.type_series2' : 'new.type_series')} · {t(project.format === 'novel' ? 'new.typeHint_novel' : project.dramaEngine === 'v2' ? 'new.typeHint_series2' : 'new.typeHint_series')}</p>
           </>
         )}
         <label className="section-label">{t('pset.styles')}</label>
