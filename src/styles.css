@@ -4268,3 +4268,14 @@ select.prompt-model:hover:not(:disabled) { border-color: var(--ink); color: var(
 
 /* subtitles: the line is there from the start; words fill in as they are spoken */
 .sub-text .sub-w.faint { opacity: 0.28; }
+
+/* a project whose media is being read (lazy media) */
+.app-opening {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted, #8a8a8a);
+  font-size: 14px;
+  letter-spacing: 0.02em;
+}

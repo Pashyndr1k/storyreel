@@ -1,5 +1,5 @@
 import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIR, DEFAULT_PROJECTS_DIR, DEFAULT_CLAUDE_MODEL, CLAUDE_MODELS, CLAUDE_MODEL_SUCCESSORS, DEFAULT_IMAGE_MODEL, LEGACY_IMAGE_MODELS, DEFAULT_KLING_MODEL, STAGE_COUNT, MAX_IMAGE_VERSIONS } from './config.js';
-import { idbGetAll, idbMediaGetAll, idbSaveProjects, idbDeleteProjects, idbPutMany, mediaKey } from './idb.js';
+import { idbGetAll, idbMediaKeys, idbMediaGetProject, idbMediaGet, idbSaveProjects, idbDeleteProjects, idbPutMany, mediaKey } from './idb.js';
 import { splitProjectMedia, mergeProjectMedia } from './projectFiles.js';
 import { isValidAspect } from './aspect.js';
 import { normalizeSceneLocations } from './sceneLocations.js';
@@ -44,25 +44,82 @@ function readLegacy() {
   }
 }
 
+// ---- lazy media ------------------------------------------------------------
+// Start-up reads the media-free project records and only the KEYS of the media
+// store. A project that owns media starts "cold": its media slots still hold
+// "file:<name>" references and it carries _cold. Opening it (hydrateProject)
+// reads that one project's records. Saving a cold project is safe: a
+// "file:<name>" slot counts as stored, so nothing is deleted or rewritten.
+export const isCold = (p) => !!p?._cold;
+
+// projectId -> Map<name, dataURL> of the projects hydrated this session
+// (storedMedia doubles as that cache)
+async function mediaMapOf(projectId, { cache = true } = {}) {
+  if (storedMedia.has(projectId)) return storedMedia.get(projectId);
+  const rows = await idbMediaGetProject(projectId);
+  const map = new Map(rows.map((m) => [m.name, m.dataURL]));
+  if (cache) storedMedia.set(projectId, map);
+  return map;
+}
+
+const warm = (p, map) => {
+  const full = mergeProjectMedia(p, (name) => map.get(name) || '');
+  delete full._cold;
+  return full;
+};
+
+// The project with its media. { cache: false } reads it for one job (backup,
+// export, duplicate, library rebuild) without keeping it in memory.
+export async function hydrateProject(p, { cache = true } = {}) {
+  if (!isCold(p) || idbBroken) return p;
+  return warm(p, await mediaMapOf(p.id, { cache }));
+}
+
+// Synchronous form for a project whose media is already in memory (a newer
+// edit of a project hydrated a moment ago); null when it is not.
+export function hydrateCached(p) {
+  if (!isCold(p)) return p;
+  const map = storedMedia.get(p.id);
+  return map ? warm(p, map) : null;
+}
+
+// A hydrated project holds exactly what is stored: no save is needed for it
+// (unless the cold version it replaces had unsaved edits).
+export function noteHydrated(cold, full) {
+  if (lastSaved.get(cold.id) === cold) lastSaved.set(cold.id, full);
+}
+
+// One "file:<name>" reference resolved (a home card's poster), cached.
+const refCache = new Map();
+export function mediaRefURL(projectId, ref) {
+  if (typeof ref !== 'string' || !ref.startsWith('file:')) return Promise.resolve(ref || null);
+  const name = ref.slice(5);
+  const key = mediaKey(projectId, name);
+  if (storedMedia.get(projectId)?.has(name)) return Promise.resolve(storedMedia.get(projectId).get(name));
+  if (!refCache.has(key)) refCache.set(key, idbMediaGet(projectId, name).then((m) => m?.dataURL || null).catch(() => null));
+  return refCache.get(key);
+}
+
+// the "file:<name>" references a lite record holds
+const refsOf = (lite) => [...JSON.stringify(lite).matchAll(/"file:([^"]+)"/g)].map((m) => m[1]);
+
 export async function loadProjects() {
   let list;
   try {
     list = await idbGetAll();
-    // v3: the media of each project comes from its own records
-    const byProject = new Map();
-    for (const m of await idbMediaGetAll()) {
-      if (!byProject.has(m.projectId)) byProject.set(m.projectId, new Map());
-      byProject.get(m.projectId).set(m.name, m.dataURL);
-    }
-    storedMedia = byProject;
+    // v3: the media of each project lives in its own records — only their
+    // keys are read here; a project's media is read when it is opened
+    const owners = new Set();
+    for (const k of await idbMediaKeys()) owners.add(String(k).split('\u0000')[0]);
+    storedMedia = new Map();
+    refCache.clear();
     needsSplit.clear();
     list = list.map((lite) => {
-      const media = byProject.get(lite.id);
-      if (!media) {
+      if (!owners.has(lite.id)) {
         needsSplit.add(lite.id); // the old whole-record form (or a project without media)
         return lite;
       }
-      return mergeProjectMedia(lite, (name) => media.get(name) || '');
+      return { ...lite, _cold: true };
     });
     if (!list.length) {
       // One-time migration from the pre-1.3.0 localStorage store.
@@ -106,17 +163,22 @@ export async function saveProjects(projects) {
     if (pending) changed.push(pending);
     const removed = [...lastSaved.keys()].filter((id) => !next.has(id));
     const items = changed.map((p) => {
-      const { lite, files } = splitProjectMedia(p);
+      const { lite: split, files } = splitProjectMedia(p);
+      const { _cold, ...lite } = split; // the flag is session state, not stored
       const prev = storedMedia.get(p.id) || new Map();
       const now = new Map(files.map((f) => [f.name, f.dataURL]));
+      // a slot still holding "file:<name>" (media not loaded) is stored as is
+      for (const name of refsOf(lite)) if (!now.has(name)) now.set(name, prev.get(name));
       const mediaPut = files.filter((f) => prev.get(f.name) !== f.dataURL).map((f) => ({ key: mediaKey(p.id, f.name), projectId: p.id, name: f.name, dataURL: f.dataURL }));
-      const mediaDelete = [...prev.keys()].filter((n) => !now.has(n)).map((n) => mediaKey(p.id, n));
-      return { id: p.id, lite, mediaPut, mediaDelete, now };
+      // only a hydrated project knows its stored media, so only it deletes any
+      const mediaDelete = storedMedia.has(p.id) ? [...prev.keys()].filter((n) => !now.has(n)).map((n) => mediaKey(p.id, n)) : [];
+      return { id: p.id, lite, mediaPut, mediaDelete, now, known: storedMedia.has(p.id) || !isCold(p) };
     });
     await idbSaveProjects(items);
     await idbDeleteProjects(removed);
     for (const it of items) {
-      storedMedia.set(it.id, it.now);
+      // a cold project stays unknown: its stored set is still unread
+      if (it.known) storedMedia.set(it.id, it.now);
       needsSplit.delete(it.id);
     }
     for (const id of removed) storedMedia.delete(id);

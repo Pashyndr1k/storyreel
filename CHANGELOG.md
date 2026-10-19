@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Much faster start-up.** The app no longer reads every image, video and
+  audio file of every project when it starts. Projects open with their
+  media read on demand, home cards load their posters in the background,
+  and memory use drops to the projects you actually open.
+
 ## 2.19.2 — 2026-10-16
 
 - **H3 sound rule is enforced.** The H3 prompt writer now follows a binding

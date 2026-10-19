@@ -11,7 +11,7 @@ import { POLICY_EVENT } from './lib/policy.js';
 import { useAgentScope } from './lib/agent/registry.js';
 import { callAgent, toolList } from './lib/agent/api.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
-import { loadProjects, saveProjects, loadSettings, saveSettings, hasStoredSettings, migrateProject } from './lib/storage.js';
+import { loadProjects, saveProjects, loadSettings, saveSettings, hasStoredSettings, migrateProject, isCold, hydrateProject, hydrateCached, noteHydrated } from './lib/storage.js';
 import { vaultAvailable, vaultRoot, vaultReadLibrary, vaultWriteLibrary, vaultReadJson, vaultWriteJson, settingsForVault } from './lib/vault.js';
 import { loadStyles, saveStyles, absorbLegacyStyles, hasStoredStyles } from './lib/styles.js';
 import { checkForUpdate } from './lib/updateCheck.js';
@@ -47,6 +47,28 @@ export default function App() {
   const { t } = i18n;
 
   const mirroredRef = useRef(new Map()); // projectId -> last mirrored object
+  const projectsRef = useRef(projects);
+  projectsRef.current = projects;
+
+  // Projects load without their media (lib/storage.js, lazy media): a
+  // project's images, videos and audio are read when it is opened, or when
+  // the agent works on it. Returns true when media was loaded.
+  const hydrateInState = async (id) => {
+    const p = projectsRef.current.find((x) => x.id === id);
+    if (!p || !isCold(p)) return false;
+    await hydrateProject(p);
+    setProjectsRaw((ps) =>
+      ps.map((x) => {
+        if (x.id !== id || !isCold(x)) return x;
+        const full = hydrateCached(x);
+        if (!full) return x;
+        noteHydrated(x, full);
+        if (mirroredRef.current.get(id) === x) mirroredRef.current.set(id, full);
+        return full;
+      })
+    );
+    return true;
+  };
 
   // Load projects from IndexedDB (with one-time localStorage migration), then
   // absorb any pre-1.4.0 per-project prompts into the shared style library.
@@ -105,13 +127,25 @@ export default function App() {
   // the library existed) gets the entries its cards imply — characters,
   // locations and story assets with photos — so shots that reference them by
   // id and the asset picker work again.
+  // A project without media in memory is checked on its references first and
+  // read only when it really has entries to give.
   useEffect(() => {
     if (!loaded || !libLoaded || !vaultChecked) return;
-    const add = rebuildLibraryFromProjects(projects, library);
-    if (!add.length) return;
-    appLog('library.rebuild', { entries: add.length, projects: [...new Set(add.map((e) => e.projectId))].length });
-    setLibrary((prev) => [...prev, ...add.filter((e) => !prev.some((x) => x.id === e.id))]);
-    for (const e of add) persistLibraryEntry(e);
+    let alive = true;
+    (async () => {
+      const owners = new Set(rebuildLibraryFromProjects(projects, library).map((e) => e.projectId));
+      if (!owners.size) return;
+      const full = [];
+      for (const p of projects) if (owners.has(p.id)) full.push(isCold(p) ? await hydrateProject(p, { cache: false }) : p);
+      const add = rebuildLibraryFromProjects(full, libraryRef.current);
+      if (!alive || !add.length) return;
+      appLog('library.rebuild', { entries: add.length, projects: [...new Set(add.map((e) => e.projectId))].length });
+      setLibrary((prev) => [...prev, ...add.filter((e) => !prev.some((x) => x.id === e.id))]);
+      for (const e of add) persistLibraryEntry(e);
+    })();
+    return () => {
+      alive = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, libLoaded, vaultChecked]);
 
@@ -122,7 +156,9 @@ export default function App() {
   const backupAllProjects = async () => {
     for (const p of projects) {
       mirroredRef.current.set(p.id, p);
-      await mirrorProjectToDisk(settingsRef.current, p, p.lang || settingsRef.current.lang);
+      // a project not opened this session is read for its folder only
+      const full = isCold(p) ? await hydrateProject(p, { cache: false }) : p;
+      await mirrorProjectToDisk(settingsRef.current, full, p.lang || settingsRef.current.lang);
     }
   };
 
@@ -375,6 +411,7 @@ export default function App() {
     updateProject: (id, patch) => updateProject(id, patch),
     addProjects: (list) => setProjects((ps) => [...list, ...ps]),
     openProject: (id) => setRoute((r) => (r.name === 'project' && r.id === id ? r : { name: 'project', id })),
+    ensureHydrated: hydrateInState,
   });
   useEffect(() => {
     // dev and tests reach the same entry point without the server
@@ -392,6 +429,16 @@ export default function App() {
   };
 
   const current = route.name === 'project' ? projects.find((p) => p.id === route.id) : null;
+  // the open project's media is read when it opens (and again after an undo
+  // that brings back its media-free version — from memory then)
+  const currentCold = !!current && isCold(current);
+  const [openError, setOpenError] = useState(null);
+  useEffect(() => {
+    if (!currentCold) return;
+    setOpenError(null);
+    hydrateInState(current.id).catch((e) => setOpenError(e?.message || String(e)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id, currentCold]);
 
   return (
     <I18nContext.Provider value={i18n}>
@@ -446,7 +493,12 @@ export default function App() {
           onSettings={() => setShowSettings(true)}
         />
       )}
-      {loaded && route.name === 'project' && current && (
+      {loaded && route.name === 'project' && currentCold && (
+        <div className="app-opening" title={t('app.openingHint')}>
+          {openError ? t('app.openFailed', { error: openError }) : t('app.opening', { title: current.title || '' })}
+        </div>
+      )}
+      {loaded && route.name === 'project' && current && !currentCold && (
         <Project
           project={current}
           updateProject={updateProject}

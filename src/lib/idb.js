@@ -109,6 +109,37 @@ export async function idbMediaGetAll() {
   });
 }
 
+// The keys of the media store only — which projects own media — without
+// reading a single blob (start-up reads these, not the gigabytes behind them).
+export async function idbMediaKeys() {
+  const db = await open();
+  return new Promise((resolve, reject) => {
+    const r = db.transaction(MEDIA_STORE, 'readonly').objectStore(MEDIA_STORE).getAllKeys();
+    r.onsuccess = () => resolve(r.result || []);
+    r.onerror = () => reject(r.error);
+  });
+}
+
+// Every media record of one project (its key range).
+export async function idbMediaGetProject(projectId) {
+  const db = await open();
+  return new Promise((resolve, reject) => {
+    const r = db.transaction(MEDIA_STORE, 'readonly').objectStore(MEDIA_STORE).getAll(mediaRange(projectId));
+    r.onsuccess = () => resolve(r.result || []);
+    r.onerror = () => reject(r.error);
+  });
+}
+
+// One media record (a card's poster).
+export async function idbMediaGet(projectId, name) {
+  const db = await open();
+  return new Promise((resolve, reject) => {
+    const r = db.transaction(MEDIA_STORE, 'readonly').objectStore(MEDIA_STORE).get(mediaKey(projectId, name));
+    r.onsuccess = () => resolve(r.result || null);
+    r.onerror = () => reject(r.error);
+  });
+}
+
 // Save projects in one transaction: each item is { lite, mediaPut, mediaDelete }
 // — the media-free record, the media records to write (new or changed) and
 // the media keys to remove. All or nothing per call.

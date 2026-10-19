@@ -987,6 +987,12 @@ export async function callAgent(method, params = {}) {
   if (!readOnly) running = method;
   if (!readOnly) appLog('agent.call', { tool: method, ...(params?.projectId ? { projectId: params.projectId } : {}), ...(params?.shotId ? { shotId: params.shotId } : {}), ...(params?.kind ? { kind: params.kind } : {}) });
   try {
+    // projects keep their media on disk until opened: load the ones this call names
+    let loadedMedia = false;
+    for (const [k, v] of Object.entries(params || {})) {
+      if (/projectId$/i.test(k) && typeof v === 'string' && (await agentScope('app')?.ensureHydrated?.(v))) loadedMedia = true;
+    }
+    if (loadedMedia) await settle();
     const result = await inAgentCall(() => tool.run(params || {}));
     return { ok: true, result };
   } catch (e) {

@@ -1,7 +1,8 @@
 import { scenePhotos } from '../lib/sceneLocations.js';
 import { STAGE_COUNT } from '../lib/config.js';
 import { useI18n, localeOf } from '../lib/i18n.js';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { mediaRefURL } from '../lib/storage.js';
 import { Copy, Archive as ArchiveIcon, Trash, RestoreIcon, Star, Download } from './icons.jsx';
 
 // Prefer the generated cover; fall back to the first reference photo.
@@ -38,7 +39,20 @@ export default function ProjectCard({ project, onOpen, onArchive, onRestore, onD
     day: '2-digit',
     year: 'numeric',
   });
-  const poster = posterOf(project);
+  // a project not opened this session holds "file:<name>" here: its one
+  // poster image is read in the background, the card shows at once
+  const rawPoster = posterOf(project);
+  const isRef = typeof rawPoster === 'string' && rawPoster.startsWith('file:');
+  const [refPoster, setRefPoster] = useState(null);
+  useEffect(() => {
+    if (!isRef) return;
+    let alive = true;
+    mediaRefURL(project.id, rawPoster).then((u) => alive && setRefPoster(u));
+    return () => {
+      alive = false;
+    };
+  }, [project.id, rawPoster, isRef]);
+  const poster = isRef ? refPoster : rawPoster;
   const stage = Math.max(1, Math.min(project.stage || 1, STAGE_COUNT));
 
   const act = (fn) => (e) => {

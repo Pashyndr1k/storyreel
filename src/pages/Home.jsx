@@ -7,7 +7,7 @@ import AppShell from '../components/AppShell.jsx';
 import Dropdown from '../components/Dropdown.jsx';
 import { Upload, Plus, Search } from '../components/icons.jsx';
 import Logo from '../components/Logo.jsx';
-import { newProject, uid, migrateProject } from '../lib/storage.js';
+import { newProject, uid, migrateProject, hydrateProject } from '../lib/storage.js';
 import { parseProjectFile } from '../lib/exportScript.js';
 import { importProjectZip, exportProjectZip } from '../lib/projectFiles.js';
 import { useI18n } from '../lib/i18n.js';
@@ -82,12 +82,18 @@ export default function Home({
     onOpen(p.id);
   };
 
+  // a project not opened this session has its media read for the ZIP
+  const exportZip = (p) =>
+    hydrateProject(p, { cache: false })
+      .then((full) => exportProjectZip(full, lang))
+      .catch((e) => window.alert(e.message || String(e)));
+
   const del = (p) => {
     if (window.confirm(t('confirm.delete', { title: p.title }))) removeProject(p.id);
   };
 
-  const duplicate = (p) => {
-    const copy = structuredClone(p);
+  const duplicate = async (p) => {
+    const copy = structuredClone(await hydrateProject(p, { cache: false }));
     copy.id = uid();
     copy.createdAt = Date.now();
     copy.archived = false;
@@ -199,7 +205,7 @@ export default function Home({
                 onOpen={() => onOpen(x.id)}
                 onArchive={() => updateProject(x.id, { archived: true }, { touch: false })}
                 onPin={() => updateProject(x.id, { pinned: !x.pinned }, { touch: false })}
-                onExport={() => exportProjectZip(x, lang).catch((e) => window.alert(e.message || String(e)))}
+                onExport={() => exportZip(x)}
                 onDuplicate={() => duplicate(x)}
                 onDelete={() => del(x)}
                 {...extra}
@@ -227,7 +233,7 @@ export default function Home({
             open: (id) => onOpen(id),
             archive: (p) => updateProject(p.id, { archived: true }, { touch: false }),
             pin: (p) => updateProject(p.id, { pinned: !p.pinned }, { touch: false }),
-            exportZip: (p) => exportProjectZip(p, lang).catch((e) => window.alert(e.message || String(e))),
+            exportZip,
             duplicate,
             remove: del,
           }}
